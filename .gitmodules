@@ -1,0 +1,3 @@
+[submodule "MammalianSecretoryRecon"]
+	path = MammalianSecretoryRecon
+	url = https://github.com/LewisLabUCSD/MammalianSecretoryRecon

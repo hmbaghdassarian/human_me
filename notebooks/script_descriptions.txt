@@ -1,0 +1,2 @@
+1) build_psim.ipynb #generates a PSIM of all relevant machinery and secreted protein (only with signal peptides)
+2) gene_information.ipynb # class for compiling all necessary information of a gene for expressing it in a ME model 
