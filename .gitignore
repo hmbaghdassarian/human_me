@@ -1,6 +1,7 @@
 # Byte-compiled / optimized / DLL files
 .env
 data/
+notebooks/.pybiomart.sqlite
 #__pycache__/
 #*.py[cod]
 
