@@ -1,2 +1,6 @@
-1) build_psim.ipynb #generates a PSIM of all relevant machinery and secreted protein (only with signal peptides)
-2) gene_information.ipynb # class for compiling all necessary information of a gene for expressing it in a ME model 
+1) load_environmental_variables # gets .env variables 
+2) download_data.ipynb # download all relevant data from google drive or public
+3) preliminary_cost_estimation # preliminary machinery and ATP cost of E-rxns
+4) build_psim.ipynb #generates a PSIM of all relevant machinery and secreted protein (only with signal peptides)
+5) gene_information.ipynb # class for compiling all necessary information of a gene for expressing it in a ME model
+6) build_expression_reactions # creates all expression reactions necessary for ME model 
