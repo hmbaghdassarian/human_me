@@ -16,37 +16,7 @@ import requests, sys, json, re, warnings
 import sys
 sys.path.insert(1, '../scripts/') # comment out in python script
 from load_environmental_variables import *
-
-
-# In[9]:
-
-
-# define necessary variables 
-compartments = {'c': 'cytosol',  'l': 'lysosome', 'm': 'mitochondria', 'r': 'endoplasmic reticulum', 
-                'e': 'extracellular space', 'x': 'peroxisome/glyoxysome', 'n': 'nucleus', 'g': 'golgi apparatus',
-                'i': 'inner mitochondrial compartment', 'pm': 'plasma membrane'}
-allowed_ptms = {'dsb': 'disulfide bond formation', 'gpi': 'GPI Anchor', 
-               'ng': 'N-linked glycosylation', 'og': 'O-linked glycosylation'}
-
-amino_acids = ['A', 'R', 'N', 'D', 'B', 'C', 'E', 'Q', 'Z', 'G', 'H', 'I', 'L', 'K', 'M', 'F', 
-              'P', 'S', 'T', 'W', 'Y', 'V']
-
-human_model = cobra.io.load_json_model(local_data_path + 'processed/corrected_recon2_2.json')
-atp_n = human_model.metabolites.get_by_id('atp[n]')
-gtp_n = human_model.metabolites.get_by_id('gtp[n]')
-seq_metabolite_map = {human_model.metabolites.get_by_id('utp[n]'): 'U' , 
-                      gtp_n: 'G',
-                      human_model.metabolites.get_by_id('ctp[n]'): 'C',
-                      atp_n: 'A'}
-
-seq_element_map = dict()
-
-for k,v in seq_metabolite_map.items():
-    elements = k.elements
-    elements['O'] = elements['O'] - 7 # lost from incoming ntp
-    elements['P'] = elements['P'] - 2 # lost from incoming ntp
-    elements['H'] = elements['H'] - 1 # lost from 3' end of growing strand
-    seq_element_map[v] = elements
+from utils import *
 
 
 # In[44]:
@@ -66,21 +36,30 @@ class gene_information():
                  premrna_seq = None, mrna_seq = None, protein_seq = None,
                  ptms = {}, tmd = 0, sp = False, keff = None, polyA_length = None, n_introns = None):
         '''
-        1) Metabolic model is a cobrapy model. 
-        2) HGNC ID is a string in the format HGNC:####.
         
-        3) PTMs is a dictionary with keys as the ptm and values as the number of that ptm for that gene.
-        PTMs are not currently considered for machinery. 
-               
-        4) TMD is an integer indicating the number of transmembrane domains the protein has. This is only relevant
-        for proteins processed into secretory pathway. 
+        1) Metabolic model is a cobrapy model - required. 
         
-        5) SP is a boolean indicating whether a protein has a signal peptide.
+        2) HGNC ID is a string in the format HGNC:#### - required.
         
-        6) keff is a float representing the kinetic constant the enzyme in [units].
+        3-5) Relevant string representing sequence - required
         
-        7) polyA_length is a float representing the length of the polyA tail. This information will be estimated
-        if not provided.'''
+        6) PTMs is a dictionary with keys as the ptm and values as the number of that ptm for that gene.
+        PTMs are not currently considered for machinery. - optional
+        
+        7) TMD is an integer indicating the number of transmembrane domains the protein has. This is only relevant
+        for proteins processed into secretory pathway. - optional
+        
+        8) SP is a boolean indicating whether a protein has a signal peptide. 
+        Not used in current format - unimplemented
+        
+        9) keff is a float representing the kinetic constant the enzyme in [units]. - optional
+        10) polyA_length is an integer representing the length of the polyA tail. This information will be estimated
+        if not provided. - optional
+        
+        11) n_introns is an integer representing the length of the polyA tail. This information will be estimated
+        if not provided. Should be specific to the transcript isoform. - optional
+        
+        '''
         
         self.hgnc_id = hgnc_id
         
