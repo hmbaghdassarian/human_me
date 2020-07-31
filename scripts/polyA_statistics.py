@@ -25,7 +25,7 @@ def calculate_polyA_length(polyA_length = None):
          polyA_length = round(st.johnsonsu.rvs(loc=polyA_params[-2], scale=polyA_params[-1], *polyA_params[:-2]))
     else:
         if  polyA_length > min_polyA_mean:
-             polyA_length = round(polyA_mod.predict((polyA_length, 1)))
+             polyA_length = round(polyA_mod.predict((polyA_length, 1))[0])
         else:
              polyA_length = round( polyA_length)
     return polyA_length

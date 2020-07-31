@@ -1,14 +1,14 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[2]:
+# In[4]:
 
 
 import cobra
 import pandas as pd
 
 from Bio.Seq import Seq
-from Bio.Alphabet import generic_dna
+from Bio.Alphabet import generic_dna, generic_rna
 from Bio.SeqUtils import molecular_weight as calculate_molecular_weight
 
 import requests, sys, json, re, warnings
@@ -19,7 +19,7 @@ from load_environmental_variables import *
 from utils import *
 
 
-# In[44]:
+# In[1]:
 
 
 class gene_information():
@@ -33,7 +33,7 @@ class gene_information():
     
     
     def __init__(self, metabolic_model, hgnc_id, 
-                 premrna_seq = None, mrna_seq = None, protein_seq = None,
+                 premrna_seq, mrna_seq, protein_seq,
                  ptms = {}, tmd = 0, sp = False, keff = None, polyA_length = None, n_introns = None):
         '''
         
@@ -87,29 +87,34 @@ class gene_information():
         elif len(premrna_seq) == len(mrna_seq):
             if premrna_seq != mrna_seq:
                 raise ValueError('Premrna and mrna sequences are the same length, but not the same sequence')
-            if self.n_introns > 0:
-                raise ValueError('Premrna and mrna sequences are the same length, but you have indicated this is not an intronless gene')
-        else:
-            premrna_base_counts, mrna_base_counts = dict(), dict()
-            for base_letter in seq_element_map.keys():
-                premrna_base_counts[base_letter] = premrna_seq.count(base_letter)
-                mrna_base_counts[base_letter] = mrna_seq.count(base_letter)
-            for k,v in mrna_base_counts.items():
-                if v > premrna_base_counts[k]:
-                    raise ValueError('Number of ' + k + ' bases in premrna sequence less than that of mrna sequence')
+            if n_introns != None and n_introns > 0:
+                warning_ = 'Premrna and mrna sequences are the same length, but you have indicated this is' 
+                warning_ += 'not an intronless gene. Setting n_introns to None'
+                warnings.warn(warning_)
+                n_introns = None
+#         else:
+#             premrna_base_counts, mrna_base_counts = dict(), dict()
+#             for base_letter in seq_element_map.keys():
+#                 premrna_base_counts[base_letter] = premrna_seq.count(base_letter)
+#                 mrna_base_counts[base_letter] = mrna_seq.count(base_letter)
+#             for k,v in mrna_base_counts.items():
+#                 if v > premrna_base_counts[k]:
+#                     raise ValueError('Number of ' + k + ' bases in premrna sequence less than that of mrna sequence')
             
-            self.premrna_base_counts = premrna_base_counts
-            self.mrna_base_counts = mrna_base_counts
+#             self.premrna_base_counts = premrna_base_counts
+#             self.mrna_base_counts = mrna_base_counts
             
             
         if len(mrna_seq) < len(protein_seq)*3:
             warnings.warn('The mrna and protein sequence lengths are inconsistent')
         
-        self.premrna_seq = premrna_seq
-        self.mrna_seq = mrna_seq
+        self.premrna_seq = Seq(premrna_seq, generic_rna)
+        self.mrna_seq = Seq(mrna_seq, generic_rna)
         self.protein_seq = protein_seq
         
         self.protein_mass = calculate_molecular_weight(seq=self.protein_seq, seq_type='protein')
+        self.L_protein = len(self.protein_seq)
+        self.amino_acid_counts = {k: self.protein_seq.count(k) for k in amino_acids}
 
         self.ptms = ptms
         self.tmd = tmd
@@ -153,23 +158,23 @@ class gene_information():
             for r in rxns:
             # proteins can be associated with multiple locations due to multiple reactions, but for each reaction
             # we want that protein to be associated with one compartment
-                compartments = r.compartments.copy()
-                if len(compartments) == 1: # not needed but more efficient
-                    final_locations += list(compartments)
+                compartments_ = r.compartments.copy()
+                if len(compartments_) == 1: # not needed but more efficient
+                    final_locations += list(compartments_)
                     pass
-                elif len(compartments) == 2: # for reactions that occur in more than one compartment
-                    if 'c' in compartments: # remove cytoplasmic compartment between the two for machinery
-                        compartments.remove('c')
+                elif len(compartments_) == 2: # for reactions that occur in more than one compartment
+                    if 'c' in compartments_: # remove cytoplasmic compartment between the two for machinery
+                        compartments_.remove('c')
                     else: # choose compartment on reactant side if no cytoplasmic compartment
-                        reactant_compartments = set([m.compartment for m in r.reactants])
-                        if len(reactant_compartments) == 1:
-                            compartments = reactant_compartments
+                        reactant_compartments_ = set([m.compartment for m in r.reactants])
+                        if len(reactant_compartments_) == 1:
+                            compartments_ = reactant_compartments_
                         else:
-                            compartments = max(reactant_compartments, key = list(reactant_compartments).count)
-                elif len(compartments) > 2: # hardcoded for ASPGLUm reaction
-                    compartments = {'i'}
-                
-                final_locations += list(compartments)
+                            compartments_ = max(reactant_compartments_, key = list(reactant_compartments_).count)
+                elif len(compartments_) > 2: # hardcoded for ASPGLUm reaction
+                    compartments_ = {'i'}
+
+                final_locations += list(compartments_)
             final_locations = sorted(set(final_locations)) # redundancy from multiple reactions
 
                  
@@ -197,7 +202,7 @@ class gene_information():
                 # mitochondrial expression not considered
                 self.final_locations[loc] = 'Cytosolic Tranport'
                 if self.sp: 
-                    warnings.warng('Signal peptides not considered for these compartments')
+                    warnings.warn('Signal peptides not considered for these compartments')
             else:
                 self.final_locations[loc] = 'Canonical Secretion'
                 if not self.sp:
@@ -221,12 +226,15 @@ class gene_information():
                 warnings.warn('PTMs are not considered for machinery proteins currently')
             elif len(set(self.ptms.keys()).difference(allowed_ptms.keys())) > 0:
                 warnings.warn('Atleast one of the PTMs provided will not be considered in this model')
+                self.ptms = {k:v for k in self.ptms.keys() if k in allowed_ptms.keys()}
+
+
         print('No errors raised')
 
 
 # Usage
 
-# In[21]:
+# In[3]:
 
 
 # psim_me = pd.read_csv(local_data_path + 'processed/psim_me.csv', index_col = 0)
@@ -242,7 +250,7 @@ class gene_information():
 # psim_me.head()
 
 
-# In[23]:
+# In[4]:
 
 
 # gene1_id = human_model.genes[0].id
@@ -264,7 +272,7 @@ class gene_information():
 # polyA_length_ = psim_me.loc[idx, 'POLYA_LENGTH'].tolist()[0]
 
 
-# In[42]:
+# In[5]:
 
 
 # # initialize the gene class
@@ -282,7 +290,7 @@ class gene_information():
 # print(gene1.protein_mass)
 
 
-# In[38]:
+# In[6]:
 
 
 # # get the gene's final locations, final_locations list does not need to be specified for machinery
@@ -290,20 +298,8 @@ class gene_information():
 # print(gene1.final_locations)
 
 
-# In[39]:
+# In[7]:
 
 
 # gene1.check_gene_information()
-
-
-# In[ ]:
-
-
-
-
-
-# In[ ]:
-
-
-
 

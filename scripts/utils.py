@@ -12,9 +12,7 @@ sys.path.insert(1, '../scripts/') # comment out in python script
 from load_environmental_variables import *
 
 
-# Necessary variables and functions shared across scripts
-
-# Gene information variables
+# Gene information class variables
 
 # In[2]:
 
@@ -26,8 +24,7 @@ compartments = {'c': 'cytosol',  'l': 'lysosome', 'm': 'mitochondria', 'r': 'end
 allowed_ptms = {'dsb': 'disulfide bond formation', 'gpi': 'GPI Anchor', 
                'ng': 'N-linked glycosylation', 'og': 'O-linked glycosylation'}
 
-amino_acids = ['A', 'R', 'N', 'D', 'B', 'C', 'E', 'Q', 'Z', 'G', 'H', 'I', 'L', 'K', 'M', 'F', 
-              'P', 'S', 'T', 'W', 'Y', 'V']
+amino_acids = ['A', 'R', 'N', 'D', 'C', 'E', 'Q', 'G', 'H', 'I', 'L', 'K', 'M', 'F', 'P', 'S', 'T', 'W', 'Y', 'V']
 
 human_model = cobra.io.load_json_model(local_data_path + 'processed/corrected_recon2_2.json')
 atp_n = human_model.metabolites.get_by_id('atp[n]')
@@ -69,8 +66,7 @@ ec = rnap2['HGNC ID (gene)'].tolist() + elongin['HGNC ID (gene)'].tolist() + elo
 ec += tfiis + tfiif + ell + fact
 
 # processing variables------------------------------------------------------------
-# L_polyA_n = 250 # https://www.nature.com/articles/s41592-019-0503-y
-from polyA_statistics import calculate_polyA_length#, min_polyA_mean, polyA_params, polyA_mod, 
+ 
 pi_n =  human_model.metabolites.get_by_id('pi[n]')
 h_n =  human_model.metabolites.get_by_id('h[n]')
 h2o_n =  human_model.metabolites.get_by_id('h2o[n]')
@@ -147,10 +143,11 @@ deadenylation_machinery = [item for sublist in [v for v in deadenylation_machine
 mrna_degradation_machinery_1 = {"Exosome": exosome.loc[:, 'HGNC ID (gene)'].tolist(), 
                'Cap_Degradation': ['HGNC:29812']}
 mrna_degradation_machinery_1 = [item for sublist in [v for v in mrna_degradation_machinery_1.values()] for item in sublist]
+XRN1 = ['HGNC:30654']
 decapping_degradation_machinery = {'LSM1-7 Complex': ['HGNC:20472', 'HGNC:13940', 'HGNC:17874', 'HGNC:17259', 
                                    'HGNC:17162', 'HGNC:17017', 'HGNC:20470'],
                 'Decapping': ['HGNC:18714', 'HGNC:24451', 'HGNC:24452', 'HGNC:17157'], 
-               "5' Exonuclease": ['HGNC:30654']}
+               "5' Exonuclease": XRN1}
 decapping_degradation_machinery = [item for sublist in [v for v in decapping_degradation_machinery.values()] for item in sublist]
 degradation_rule1 = ' and '.join(deadenylation_machinery + mrna_degradation_machinery_1)
 decapping_rule = ' and '.join(deadenylation_machinery + decapping_degradation_machinery)
@@ -162,10 +159,11 @@ decapping_rule = ' and '.join(deadenylation_machinery + decapping_degradation_ma
 
 
 # variables needed
+atp_c = human_model.metabolites.get_by_id('atp[c]')
 ntp_map_c = {'C': human_model.metabolites.get_by_id('ctp[c]'), 
              'U': human_model.metabolites.get_by_id('utp[c]'), 
              'G': human_model.metabolites.get_by_id('gtp[c]'), 
-             'A': human_model.metabolites.get_by_id('atp[c]')}
+             'A': atp_c}
 ntp_map_n = {v:k for k,v in seq_metabolite_map.items()}
 
 # 5s rrna
@@ -195,12 +193,97 @@ ISG20L2 = ['HGNC:25745']
 ERI1 = ['HGNC:23994']
 
 
+# trna variables
+
+# In[ ]:
+
+
+# add to utils
+allowed_trna_modifications = {}
+
+TRNT1 = ['HGNC:17341']
+RNASEP = ['HGNC:30129', 'HGNC:30329', 'HGNC:30081', 'HGNC:17689', 'HGNC:19949', 'HGNC:21300',
+         'HGNC:17688', 'HGNC:20992', 'HGNC:30361', 'HGNC:30327']
+RNASEZ = ['HGNC:14198']
+trna_splicing_machinery = ['HGNC:28422', 'HGNC:16791', 'HGNC:15506', 'HGNC:27561']
+
+seq_amino_acid_map_c = {
+    'A': human_model.metabolites.get_by_id('ala_L[c]'),
+    'R': human_model.metabolites.get_by_id('arg_L[c]'),
+    'N': human_model.metabolites.get_by_id('asn_L[c]'),
+    'D': human_model.metabolites.get_by_id('asp_L[c]'),
+    'C': human_model.metabolites.get_by_id('cys_L[c]'),
+    'E': human_model.metabolites.get_by_id('glu_L[c]'),
+    'Q': human_model.metabolites.get_by_id('gln_L[c]'),
+    'G': human_model.metabolites.get_by_id('gly[c]'),
+    'H': human_model.metabolites.get_by_id('his_L[c]'),
+    'I': human_model.metabolites.get_by_id('ile_L[c]'),
+    'L': human_model.metabolites.get_by_id('leu_L[c]'),
+    'K': human_model.metabolites.get_by_id('lys_L[c]'),
+    'M': human_model.metabolites.get_by_id('met_L[c]'),
+    'F': human_model.metabolites.get_by_id('phe_L[c]'),
+    'P': human_model.metabolites.get_by_id('pro_L[c]'),
+    'S': human_model.metabolites.get_by_id('ser_L[c]'),
+    'T': human_model.metabolites.get_by_id('thr_L[c]'),
+    'W': human_model.metabolites.get_by_id('trp_L[c]'),
+    'Y': human_model.metabolites.get_by_id('tyr_L[c]'),
+    'V': human_model.metabolites.get_by_id('val_L[c]')
+}
+ppi_c =  human_model.metabolites.get_by_id('ppi[c]')
+
+classI_synthetase = pd.read_csv(local_data_path + 'raw/classI_aa_trna_synthetases.csv', index_col = None, 
+                                skiprows = [0])
+classII_synthetase = pd.read_csv(local_data_path + 'raw/classII_aa_trna_synthetases.csv', index_col = None, 
+                                 skiprows = [0])
+trna_synthetase = pd.concat([classI_synthetase, classII_synthetase], axis = 0)
+trna_synthetase.reset_index(inplace = True, drop = True)
+drop_idx = [i for i in trna_synthetase.index if ('mitochondria' in trna_synthetase.loc[i, 'Approved name']) or ('2' in trna_synthetase.loc[i, 'Approved name'])]
+trna_synthetase.drop(index = drop_idx, inplace = True)
+trna_synthetase.drop_duplicates(keep='first', inplace = True)
+trna_synthetase.reset_index(inplace = True, drop = True)
+
+seq_synthetase_map = {
+    'A': trna_synthetase[trna_synthetase['Approved name'] == 'alanyl-tRNA synthetase 1']['HGNC ID (gene)'].tolist(),
+    'R': trna_synthetase[trna_synthetase['Approved name'] == 'arginyl-tRNA synthetase 1']['HGNC ID (gene)'].tolist(),
+    'N': trna_synthetase[trna_synthetase['Approved name'] == 'asparaginyl-tRNA synthetase 1']['HGNC ID (gene)'].tolist(),
+    'D': trna_synthetase[trna_synthetase['Approved name'] == 'aspartyl-tRNA synthetase 1']['HGNC ID (gene)'].tolist(),
+    'C': trna_synthetase[trna_synthetase['Approved name'] == 'cysteinyl-tRNA synthetase 1']['HGNC ID (gene)'].tolist(),
+    'E': trna_synthetase[trna_synthetase['Approved name'] == 'glutamyl-prolyl-tRNA synthetase 1']['HGNC ID (gene)'].tolist(),
+    'Q': trna_synthetase[trna_synthetase['Approved name'] == 'glutaminyl-tRNA synthetase 1']['HGNC ID (gene)'].tolist(),
+    'G': trna_synthetase[trna_synthetase['Approved name'] == 'glycyl-tRNA synthetase 1']['HGNC ID (gene)'].tolist(),
+    'H': trna_synthetase[trna_synthetase['Approved name'] == 'histidyl-tRNA synthetase 1']['HGNC ID (gene)'].tolist(),
+    'I': trna_synthetase[trna_synthetase['Approved name'] == 'isoleucyl-tRNA synthetase 1']['HGNC ID (gene)'].tolist(),
+    'L': trna_synthetase[trna_synthetase['Approved name'] == 'leucyl-tRNA synthetase 1']['HGNC ID (gene)'].tolist(),
+    'K': trna_synthetase[trna_synthetase['Approved name'] == 'lysyl-tRNA synthetase 1']['HGNC ID (gene)'].tolist(),
+    'M': trna_synthetase[trna_synthetase['Approved name'] == 'methionyl-tRNA synthetase 1']['HGNC ID (gene)'].tolist(),
+    'F': trna_synthetase[trna_synthetase['Approved name'] == 'phenylalanyl-tRNA synthetase subunit alpha']['HGNC ID (gene)'].tolist() + trna_synthetase[trna_synthetase['Approved name'] == 'phenylalanyl-tRNA synthetase subunit beta']['HGNC ID (gene)'].tolist(),
+    'P': trna_synthetase[trna_synthetase['Approved name'] == 'glutamyl-prolyl-tRNA synthetase 1']['HGNC ID (gene)'].tolist(),
+    'S': trna_synthetase[trna_synthetase['Approved name'] == 'seryl-tRNA synthetase 1']['HGNC ID (gene)'].tolist(),
+    'T': trna_synthetase[trna_synthetase['Approved name'] == 'threonyl-tRNA synthetase 1']['HGNC ID (gene)'].tolist(),
+    'W': trna_synthetase[trna_synthetase['Approved name'] == 'tryptophanyl-tRNA synthetase 1']['HGNC ID (gene)'].tolist(),
+    'Y': trna_synthetase[trna_synthetase['Approved name'] == 'tyrosyl-tRNA synthetase 1']['HGNC ID (gene)'].tolist(),
+    'V': trna_synthetase[trna_synthetase['Approved name'] == 'valyl-tRNA synthetase 1']['HGNC ID (gene)'].tolist()
+}
+
+
+# # Functions
+
 # In[5]:
 
 
 def get_base_counts_and_elements(seq, triphosphate = True):
-    '''Seq is a Bio.Seq object. Triphosphate is a boolean indicated whether the 5 end has a triphosphate. 
-    Otherwise assume it is a monophosphate'''
+    '''
+    
+    Inputs:
+    1) Seq is a Bio.Seq object or a string representing an RNA sequence. 
+    2) triphosphate is a boolean. If true, assume the 5' end has a triphosphate, otherwise assume monophosphate. 
+   
+   Outputs:
+    1) base_counts is a dictionary with keys as one-letter RNA base characters and values as the # of 
+    occurences of that base in the RNA sequence
+    2) elements is a dictionary emulating cobra.Metabolite.elements
+   
+   '''
     base_counts = dict()
     for base_letter in seq_element_map.keys():
         base_counts[base_letter] = seq.count(base_letter)
@@ -210,7 +293,7 @@ def get_base_counts_and_elements(seq, triphosphate = True):
         for element in elements.keys():
             elements[element] += base_counts[base_letter]* seq_element_map[base_letter][element]   
     
-    #3' end
+    #3' OH end
     elements['H'] += 1 
     elements['O'] += 1
     
@@ -223,4 +306,104 @@ def get_base_counts_and_elements(seq, triphosphate = True):
       
         
     return base_counts, elements
+
+
+# In[ ]:
+
+
+def make_rna_metabolite(metabolite_name, seq, molecule_type, compartment = 'n', triphosphate = True):
+    
+    '''
+    Inputs:
+    1) metabolite_name is the name of the RNA molecule (unique ID)
+    2) seq is a string representing the one-letter sequence of the RNA molecule.
+    3) molecule type = ['mrna', 'trna', 'rrna']
+    4) compartment is the one-letter string representing the location of the RNA molecule (usually 'n' or 'c')
+    5) triphosphate is a boolean. If true, assume the 5' end has a triphosphate, otherwise assume monophosphate.
+    
+    Outputs:
+    1) rna_metabolite is an object of cobra.Metabolite representing teh RNA molecule
+    2) base_counts is a dictionary with keys as one-letter RNA base characters and values as the # of 
+    occurences of that base in the RNA sequence 
+    
+    '''
+    
+    if molecule_type not in ['mrna', 'trna', 'rrna']:
+        raise ValueError('molecule_type must be mrna, trna, or rrna')
+
+    rna_metabolite = cobra.Metabolite(metabolite_name + '_' + molecule_type + '[' + compartment + ']')
+    rna_metabolite.compartment = compartment
+    base_counts, elements = get_base_counts_and_elements(seq, triphosphate = triphosphate) # utils function
+
+    rna_metabolite.elements = elements
+    rna_metabolite.charge = -len(seq)
+    
+    if triphosphate:
+        rna_metabolite.charge -= 3
+    
+    return rna_metabolite, base_counts
+
+
+# In[ ]:
+
+
+def rna_exonucleolytic_degradation(rna_metabolite, rna_base_counts, rna_sequence, reaction_name, 
+                                   triphosphate = True, nucleus = True):
+    ''' 
+    
+    Generates a reaction for exonucleolytic cleavage of an RNA molecule (RNA-->NMPs).
+    Inputs:
+    1) rna_metabolite is a cobra.Metabolite object representing the rna molecule to be degraded.
+    2) rna_base_counts is a dictionary with keys as one-letter RNA base characters and values as the # of 
+    occurences of that base in the RNA sequence.
+    3) rna_sequence is the ordered (5'-->3') sequence of the RNA molecule, as a string of one-letter bases
+    4) reaction_name is a string representing the name you want to give the reaction
+    5) triphosphate is a boolean. If true, assume the 5' end has a triphosphate, otherwise assume monophosphate. 
+    6) nucleus is a boolean. If true, the degradation reaction is taking place in the nucleus. Otherwise, assume
+    it takes place in the cytoplasm (current iteration of model only degrades RNA in these two compartments).
+    
+    Output: a degradation reaction of type cobra.Reaction
+    no GPRs or subsystems added to reaction
+    
+    '''
+    # exonucleolytic cleavage of RNA reaction
+
+    rna_degradation = cobra.Reaction(reaction_name + '_DEGRADATION')
+
+    if nucleus: 
+        rxn = dict()
+        rxn[h2o_n] = -sum(rna_base_counts.values())+1
+        rxn[rna_metabolite] = -1
+        for k,v in nmp_map_n.items():
+            rxn[v] = rna_base_counts[k]
+
+        # triphosphate on 5' end
+        if triphosphate:
+            rxn[nmp_map_n[rna_sequence[0]]] -= 1
+            rxn[ntp_map_n[rna_sequence[0]]]  = 1  
+            rxn[h_n] = sum(rna_base_counts.values())-1
+        else:
+            rxn[h_n] = sum(rna_base_counts.values()) # extra H on 5' end <--unsure about this
+
+        rna_degradation.add_metabolites(rxn)
+
+        
+    else:
+        rxn = dict()
+        rxn[h2o_c] = -sum(rna_base_counts.values())+1
+        rxn[rna_metabolite] = -1
+        for k,v in nmp_map_c.items():
+            rxn[v] = rna_base_counts[k]
+
+        # triphosphate on 5' end
+        if triphosphate:
+            rxn[nmp_map_c[rna_sequence[0]]] -= 1
+            rxn[ntp_map_c[rna_sequence[0]]]  = 1  
+            rxn[h_c] = sum(rna_base_counts.values())-1
+        else:
+            rxn[h_c] = sum(rna_base_counts.values()) # extra H on 5' end <--unsure about this
+
+        rna_degradation.add_metabolites(rxn)
+        
+    return rna_degradation 
 

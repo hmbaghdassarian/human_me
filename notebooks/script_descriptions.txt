@@ -4,6 +4,6 @@
 3) preliminary_cost_estimation # preliminary machinery and ATP cost of E-rxns
 4) build_psim.ipynb #generates a PSIM of all relevant machinery and secreted protein (only with signal peptides)
 5) gene_information.ipynb # class for compiling all necessary information of a gene for expressing it in a ME model
-6) build_mrna_expression_reactions # creates all mrna expression reactions necessary for ME model 
+6) build_mrna_expression_reactions # creates all mrna expression reactions necessary for a given gene for the ME model 
 7) build_ribosome_expression_reactions # all ribosome biogenesis reactions (rRNA synthesis, RP synthesis, complex formation)
-8) build_trna_expression_reactions
+8) build_trna_expression_reactions # all tRNA biogenesis reactions
