@@ -72,11 +72,7 @@ def process_mrna(gene_info, premrna_transcript_n, L_premrna, premrna_base_counts
         rxn[h_n] = 1 # methyltransferase cap1
         
         #4 ATP consumed per capping reaction
-        rxn[atp_n] -= 4 
-        rxn[h2o_n] -= 4
-        rxn[adp_n] = 4
-        rxn[pi_n] += 4
-        rxn[h_n] += 4
+        rxn = hydrolyze_atp(rxn, n_atp = 4, compartment = 'n')
 
         # transcripts
         mrna_transcript_n, mrna_base_counts = make_rna_metabolite(gene_info.hgnc_id, gene_info.mrna_seq, 
@@ -119,12 +115,7 @@ def process_mrna(gene_info, premrna_transcript_n, L_premrna, premrna_base_counts
             rxn[lariats_n] = 1
             rxn[h2o_n] -= 1 # endonucleolytic cleavage
             # 10 ATP consumed per intron during splicing
-            rxn[atp_n] -= 10*n_lariats 
-            rxn[h2o_n] -= 10*n_lariats
-            rxn[adp_n] += 10*n_lariats
-            rxn[pi_n] += 10*n_lariats
-            rxn[h_n] += 10*n_lariats
-            
+            rxn = hydrolyze_atp(rxn, n_atp = 10*n_lariats, compartment = 'n')
             
             # lariat degradation - no linearization reaction (just one triphosphate consumption)
             lariat_degradation = rna_exonucleolytic_degradation(lariats_n, lariats_base_counts, lariat_seq, 
@@ -154,7 +145,7 @@ def export_mrna(gene_info, mrna_transcript_n):
     rxn = dict()
     rxn[mrna_transcript_n], rxn[mrna_transcript_c] = -1, 1
     # 10 ATP consumer per transcript exported
-    rxn[atp_n], rxn[h2o_n], rxn[adp_n], rxn[pi_n], rxn[h_n] = -10, -10, 10, 10, 10
+    rxn = hydrolyze_atp(rxn, n_atp = 10, compartment = 'n')
 
     mrna_export.add_metabolites(rxn)
     # can change this GPR as an if statement in future based on following source:

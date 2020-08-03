@@ -407,3 +407,61 @@ def rna_exonucleolytic_degradation(rna_metabolite, rna_base_counts, rna_sequence
         
     return rna_degradation 
 
+
+# In[ ]:
+
+
+atp_m = human_model.metabolites.get_by_id('atp[m]')
+adp_m = human_model.metabolites.get_by_id('adp[m]')
+h_m = human_model.metabolites.get_by_id('h[m]')
+pi_m = human_model.metabolites.get_by_id('pi[m]')
+h2o_m = human_model.metabolites.get_by_id('h2o[m]')
+h_i = human_model.metabolites.get_by_id('h[i]')
+
+h_x = human_model.metabolites.get_by_id('h[x]')
+h2o_x = human_model.metabolites.get_by_id('h2o[x]')
+pi_x = human_model.metabolites.get_by_id('pi[x]')
+atp_x = human_model.metabolites.get_by_id('atp[x]')
+adp_x = human_model.metabolites.get_by_id('adp[x]')
+
+adp_c = ndp_map_c['A']
+atp_compartments = {'c': atp_c, 'm': atp_m, 'i': atp_m, 'x': atp_x, 'n': atp_n}
+adp_compartments = {'c': adp_c, 'm': adp_m, 'i': adp_m, 'x': adp_x, 'n': adp_n}
+h2o_compartments = {'c': h2o_c, 'm': h2o_m, 'i': h2o_m, 'x': h2o_x, 'n': h2o_n}
+pi_compartments = {'c': pi_c, 'm': pi_m, 'i': pi_m, 'x': pi_x, 'n': pi_n}
+h_compartments = {'c': h_c, 'm': h_m, 'i': h_i, 'x': h_x, 'n': h_n}
+
+def hydrolyze_atp(rxn, n_atp, compartment):
+    '''
+    Rxn is a dict for the cobra.Reaction.add_metabolite function.
+    n_atp is the # of atp to hydrolyze
+    compartment is the compartment for hydrolysis
+    
+    '''
+    if atp_compartments[compartment] in rxn.keys():
+        rxn[atp_compartments[compartment]] -= round(n_atp) 
+    else:
+        rxn[atp_compartments[compartment]] = -round(n_atp) 
+
+    if h2o_compartments[compartment] in rxn.keys():
+        rxn[h2o_compartments[compartment]] -= round(n_atp) 
+    else:
+        rxn[h2o_compartments[compartment]] = -round(n_atp) 
+
+    if adp_compartments[compartment] in rxn.keys():
+        rxn[adp_compartments[compartment]] += round(n_atp) 
+    else:
+        rxn[adp_compartments[compartment]] = round(n_atp)
+
+    if pi_compartments[compartment] in rxn.keys():
+        rxn[pi_compartments[compartment]] += round(n_atp) 
+    else:
+        rxn[pi_compartments[compartment]] = round(n_atp)
+
+    if h_compartments[compartment] in rxn.keys():
+        rxn[h_compartments[compartment]] += round(n_atp) 
+    else:
+        rxn[h_compartments[compartment]] = round(n_atp)
+    
+    return rxn
+
