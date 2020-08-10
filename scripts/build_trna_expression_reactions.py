@@ -104,7 +104,7 @@ def update_trna_degradation(trna_degradation_reaction):
     return trna_degradation_reaction
 
 
-# In[4]:
+# In[11]:
 
 
 def transcribe_pretrna(trna_info):
@@ -233,13 +233,18 @@ def primary_export_trna(trna_info, modified_trna_transcript_n):
     trna_transcript_c.id = trna_transcript_c.id.replace('[n]', '[c]')
     trna_transcript_c.compartment = 'c'
 
-    trna_primary_export = cobra.Reaction('PRIMARY_EXPORT_TRNA_' + trna_info.id)
+    trna_primary_export = cobra.Reaction(trna_info.id + 'PRIMARY_NUCLEAR_EXPORTtn')
     trna_primary_export.subsytem = 'tRNA_Biogenesis'
     trna_primary_export.name = 'trna nuclear export'
-    trna_primary_export.add_metabolites({modified_trna_transcript_n: -1, trna_transcript_c: 1})
-    trna_primary_export.gene_reaction_rule = 'xpot_nucleocytoplasmic_export'
+    
+    export_rxn = {modified_trna_transcript_n: -1, trna_transcript_c: 1}
+    # gtp hydrolysis on cytoplasmic side for export (see protein_expression nuclear_transport for details)
+    export_rxn[ntp_map_c['G']], export_rxn[h2o_c], export_rxn[ndp_map_c['G']], export_rxn[pi_c], export_rxn[h_c]  = -1, -1, 1, 1, 1
+    trna_primary_export.add_metabolites(export_rxn)
+    trna_primary_export.gene_reaction_rule = ' and '.join(XPOT + RAN)
     
     return trna_primary_export, trna_transcript_c
+
 
 def modify_trna_cytosolic(trna_info, trna_transcript_c):
     '''Add to the if statement in the future. This is for cytosolic modifications'''
@@ -277,7 +282,7 @@ def charge_trna(trna_info, modified_trna_transcript_c):
     trna_charging_reactions, charged_trna_metabolites = [], []
     for code, aa in seq_amino_acid_map_c.items():
         elements = modified_trna_transcript_c.elements
-        # attachment - loss of O-H on tRNA
+        # attachment - loss of hydrogen from tRNA hydroxyl, and oxygen from amino acid carboxyl
         elements['H'] -= 1 
         elements['O'] -= 1
         for element, count in aa.elements.items():
@@ -394,11 +399,34 @@ mature_seq += 'CCA'
 
 # # Generate reactions
 
-# In[6]:
+# In[12]:
 
 
 trna_info = trna_information(maturetrna_sequence = mature_seq , id_ = 'generic', three_trailer_seq = trailer_seq, 
                              five_leader_seq = leader_seq, modifications = {},
                              intron_sequences = None)
 trna_biogenesis_reactions, charged_trna_metabolites, modified_trna_transcript_c = trna_biogenesis(trna_info)
+
+
+# In[ ]:
+
+
+# trna_model = cobra.Model('trna_biogenesis')
+# trna_model.add_reactions(trna_biogenesis_reactions)
+# cobra.io.save_json_model(trna_model, local_data_path + 'interim/trna_biogenesis.json')
+
+
+# In[ ]:
+
+
+# trna_model
+
+
+# In[ ]:
+
+
+# import escher
+# from escher import Builder
+# builder = escher.Builder(map_json=local_data_path + 'figures/trna_biogenesis_map.json')
+# builder
 

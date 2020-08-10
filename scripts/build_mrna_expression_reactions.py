@@ -155,7 +155,17 @@ def export_mrna(gene_info, mrna_transcript_n):
     return mrna_export, mrna_transcript_c
         
 
-def degrade_mrna(gene_info, mrna_transcript_c, polyA_length, L_mrna, mrna_base_counts):
+def degrade_mrna(gene_info, mrna_transcript_c, polyA_length, L_mrna, mrna_base_counts, decapping = True, 
+                three_to_five = False):
+    '''
+    
+    Right now, only one of the two degradation pathways is included. We assume the 5' to 3' pathway is present.
+    This is simply to limit the total number of reactions
+    
+    '''
+    
+    degradation_reactions = list()
+    
     rxn = dict()
     rxn[h2o_c] = -(L_mrna + polyA_length)+1
     rxn[h_c] = L_mrna + polyA_length-1
@@ -168,36 +178,40 @@ def degrade_mrna(gene_info, mrna_transcript_c, polyA_length, L_mrna, mrna_base_c
     rxn[amet_c], rxn[ahcys_c] = 2, -2 # reverse methyltransferase - cap0 and cap1 structure
 
     # 3'-->5' degradation------------------------------------------------------------------------------------
-    transcript_degradation_1 = cobra.Reaction(gene_info.hgnc_id + "_3'to5'_mRNA_DEGRADATION")
-    transcript_degradation_1.subsytem = 'Transcription'
+    if three_to_five:
+        transcript_degradation_1 = cobra.Reaction(gene_info.hgnc_id + "_3'to5'_mRNA_DEGRADATION")
+        transcript_degradation_1.subsytem = 'Transcription'
 
-    rxn_1 = rxn.copy()
-    # fig 1 https://www.ncbi.nlm.nih.gov/pmc/articles/PMC6565619/
-    # 5' cap - degradation from 3'-->5' direction (scavenger - HIT mechanism)
-    rxn_1[nmp_map_c[gene_info.mrna_seq[0]]] -= 1
-    rxn_1[ndp_map_c[gene_info.mrna_seq[0]]] = 1
-    rxn_1[h2o_c] -= 1
-    rxn_1[h_c] += 1
-    rxn_1[nmp_map_c['G']] += 1
-    transcript_degradation_1.add_metabolites(rxn_1)
-    transcript_degradation_1.gene_reaction_rule = degradation_rule1
+        rxn_1 = rxn.copy()
+        # fig 1 https://www.ncbi.nlm.nih.gov/pmc/articles/PMC6565619/
+        # 5' cap - degradation from 3'-->5' direction (scavenger - HIT mechanism)
+        rxn_1[nmp_map_c[gene_info.mrna_seq[0]]] -= 1
+        rxn_1[ndp_map_c[gene_info.mrna_seq[0]]] = 1
+        rxn_1[h2o_c] -= 1
+        rxn_1[h_c] += 1
+        rxn_1[nmp_map_c['G']] += 1
+        transcript_degradation_1.add_metabolites(rxn_1)
+        transcript_degradation_1.gene_reaction_rule = degradation_rule1
+        degradation_reactions.append(transcript_degradation_1)
 
 
     # 5'->3' degradation (decapping) ------------------------------------------------------------------------------------
-    transcript_degradation_2_decapping = cobra.Reaction(gene_info.hgnc_id + "_DECAPPING_mRNA_DEGRADATION")
-    transcript_degradation_2_decapping.subsytem = 'Transcription'
+    if decapping:
+        transcript_degradation_2_decapping = cobra.Reaction(gene_info.hgnc_id + "_DECAPPING_mRNA_DEGRADATION")
+        transcript_degradation_2_decapping.subsytem = 'Transcription'
 
-    rxn_2_decapping = rxn.copy()
-    # 5' cap - from 5'-->3' direction (DCP1/DCP2 - NUDIX mechanism)
-    rxn_2_decapping[h2o_c] -= 1
-    rxn_2_decapping[h_c] += 1
-    rxn_2_decapping[ndp_map_c['G']] = 1
+        rxn_2_decapping = rxn.copy()
+        # 5' cap - from 5'-->3' direction (DCP1/DCP2 - NUDIX mechanism)
+        rxn_2_decapping[h2o_c] -= 1
+        rxn_2_decapping[h_c] += 1
+        rxn_2_decapping[ndp_map_c['G']] = 1
 
 
-    transcript_degradation_2_decapping.add_metabolites(rxn_2_decapping)
-    transcript_degradation_2_decapping.gene_reaction_rule = decapping_rule
+        transcript_degradation_2_decapping.add_metabolites(rxn_2_decapping)
+        transcript_degradation_2_decapping.gene_reaction_rule = decapping_rule
+        degradation_reactions.append(transcript_degradation_2_decapping)
     
-    return [transcript_degradation_1, transcript_degradation_2_decapping]
+    return degradation_reactions
     
     
 def mrna_expression(gene_info):
@@ -218,50 +232,6 @@ def mrna_expression(gene_info):
     
     reactions = [transcript_elongation] + processing_reactions + [mrna_export] + degradation_reactions
     return reactions
-
-
-# Usage
-
-# In[8]:
-
-
-# psim_me = pd.read_csv(local_data_path + 'processed/psim_me.csv', index_col = 0)
-# sp_dict = {1: True, 0: False, float('nan'): False}
-# ptm_cols = ['DSB', 'GPI', 'NG', 'OG']
-# ptm_keys = list(allowed_ptms.keys())
-
-
-# In[90]:
-
-
-# gene1_id = human_model.genes[0].id
-
-
-# idx  = psim_me[psim_me['HGNC_ID'] == gene1_id].index
-# ptms_ = dict(zip(ptm_keys, psim_me.loc[idx, ptm_cols].iloc[0,:].tolist()))
-# ptms_ = {k:v for k,v in ptms_.items() if v != 0 and not pd.isna(v)}
-# fl = psim_me.loc[idx, 'Location'].tolist()[0]
-
-# pm,m,p = psim_me.loc[idx, 'PREMRNA_SEQ'].tolist()[0], psim_me.loc[idx, 'MRNA_SEQ'].tolist()[0], psim_me.loc[idx, 'PROTEIN_SEQ'].tolist()[0]
-
-# sp = psim_me.loc[idx, 'SP'].tolist()[0]
-# if pd.isna(sp):
-#     sp = 0
-# sp = sp_dict[sp]
-# tmd = psim_me.loc[idx,'TMD'].tolist()[0]
-# if pd.isna(tmd):
-#     tmd = 0
-# polyA_length_ = psim_me.loc[idx, 'POLYA_LENGTH'].tolist()[0]
-# gene_info = gene_information(metabolic_model = human_model, hgnc_id = gene1_id, 
-#                          premrna_seq=pm, mrna_seq=m, protein_seq=p,
-#                          ptms = ptms_, tmd = tmd, sp = sp, 
-#                         keff = None, polyA_length = polyA_length_, n_introns= None)
-
-
-# In[106]:
-
-
-# mrna_expression_reactions, mrna_transcript_c = mrna_expression(gene_info)
 
 
 # In[110]:

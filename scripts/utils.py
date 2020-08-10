@@ -191,6 +191,8 @@ LAS1 = ['HGNC:25726']
 DIS3 = ['HGNC:20604']
 ISG20L2 = ['HGNC:25745']
 ERI1 = ['HGNC:23994']
+RAN = ['HGNC:9846']
+XPO1 = ['HGNC:12825']
 
 
 # trna variables
@@ -206,6 +208,7 @@ RNASEP = ['HGNC:30129', 'HGNC:30329', 'HGNC:30081', 'HGNC:17689', 'HGNC:19949', 
          'HGNC:17688', 'HGNC:20992', 'HGNC:30361', 'HGNC:30327']
 RNASEZ = ['HGNC:14198']
 trna_splicing_machinery = ['HGNC:28422', 'HGNC:16791', 'HGNC:15506', 'HGNC:27561']
+XPOT = ['HGNC:12826'] # nuclear export of trna
 
 seq_amino_acid_map_c = {
     'A': human_model.metabolites.get_by_id('ala_L[c]'),
@@ -266,7 +269,155 @@ seq_synthetase_map = {
 }
 
 
+# In[ ]:
+
+
+# cytoplasmic transport expression
+transport_translocation_atp_cost = 0.5 # 1 ATP/2 residues
+proteolysis_translocation_atp_cost = 0.5 # 1 ATP/2 residues
+
+translation_efs = ['HGNC:3189', 'HGNC:3214', 'HGNC:3208', 'HGNC:3300']
+n_ub = 4 # see this - no. of ubiquitins to add to protein
+
+# # DON'T DELETE------------------------------------------------
+# import pandas as pd
+# e3_ligase = pd.read_csv(local_data_path + 'raw/E3_HPA.tsv', sep = '\t')
+# e3_ligase = e3_ligase[e3_ligase['RNA cell line specificity'] == 'Low cell line specificity']
+# e3_ligase = e3_ligase.loc[e3_ligase[e3_ligase['Subcellular main location'].notna()].index,:]
+# e3_ligase = e3_ligase.loc[[i for i in e3_ligase.index if ('Cytosol' in e3_ligase.loc[i, 'Subcellular main location'])], :]
+# # e3_ligase = e3_ligase[e3_ligase['Subcellular main location'] == 'Cytosol']
+# top_gene_idx = e3_ligase.iloc[:, e3_ligase.columns.tolist().index('Tissue RNA - adipose tissue [NX]'):].mean(axis = 1).sort_values(ascending = False).index.tolist()[3]
+# e3_uniprot_id = e3_ligase.loc[top_gene_idx, 'Uniprot']
+
+# e2_ligase = pd.read_csv(local_data_path + 'raw/E2_HPA.tsv', sep = '\t')
+# e2_ligase = e2_ligase[e2_ligase['RNA cell line specificity'] == 'Low cell line specificity']
+# e2_ligase = e2_ligase.loc[e2_ligase[e2_ligase['Subcellular main location'].notna()].index,:]
+# e2_ligase = e2_ligase.loc[[i for i in e2_ligase.index if ('Cytosol' in e2_ligase.loc[i, 'Subcellular main location'])], :]
+# # e2_ligase = e2_ligase[e2_ligase['Subcellular main location'] == 'Cytosol']
+# top_gene_idx = e2_ligase.iloc[:, e2_ligase.columns.tolist().index('Tissue RNA - adipose tissue [NX]'):].mean(axis = 1).sort_values(ascending = False).index.tolist()[0]
+# e2_uniprot_id = e2_ligase.loc[top_gene_idx, 'Uniprot']
+
+# e3_ligase = pd.read_csv(local_data_path + 'raw/E3_HPA.tsv', sep = '\t')
+# e3_ligase = e3_ligase[e3_ligase['RNA cell line specificity'] == 'Low cell line specificity']
+# e3_ligase = e3_ligase.loc[e3_ligase[e3_ligase['Subcellular main location'].notna()].index,:]
+# e3_ligase = e3_ligase.loc[[i for i in e3_ligase.index if ('Nucleoplasm' in e3_ligase.loc[i, 'Subcellular main location'])], :]
+# # e3_ligase = e3_ligase[e3_ligase['Subcellular main location'] == 'Cytosol']
+# top_gene_idx = e3_ligase.iloc[:, e3_ligase.columns.tolist().index('Tissue RNA - adipose tissue [NX]'):].mean(axis = 1).sort_values(ascending = False).index.tolist()[0]
+# e3_uniprot_id = e3_ligase.loc[top_gene_idx, 'Uniprot']
+# e2_ligase = pd.read_csv(local_data_path + 'raw/E2_HPA.tsv', sep = '\t')
+# e2_ligase = e2_ligase[e2_ligase['RNA cell line specificity'] == 'Low cell line specificity']
+# e2_ligase = e2_ligase.loc[e2_ligase[e2_ligase['Subcellular main location'].notna()].index,:]
+# e2_ligase = e2_ligase.loc[[i for i in e2_ligase.index if ('Nucleoplasm' in e2_ligase.loc[i, 'Subcellular main location'])], :]
+# # e2_ligase = e2_ligase[e2_ligase['Subcellular main location'] == 'Cytosol']
+# top_gene_idx = e2_ligase.iloc[:, e2_ligase.columns.tolist().index('Tissue RNA - adipose tissue [NX]'):].mean(axis = 1).sort_values(ascending = False).index.tolist()[0]
+# e2_uniprot_id = e2_ligase.loc[top_gene_idx, 'Uniprot']
+# # DON'T DELETE------------------------------------------------
+
+USP5, UBA1, UBE2D3, STUB1 = ['HGNC:12628'], ['HGNC:12469'], ['HGNC:12476'], ['HGNC:11427']
+RNF181, UB2EV1 = ['HGNC:28037'], ['HGNC:12494']
+UB_ligases_c = UBA1 + UBE2D3 + STUB1
+UB_ligases_n = UBA1 + UB2EV1 + RNF181
+
+psim_me = pd.read_csv(local_data_path + 'processed/psim_me.csv', index_col = 0)
+
+proteasome_structural = ['HGNC:9554', 'HGNC:9560', 'HGNC:9557', 'HGNC:9556', 'HGNC:9564', 'HGNC:9565', 'HGNC:9558',
+                        'HGNC:9566', 'HGNC:9567']
+proteasome_ubiquitin = ['HGNC:9559', 'HGNC:15759', 'HGNC:16889', 'HGNC:9561', 'HGNC:12612', 'HGNC:19678']
+proteasome_atpase = ['HGNC:9548', 'HGNC:9547', 'HGNC:9551', 'HGNC:9553', 'HGNC:9549', 'HGNC:9552']
+proteasome_machinery = proteasome_structural + proteasome_ubiquitin + proteasome_atpase
+
+seq_amino_acid_map_m = {aa_code: human_model.metabolites.get_by_id(met_obj.id.replace('[c]', '[m]')) for aa_code, met_obj in seq_amino_acid_map_c.items()}
+
+
+# mitochondria
+
+TOM = ['HGNC:31369', 'HGNC:34528', 'HGNC:21648', 'HGNC:20947', 'HGNC:18002', 'HGNC:18001', 'HGNC:11985']
+# HGNC's tim23 already contains PAM
+TIM23_PAM = pd.read_csv(local_data_path + 'raw/tim23_complex.csv',  index_col = None, skiprows = [0])['HGNC ID (gene)'].tolist()
+HSP70_m = ['HGNC:5244'] # mitocondrial version
+OXA = ['HGNC:8526'] # inner membrane transport
+
+mLON, iAAA   = ['HGNC:9479'], ['HGNC:12843']# mitochondrial proteases
+#mAAA =  ['HGNC:315', 'HGNC:11237'] 
+HSP70_c, HSP40_c  = ['HGNC:5233'], ['HGNC:5229']
+
+# peroxisome
+seq_amino_acid_map_x = {aa_code: human_model.metabolites.get_by_id(met_obj.id.replace('[c]', '[x]')) for aa_code, met_obj in seq_amino_acid_map_c.items()}
+PEX5, L_PEX5 = ['HGNC:9719'], 639 # Uniprot and PSIM_ME agree on this number
+peroxins = ['HGNC:22965', 'HGNC:8859', 'HGNC:8850', 'HGNC:8856', 'HGNC:8855'] + PEX5
+AWP1 = ['HGNC:30164']
+LONP2 = ['HGNC:20598']
+
+
+
+# nucleus
+seq_amino_acid_map_n = {aa_code: human_model.metabolites.get_by_id(aa_metabolite.id.replace('[c]', '[n]')) for aa_code, aa_metabolite in seq_amino_acid_map_c.items()}
+seq_amino_acid_map_compartments = {'c': seq_amino_acid_map_c, 'x': seq_amino_acid_map_x, 
+                                  'm': seq_amino_acid_map_m, 'n': seq_amino_acid_map_n}
+gdp_n = human_model.metabolites.get_by_id('gdp[n]')
+importins = ['HGNC:6400', 'HGNC:6394']
+nuclear_diffusion_limit = 40000 # 40 kDA and less proteins diffuse through nucleus
+
+
 # # Functions
+
+# In[ ]:
+
+
+atp_m = human_model.metabolites.get_by_id('atp[m]')
+adp_m = human_model.metabolites.get_by_id('adp[m]')
+h_m = human_model.metabolites.get_by_id('h[m]')
+pi_m = human_model.metabolites.get_by_id('pi[m]')
+h2o_m = human_model.metabolites.get_by_id('h2o[m]')
+h_i = human_model.metabolites.get_by_id('h[i]')
+
+h_x = human_model.metabolites.get_by_id('h[x]')
+h2o_x = human_model.metabolites.get_by_id('h2o[x]')
+pi_x = human_model.metabolites.get_by_id('pi[x]')
+atp_x = human_model.metabolites.get_by_id('atp[x]')
+adp_x = human_model.metabolites.get_by_id('adp[x]')
+
+adp_c = ndp_map_c['A']
+atp_compartments = {'c': atp_c, 'm': atp_m, 'i': atp_m, 'x': atp_x, 'n': atp_n}
+adp_compartments = {'c': adp_c, 'm': adp_m, 'i': adp_m, 'x': adp_x, 'n': adp_n}
+h2o_compartments = {'c': h2o_c, 'm': h2o_m, 'i': h2o_m, 'x': h2o_x, 'n': h2o_n}
+pi_compartments = {'c': pi_c, 'm': pi_m, 'i': pi_m, 'x': pi_x, 'n': pi_n}
+h_compartments = {'c': h_c, 'm': h_m, 'i': h_i, 'x': h_x, 'n': h_n}
+
+def hydrolyze_atp(rxn, n_atp, compartment):
+    '''
+    Rxn is a dict for the cobra.Reaction.add_metabolite function.
+    n_atp is the # of atp to hydrolyze
+    compartment is the compartment for hydrolysis
+    
+    '''
+    if atp_compartments[compartment] in rxn.keys():
+        rxn[atp_compartments[compartment]] -= round(n_atp) 
+    else:
+        rxn[atp_compartments[compartment]] = -round(n_atp) 
+
+    if h2o_compartments[compartment] in rxn.keys():
+        rxn[h2o_compartments[compartment]] -= round(n_atp) 
+    else:
+        rxn[h2o_compartments[compartment]] = -round(n_atp) 
+
+    if adp_compartments[compartment] in rxn.keys():
+        rxn[adp_compartments[compartment]] += round(n_atp) 
+    else:
+        rxn[adp_compartments[compartment]] = round(n_atp)
+
+    if pi_compartments[compartment] in rxn.keys():
+        rxn[pi_compartments[compartment]] += round(n_atp) 
+    else:
+        rxn[pi_compartments[compartment]] = round(n_atp)
+
+    if h_compartments[compartment] in rxn.keys():
+        rxn[h_compartments[compartment]] += round(n_atp) 
+    else:
+        rxn[h_compartments[compartment]] = round(n_atp)
+    
+    return rxn
+
 
 # In[5]:
 
@@ -411,57 +562,114 @@ def rna_exonucleolytic_degradation(rna_metabolite, rna_base_counts, rna_sequence
 # In[ ]:
 
 
-atp_m = human_model.metabolites.get_by_id('atp[m]')
-adp_m = human_model.metabolites.get_by_id('adp[m]')
-h_m = human_model.metabolites.get_by_id('h[m]')
-pi_m = human_model.metabolites.get_by_id('pi[m]')
-h2o_m = human_model.metabolites.get_by_id('h2o[m]')
-h_i = human_model.metabolites.get_by_id('h[i]')
-
-h_x = human_model.metabolites.get_by_id('h[x]')
-h2o_x = human_model.metabolites.get_by_id('h2o[x]')
-pi_x = human_model.metabolites.get_by_id('pi[x]')
-atp_x = human_model.metabolites.get_by_id('atp[x]')
-adp_x = human_model.metabolites.get_by_id('adp[x]')
-
-adp_c = ndp_map_c['A']
-atp_compartments = {'c': atp_c, 'm': atp_m, 'i': atp_m, 'x': atp_x, 'n': atp_n}
-adp_compartments = {'c': adp_c, 'm': adp_m, 'i': adp_m, 'x': adp_x, 'n': adp_n}
-h2o_compartments = {'c': h2o_c, 'm': h2o_m, 'i': h2o_m, 'x': h2o_x, 'n': h2o_n}
-pi_compartments = {'c': pi_c, 'm': pi_m, 'i': pi_m, 'x': pi_x, 'n': pi_n}
-h_compartments = {'c': h_c, 'm': h_m, 'i': h_i, 'x': h_x, 'n': h_n}
-
-def hydrolyze_atp(rxn, n_atp, compartment):
+def make_protein_metabolite(id_, amino_acid_counts, L_protein, compartment):
     '''
-    Rxn is a dict for the cobra.Reaction.add_metabolite function.
-    n_atp is the # of atp to hydrolyze
-    compartment is the compartment for hydrolysis
+    ID is a string to name the protein metabolite. 
+    Amino acid counts is a dictionary with keys as the aa one letter code and counts as the number of occurences of that amino acid in the protein sequence
+    L_protein is the length of the protein
+    Compartment is the location of the protein (one letter string, corresponds to Recon2.2s compartments)
+    
+    Will return a cobra.Metabolite object with relevant charge and elements.
     
     '''
-    if atp_compartments[compartment] in rxn.keys():
-        rxn[atp_compartments[compartment]] -= round(n_atp) 
-    else:
-        rxn[atp_compartments[compartment]] = -round(n_atp) 
-
-    if h2o_compartments[compartment] in rxn.keys():
-        rxn[h2o_compartments[compartment]] -= round(n_atp) 
-    else:
-        rxn[h2o_compartments[compartment]] = -round(n_atp) 
-
-    if adp_compartments[compartment] in rxn.keys():
-        rxn[adp_compartments[compartment]] += round(n_atp) 
-    else:
-        rxn[adp_compartments[compartment]] = round(n_atp)
-
-    if pi_compartments[compartment] in rxn.keys():
-        rxn[pi_compartments[compartment]] += round(n_atp) 
-    else:
-        rxn[pi_compartments[compartment]] = round(n_atp)
-
-    if h_compartments[compartment] in rxn.keys():
-        rxn[h_compartments[compartment]] += round(n_atp) 
-    else:
-        rxn[h_compartments[compartment]] = round(n_atp)
     
-    return rxn
+    protein_metabolite = cobra.Metabolite(id_ + '_protein[' + compartment + ']')
+    protein_metabolite.compartment = compartment
+    elements = {'C': 0, 'H': 0, 'N': 0, 'O': 0, 'S': 0}
+    if compartment in seq_amino_acid_map_compartments.keys():
+        for aa_code, aa_count in amino_acid_counts.items():
+            aa_elements = seq_amino_acid_map_compartments[compartment][aa_code].elements
+            for element in aa_elements:
+                elements[element] += aa_count*aa_elements[element]
+    else:
+        raise ValueError('Must add this compartment to make_protein_metabolite function')
+
+    # peptide bond formation
+    elements['H'] -= 2*(L_protein-1)
+    elements['O'] -= 1*(L_protein-1)
+
+    protein_metabolite.elements = elements
+    # assume charge of amino acid is the ssame regardless of metabolite
+    protein_metabolite.charge = sum([seq_amino_acid_map_compartments[compartment][aa_code].charge*aa_count for aa_code, aa_count in amino_acid_counts.items()])
+    return protein_metabolite
+
+
+# In[ ]:
+
+
+def make_complex_metabolite(**complex_info):# metabolites, *ids, *metabolite_types):
+    '''
+    
+    Inputs:
+    Complex info is a dictionary with three keys ['METABOLITES', 'IDS', 'METABOLITE_TYPES']
+    Each value is a list:
+        Metabolites is a list of cobra.Metabolite objects
+        IDs is a list of string identifiers corresponding to each metabolite object
+        Metabolite_types is a list of strings; possible values are ['protein', 'rrna', 'trna', 'mrna',  'metabolite']
+    
+    Output:
+    A cobra.Metabolite object representing the complex formed between metabolites
+    
+    '''
+    if sorted(set(complex_info.keys())) != ['IDS', 'METABOLITES', 'METABOLITE_TYPES']:
+        raise ValueError('Invalid complex information keys or insufficient complex information keys')
+    
+    metabolites, ids, metabolite_types = complex_info['METABOLITES'], complex_info['IDS'], complex_info['METABOLITE_TYPES']
+    if len(set(metabolite_types).difference(['protein', 'rrna', 'trna', 'mrna',  'metabolite']))>1:
+        raise ValueError('At least one of the metabolite types is not considered in complex formation currently')
+    
+    
+    compartments = list(set([m.compartment for m in metabolites]))
+    if len(compartments) == 1:
+        compartment = compartments[0]
+    else:
+        raise ValueError('Metabolites are not in the same compartment')
+    
+    mts = list(set(metabolite_types))
+    mt_type = '_'.join(mts)
+    
+    ids_ = '_'.join(ids)
+    
+    id_ = ids_ + '_' + mt_type + '_complex'
+    
+    complex_metabolite = cobra.Metabolite(id_ + '[' + compartment + ']')
+    complex_metabolite.compartment = compartment
+    complex_metabolite.charge = sum([m.charge for m in metabolites])
+    
+    elements = dict()
+    for m in metabolites:
+        for k,v in m.elements.items():
+            if k in elements.keys():
+                elements[k] += v
+            else:
+                elements[k] = v
+    complex_metabolite.elements = elements
+    
+    return complex_metabolite, id_
+
+def form_complex(**complex_info):
+    
+    '''
+    
+    Inputs:
+    Complex info is a dictionary with three keys ['METABOLITES', 'IDS', 'METABOLITE_TYPES']
+    Each value is a list:
+        Metabolites is a list of cobra.Metabolite objects
+        IDs is a list of string identifiers corresponding to each metabolite object
+        Metabolite_types is a list of strings; possible values are ['protein', 'rrna', 'trna', 'mrna',  'metabolite']
+  
+    Output:
+    A cobra.Reaction object representing the complex formation between metabolites
+    
+    '''
+    
+    complex_metabolite, id_ = make_complex_metabolite(**complex_info)
+    complex_formation = cobra.Reaction(id_.replace('complex', 'COMPLEX_FORMATION'))
+    
+    rxn = {m: -1 for m in metabolites}
+    rxn[complex_metabolite] = 1
+    complex_formation.add_metabolites(rxn)
+    complex_formation.lower_bound = -1000
+    
+    return complex_formation
 

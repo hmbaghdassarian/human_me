@@ -120,8 +120,10 @@ class gene_information():
         self.tmd = tmd
         self.sp = sp
         
-        if polyA_length == None or pd.isna(polyA_length) or (polyA_length >= 0 and round(polyA_length) == polyA_length):
+        if polyA_length == None or (polyA_length >= 0 and round(polyA_length) == polyA_length):
             self.polyA_length = polyA_length
+        elif pd.isna(polyA_length):
+            self.polyA_length = None
         else:
             raise ValueError('polyA_length must either be an integer >= 0 or None/nan')
         
@@ -153,6 +155,7 @@ class gene_information():
                 warnings.warn('Final location extacted from cobrapy model, will disregard user input.')
 
             rxns = list(metabolic_model.genes.get_by_id(self.hgnc_id).reactions)
+#             fl = final_locations.copy()
             final_locations = []
             
             for r in rxns:
@@ -175,7 +178,7 @@ class gene_information():
                     compartments_ = {'i'}
 
                 final_locations += list(compartments_)
-            final_locations = sorted(set(final_locations)) # redundancy from multiple reactions
+            final_locations = sorted(set(final_locations))# + fl)) # redundancy from multiple reactions
 
                  
         if self.module == 'Non-Machinery':
