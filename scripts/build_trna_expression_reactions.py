@@ -233,7 +233,7 @@ def primary_export_trna(trna_info, modified_trna_transcript_n):
     trna_transcript_c.id = trna_transcript_c.id.replace('[n]', '[c]')
     trna_transcript_c.compartment = 'c'
 
-    trna_primary_export = cobra.Reaction(trna_info.id + 'PRIMARY_NUCLEAR_EXPORTtn')
+    trna_primary_export = cobra.Reaction(trna_info.id + 'PRIMARY_EXPORTtn')
     trna_primary_export.subsytem = 'tRNA_Biogenesis'
     trna_primary_export.name = 'trna nuclear export'
     

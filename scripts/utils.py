@@ -359,6 +359,23 @@ importins = ['HGNC:6400', 'HGNC:6394']
 nuclear_diffusion_limit = 40000 # 40 kDA and less proteins diffuse through nucleus
 
 
+# In[ ]:
+
+
+# ribosome biogenesis
+UCHL3 = ['HGNC:12515']
+rs = pd.read_csv(local_data_path + 'raw/small_ribosomal_protein.csv', index_col = None, skiprows = [0])
+rl = pd.read_csv(local_data_path + 'raw/large_ribosomal_protein.csv', index_col = None, skiprows = [0])
+pre40s_rbfs = ['HGNC:25542', 'HGNC:21173', 'HGNC:32790', 'HGNC:29100']
+pre60s_rbfs = ['HGNC:18477', 'HGNC:25789', 'HGNC:19440', 'HGNC:20870', 'HGNC:17083', 'HGNC:4333']
+
+eif1, eif2 = ['HGNC:3249', 'HGNC:3250'], ['HGNC:3265', 'HGNC:3266', 'HGNC:3267']
+eif3 = pd.read_csv(local_data_path + 'raw/eif3.csv', index_col = None, skiprows = [0])['HGNC ID (gene)'].tolist()
+eif4f = ['HGNC:3282', 'HGNC:3284', 'HGNC:3287', 'HGNC:3296']
+eif5 = ['HGNC:3299', 'HGNC:30793']
+eifs = eif1 + eif2 + eif3 + eif4f + eif5 + ['HGNC:8554']
+
+
 # # Functions
 
 # In[ ]:
@@ -377,12 +394,19 @@ pi_x = human_model.metabolites.get_by_id('pi[x]')
 atp_x = human_model.metabolites.get_by_id('atp[x]')
 adp_x = human_model.metabolites.get_by_id('adp[x]')
 
+h_r = human_model.metabolites.get_by_id('h[r]')
+h2o_r = human_model.metabolites.get_by_id('h2o[r]')
+pi_r = human_model.metabolites.get_by_id('pi[r]')
+atp_r = human_model.metabolites.get_by_id('atp[r]')
+adp_r = human_model.metabolites.get_by_id('adp[r]')
+
 adp_c = ndp_map_c['A']
-atp_compartments = {'c': atp_c, 'm': atp_m, 'i': atp_m, 'x': atp_x, 'n': atp_n}
-adp_compartments = {'c': adp_c, 'm': adp_m, 'i': adp_m, 'x': adp_x, 'n': adp_n}
-h2o_compartments = {'c': h2o_c, 'm': h2o_m, 'i': h2o_m, 'x': h2o_x, 'n': h2o_n}
-pi_compartments = {'c': pi_c, 'm': pi_m, 'i': pi_m, 'x': pi_x, 'n': pi_n}
-h_compartments = {'c': h_c, 'm': h_m, 'i': h_i, 'x': h_x, 'n': h_n}
+
+atp_compartments = {'c': atp_c, 'm': atp_m, 'i': atp_m, 'x': atp_x, 'n': atp_n, 'r': atp_r}
+adp_compartments = {'c': adp_c, 'm': adp_m, 'i': adp_m, 'x': adp_x, 'n': adp_n, 'r': adp_r}
+h2o_compartments = {'c': h2o_c, 'm': h2o_m, 'i': h2o_m, 'x': h2o_x, 'n': h2o_n, 'r': h2o_r}
+pi_compartments = {'c': pi_c, 'm': pi_m, 'i': pi_m, 'x': pi_x, 'n': pi_n, 'r': pi_r}
+h_compartments = {'c': h_c, 'm': h_m, 'i': h_i, 'x': h_x, 'n': h_n, 'r': h_r}
 
 def hydrolyze_atp(rxn, n_atp, compartment):
     '''
@@ -391,30 +415,32 @@ def hydrolyze_atp(rxn, n_atp, compartment):
     compartment is the compartment for hydrolysis
     
     '''
+    n_atp = round(n_atp)
+    
     if atp_compartments[compartment] in rxn.keys():
-        rxn[atp_compartments[compartment]] -= round(n_atp) 
+        rxn[atp_compartments[compartment]] -= n_atp 
     else:
-        rxn[atp_compartments[compartment]] = -round(n_atp) 
+        rxn[atp_compartments[compartment]] = -n_atp 
 
     if h2o_compartments[compartment] in rxn.keys():
-        rxn[h2o_compartments[compartment]] -= round(n_atp) 
+        rxn[h2o_compartments[compartment]] -= n_atp 
     else:
-        rxn[h2o_compartments[compartment]] = -round(n_atp) 
+        rxn[h2o_compartments[compartment]] = -n_atp 
 
     if adp_compartments[compartment] in rxn.keys():
-        rxn[adp_compartments[compartment]] += round(n_atp) 
+        rxn[adp_compartments[compartment]] += n_atp 
     else:
-        rxn[adp_compartments[compartment]] = round(n_atp)
+        rxn[adp_compartments[compartment]] = n_atp
 
     if pi_compartments[compartment] in rxn.keys():
-        rxn[pi_compartments[compartment]] += round(n_atp) 
+        rxn[pi_compartments[compartment]] += n_atp 
     else:
-        rxn[pi_compartments[compartment]] = round(n_atp)
+        rxn[pi_compartments[compartment]] = n_atp
 
     if h_compartments[compartment] in rxn.keys():
-        rxn[h_compartments[compartment]] += round(n_atp) 
+        rxn[h_compartments[compartment]] += n_atp 
     else:
-        rxn[h_compartments[compartment]] = round(n_atp)
+        rxn[h_compartments[compartment]] = n_atp
     
     return rxn
 
@@ -519,9 +545,10 @@ def rna_exonucleolytic_degradation(rna_metabolite, rna_base_counts, rna_sequence
     '''
     # exonucleolytic cleavage of RNA reaction
 
-    rna_degradation = cobra.Reaction(reaction_name + '_DEGRADATION')
+    
 
     if nucleus: 
+        rna_degradation = cobra.Reaction(reaction_name + '_DEGRADATIONn')
         rxn = dict()
         rxn[h2o_n] = -sum(rna_base_counts.values())+1
         rxn[rna_metabolite] = -1
@@ -540,6 +567,7 @@ def rna_exonucleolytic_degradation(rna_metabolite, rna_base_counts, rna_sequence
 
         
     else:
+        rna_degradation = cobra.Reaction(reaction_name + '_DEGRADATIONc')
         rxn = dict()
         rxn[h2o_c] = -sum(rna_base_counts.values())+1
         rxn[rna_metabolite] = -1
@@ -562,6 +590,10 @@ def rna_exonucleolytic_degradation(rna_metabolite, rna_base_counts, rna_sequence
 # In[ ]:
 
 
+seq_amino_acid_map_r = {aa_code: human_model.metabolites.get_by_id(aa_metabolite.id.replace('[c]', '[r]')) for aa_code, aa_metabolite in seq_amino_acid_map_c.items()}
+
+seq_amino_acid_map_compartments = {'c': seq_amino_acid_map_c, 'x': seq_amino_acid_map_x, 'r': seq_amino_acid_map_r,
+                                  'm': seq_amino_acid_map_m, 'n': seq_amino_acid_map_n}
 def make_protein_metabolite(id_, amino_acid_counts, L_protein, compartment):
     '''
     ID is a string to name the protein metabolite. 
@@ -594,7 +626,7 @@ def make_protein_metabolite(id_, amino_acid_counts, L_protein, compartment):
     return protein_metabolite
 
 
-# In[ ]:
+# In[2]:
 
 
 def make_complex_metabolite(**complex_info):# metabolites, *ids, *metabolite_types):
@@ -606,7 +638,7 @@ def make_complex_metabolite(**complex_info):# metabolites, *ids, *metabolite_typ
         Metabolites is a list of cobra.Metabolite objects
         IDs is a list of string identifiers corresponding to each metabolite object
         Metabolite_types is a list of strings; possible values are ['protein', 'rrna', 'trna', 'mrna',  'metabolite']
-    
+        This means complexes can form between any of these species, including other complexes; metabolite is a M-model metabolite
     Output:
     A cobra.Metabolite object representing the complex formed between metabolites
     
@@ -615,7 +647,8 @@ def make_complex_metabolite(**complex_info):# metabolites, *ids, *metabolite_typ
         raise ValueError('Invalid complex information keys or insufficient complex information keys')
     
     metabolites, ids, metabolite_types = complex_info['METABOLITES'], complex_info['IDS'], complex_info['METABOLITE_TYPES']
-    if len(set(metabolite_types).difference(['protein', 'rrna', 'trna', 'mrna',  'metabolite']))>1:
+    
+    if len(set(metabolite_types).difference(['protein', 'rrna', 'trna', 'mrna',  'metabolite', 'complex']))>1:
         raise ValueError('At least one of the metabolite types is not considered in complex formation currently')
     
     
@@ -625,8 +658,7 @@ def make_complex_metabolite(**complex_info):# metabolites, *ids, *metabolite_typ
     else:
         raise ValueError('Metabolites are not in the same compartment')
     
-    mts = list(set(metabolite_types))
-    mt_type = '_'.join(mts)
+    mt_type = '_'.join(list(set(metabolite_types)))
     
     ids_ = '_'.join(ids)
     
@@ -656,7 +688,7 @@ def form_complex(**complex_info):
     Each value is a list:
         Metabolites is a list of cobra.Metabolite objects
         IDs is a list of string identifiers corresponding to each metabolite object
-        Metabolite_types is a list of strings; possible values are ['protein', 'rrna', 'trna', 'mrna',  'metabolite']
+        Metabolite_types is a list of strings; possible values are ['protein', 'rrna', 'trna', 'mrna',  'metabolite', 'complex']
   
     Output:
     A cobra.Reaction object representing the complex formation between metabolites
@@ -664,12 +696,15 @@ def form_complex(**complex_info):
     '''
     
     complex_metabolite, id_ = make_complex_metabolite(**complex_info)
-    complex_formation = cobra.Reaction(id_.replace('complex', 'COMPLEX_FORMATION'))
+    metabolites = complex_info['METABOLITES']
+    compartment = list(set([m.compartment for m in metabolites]))[0]
+
+    complex_formation = cobra.Reaction(id_.replace('complex', 'COMPLEX_FORMATION' + compartment))
     
     rxn = {m: -1 for m in metabolites}
     rxn[complex_metabolite] = 1
     complex_formation.add_metabolites(rxn)
     complex_formation.lower_bound = -1000
     
-    return complex_formation
+    return complex_formation, complex_metabolite
 

@@ -139,7 +139,7 @@ def export_mrna(gene_info, mrna_transcript_n):
     mrna_transcript_c.compartment = 'c'
 
     # make the transport reaction
-    mrna_export = cobra.Reaction(gene_info.hgnc_id + '_mRNAtn')
+    mrna_export = cobra.Reaction(gene_info.hgnc_id + '_mRNA_EXPORTtn')
     mrna_export.name = 'mRNA nuclear export'
     mrna_export.subsytem = 'mRNA_expression'
     rxn = dict()
@@ -179,7 +179,7 @@ def degrade_mrna(gene_info, mrna_transcript_c, polyA_length, L_mrna, mrna_base_c
 
     # 3'-->5' degradation------------------------------------------------------------------------------------
     if three_to_five:
-        transcript_degradation_1 = cobra.Reaction(gene_info.hgnc_id + "_3'to5'_mRNA_DEGRADATION")
+        transcript_degradation_1 = cobra.Reaction(gene_info.hgnc_id + "_3'to5'_mRNA_DEGRADATIONc")
         transcript_degradation_1.subsytem = 'Transcription'
 
         rxn_1 = rxn.copy()
@@ -197,7 +197,7 @@ def degrade_mrna(gene_info, mrna_transcript_c, polyA_length, L_mrna, mrna_base_c
 
     # 5'->3' degradation (decapping) ------------------------------------------------------------------------------------
     if decapping:
-        transcript_degradation_2_decapping = cobra.Reaction(gene_info.hgnc_id + "_DECAPPING_mRNA_DEGRADATION")
+        transcript_degradation_2_decapping = cobra.Reaction(gene_info.hgnc_id + "_DECAPPING_mRNA_DEGRADATIONc")
         transcript_degradation_2_decapping.subsytem = 'Transcription'
 
         rxn_2_decapping = rxn.copy()
