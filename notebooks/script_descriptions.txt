@@ -9,6 +9,8 @@
 8) build_trna_expression_reactions # all tRNA biogenesis reactions
 9) utils_2 # overlapping variables/functions used in proceedng scripts that require scripts 6-8
 10) build_protein_expression_reactions # protein translation, transport, and degradation
-11) build_ribosome_biogenesis_reactions # all ribosome biogenesis reactions (rRNA synthesis, RP synthesis, complex formation)
+11) test_expression_module # script to test that mrna_reactions and protein_reactions make sense for all combinations of cases
+12) build_ribosome_biogenesis_reactions # all ribosome biogenesis reactions (rRNA synthesis, RP synthesis, complex formation)
 
+Guide
 
