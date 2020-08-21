@@ -104,17 +104,18 @@ def process_mrna(gene_info, premrna_transcript_n, L_premrna, premrna_base_counts
                                              lariat_seq,molecule_type = 'mrna', compartment = 'n',
                                              triphosphate = False)
             
-            if gene_info.n_introns == None or pd.isna(gene_info.n_introns):
+            if gene_info.n_introns == None:
                 n_lariats = round(L_premrna * rate_intron)
                 if n_lariats < 1: # atleast one intron must be generated
                     n_lariats = 1
     #             n_splices = n_lariats * 2 # because on average, one more exon than intron
             else:
-                n_lariats = gene_information.n_introns                    
+                n_lariats = gene_info.n_introns                    
                                   
             rxn[lariats_n] = 1
             rxn[h2o_n] -= 1 # endonucleolytic cleavage
             # 10 ATP consumed per intron during splicing
+           
             rxn = hydrolyze_atp(rxn, n_atp = 10*n_lariats, compartment = 'n')
             
             # lariat degradation - no linearization reaction (just one triphosphate consumption)
@@ -231,7 +232,7 @@ def mrna_expression(gene_info):
     
     
     reactions = [transcript_elongation] + processing_reactions + [mrna_export] + degradation_reactions
-    return reactions
+    return reactions, mrna_transcript_c 
 
 
 # In[110]:

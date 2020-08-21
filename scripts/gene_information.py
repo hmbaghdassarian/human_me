@@ -4,9 +4,10 @@
 # In[4]:
 
 
-import cobra
 import pandas as pd
+import random
 
+import cobra
 from Bio.Seq import Seq
 from Bio.Alphabet import generic_dna, generic_rna
 from Bio.SeqUtils import molecular_weight as calculate_molecular_weight
@@ -19,7 +20,7 @@ from load_environmental_variables import *
 from utils import *
 
 
-# In[1]:
+# In[8]:
 
 
 class gene_information():
@@ -43,8 +44,10 @@ class gene_information():
         
         3-5) Relevant string representing sequence - required
         
-        6) PTMs is a dictionary with keys as the ptm and values as the number of that ptm for that gene.
-        PTMs are not currently considered for machinery. - optional
+        6) PTMs is a dictionary with keys as a string representing the ptm and values as an integer
+        representing the number of that ptms of that kind for that gene. The exception here is gpi, which is binary 
+        with 0 for no GPI Anchor and 1 indicating GPI Anchor presence. The keys of the dictionary allowed_ptms 
+        show all possible key values here. PTMs are not currently considered for machinery.  - optional
         
         7) TMD is an integer indicating the number of transmembrane domains the protein has. This is only relevant
         for proteins processed into secretory pathway. - optional
@@ -53,8 +56,9 @@ class gene_information():
         Not used in current format - unimplemented
         
         9) keff is a float representing the kinetic constant the enzyme in [units]. - optional
-        10) polyA_length is an integer representing the length of the polyA tail. This information will be estimated
-        if not provided. - optional
+        
+        10) polyA_length is an floating point representing the length of the polyA tail. This information will be 
+        estimated by a statistical model if not provided. - optional
         
         11) n_introns is an integer representing the length of the polyA tail. This information will be estimated
         if not provided. Should be specific to the transcript isoform. - optional
@@ -66,7 +70,7 @@ class gene_information():
         # current structure assumes that a protein is either machinery (catalyzing a reaction) or
         # a secreted protein (processed through secretory pathway, does not catalyze reaction) but not both
         
-        machinery = [g.id for g in metabolic_model.genes] # not super efficient to do this each time
+        machinery = [g.id for g in metabolic_model.genes] # not efficient to do this each time
         if hgnc_id in machinery:
             self.module = 'Machinery'
         else:
@@ -79,6 +83,9 @@ class gene_information():
             raise ValueError('The premrna sequence contains bases which are not allowed')
         if len(set(mrna_seq).difference(['A', 'U', 'G', 'C'])) > 0:
             raise ValueError('The mrna sequence contains bases which are not allowed')
+        if 'X' in protein_seq:
+            warnings.warn('The letter X is in the protein sequence. Replacing with a random amino acid')
+            protein_seq = protein_seq.replace('X', random.choice(amino_acids))
         if len(set(protein_seq).difference(amino_acids)) > 0:
             raise ValueError('The protein sequence contains amino acids which are not allowed')
         
@@ -107,6 +114,8 @@ class gene_information():
             
         if len(mrna_seq) < len(protein_seq)*3:
             warnings.warn('The mrna and protein sequence lengths are inconsistent')
+            
+        
         
         self.premrna_seq = Seq(premrna_seq, generic_rna)
         self.mrna_seq = Seq(mrna_seq, generic_rna)
@@ -115,20 +124,39 @@ class gene_information():
         self.protein_mass = calculate_molecular_weight(seq=self.protein_seq, seq_type='protein')
         self.L_protein = len(self.protein_seq)
         self.amino_acid_counts = {k: self.protein_seq.count(k) for k in amino_acids}
-
-        self.ptms = ptms
-        self.tmd = tmd
-        self.sp = sp
         
-        if polyA_length == None or (polyA_length >= 0 and round(polyA_length) == polyA_length):
-            self.polyA_length = polyA_length
-        elif pd.isna(polyA_length):
+        remove_ptms = list()
+        for k,v in ptms.items():
+            if v == None or pd.isna(v) or v == 0:
+                remove_ptms.append(k)
+        for k in remove_ptms:
+            del ptms[k]
+        self.ptms = ptms
+        
+        
+        if pd.isna(tmd) or tmd == None or round(tmd) == 0:
+            self.tmd = 0
+        else:
+            self.tmd = round(tmd) # must be an integer
+        
+        if pd.isna(sp) or sp == None:
+            self.sp = False 
+        elif type(sp) != bool:
+            raise ValueError('SP must be a boolean')
+        else:
+            self.sp = sp
+        
+        if polyA_length == None or pd.isna(polyA_length):
             self.polyA_length = None
+        elif polyA_length >= 0:
+            self.polyA_length = polyA_length # can be floating point, rounded in polyA_statistics script
         else:
             raise ValueError('polyA_length must either be an integer >= 0 or None/nan')
         
-        if n_introns == None or pd.isna(n_introns) or (n_introns >= 0 or round(n_introns) == n_introns):
-            self.n_introns = n_introns
+        if n_introns == None or pd.isna(n_introns): # or round(n_introns) == n_introns):
+            self.n_introns = None
+        elif n_introns >= 0:
+            self.n_introns = round(n_introns) # must be an integer
         else:
             raise ValueError('n_introns must either be an integer >= 0 or None/nan')
         
@@ -207,7 +235,6 @@ class gene_information():
                 if self.sp: 
                     warnings.warn('Signal peptides not considered for these compartments')
             else:
-                self.final_locations[loc] = 'Canonical Secretion'
                 if not self.sp:
                     # add non-canonical in future
                     
@@ -219,6 +246,10 @@ class gene_information():
                     warning_ += 'Non canonical secretion is not considered currently. Changing sp to True'
                     warnings.warn(warning_)
                     self.sp = True
+                if self.sp:
+                    self.final_locations[loc] = 'Canonical Secretion'
+                else:
+                    self.final_locations[loc] = 'Non-Canonical Secretion'
 
     def check_gene_information(self):
         if self.final_locations == None:
@@ -227,9 +258,13 @@ class gene_information():
             if self.module == 'Machinery':
                 # change in the future
                 warnings.warn('PTMs are not considered for machinery proteins currently')
+                self.ptms = {}
             elif len(set(self.ptms.keys()).difference(allowed_ptms.keys())) > 0:
                 warnings.warn('Atleast one of the PTMs provided will not be considered in this model')
                 self.ptms = {k:v for k in self.ptms.keys() if k in allowed_ptms.keys()}
+            elif 'gpi' in self.ptms.keys() and self.ptms['gpi'] > 1:
+                warnings.warn('GPI is binary, 1 for presence or 0 for absence. Changing to 1')
+                self.ptms['gpi'] = 1
 
 
         print('No errors raised')

@@ -8,7 +8,7 @@ from dotenv import load_dotenv, find_dotenv, dotenv_values
 import os
 
 
-# In[2]:
+# In[4]:
 
 
 print('load environmental variables')
@@ -25,8 +25,9 @@ try:
 
     folder_id = os.environ.get("FOLDER_ID")
 #     zip_name = os.environ.get("ZIP_NAME")
+    n_cores = int(os.environ.get("NO_CORES"))
 
-    email = os.environ.get("EMAIL")
+#     email = os.environ.get("EMAIL")
     
 except:
     raise ValueError('Create a .env file in root directory with appropriate variables filled in (see .env_template)')

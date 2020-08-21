@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[1]:
+# In[3]:
 
 
 import cobra
@@ -12,21 +12,33 @@ sys.path.insert(1, '../scripts/') # comment out in python script
 from load_environmental_variables import *
 
 
+# In[4]:
+
+
+# universal variables and inputs
+psim_me = pd.read_csv(local_data_path + 'processed/corrected_psim_me.csv', index_col = 0) #psim_me = pd.read_csv(root_path+'TRASH.csv', index_col = 0)
+human_model = cobra.io.load_json_model(local_data_path + 'processed/corrected_model.json')
+ptt_length = 160 # amino acid length greater than which co-translatioanl translocatoin occurs rather than post-translational
+nuclear_diffusion_limit = 40000 # 40 kDA and less proteins diffuse through nucleus
+rate_intron = 10/67000 # 10 introns / 67 kbp
+L_sp = 22 # secretory pathway signal peptide degradation
+Kv = 0.7 # secretory pathway vesicle coat coefficients
+
+
 # Gene information class variables
 
-# In[2]:
+# In[48]:
 
 
 # define necessary variables 
 compartments = {'c': 'cytosol',  'l': 'lysosome', 'm': 'mitochondria', 'r': 'endoplasmic reticulum', 
                 'e': 'extracellular space', 'x': 'peroxisome/glyoxysome', 'n': 'nucleus', 'g': 'golgi apparatus',
                 'i': 'inner mitochondrial compartment', 'pm': 'plasma membrane'}
-allowed_ptms = {'dsb': 'disulfide bond formation', 'gpi': 'GPI Anchor', 
-               'ng': 'N-linked glycosylation', 'og': 'O-linked glycosylation'}
+allowed_ptms = {'dsb': 'disulfide bond formation', 'gpi': 'GPI Anchor', 'og': 'O-linked glycosylation'}#,
+               #'ng': 'N-linked glycosylation'}
 
 amino_acids = ['A', 'R', 'N', 'D', 'C', 'E', 'Q', 'G', 'H', 'I', 'L', 'K', 'M', 'F', 'P', 'S', 'T', 'W', 'Y', 'V']
 
-human_model = cobra.io.load_json_model(local_data_path + 'processed/corrected_recon2_2.json')
 atp_n = human_model.metabolites.get_by_id('atp[n]')
 gtp_n = human_model.metabolites.get_by_id('gtp[n]')
 seq_metabolite_map = {human_model.metabolites.get_by_id('utp[n]'): 'U' , 
@@ -46,7 +58,7 @@ for k,v in seq_metabolite_map.items():
 
 # mrna_expression variables
 
-# In[3]:
+# In[49]:
 
 
 ppi_n =  human_model.metabolites.get_by_id('ppi[n]')
@@ -76,7 +88,7 @@ gp['P'] -= 2
 amet_n =  human_model.metabolites.get_by_id('amet[n]')
 ahcys_n =  human_model.metabolites.get_by_id('ahcys[n]')
 adp_n = human_model.metabolites.get_by_id('adp[n]')
-rate_intron = 10/67000 # 10 introns / 67 kbp
+
 
 # processing machinery
 cpsf = ['HGNC:2324', 'HGNC:2327', 'HGNC:19124', 'HGNC:2325', 'HGNC:2326', 'HGNC:25651', 'HGNC:13871']
@@ -155,7 +167,7 @@ decapping_rule = ' and '.join(deadenylation_machinery + decapping_degradation_ma
 
 # rrna_expression variables
 
-# In[4]:
+# In[50]:
 
 
 # variables needed
@@ -197,7 +209,7 @@ XPO1 = ['HGNC:12825']
 
 # trna variables
 
-# In[ ]:
+# In[51]:
 
 
 # add to utils
@@ -269,7 +281,7 @@ seq_synthetase_map = {
 }
 
 
-# In[ ]:
+# In[52]:
 
 
 # cytoplasmic transport expression
@@ -318,8 +330,6 @@ RNF181, UB2EV1 = ['HGNC:28037'], ['HGNC:12494']
 UB_ligases_c = UBA1 + UBE2D3 + STUB1
 UB_ligases_n = UBA1 + UB2EV1 + RNF181
 
-psim_me = pd.read_csv(local_data_path + 'processed/psim_me.csv', index_col = 0)
-
 proteasome_structural = ['HGNC:9554', 'HGNC:9560', 'HGNC:9557', 'HGNC:9556', 'HGNC:9564', 'HGNC:9565', 'HGNC:9558',
                         'HGNC:9566', 'HGNC:9567']
 proteasome_ubiquitin = ['HGNC:9559', 'HGNC:15759', 'HGNC:16889', 'HGNC:9561', 'HGNC:12612', 'HGNC:19678']
@@ -352,14 +362,13 @@ LONP2 = ['HGNC:20598']
 
 # nucleus
 seq_amino_acid_map_n = {aa_code: human_model.metabolites.get_by_id(aa_metabolite.id.replace('[c]', '[n]')) for aa_code, aa_metabolite in seq_amino_acid_map_c.items()}
-seq_amino_acid_map_compartments = {'c': seq_amino_acid_map_c, 'x': seq_amino_acid_map_x, 
-                                  'm': seq_amino_acid_map_m, 'n': seq_amino_acid_map_n}
+
+
 gdp_n = human_model.metabolites.get_by_id('gdp[n]')
 importins = ['HGNC:6400', 'HGNC:6394']
-nuclear_diffusion_limit = 40000 # 40 kDA and less proteins diffuse through nucleus
 
 
-# In[ ]:
+# In[53]:
 
 
 # ribosome biogenesis
@@ -376,10 +385,119 @@ eif5 = ['HGNC:3299', 'HGNC:30793']
 eifs = eif1 + eif2 + eif3 + eif4f + eif5 + ['HGNC:8554']
 
 
+# In[54]:
+
+
+# secretory pathway
+
+ASNA1, WRB  = ['HGNC:752'], ['HGNC:12790']
+ptnm = ['HGNC:20090', 'HGNC:5238', 'HGNC:7670', 'HGNC:18276', 'HGNC:16993', 
+                            'HGNC:18277', 'HGNC:11846', 'HGNC:21082', 'HGNC:10759', 'HGNC:11323', 'HGNC:11324', 
+                            'HGNC:11325', 'HGNC:11326'] + ASNA1
+ctnm = ['HGNC:20090', 'HGNC:5238', 'HGNC:16931', 'HGNC:7670', 'HGNC:10448', 'HGNC:17718', 'HGNC:23400', 
+        'HGNC:18276', 'HGNC:16993', 'HGNC:18277', 'HGNC:11846', 'HGNC:21082', 'HGNC:10759', 'HGNC:24624', 
+        'HGNC:23401', 'HGNC:28962', 'HGNC:26212', 'HGNC:11299', 'HGNC:11300', 'HGNC:11301', 'HGNC:11302', 
+        'HGNC:11303', 'HGNC:11307', 'HGNC:11323', 'HGNC:11324', 'HGNC:11325', 'HGNC:11326', 'HGNC:11740']
+sp_map = {'5682': 'HGNC:9530', '5683': 'HGNC:9531', '5684': 'HGNC:9532', '5685': 'HGNC:9533', '5686': 'HGNC:9534', 
+          '5688': 'HGNC:9536', '143471': 'HGNC:22985', '5689': 'HGNC:9537', '5690': 'HGNC:9539', 
+          '5691': 'HGNC:9540', '5692': 'HGNC:9541', '5693': 'HGNC:9542', '5694': 'HGNC:9543', '5695': 'HGNC:9544', 
+          '5696': 'HGNC:9545', '5698': 'HGNC:9546', '5699': 'HGNC:9538', '122706': 'HGNC:31963', 
+          '5707': 'HGNC:9554', '5708': 'HGNC:9559', '5710': 'HGNC:9561', '5711': 'HGNC:9563', '9861': 'HGNC:9564', 
+          '5713': 'HGNC:9565', '5714': 'HGNC:9566', '5715': 'HGNC:9567', '5716': 'HGNC:9555', '5717': 'HGNC:9556', 
+          '5718': 'HGNC:9557', '5719': 'HGNC:9558', '10213': 'HGNC:16889', '8624': 'HGNC:3043', 
+          '56984': 'HGNC:24929', '84262': 'HGNC:22420', '389362': 'HGNC:21108'}
+sp_rule = '((5682) or (5683) or (5684) or (5685) or (5686) or (5688) or (143471)) and ((5689) or (5690) or (5691) or (5692) or (5693) or (5694) or (5695) or (5696) or (5698) or (5699) or (122706)) and (8624) and (56984) and (84262) and (389362) and (5707) and (5708) and (5711) and (5710) and (9861) and (5713) and (5714) and (5715) and (5716) and (5717) and (5718) and (5719) and (10213)'
+for k,v in sp_map.items():
+    if k != '5698':
+        sp_rule = sp_rule.replace(k,v)
+sp_rule = sp_rule.replace('5698', 'HGNC:9546')
+    
+
+o2_r = human_model.metabolites.get_by_id('o2[r]')
+h2o2_r = human_model.metabolites.get_by_id('h2o2[r]')
+
+P4HB = ['HGNC:8548']
+gpi_machinery = ['HGNC:4446', 'HGNC:25712', 'HGNC:8965', 'HGNC:14937', 'HGNC:14938', 'HGNC:15791']
+hdca_r = human_model.metabolites.get_by_id('hdca[r]')
+gpi_hs_r = human_model.metabolites.get_by_id('gpi_hs[r]')
+balanced_gpi = {'N': 6,'O': 42,'S': 1,'P': 5,'E': 1,'C': 58,'I': 2,'F': 1,'H': 107, 'R': 1}
+# M4ATAer = human_model.reactions.get_by_id('M4ATAer').metabolites
+m4ataer_0 = human_model.metabolites.get_by_id('gpi_sig[r]')
+m4ataer_1 = human_model.metabolites.get_by_id('m_em_3gacpail_hs[r]')
+m4ataer_2 = human_model.metabolites.get_by_id('m_em_3gacpail_prot_hs[r]')
+m4ataer_3 = human_model.metabolites.get_by_id('pre_prot[r]')
+M4ATAer = {m4ataer_0:1,m4ataer_1:-1,m4ataer_2:1, m4ataer_3:-1}
+#number_BiP = len(gene_info.protein_seq)/40
+
+
+# In[55]:
+
+
+
+copii_r_m = ['HGNC:14562', 'HGNC:4430', 'HGNC:6632', 'HGNC:9758', 'HGNC:10535', 'HGNC:10697', 'HGNC:29006', 
+             'HGNC:10700', 'HGNC:10701', 'HGNC:10703', 'HGNC:17052', 'HGNC:11440']
+copii_gpi_m = ['HGNC:14562', 'HGNC:4430', 'HGNC:9758', 'HGNC:10535', 'HGNC:10697', 'HGNC:29006', 'HGNC:10700', 
+               'HGNC:10701', 'HGNC:10703', 'HGNC:17052', 'HGNC:11440']
+udpacgal_g = human_model.metabolites.get_by_id('udpacgal[g]')
+udpgal_g = human_model.metabolites.get_by_id('udpgal[g]')
+uacgam_g = human_model.metabolites.get_by_id('uacgam[g]')
+h_g = human_model.metabolites.get_by_id('h[g]')
+udp_g = human_model.metabolites.get_by_id('udp[g]')
+
+og_rule = '(HGNC:16347 or HGNC:19873 or HGNC:4124 or HGNC:4127 or HGNC:4131 or HGNC:4125 or HGNC:4129 or HGNC:19875 or HGNC:4128 or HGNC:23242 or HGNC:4123 or HGNC:4130 or HGNC:4126) and HGNC:24337 and HGNC:24338 and HGNC:4205'
+copi_m = ['HGNC:649', 'HGNC:14562', 'HGNC:2230', 'HGNC:2231', 'HGNC:2232', 'HGNC:2234', 'HGNC:2236', 'HGNC:2243', 'HGNC:19356', 
+          'HGNC:9758', 'HGNC:10700', 'HGNC:11443', 'HGNC:15942', 'HGNC:25847']
+clathrin_m = ['HGNC:652', 'HGNC:2090', 'HGNC:2091', 'HGNC:2092', 'HGNC:17842', 'HGNC:16064', 'HGNC:17079', 
+              'HGNC:14902', 'HGNC:11441', 'HGNC:11442', 'HGNC:11430']
+
+
+# In[56]:
+
+
+retro_mach_glyco = ['HGNC:16695', 'HGNC:28454', 'HGNC:14236', 'HGNC:18261', 'HGNC:10717', 'HGNC:30396', 'HGNC:20738', 
+           'HGNC:12520', 'HGNC:12666']
+ERDJ5 = ['HGNC:24637']
+
+udpgal_r = human_model.metabolites.get_by_id('udpgal[r]')
+uacgam_r = human_model.metabolites.get_by_id('uacgam[r]')
+udpacgal_r = human_model.metabolites.get_by_id('udpacgal[r]')
+udp_r = human_model.metabolites.get_by_id('udp[r]')
+
+hdca_l = human_model.metabolites.get_by_id('hdca[l]')
+h_l = human_model.metabolites.get_by_id('h[l]')
+h2o_l = human_model.metabolites.get_by_id('h2o[l]')
+o2_l = human_model.metabolites.get_by_id('o2[l]')
+h2o2_l = human_model.metabolites.get_by_id('h2o2[l]')
+
+udpacgal_l = human_model.metabolites.get_by_id('udpacgal[l]')
+udp_l = human_model.metabolites.get_by_id('udp[l]')
+
+HSP90AB1 = ['HGNC:5258']
+escrt = pd.read_csv(local_data_path + 'raw/escrt_complexes.txt', sep = '\t')['HGNC ID'].tolist()
+eps = ['HGNC:3419', 'HGNC:21604']
+endocytic_machinery = sorted(set(proteasome_ubiquitin + escrt + eps + clathrin_m))
+
+seq_amino_acid_map_l = {aa_code: human_model.metabolites.get_by_id(aa_metabolite.id.replace('[c]', '[l]')) for aa_code, aa_metabolite in seq_amino_acid_map_c.items()}
+cathepsins = ['HGNC:2527', 'HGNC:2529', 'HGNC:9251']
+
+
 # # Functions
 
 # In[ ]:
 
+
+def blockPrint():
+    sys.stdout = open(os.devnull, 'w')
+def enablePrint():
+    sys.stdout = sys.__stdout__
+
+
+# In[ ]:
+
+
+seq_amino_acid_map_compartments = {'c': seq_amino_acid_map_c, 'x': seq_amino_acid_map_x, 
+                                  'm': seq_amino_acid_map_m, 'n': seq_amino_acid_map_n, 'l': seq_amino_acid_map_l}
+adp_c = ndp_map_c['A']
 
 atp_m = human_model.metabolites.get_by_id('atp[m]')
 adp_m = human_model.metabolites.get_by_id('adp[m]')
@@ -400,13 +518,17 @@ pi_r = human_model.metabolites.get_by_id('pi[r]')
 atp_r = human_model.metabolites.get_by_id('atp[r]')
 adp_r = human_model.metabolites.get_by_id('adp[r]')
 
-adp_c = ndp_map_c['A']
+pi_l = human_model.metabolites.get_by_id('pi[l]')
+atp_l = human_model.metabolites.get_by_id('atp[l]')
+adp_l = human_model.metabolites.get_by_id('adp[l]')
 
-atp_compartments = {'c': atp_c, 'm': atp_m, 'i': atp_m, 'x': atp_x, 'n': atp_n, 'r': atp_r}
-adp_compartments = {'c': adp_c, 'm': adp_m, 'i': adp_m, 'x': adp_x, 'n': adp_n, 'r': adp_r}
-h2o_compartments = {'c': h2o_c, 'm': h2o_m, 'i': h2o_m, 'x': h2o_x, 'n': h2o_n, 'r': h2o_r}
-pi_compartments = {'c': pi_c, 'm': pi_m, 'i': pi_m, 'x': pi_x, 'n': pi_n, 'r': pi_r}
-h_compartments = {'c': h_c, 'm': h_m, 'i': h_i, 'x': h_x, 'n': h_n, 'r': h_r}
+
+
+atp_compartments = {'c': atp_c, 'm': atp_m, 'i': atp_m, 'x': atp_x, 'n': atp_n, 'r': atp_r, 'l': atp_l}
+adp_compartments = {'c': adp_c, 'm': adp_m, 'i': adp_m, 'x': adp_x, 'n': adp_n, 'r': adp_r, 'l': adp_l}
+h2o_compartments = {'c': h2o_c, 'm': h2o_m, 'i': h2o_m, 'x': h2o_x, 'n': h2o_n, 'r': h2o_r, 'l': h2o_l}
+pi_compartments = {'c': pi_c, 'm': pi_m, 'i': pi_m, 'x': pi_x, 'n': pi_n, 'r': pi_r, 'l': pi_l}
+h_compartments = {'c': h_c, 'm': h_m, 'i': h_i, 'x': h_x, 'n': h_n, 'r': h_r, 'l': h_l}
 
 def hydrolyze_atp(rxn, n_atp, compartment):
     '''
@@ -626,10 +748,10 @@ def make_protein_metabolite(id_, amino_acid_counts, L_protein, compartment):
     return protein_metabolite
 
 
-# In[2]:
+# In[1]:
 
 
-def make_complex_metabolite(**complex_info):# metabolites, *ids, *metabolite_types):
+def make_complex_metabolite(complex_id = None, **complex_info):# metabolites, *ids, *metabolite_types):
     '''
     
     Inputs:
@@ -639,6 +761,7 @@ def make_complex_metabolite(**complex_info):# metabolites, *ids, *metabolite_typ
         IDs is a list of string identifiers corresponding to each metabolite object
         Metabolite_types is a list of strings; possible values are ['protein', 'rrna', 'trna', 'mrna',  'metabolite']
         This means complexes can form between any of these species, including other complexes; metabolite is a M-model metabolite
+    complex_id is a string for the id of the complex metabolite, otherwise will form one from metabolite ids
     Output:
     A cobra.Metabolite object representing the complex formed between metabolites
     
@@ -662,9 +785,19 @@ def make_complex_metabolite(**complex_info):# metabolites, *ids, *metabolite_typ
     
     ids_ = '_'.join(ids)
     
-    id_ = ids_ + '_' + mt_type + '_complex'
+    if complex_id == None:
+        id_ = ids_ + '_' + mt_type
+    else: 
+        id_ = complex_id + '_' + mt_type
     
-    complex_metabolite = cobra.Metabolite(id_ + '[' + compartment + ']')
+    complex_id = id_ + '_complex' + '[' + compartment + ']'
+    if len(complex_id)>(256-8-4-len(mt_type)): #-8 and -4 for _complex and compartment appended to end
+        err_msg = 'Cobrapy requires metabolite ids to be less than 256 characters, please specify a '
+        err_msg += 'shorter user-defined complex id'
+        raise ValueError(err_msg)
+    
+        
+    complex_metabolite = cobra.Metabolite(complex_id)
     complex_metabolite.compartment = compartment
     complex_metabolite.charge = sum([m.charge for m in metabolites])
     
@@ -679,7 +812,7 @@ def make_complex_metabolite(**complex_info):# metabolites, *ids, *metabolite_typ
     
     return complex_metabolite, id_
 
-def form_complex(**complex_info):
+def form_complex(reaction_id = None, complex_id = None, **complex_info):
     
     '''
     
@@ -695,11 +828,15 @@ def form_complex(**complex_info):
     
     '''
     
-    complex_metabolite, id_ = make_complex_metabolite(**complex_info)
+    complex_metabolite, id_ = make_complex_metabolite(complex_id, **complex_info)
     metabolites = complex_info['METABOLITES']
     compartment = list(set([m.compartment for m in metabolites]))[0]
 
-    complex_formation = cobra.Reaction(id_.replace('complex', 'COMPLEX_FORMATION' + compartment))
+    if reaction_id == None:
+        reaction_id = id_ + 'COMPLEX_FORMATION' + compartment
+    else:
+        reaction_id = reaction_id + 'COMPLEX_FORMATION' + compartment
+    complex_formation = cobra.Reaction()
     
     rxn = {m: -1 for m in metabolites}
     rxn[complex_metabolite] = 1

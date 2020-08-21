@@ -1,13 +1,19 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[1]:
+# In[68]:
 
 
 from Bio.SeqUtils import molecular_weight as calculate_molecular_weight
 import random
 import itertools
+import numpy as np
+import pandas as pd
+import gc
 import multiprocessing
+import os
+import warnings
+import time
 n_cores = multiprocessing.cpu_count() # number of cores to use in parallelization
 
 import sys
@@ -172,41 +178,69 @@ psim_test.columns = ['Seq', 'SP', 'POLYA_LENGTH', 'DSB', 'OG', 'TMD', 'LOCATION'
 
 df2 = pd.DataFrame(psim_test['Seq'].to_list(), columns=seq_df.columns.tolist())
 psim_test = pd.concat([df2, psim_test[psim_test.columns.tolist()[1:]]], axis = 1)
+
 del df2
 del seq_df
+del seq_combos
+del location_combos
 
-psim_test['HGNC_ID'] = ['HGNC_' + str(i) for i in psim_test.index] # underscore instead of colon to not be in machinery
+# psim_test['HGNC_ID'] = ['HGNC_' + str(i) for i in psim_test.index] # underscore instead of colon to not be in machinery
 
 
 # In[7]:
 
 
-n_iter = psim_test.shape[0]
-def test_expression_module(i):
-    print('{} of {}. {}% complete'.format(i+1, n_iter, (i+1)/n_iter * 100))
-    error = list()
-    entries = psim_test.loc[i,]
+if not os.path.isdir(local_data_path + 'processed/test_modules'):
+    os.mkdir(local_data_path + 'processed/test_modules/')
 
+n_iter = psim_test.shape[0]
+psim_test_cols = psim_test.columns.tolist()
+psim_test = np.array(psim_test)
+n_splits = 10000 # number of files to create, limits ram on any given run
+split_length = round(n_iter/n_splits)
+idxes = sorted(set(list(range(0,n_iter,split_length)) + [n_iter]))
+gc.collect()
+
+
+
+def blockPrint():
+    sys.stdout = open(os.devnull, 'w')
+def enablePrint():
+    sys.stdout = sys.__stdout__
+warnings.filterwarnings("ignore")
+def test_expression_module(i):
+    if (i+1)%1000 == 0:
+        print('{} of {}. {}% complete'.format(i+1, split_length, (i+1)/split_length * 100))
+    error = list()
+    entries = list(psim_test[i])#psim_test.loc[i,]
+    
+    
     try:
-        gene_info = gene_information(metabolic_model=human_model, hgnc_id = entries['HGNC_ID'], 
-                    premrna_seq = entries['PREMRNA_SEQ'], mrna_seq = entries['MRNA_SEQ'], 
-                    protein_seq = entries['PROTEIN_SEQ'], 
-                    ptms = dict(zip(['dsb', 'og', 'gpi'],[entries['DSB'], entries['OG'], entries['GPI']])),
-                    tmd = entries['TMD'], sp = entries['SP'], polyA_length = entries['POLYA_LENGTH'], 
-                    n_introns = entries['N_INTRONS'])
-        gene_info.get_final_locations(metabolic_model = human_model, final_locations = entries['LOCATION'])
+        blockPrint()
+        gene_info = gene_information(metabolic_model=human_model, hgnc_id = 'HGNC_' + str(i), 
+                    premrna_seq = entries[0], mrna_seq = entries[1], 
+                    protein_seq = entries[2], 
+                    ptms = dict(zip(['dsb', 'og', 'gpi'],[entries[5], entries[6], entries[9]])),
+                    tmd = entries[7], sp = entries[3], polyA_length = entries[4], 
+                    n_introns = entries[10])
+        gene_info.get_final_locations(metabolic_model = human_model, final_locations = entries[8])
         gene_info.check_gene_information()
+        enablePrint()
         try:
             mrna_reactions = build_mrna.mrna_expression(gene_info)
             if len([r.id for r in mrna_reactions if len(r.check_mass_balance()) > 0]) != 0:
                 error += ['mrna reaction mass balance']
+            del mrna_reactions
             try:
                 protein_expression_reactions, protein_metabolites = build_protein.get_protein_expression_reactions(gene_info)
                 if len([r.id for r in protein_expression_reactions if len(r.check_mass_balance()) > 0]) != 0:
                     error += ['protein reaction mass balance']
 
-                if sorted([p.compartment for p in protein_metabolites]) != sorted(entries['LOCATION']):
+                if sorted([p.compartment for p in protein_metabolites]) != sorted(entries[8]):
                     error += ['protein metabolite incorrect compartment']
+                del protein_expression_reactions
+                del protein_metabolites
+                del gene_info
             except:
                 error += ['could not create protein reactions']
 
@@ -216,37 +250,48 @@ def test_expression_module(i):
 
     except: 
         error += ['could not create gene information object']
-
+    gc.collect()
     if len(error)>0:
         return (i, ';'.join(error))
     else:
+        del error
         return (float('nan'),float('nan'))
 
 
 # In[14]:
 
 
-# for i in psim_test.index:#range(10):
+# for i in list(range(n_iter)):#range(10):
 #     res.append(test_expression_module(i))
-pool = multiprocessing.Pool(processes=n_cores)
-res = pool.map(test_expression_module, psim_test.index)#range(20))
-pool.close()
+start_time = time.time()
+if __name__ == '__main__':
+    for i in range(len(idxes)-1):
+        print('Starting data frame number: {} of {}'.format(i+1, n_splits))
+        print('------------------------------------------------------------')
+        idx = list(range(idxes[i], idxes[i+1]+1))
+        
+        pool = multiprocessing.Pool(processes=round(n_cores/2))
+        res = pool.map(test_expression_module, idx)#range(20))
+        pool.close()
 
-res = [i for i in res if not pd.isna(i[0])]
-if len(res) > 0:
-    fail_index, error_message = list(zip(*res))
-    psim_fail = psim_test.loc[fail_index,:].copy()
-    psim_fail['ERROR'] = error_message
-else:
-    psim_fail = pd.DataFrame(columns = psim_test.columns.tolist() + ['ERROR'])
-del psim_test
-psim_fail.to_csv(local_data_path + 'processed/test_expression_module.csv')
-
-print('COMPLETE')
-
-
-# In[ ]:
-
-
-
+        res = [i for i in res if not pd.isna(i[0])]
+        if len(res) > 0:
+            fail_index, error_message = list(zip(*res))
+            psim_fail = psim_test[fail_index].copy()
+            psim_fail = pd.DataFrame(psim_fail, columns = psim_test_cols)
+            psim_fail['ERROR'] = error_message
+        else:
+            psim_fail = pd.DataFrame(columns = psim_test_cols + ['ERROR'])
+        
+        gc.collect()
+        file_name = local_data_path + 'processed/test_modules/test_expression_module' + str(i) + '.csv'
+        psim_fail.to_csv(file_name, compression = 'gzip')
+        del psim_fail
+        gc.collect()
+        
+        print("--- Time passed so far: {:.3f} hours ---".format((time.time() - start_time)/3600))
+        
+    del psim_test
+    print('COMPLETE')
+    gc.collect()
 
