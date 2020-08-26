@@ -200,7 +200,7 @@ class gene_information():
         synthesis (Cytosolic Transport, Mitochondrial Expression, Canonical Secretion, Non-Canonical Secretion) 
         depending on Boolean rules. Traditional are those that don't go through the secretory pathway.'''
         
-        if self.module != 'Non-Machinery':
+        if self.module != ['Non-Machinery']:
             if final_locations != None:
                 warnings.warn(self.hgnc_id + ': Final location extacted from cobrapy model, will disregard user input.')
   
@@ -232,9 +232,8 @@ class gene_information():
 #                     compartments_ = {'i'}
                 final_locations += [get_reaction_compartment(r)]
             final_locations = sorted(set(final_locations))# + fl)) # redundancy from multiple reactions
-
-                 
-        if 'Non-Machinery' in self.module:
+        elif self.module == ['Non-Machinery']:
+    
             if final_locations == None:
                 raise ValueError(self.hgnc_id + ': For non-machinery, must specify the final locations')
             if type(final_locations) != list:
@@ -242,7 +241,8 @@ class gene_information():
             if len(set(final_locations).difference(compartments.keys())) > 0:
                 error = 'At least one of the locations specified is not allowed in this model.'
                 raise ValueError(error + ' Allowable comparments include: ' + ', '.join(list(compartments.keys())))
-
+        else:
+            raise ValueError('Model does not currently deal with both non-machinery and machinery')
    
         # transport rules
         # assume location dictates transport pathway ind of sp;
@@ -284,10 +284,10 @@ class gene_information():
                 # change in the future
                 warnings.warn(self.hgnc_id + ': PTMs are not considered for machinery proteins currently')
                 self.ptms = {}
-            elif len(set(self.ptms.keys()).difference(allowed_ptms.keys())) > 0:
+            if len(set(self.ptms.keys()).difference(allowed_ptms.keys())) > 0:
                 warnings.warn(self.hgnc_id + ': Atleast one of the PTMs provided will not be considered in this model')
                 self.ptms = {k:v for k in self.ptms.keys() if k in allowed_ptms.keys()}
-            elif 'gpi' in self.ptms.keys() and self.ptms['gpi'] > 1:
+            if 'gpi' in self.ptms.keys() and self.ptms['gpi'] > 1:
                 warnings.warn(self.hgnc_id + ': GPI is binary, 1 for presence or 0 for absence. Changing to 1')
                 self.ptms['gpi'] = 1
 
