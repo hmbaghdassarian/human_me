@@ -6,8 +6,13 @@ scripts/__pycache__/
 __pycache__/
 
 # change in the future - large files
-*.json
-*.csv
+non_machinery.txt
+psim_recon2_2.csv
+recon2_2.json
+expression_module_model.json
+expression_module_psim.csv
+psim_recon2_2.csv
+required_metabolic_metabolites.txt
 
 
 #*.py[cod]
