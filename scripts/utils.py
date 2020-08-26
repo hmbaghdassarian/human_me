@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[3]:
+# In[19]:
 
 
 import cobra
@@ -17,6 +17,7 @@ from load_environmental_variables import *
 
 # universal variables and inputs
 psim_me = pd.read_csv(local_data_path + 'processed/corrected_psim_me.csv', index_col = 0) #psim_me = pd.read_csv(root_path+'TRASH.csv', index_col = 0)
+psim_me['SP'] = psim_me['SP'].map({1: True, 0: False})
 human_model = cobra.io.load_json_model(local_data_path + 'processed/corrected_model.json')
 ptt_length = 160 # amino acid length greater than which co-translatioanl translocatoin occurs rather than post-translational
 nuclear_diffusion_limit = 40000 # 40 kDA and less proteins diffuse through nucleus
@@ -31,6 +32,23 @@ Kv = 0.7 # secretory pathway vesicle coat coefficients
 
 
 # define necessary variables 
+rs = pd.read_csv(local_data_path + 'raw/small_ribosomal_protein.csv', index_col = None, skiprows = [0])
+rl = pd.read_csv(local_data_path + 'raw/large_ribosomal_protein.csv', index_col = None, skiprows = [0])
+
+
+expression_model = cobra.io.json.load_json_model(root_path + 'expression_module_model.json')
+# to work with gene_information class
+expression_model_2 = expression_model.copy()
+for r in expression_model_2.genes.get_by_id('ribosome').reactions:
+    r.gene_reaction_rule = r.gene_reaction_rule.replace('ribosome', ' and '.join(rs['HGNC ID (gene)'].tolist() + rl['HGNC ID (gene)'].tolist()))
+
+
+expression_psim = pd.read_csv(root_path + 'expression_module_psim.csv', index_col = 0)
+metabolic_machinery = [g.id for g in human_model.genes] # not efficient to do this each time
+expression_machinery = expression_psim.HGNC_ID.tolist()
+all_machinery = metabolic_machinery + expression_machinery
+
+
 compartments = {'c': 'cytosol',  'l': 'lysosome', 'm': 'mitochondria', 'r': 'endoplasmic reticulum', 
                 'e': 'extracellular space', 'x': 'peroxisome/glyoxysome', 'n': 'nucleus', 'g': 'golgi apparatus',
                 'i': 'inner mitochondrial compartment', 'pm': 'plasma membrane'}
@@ -72,6 +90,7 @@ rnap2 = rnap[rnap['Approved name'].isin([i for i in rnap['Approved name'] if ' I
 
 tfiis, tfiif, ell = ['HGNC:11612', 'HGNC:11614'], ['HGNC:4652', 'HGNC:4653'], ['HGNC:23114', 'HGNC:17064', 'HGNC:23113']
 elongin = pd.read_csv(local_data_path + 'raw/elongin.csv', index_col = None, skiprows = [0])
+elongin.drop(index = elongin[elongin['HGNC ID (gene)'] == 'HGNC:24617'].index, inplace = True)
 elongator = pd.read_csv(local_data_path + 'raw/elongator.csv', index_col = None, skiprows = [0])
 fact = ['HGNC:11327', 'HGNC:11465']
 ec = rnap2['HGNC ID (gene)'].tolist() + elongin['HGNC ID (gene)'].tolist() + elongator['HGNC ID (gene)'].tolist()
@@ -242,7 +261,7 @@ seq_amino_acid_map_c = {
     'T': human_model.metabolites.get_by_id('thr_L[c]'),
     'W': human_model.metabolites.get_by_id('trp_L[c]'),
     'Y': human_model.metabolites.get_by_id('tyr_L[c]'),
-    'V': human_model.metabolites.get_by_id('val_L[c]')
+    'V': human_model.metabolites.get_by_id('val_L[c]'), 
 }
 ppi_c =  human_model.metabolites.get_by_id('ppi[c]')
 
@@ -373,8 +392,6 @@ importins = ['HGNC:6400', 'HGNC:6394']
 
 # ribosome biogenesis
 UCHL3 = ['HGNC:12515']
-rs = pd.read_csv(local_data_path + 'raw/small_ribosomal_protein.csv', index_col = None, skiprows = [0])
-rl = pd.read_csv(local_data_path + 'raw/large_ribosomal_protein.csv', index_col = None, skiprows = [0])
 pre40s_rbfs = ['HGNC:25542', 'HGNC:21173', 'HGNC:32790', 'HGNC:29100']
 pre60s_rbfs = ['HGNC:18477', 'HGNC:25789', 'HGNC:19440', 'HGNC:20870', 'HGNC:17083', 'HGNC:4333']
 
@@ -490,6 +507,27 @@ def blockPrint():
     sys.stdout = open(os.devnull, 'w')
 def enablePrint():
     sys.stdout = sys.__stdout__
+
+
+# In[ ]:
+
+
+def get_reaction_compartment(reaction):
+    '''Input is a cobra.Reaction, output is a singular compartment. This function maps reactions to a particular 
+    compartment according to some rules'''
+    
+    compartments_ = list(reaction.compartments.copy())
+    if len(compartments_) > 1: # for reactions that occur in more than one compartment
+        if 'c' in compartments_ and len(compartments_) == 2: # remove cytoplasmic compartment between the two for machinery
+            compartments_.remove('c')
+        else: # choose most common compartment 
+            compartments_ = [max(compartments_, key = compartments_.count)]
+    if len(compartments_) > 1:
+        raise ValueError('Failed to map reaction to a singular compartment')
+    elif compartments_[0] not in compartments.keys():
+        raise ValueError('Mapped reaction to a compartment that is not allowed in ME model')
+    else:
+        return compartments_[0]
 
 
 # In[ ]:
@@ -778,6 +816,9 @@ def make_complex_metabolite(complex_id = None, **complex_info):# metabolites, *i
     compartments = list(set([m.compartment for m in metabolites]))
     if len(compartments) == 1:
         compartment = compartments[0]
+    # exception of ribosome complex
+    elif (len(compartments) == 2) and ('c' in compartments) and ('mature_ribosome_complex_complex[c]' in [m.id for m in metabolites]):
+        compartment = 'c'
     else:
         raise ValueError('Metabolites are not in the same compartment')
     
@@ -833,10 +874,10 @@ def form_complex(reaction_id = None, complex_id = None, **complex_info):
     compartment = list(set([m.compartment for m in metabolites]))[0]
 
     if reaction_id == None:
-        reaction_id = id_ + 'COMPLEX_FORMATION' + compartment
+        reaction_id = id_ + '_COMPLEX_FORMATION' + compartment
     else:
-        reaction_id = reaction_id + 'COMPLEX_FORMATION' + compartment
-    complex_formation = cobra.Reaction()
+        reaction_id = reaction_id + '_COMPLEX_FORMATION' + compartment
+    complex_formation = cobra.Reaction(reaction_id)
     
     rxn = {m: -1 for m in metabolites}
     rxn[complex_metabolite] = 1

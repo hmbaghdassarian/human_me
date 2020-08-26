@@ -81,7 +81,7 @@ def fold_protein_cytosolic(gene_info, unfolded_protein_c):
 # UBC
 ubc_psim = psim_me[psim_me['HGNC_ID'] == 'HGNC:12468'] # UBC
 ubc_psim['Location'] = 'c'
-ubc_info = gene_information(metabolic_model = human_model, hgnc_id = ubc_psim['HGNC_ID'].values.tolist()[0], 
+ubc_info = gene_information(hgnc_id = ubc_psim['HGNC_ID'].values.tolist()[0], 
                          premrna_seq=ubc_psim['PREMRNA_SEQ'].values.tolist()[0], 
                             mrna_seq=ubc_psim['MRNA_SEQ'].values.tolist()[0], 
                             protein_seq=ubc_psim['PROTEIN_SEQ'].values.tolist()[0],
@@ -113,7 +113,7 @@ ubiquitin_monomerization_ubc.gene_reaction_rule = USP5[0]
 # UBB
 ubb_psim = psim_me[psim_me['HGNC_ID'] == 'HGNC:12463'] # UBB
 ubb_psim['Location'] = 'c'
-ubb_info = gene_information(metabolic_model = human_model, hgnc_id = ubb_psim['HGNC_ID'].values.tolist()[0], 
+ubb_info = gene_information(hgnc_id = ubb_psim['HGNC_ID'].values.tolist()[0], 
                          premrna_seq=ubb_psim['PREMRNA_SEQ'].values.tolist()[0], 
                             mrna_seq=ubb_psim['MRNA_SEQ'].values.tolist()[0], 
                             protein_seq=ubb_psim['PROTEIN_SEQ'].values.tolist()[0],
@@ -649,7 +649,7 @@ def co_translational_translocation(gene_info):
     rxn[h2o_r] = -L_sp
     rxn[unprocessed_protein_r],rxn[folded_protein_r] = -1, 1
     
-    sp_degradation = cobra.Reaction(gene_info.hgnc_id + '_SP_degradation')
+    sp_degradation = cobra.Reaction(gene_info.hgnc_id + '_SP_degradationr')
     sp_degradation.subsystem = 'Protein Expression'
     sp_degradation.add_metabolites(rxn)
     sp_degradation.gene_reaction_rule = sp_rule

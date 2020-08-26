@@ -27,7 +27,8 @@ sp_dict = {1: True, 0: False, float('nan'): False}
 ptm_cols = ['DSB', 'GPI', 'NG', 'OG']
 ptm_keys = list(allowed_ptms.keys())
 
-def generate_geneinfo_object(hgnc_id, psim = psim_me):
+def generate_geneinfo_object(hgnc_id, psim = psim_me, metabolic_machinery = metabolic_machinery, 
+                             metabolic_model = human_model):
     '''Generates gene information object from PSIM'''
     
     idx = psim[psim.HGNC_ID == hgnc_id].index.tolist()
@@ -38,13 +39,14 @@ def generate_geneinfo_object(hgnc_id, psim = psim_me):
 
     entries = psim.loc[idx[0],:]
 
-    gene_info = gene_information(metabolic_model=human_model, hgnc_id = entries['HGNC_ID'], 
+    gene_info = gene_information(hgnc_id = entries['HGNC_ID'], 
                     premrna_seq = entries['PREMRNA_SEQ'], mrna_seq = entries['MRNA_SEQ'], 
                     protein_seq = entries['PROTEIN_SEQ'], 
+                    metabolic_machinery = metabolic_machinery,
                     ptms = dict(zip(['dsb', 'og', 'gpi'],[entries['DSB'], entries['OG'], entries['GPI']])),
                     tmd = entries['TMD'], sp = entries['SP'], polyA_length = entries['POLYA_LENGTH'], 
                     n_introns = entries['N_INTRONS'])
-    gene_info.get_final_locations(metabolic_model = human_model, final_locations = entries['LOCATION'])
+    gene_info.get_final_locations(metabolic_model = metabolic_model, final_locations = entries['LOCATION'])
     gene_info.check_gene_information()
     return gene_info
 
