@@ -12,7 +12,7 @@ recon2_2.json
 expression_module_model.json
 expression_module_psim.csv
 psim_recon2_2.csv
-required_metabolic_metabolites.txt
+required_metabolic_model_metabolites.txt
 
 
 #*.py[cod]
