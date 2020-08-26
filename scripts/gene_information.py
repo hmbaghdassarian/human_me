@@ -258,7 +258,7 @@ class gene_information():
                 # mitochondrial expression not considered
                 self.final_locations[loc] = 'Cytosolic Tranport'
                 if self.sp: 
-                    warnings.warn(self.hgnc_id + ': Signal peptides not considered for these compartments')
+                    warnings.warn(self.hgnc_id + ': Signal peptides not considered for ' + compartments[loc])
             else:
                 if not self.sp:
                     # add non-canonical in future
