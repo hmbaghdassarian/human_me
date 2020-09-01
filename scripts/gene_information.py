@@ -27,38 +27,40 @@ class gene_information():
     '''This class compiles all the necessary information for a given protein to be expressed in the 
     ME model. 
     
-    Notes: As of right now, machinery PTMs are not considered. Proteins processed through the secretory pathway includes 
-    1) anything assigned to the Secreted Protein module, or 2) machinery with a final location
-    in the following compartments: ['l', 'r', 'e', 'x', 'g', 'pm']. See get_final_locations() method
-    for details.'''
+    Notes: 
+    
+    1) As of right now, machinery PTMs are not considered. Proteins processed through the secretory pathway includes 
+    those with a final location in the following compartments: ['l', 'r', 'e', 'x', 'g', 'pm']. See get_final_locations() method
+    for details.
+    
+    2) Expression machinery is checked from the utils expression model; there is no input for this. Further, 
+    the expression model may include expression machinery that the final specific ME model does not include.'''
     
     
     def __init__(self, hgnc_id, premrna_seq, mrna_seq, protein_seq,
-                 metabolic_machinery = metabolic_machinery,
+                 machinery_list = metabolic_machinery, #expression_machinery = list()
                  ptms = {}, tmd = 0, sp = False, keff = None, polyA_length = None, n_introns = None):
         '''
         
-        1) Metabolic model is a cobrapy model - required. 
+        1) HGNC ID is a string in the format HGNC:#### - required.
         
-        2) HGNC ID is a string in the format HGNC:#### - required.
+        2-4) Relevant string representing sequence - required
         
-        3-5) Relevant string representing sequence - required
+        5) Metabolic machinery is a list of HGNC IDs of metabolic enzymes in the metabolic model. 
+        The default is a list generated from the input CobraPy model in utils.
         
-        6) Metabolic machinery is a list of HGNC IDs of metabolic enzymes in the metabolic model. 
-        The defaul is a list generated from the input CobraPy model in utils.
-        
-        7) PTMs is a dictionary with keys as a string representing the ptm and values as an integer
+        6) PTMs is a dictionary with keys as a string representing the ptm and values as an integer
         representing the number of that ptms of that kind for that gene. The exception here is gpi, which is binary 
-        with 0 for no GPI Anchor and 1 indicating GPI Anchor presence. The keys of the dictionary allowed_ptms 
+        with 0 for no GPI Anchor and 1 indicating GPI Anchor presence. The keys of the dictionary utils.allowed_ptms 
         show all possible key values here. PTMs are not currently considered for machinery.  - optional
         
-        8) TMD is an integer indicating the number of transmembrane domains the protein has. This is only relevant
+        7) TMD is an integer indicating the number of transmembrane domains the protein has. This is only relevant
         for proteins processed into secretory pathway. - optional
         
         9) SP is a boolean indicating whether a protein has a signal peptide. 
-        Not used in current format - unimplemented
+        Not used in current format (automatically defaults to True for secretory pathway proteins) - unimplemented
         
-        10) keff is a float representing the kinetic constant the enzyme in [units]. - optional
+        10) keff is a float representing the kinetic constant the enzyme in [units]. - unimplemented
         
         11) polyA_length is an floating point representing the length of the polyA tail. This information will be 
         estimated by a statistical model if not provided. - optional
@@ -73,21 +75,16 @@ class gene_information():
         # current structure assumes that a protein is either machinery (catalyzing a reaction) or
         # a secreted protein (processed through secretory pathway, does not catalyze reaction) but not both
         
-#         if expression_model != None:
-#             expression_machinery = [g.id for g in expression_model.genes]
-#             if 'ribosome' in expression_machinery:
-#                 expression_machinery.remove('ribosome')
-#         else:
-#             expression_machinery = list()
             
-        self.module = list()
-        if hgnc_id in metabolic_machinery or hgnc_id in expression_machinery:
-            if hgnc_id in metabolic_machinery:
-                self.module += ['Metabolic Machinery']
-            else:
-                self.module += ['Expression Machinery']
+        #self.module = list()
+        if hgnc_id in machinery_list: #or hgnc_id in expression_machinery:
+            self.module = 'Machinery'
+#             if hgnc_id in machinery_list:
+#                 self.module += ['Metabolic Machinery']
+#             else:
+#                 self.module += ['Expression Machinery']
         else:
-            self.module += ['Non-Machinery']
+            self.module = 'Non-Machinery'
         
         # sequence check
         if premrna_seq == None or mrna_seq == None or protein_seq == None:
@@ -192,47 +189,27 @@ class gene_information():
         self.final_locations = None
        
     def get_final_locations(self, metabolic_model = human_model, final_locations = None):
-        '''Assigns a final compartment for proteins. For machinery, extracts this from the model. 
-        For secreted proteins, final_locations should be specified by a list of strings
+        '''Assigns a set of final compartments for the protein. For machinery, extracts this from the inputer
+        cobrapy model. For non-machinery, final_locations should be specified by a list of strings
         within the allowable compartments. This method helps define necessary transport reactions.
         
         The final output will be a dictionary with keys as the final locations and values as the method of 
-        synthesis (Cytosolic Transport, Mitochondrial Expression, Canonical Secretion, Non-Canonical Secretion) 
-        depending on Boolean rules. Traditional are those that don't go through the secretory pathway.'''
+        synthesis (Cytosolic Transport, Mitochondrial Expression - unimplemented, Canonical Secretion, Non-Canonical Secretion) 
+        depending on Boolean rules.'''
         
-        if self.module != ['Non-Machinery']:
+        if self.module == 'Machinery':
             if final_locations != None:
                 warnings.warn(self.hgnc_id + ': Final location extacted from cobrapy model, will disregard user input.')
-  
-            rxns = list()
-            if 'Metabolic Machinery' in self.module:
-                rxns += list(metabolic_model.genes.get_by_id(self.hgnc_id).reactions)
-            if 'Expression Machinery' in self.module:
-                rxns += list(expression_model_2.genes.get_by_id(self.hgnc_id).reactions)
-#             fl = final_locations.copy()
-            final_locations = []
-            
-            for r in rxns:
-            # proteins can be associated with multiple locations due to multiple reactions, but for each reaction
-            # we want that protein to be associated with one compartment
-#                 compartments_ = r.compartments.copy()
-#                 if len(compartments_) == 1: # not needed but more efficient
-#                     final_locations += list(compartments_)
-#                     pass
-#                 elif len(compartments_) == 2: # for reactions that occur in more than one compartment
-#                     if 'c' in compartments_: # remove cytoplasmic compartment between the two for machinery
-#                         compartments_.remove('c')
-#                     else: # choose compartment on reactant side if no cytoplasmic compartment
-#                         reactant_compartments_ = set([m.compartment for m in r.reactants])
-#                         if len(reactant_compartments_) == 1:
-#                             compartments_ = reactant_compartments_
-#                         else:
-#                             compartments_ = max(reactant_compartments_, key = list(reactant_compartments_).count)
-#                 elif len(compartments_) > 2: # hardcoded for ASPGLUm reaction
-#                     compartments_ = {'i'}
-                final_locations += [get_reaction_compartment(r)]
-            final_locations = sorted(set(final_locations))# + fl)) # redundancy from multiple reactions
-        elif self.module == ['Non-Machinery']:
+              
+            rxns = list(metabolic_model.genes.get_by_id(self.hgnc_id).reactions)
+#             rxns = list()
+#             if 'Metabolic Machinery' in self.module:
+#                 rxns += list(metabolic_model.genes.get_by_id(self.hgnc_id).reactions)
+#             if 'Expression Machinery' in self.module:
+#                 rxns += list(expression_model_2.genes.get_by_id(self.hgnc_id).reactions)
+            final_locations = sorted(set([get_reaction_compartment(r) for r in rxns])) # redundancy from multiple reactions
+
+        elif self.module == 'Non-Machinery':
     
             if final_locations == None:
                 raise ValueError(self.hgnc_id + ': For non-machinery, must specify the final locations')
@@ -280,7 +257,7 @@ class gene_information():
         if self.final_locations == None:
             raise ValueError(self.hgnc_id + ': Must specify a final location for the gene. Use the get_final_locations() method')
         if len(self.ptms) > 0:
-            if 'Metabolic Machinery' in self.module or 'Expression Machinery' in self.module:
+            if self.module == 'Machinery':
                 # change in the future
                 warnings.warn(self.hgnc_id + ': PTMs are not considered for machinery proteins currently')
                 self.ptms = {}

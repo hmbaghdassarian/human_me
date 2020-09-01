@@ -6,6 +6,7 @@
 
 import cobra
 import pandas as pd
+import os
 
 import sys
 sys.path.insert(1, '../scripts/') # comment out in python script
@@ -503,10 +504,19 @@ cathepsins = ['HGNC:2527', 'HGNC:2529', 'HGNC:9251']
 # In[ ]:
 
 
-def blockPrint():
-    sys.stdout = open(os.devnull, 'w')
-def enablePrint():
-    sys.stdout = sys.__stdout__
+# def blockPrint():
+#     sys.stdout = open(os.devnull, 'w')
+# def enablePrint():
+#     sys.stdout = sys.__stdout__
+
+class HiddenPrints:
+    def __enter__(self):
+        self._original_stdout = sys.stdout
+        sys.stdout = open(os.devnull, 'w')
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        sys.stdout.close()
+        sys.stdout = self._original_stdout
 
 
 # In[ ]:
