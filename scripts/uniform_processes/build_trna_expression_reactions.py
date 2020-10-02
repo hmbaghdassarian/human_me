@@ -10,9 +10,12 @@ import cobra
 import pandas as pd
 
 import sys
-sys.path.insert(1, '../scripts/') # comment out in python script
-from load_environmental_variables import *
-from utils import *
+sys.path.insert(1, '../../scripts/') # comment out in python script
+from utils.load_environmental_variables import *
+from utils import machinery as mach
+from utils import parameters as params
+from utils import metabolites as metab
+from utils import functions as func
 
 
 # -To change to individual tRNA molecules rather than a generic one, start with the charge_trna function and also change the trna_biogenesis function
@@ -43,19 +46,19 @@ class trna_information():
         if maturetrna_sequence[-3:] != 'CCA':
             warnings.warn('CCA tail not present in provided mature sequence, adding to 3 primed end')
             maturetrna_sequence += 'CCA'
-        if len(maturetrna_sequence) < 73 or len(maturetrna_sequence) > 93:
-            # https://www.nature.com/articles/nrm.2017.77#Sec2
-            warnings.warn('Mature tRNA sequence not in the expected length range (76<=L<=93)')
+#         if len(maturetrna_sequence) < 73 or len(maturetrna_sequence) > 93:
+#             # https://www.nature.com/articles/nrm.2017.77#Sec2
+#             warnings.warn('Mature tRNA sequence not in the expected length range (76<=L<=93)')
             
 #         if anticodon_sequence != None:
 #             warnings.warn('Current iteration of ME-model synthesizes a generic tRNA, not a codon-specific one')
 #             if anticodon_sequence not in maturetrna_sequence:
 #                 raise ValueError('Anticodon sequence not in mature tRNA sequence')
                 
-        if len(set(modifications.keys()).difference(allowed_trna_modifications)) > 0:
+        if len(set(modifications.keys()).difference(params.allowed_trna_modifications)) > 0:
             warning_ = 'At least one of the listed modifications is not currently considered in this model'
             warnings.warn(warning_)
-            modifications = {k:v for k in modifications.keys() if k in allowed_trna_modifications.keys()}
+            modifications = {k:v for k in modifications.keys() if k in params.allowed_trna_modifications.keys()}
         
         if intron_sequences != None and type(intron_sequences) != list:
             raise ValueError('intron_sequences must be a list of sequences, one for each intron')
@@ -82,7 +85,7 @@ class trna_information():
             self.pretrna_sequence += self.three_trailer_seq   
         
         pretrna_base_counts, trna_base_counts = dict(), dict()
-        for base_letter in seq_element_map.keys():
+        for base_letter in metab.seq_element_map.keys():
             pretrna_base_counts[base_letter] = self.pretrna_sequence.count(base_letter)
             trna_base_counts[base_letter] = self.maturetrna_sequence.count(base_letter)
         for k,v in trna_base_counts.items():
@@ -100,27 +103,27 @@ class trna_information():
 
 def update_trna_degradation(trna_degradation_reaction):
     trna_degradation_reaction.subsytem = 'tRNA_Biogenesis'
-    trna_degradation_reaction.gene_reaction_rule = ' and '.join(lariat_machinery['Exosome'])
+    trna_degradation_reaction.gene_reaction_rule = ' and '.join(mach.lariat_machinery['Exosome'])
     return trna_degradation_reaction
 
 
-# In[11]:
+# In[4]:
 
 
 def transcribe_pretrna(trna_info):
-    pretrna_transcript_n, pretrna_base_counts = make_rna_metabolite(trna_info.id + '_pre', 
+    pretrna_transcript_n, pretrna_base_counts = func.make_rna_metabolite(trna_info.id + '_pre', 
                                                 trna_info.pretrna_sequence, molecule_type = 'trna',
                                                 compartment = 'n', triphosphate = True)
 
     pretrna_transcription = cobra.Reaction('TRANSCRIPTION_PRE_TRNA_' + trna_info.id)
     pretrna_transcription.subsytem = 'tRNA_Biogenesis'
     rxn = dict()
-    for ntp, base_letter in seq_metabolite_map.items():
+    for ntp, base_letter in metab.seq_metabolite_map.items():
         rxn[ntp] = -1*pretrna_base_counts[base_letter]
-    rxn[ppi_n] = len(trna_info.pretrna_sequence) - 1
+    rxn[metab.ppi_n] = len(trna_info.pretrna_sequence) - 1
     rxn[pretrna_transcript_n] = 1
     pretrna_transcription.add_metabolites(rxn)
-    pretrna_transcription.gene_reaction_rule = ' and '.join(rnap3_transcription_machinery)     
+    pretrna_transcription.gene_reaction_rule = ' and '.join(mach.rnap3_transcription_machinery)     
     return pretrna_transcription, pretrna_transcript_n
 
 def process_trna(trna_info, pretrna_transcript_n):
@@ -136,25 +139,25 @@ def process_trna(trna_info, pretrna_transcript_n):
     
     rxn = {pretrna_transcript_n: -1}
     # CCA synthesis
-    rxn[ntp_map_n['C']] = -2
-    rxn[ntp_map_n['A']] = -1
-    rxn[ppi_n] = 3
-    trna_processing_machinery = TRNT1.copy()
+    rxn[metab.ntp_map_n['C']] = -2
+    rxn[metab.ntp_map_n['A']] = -1
+    rxn[metab.ppi_n] = 3
+    trna_processing_machinery = mach.TRNT1.copy()
     
     # initialize
     reactions = list()
-    rxn[h2o_n] = 0 
+    rxn[metab.h2o_n] = 0 
     
     # 5' cleavage
     if trna_info.five_leader_seq != None: # if there is a 5' leader sequence
-        five_frag_n, five_frag_base_counts = make_rna_metabolite(trna_info.id + "_5'_leader_fragment", 
+        five_frag_n, five_frag_base_counts = func.make_rna_metabolite(trna_info.id + "_5'_leader_fragment", 
                                              trna_info.five_leader_seq, compartment = 'n', molecule_type = 'trna',
                                              triphosphate = True)
         rxn[five_frag_n] = 1
-        rxn[h2o_n] -= 1 #endonuclolytic cleavage (RNAse P)
-        trna_processing_machinery += RNASEP
+        rxn[metab.h2o_n] -= 1 #endonuclolytic cleavage (RNAse P)
+        trna_processing_machinery += mach.RNASEP
         
-        five_leader_degradation = rna_exonucleolytic_degradation(five_frag_n, five_frag_base_counts, trna_info.five_leader_seq, 
+        five_leader_degradation = func.rna_exonucleolytic_degradation(five_frag_n, five_frag_base_counts, trna_info.five_leader_seq, 
                               trna_info.id + "_5'_leader_fragment_tRNA", triphosphate = True, 
                                   nucleus = True)
         five_leader_degradation = update_trna_degradation(five_leader_degradation)
@@ -165,21 +168,21 @@ def process_trna(trna_info, pretrna_transcript_n):
         tp = True
 
     # mature tRNA
-    trna_transcript_n, trna_base_counts = make_rna_metabolite(trna_info.id, trna_info.maturetrna_sequence, 
+    trna_transcript_n, trna_base_counts = func.make_rna_metabolite(trna_info.id, trna_info.maturetrna_sequence, 
                                           molecule_type = 'trna', compartment = 'n', triphosphate = tp)
     rxn[trna_transcript_n] = 1
 
     # 3' cleavage
     if trna_info.three_trailer_seq != None:
-        three_frag_n, three_frag_base_counts = make_rna_metabolite(trna_info.id + "_3'_trailer_fragment", 
+        three_frag_n, three_frag_base_counts = func.make_rna_metabolite(trna_info.id + "_3'_trailer_fragment", 
                                                trna_info.three_trailer_seq, molecule_type = 'trna', 
                                                compartment = 'n',triphosphate = False)
         rxn[three_frag_n] = 1
-        rxn[h2o_n] -= 1 #endonuclolytic cleavage (RNase Z)
-        trna_processing_machinery += RNASEZ
+        rxn[metab.h2o_n] -= 1 #endonuclolytic cleavage (RNase Z)
+        trna_processing_machinery += mach.RNASEZ
         
         
-        three_trailer_degradation = rna_exonucleolytic_degradation(three_frag_n, three_frag_base_counts, 
+        three_trailer_degradation = func.rna_exonucleolytic_degradation(three_frag_n, three_frag_base_counts, 
                                     trna_info.three_trailer_seq,trna_info.id + "_3'_trailer_fragment_tRNA", 
                                     triphosphate = False,nucleus = True)
         three_trailer_degradation = update_trna_degradation(three_trailer_degradation)
@@ -192,13 +195,13 @@ def process_trna(trna_info, pretrna_transcript_n):
         n_introns = len(trna_info.intron_sequences)
         trna_introns_n = dict()
         for i in range(len(trna_info.intron_sequences)):
-            trna_intron_n, trna_intron_base_counts = make_rna_metabolite(trna_info.id + "_intron_" + str(i), 
+            trna_intron_n, trna_intron_base_counts = func.make_rna_metabolite(trna_info.id + "_intron_" + str(i), 
                                                      trna_info.intron_sequences[i], molecule_type = 'trna',
                                                      compartment = 'n',triphosphate = False)
             rxn[trna_intron_n] = 1
-            trna_processing_machinery += trna_splicing_machinery
+            trna_processing_machinery += mach.trna_splicing_machinery
             
-            intron_degradation = rna_exonucleolytic_degradation(trna_intron_n, trna_intron_base_counts, 
+            intron_degradation = func.rna_exonucleolytic_degradation(trna_intron_n, trna_intron_base_counts, 
                                                            trna_info.intron_sequences[i],
                                                            trna_info.id + "_intron_" + str(i) + '_tRNA', 
                                                            triphosphate = False, nucleus = True)
@@ -239,9 +242,9 @@ def primary_export_trna(trna_info, modified_trna_transcript_n):
     
     export_rxn = {modified_trna_transcript_n: -1, trna_transcript_c: 1}
     # gtp hydrolysis on cytoplasmic side for export (see protein_expression nuclear_transport for details)
-    export_rxn[ntp_map_c['G']], export_rxn[h2o_c], export_rxn[ndp_map_c['G']], export_rxn[pi_c], export_rxn[h_c]  = -1, -1, 1, 1, 1
+    export_rxn[metab.ntp_map_c['G']], export_rxn[metab.h2o_c], export_rxn[metab.ndp_map_c['G']], export_rxn[metab.pi_c], export_rxn[metab.h_c]  = -1, -1, 1, 1, 1
     trna_primary_export.add_metabolites(export_rxn)
-    trna_primary_export.gene_reaction_rule = ' and '.join(XPOT + RAN)
+    trna_primary_export.gene_reaction_rule = ' and '.join(mach.XPOT + mach.RAN)
     
     return trna_primary_export, trna_transcript_c
 
@@ -262,10 +265,10 @@ def degrade_trna(trna_info, modified_trna_transcript_c):
         tp = False 
     else:
         tp = True
-    trna_degradation = rna_exonucleolytic_degradation(modified_trna_transcript_c, trna_info.trna_base_counts, 
+    trna_degradation = func.rna_exonucleolytic_degradation(modified_trna_transcript_c, trna_info.trna_base_counts, 
                        trna_info.maturetrna_sequence, trna_info.id + '_tRNA', triphosphate = tp, nucleus = False)
     trna_degradation.subsytem = 'tRNA_Biogenesis'
-    trna_degradation.gene_reaction_rule = XRN1[0]
+    trna_degradation.gene_reaction_rule = mach.XRN1[0]
     return trna_degradation
     
 
@@ -280,7 +283,7 @@ def charge_trna(trna_info, modified_trna_transcript_c):
     
     # diagram: https://www.researchgate.net/figure/The-reaction-scheme-for-the-two-steps-of-aminoacylation-reaction-at-the-active-site-of_fig4_231225238
     trna_charging_reactions, charged_trna_metabolites = [], []
-    for code, aa in seq_amino_acid_map_c.items():
+    for code, aa in metab.seq_amino_acid_map_c.items():
         elements = modified_trna_transcript_c.elements
         # attachment - loss of hydrogen from tRNA hydroxyl, and oxygen from amino acid carboxyl
         elements['H'] -= 1 
@@ -299,10 +302,11 @@ def charge_trna(trna_info, modified_trna_transcript_c):
 
         trna_charging = cobra.Reaction('CHARGING_TRNA_' + trna_info.id + '_' + code)
         trna_charging.subsytem = 'tRNA_Biogenesis'
-        rxn = {modified_trna_transcript_c: -1, aa: -1, charged_trna_c: 1, atp_c: -1, ppi_c: 1, amp_c: 1}
+        rxn = {modified_trna_transcript_c: -1, aa: -1, charged_trna_c: 1, metab.atp_c: -1, metab.ppi_c: 1, 
+               metab.amp_c: 1}
         trna_charging.add_metabolites(rxn)
         # add gprs
-        genes = seq_synthetase_map[code]
+        genes = mach.seq_synthetase_map[code]
         if len(genes) == 1:
             trna_charging.gene_reaction_rule = genes[0]
         else:
@@ -399,7 +403,7 @@ mature_seq += 'CCA'
 
 # # Generate reactions
 
-# In[12]:
+# In[6]:
 
 
 trna_info = trna_information(maturetrna_sequence = mature_seq , id_ = 'generic', three_trailer_seq = trailer_seq, 
@@ -408,7 +412,7 @@ trna_info = trna_information(maturetrna_sequence = mature_seq , id_ = 'generic',
 trna_biogenesis_reactions, charged_trna_metabolites, modified_trna_transcript_c = trna_biogenesis(trna_info)
 
 
-# In[ ]:
+# In[7]:
 
 
 # trna_model = cobra.Model('trna_biogenesis')
@@ -416,13 +420,13 @@ trna_biogenesis_reactions, charged_trna_metabolites, modified_trna_transcript_c 
 # cobra.io.save_json_model(trna_model, local_data_path + 'interim/trna_biogenesis.json')
 
 
-# In[ ]:
+# In[8]:
 
 
 # trna_model
 
 
-# In[ ]:
+# In[9]:
 
 
 # import escher

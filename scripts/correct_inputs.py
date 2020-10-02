@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[2]:
+# In[1]:
 
 
 import cobra
@@ -10,7 +10,7 @@ import warnings
 
 import sys
 sys.path.insert(1, '../scripts/') # comment out in python script
-from load_environmental_variables import *
+from utils.load_environmental_variables import *
 
 compartments_ = {'c': 'cytosolic',  'l': 'lysosomal', 'm': 'mitochondrial', 'r': 'endoplasmic reticulum', 
                 'e': 'extracellular space', 'x': 'peroxisomal', 'n': 'nuclear', 'g': 'golgi apparatus',
@@ -23,16 +23,13 @@ compartments_me = {'c': 'cytosol',  'l': 'lysosome', 'm': 'mitochondria', 'r': '
 
 # # Inputs
 
-# In[10]:
+# In[2]:
 
 
-# psim_me = pd.read_csv(input_psim_file)
-# human_model = cobra.io.json.load_json_model(input_model_file)
+psim_me = pd.read_csv(input_psim_file)
+human_model = cobra.io.json.load_json_model(input_model_file)
 non_machinery = open(input_non_machinery_file).read().splitlines()
-if len(non_machinery) == 0:
-    non_machinery = None
-else:
-    raise ValueError('Code to deal with non_machinery not yet implemented in build_me_model')
+
     
 # psim_me = pd.read_csv(root_path + 'psim_recon2_2.csv', index_col= 0)
 # non_machinery = None
@@ -207,6 +204,15 @@ cobra.io.save_json_model(human_model, local_data_path + 'processed/corrected_mod
 human_model = cobra.io.json.load_json_model(local_data_path + 'processed/corrected_model.json')
 
 
+# In[12]:
+
+
+essential_cols = ['HGNC_ID', 'PREMRNA_SEQ', 'MRNA_SEQ', 'PROTEIN_SEQ']
+optional_cols = ['POLYA_LENGTH', 'TMD', 'SP', 'N_INTRONS', 'DSB', 'GPI', 'OG'] # NG
+other_cols = ['LOCATION']
+all_columns = essential_cols + optional_cols + other_cols
+
+
 # In[5]:
 
 
@@ -265,44 +271,44 @@ if len(set(metabolic_machinery).difference(psim_me.HGNC_ID.tolist())) > 0:
 # In[9]:
 
 
-if non_machinery != None:
-    if type(non_machinery) != list():
-        raise ValueError('non_machinery must be a list of HGNC IDs')
-    # location must be specified for non-machinery
-    if len(list(set(non_machinery).intersection(expression_machinery + metabolic_machinery))) > 0:
-        msg = 'You have specificied some non-machinery genes which overlap with genes in either the metabolic model '
-        msg += 'or the expression module of the ME model. The current format of the model only allows non GPR '
-        msg += 'genes to be categorizes as non-machinery. Removing these from the non-machinery list'
-        warnings.warn(msg)
 
-        non_machinery = list(set(non_machinery).difference(expression_machinery + metabolic_machinery))
+if type(non_machinery) != list():
+    raise ValueError('non_machinery must be a list of HGNC IDs')
+# location must be specified for non-machinery
+if len(list(set(non_machinery).intersection(expression_machinery + metabolic_machinery))) > 0:
+    msg = 'You have specificied some non-machinery genes which overlap with genes in either the metabolic model '
+    msg += 'or the expression module of the ME model. The current format of the model only allows non GPR '
+    msg += 'genes to be categorizes as non-machinery. Removing these from the non-machinery list'
+    warnings.warn(msg)
 
-    if len(set(non_machinery).difference(psim_me.HGNC_ID.tolist())) > 0:
-        msg = 'Not all genes in provided non-machinery list are in the the PSIM '
-        msg += 'Please either remove these from the non-machinery list or add their information to the PSIM'
+    non_machinery = list(set(non_machinery).difference(expression_machinery + metabolic_machinery))
+
+if len(set(non_machinery).difference(psim_me.HGNC_ID.tolist())) > 0:
+    msg = 'Not all genes in provided non-machinery list are in the the PSIM '
+    msg += 'Please either remove these from the non-machinery list or add their information to the PSIM'
+    raise ValueError(msg)
+
+loc_vals = psim_me[psim_me.HGNC_ID.isin(non_machinery)].LOCATION.unique().tolist()
+for loc in loc_vals:
+    if pd.isna(loc):
+        msg = 'All locations for non-machinery must be specificied in the PSIM LOCATION column. '
+        msg += 'Each location entry must be formatted as a list of compartments corresponding to the metabolic model compartments'
         raise ValueError(msg)
 
-    loc_vals = psim_me[psim_me.HGNC_ID.isin(non_machinery)].LOCATION.unique().tolist()
-    for loc in loc_vals:
-        if pd.isna(loc):
-            msg = 'All locations for non-machinery must be specificied in the PSIM LOCATION column. '
-            msg += 'Each location entry must be formatted as a list of compartments corresponding to the metabolic model compartments'
+    msg = 'All locations for non-machinery must be specificied in the PSIM LOCATION column '
+    msg += 'Each location entry must be formatted as a list of compartments corresponding to the metabolic model compartments'
+    if type(loc) == str:
+        if loc[0] != '[' or loc[-1] != ']':
             raise ValueError(msg)
-
-        msg = 'All locations for non-machinery must be specificied in the PSIM LOCATION column '
-        msg += 'Each location entry must be formatted as a list of compartments corresponding to the metabolic model compartments'
-        if type(loc) == str:
-            if loc[0] != '[' or loc[-1] != ']':
-                raise ValueError(msg)
-            else:
-                loc = loc[1:-1].split(',')
-        if type(loc) != list:
-            raise ValueError(msg)
+        else:
+            loc = loc[1:-1].split(',')
+    if type(loc) != list:
+        raise ValueError(msg)
 
 
-        for c in loc:
-            if c not in compartments_me.keys():
-                raise ValueError('The non-machinery final locations specified are not a compartment considered in the ME model')
+    for c in loc:
+        if c not in compartments_me.keys():
+            raise ValueError('The non-machinery final locations specified are not a compartment considered in the ME model')
 
 
 # In[8]:

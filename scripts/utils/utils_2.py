@@ -1,16 +1,16 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[2]:
+# In[3]:
 
 
-# all scripts call utils, this is for utils that depend on earlier scripts
-# can't be in utils
 import sys
-sys.path.insert(1, '../scripts/') # comment out in python script
-from load_environmental_variables import *
-from utils import *
-from build_trna_expression_reactions import charged_trna_metabolites, modified_trna_transcript_c
+sys.path.insert(1, '../../scripts/') # comment out in python script
+# from utils.load_environmental_variables import *
+from utils import machinery as mach
+from utils import parameters as params
+
+from uniform_processes.build_trna_expression_reactions import charged_trna_metabolites, modified_trna_transcript_c
 from gene_information import gene_information
 
 
@@ -18,17 +18,12 @@ from gene_information import gene_information
 
 
 charged_trna_map = {v.id.split('_')[2]: v for v in charged_trna_metabolites}
-
-
-# In[ ]:
-
-
 sp_dict = {1: True, 0: False, float('nan'): False}
 ptm_cols = ['DSB', 'GPI', 'NG', 'OG']
-ptm_keys = list(allowed_ptms.keys())
+ptm_keys = list(params.allowed_ptms.keys())
 
-def generate_geneinfo_object(hgnc_id, psim = psim_me, machinery_list = metabolic_machinery, 
-                             metabolic_model = human_model):
+def generate_geneinfo_object(hgnc_id, psim = params.psim_me, machinery_list = mach.metabolic_machinery, 
+                             metabolic_model = params.human_model):
     '''Generates gene information object from PSIM'''
     
     idx = psim[psim.HGNC_ID == hgnc_id].index.tolist()

@@ -1,29 +1,34 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[1]:
+# In[19]:
 
 
+import cobra
 from cobra.core.gene import parse_gpr
 from tqdm import tqdm
 import warnings
 import ast
 import os
+import pandas as pd
+
 import sys
-
 sys.path.insert(1, '../scripts/') # comment out in python script
-from load_environmental_variables import *
-from utils import *
-from utils_2 import *
+with warnings.catch_warnings():
+    warnings.simplefilter('ignore')
+#     from load_environmental_variables import *
+#     from utils import *
+    from utils import functions as func  
+    from utils import parameters as params
+    from utils import machinery as mach
+    with func.HiddenPrints():
+        from utils import utils_2
 
-blockPrint()
-warnings.filterwarnings("ignore", category=UserWarning)
-import build_mrna_expression_reactions as build_mrna
-import build_protein_expression_reactions as build_protein
+        import build_mrna_expression_reactions as build_mrna
+        import build_protein_expression_reactions as build_protein
 
-from build_ribosome_biogenesis_reactions import ribosomal_reactions, ribosome_complex_c
-from build_trna_expression_reactions import trna_biogenesis_reactions
-enablePrint()
+        from build_ribosome_biogenesis_reactions import ribosomal_reactions, ribosome_complex_c
+        from build_trna_expression_reactions import trna_biogenesis_reactions
 
 
 # In[2]:
@@ -38,51 +43,86 @@ me_reactions = ribosomal_reactions + trna_biogenesis_reactions + build_protein.u
 # In[3]:
 
 
-# get protein expression for all metabolic reactions
-print('Generate protein expression reactions for metabolic enzymes')
-id_protein_map = dict() # map HGNC ID to a dictionary of compartments and cobra.Metabolite proteins
-for hgnc_id in metabolic_machinery:
-    # None bc will add later for expression model specific to this
-    gene_info =  generate_geneinfo_object(hgnc_id) 
-    mrna_reactions, mrna_metabolite = build_mrna.mrna_expression(gene_info)
-    protein_reactions, protein_metabolites = build_protein.get_protein_expression_reactions(gene_info)
-    id_protein_map[hgnc_id] = {p.compartment:p for p in protein_metabolites}
-
-
-
-    me_reactions += mrna_reactions + protein_reactions
+# non_machinery = list(set(psim_me.loc[psim_me.loc[:,'LOCATION'].dropna().index, 'HGNC_ID'].dropna().tolist()).difference(metabolic_machinery + expression_machinery))[:10]
+# non_machinery += ['HGNC:3765']
+# non_machinery = []
 
 
 # In[4]:
 
 
+def get_all_expression_reactions(hgnc_id, psim = params.psim_me, machinery_list = mach.metabolic_machinery, 
+                             metabolic_model = params.human_model):
+    '''Generates all the expression reactions for a given protein from the HGNC ID and the PSIM'''
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore')
+        with func.HiddenPrints():
+            gene_info = utils_2.generate_geneinfo_object(hgnc_id, psim, machinery_list, metabolic_model)
+            mrna_reactions, mrna_metabolite = build_mrna.get_mrna_expression_reactions(gene_info)
+            protein_reactions, protein_metabolites = build_protein.get_protein_expression_reactions(gene_info)
+
+    return mrna_reactions + protein_reactions, protein_metabolites
+
+
+# In[6]:
+
+
+# get protein expression for all metabolic reactions
+print('Generate protein expression reactions for metabolic enzymes and non-machinery')
+id_protein_map = dict() # map HGNC ID to a dictionary of compartments and cobra.Metabolite proteins
+
+loop_machinery = mach.metabolic_machinery + non_machinery
+
+for hgnc_id in tqdm(loop_machinery):
+    # None bc will add later for expression model specific to this
+    expr_reactions, protein_metabolites = get_all_expression_reactions(hgnc_id)
+    id_protein_map[hgnc_id] = {p.compartment: p for p in protein_metabolites}
+
+    me_reactions += expr_reactions
+
+
+# In[13]:
+
+
 # get protein expression reactions for all expression module reactions
+print('Generate protein expression reactions for expression module enzymes')
 expression_module = cobra.Model('expression_module')
 expression_module.add_reactions(me_reactions) # don't use utils.expression_machinery since not all machinery may be included
 expression_machinery_me = [g.id for g in expression_module.genes]
 if 'ribosome' in expression_machinery_me:
     expression_machinery_me.remove('ribosome')
-del expression_module
+# del expression_module
 # for internal use
-if len(set(expression_machinery_me).difference(expression_machinery)) > 0:
+if len(set(expression_machinery_me).difference(mach.expression_machinery)) > 0:
        raise ValueError('The expression module model does not contain all machinery')
         
-# don't include ones already in metabolic machinery, gene information class deals with overlap already
-for hgnc_id in list(set(expression_machinery_me).difference(metabolic_machinery)):
-    gene_info =  generate_geneinfo_object(hgnc_id, metabolic_machinery = list())
-    mrna_reactions, mrna_metabolite = build_mrna.mrna_expression(gene_info)
-    protein_reactions, protein_metabolites = build_protein.get_protein_expression_reactions(gene_info)
-    if hgnc_id in id_protein_map.keys():
-        raise ValueError('Unexpected behavior')
+for hgnc_id in tqdm(list(set(expression_machinery_me))):
+    expr_reactions, protein_metabolites = get_all_expression_reactions(hgnc_id, machinery_list = expression_machinery_me,
+                                          metabolic_model = expression_module)
+    
+    
+    if hgnc_id not in set(expression_machinery_me).intersection(mach.metabolic_machinery):
+        if hgnc_id in id_protein_map.keys():
+            raise ValueError('Unexpected behavior')
+        else:
+            id_protein_map[hgnc_id] = {p.compartment:p for p in protein_metabolites}
+    
+    # when there is machinery overlap between metabolic and expression module, deal with compartment overlap 
     else:
-        id_protein_map[hgnc_id] = {p.compartment:p for p in protein_metabolites}
+        ids_to_keep = list(set([r.id for r in expr_reactions]).difference([r.id for r in me_reactions]))
+        expr_reactions = [r for r in expr_reactions if r.id in ids_to_keep]
+        
+        temp_map = {p.compartment:p for p in protein_metabolites}
+        for comp, met in temp_map.items():
+            if comp not in id_protein_map[hgnc_id].keys(): 
+                id_protein_map[hgnc_id][comp] = met
 
-    me_reactions += mrna_reactions + protein_reactions
+    me_reactions += expr_reactions
 
 
-# The following cell continues to add any expression module machinery that may have arised from adding expression reactions for expression machinery. The simpler solution to above cell and below is to just use expression_machinery from utils.py rather than expression_machinery_me, but doing this would possibly create expression reactions for unused expression machinery (since expression_machinery is a list of ALL expression machinery in all possible reactions)
+# The following cell continues to add any expression module machinery that may have arised from adding expression reactions for expression machinery. The simpler solution to above cell and below is to just use expression_machinery from utils.py rather than expression_machinery_me, but doing this would possibly create expression reactions for unused expression machinery (since expression_machinery is a list of ALL expression machinery in all possible reactions). This only takes one iteration for recon2.2
 
-# In[5]:
+# In[14]:
 
 
 # get protein expression reactions for all expression module reactions
@@ -91,23 +131,30 @@ expression_module.add_reactions(me_reactions) # don't use utils.expression_machi
 expression_machinery_me_2 = [g.id for g in expression_module.genes]
 if 'ribosome' in expression_machinery_me_2:
     expression_machinery_me_2.remove('ribosome')
-del expression_module
 
-counter = 0
-new_expression_machinery = list(set(expression_machinery_me_2).difference(expression_machinery_me + metabolic_machinery))
+new_expression_machinery = list(set(expression_machinery_me_2).difference(expression_machinery_me + mach.metabolic_machinery))
 while len(new_expression_machinery)>0:    
-    for hgnc_id in new_expression_machinery:
-        gene_info =  generate_geneinfo_object(hgnc_id, metabolic_machinery = list())
-        mrna_reactions, mrna_metabolite = build_mrna.mrna_expression(gene_info)
-        protein_reactions, protein_metabolites = build_protein.get_protein_expression_reactions(gene_info)
+    expr_reactions, protein_metabolites = get_all_expression_reactions(hgnc_id, machinery_list = expression_machinery_me,
+                                          metabolic_model = expression_module)
+    
+    
+    if hgnc_id not in set(expression_machinery_me).intersection(mach.metabolic_machinery):
         if hgnc_id in id_protein_map.keys():
             raise ValueError('Unexpected behavior')
         else:
             id_protein_map[hgnc_id] = {p.compartment:p for p in protein_metabolites}
+    
+    # when there is machinery overlap between metabolic and expression module, deal with compartment overlap 
+    else:
+        ids_to_keep = list(set([r.id for r in expr_reactions]).difference([r.id for r in me_reactions]))
+        expr_reactions = [r for r in expr_reactions if r.id in ids_to_keep]
+        
+        temp_map = {p.compartment:p for p in protein_metabolites}
+        for comp, met in temp_map.items():
+            if comp not in id_protein_map[hgnc_id].keys(): 
+                id_protein_map[hgnc_id][comp] = met
 
-
-
-        me_reactions += mrna_reactions + protein_reactions
+    me_reactions += expr_reactions
     
     # get protein expression reactions for all expression module reactions
     expression_machinery_me = expression_machinery_me_2.copy()
@@ -117,20 +164,21 @@ while len(new_expression_machinery)>0:
     expression_machinery_me_2 = [g.id for g in expression_module.genes]
     if 'ribosome' in expression_machinery_me_2:
         expression_machinery_me_2.remove('ribosome')
-    del expression_module
     
-    new_expression_machinery = list(set(expression_machinery_me_2).difference(expression_machinery_me + metabolic_machinery))
+    new_expression_machinery = list(set(expression_machinery_me_2).difference(expression_machinery_me + mach.metabolic_machinery))
+
+del expression_module
 
 
 # The way this is constructed right now, expression_model is not an input to gene_information, but rather a comprehensive toy model that creates all possible reactions from the expression module. As such, there is a slight possibility that some metabolic enzyme in the metabolic model overlaps with the toy expression module but not the model-specific expression module. This may create excess protein expression reactions
 
-# In[6]:
+# In[16]:
 
 
 expression_machinery_me = expression_machinery_me_2
 # list of hgnc ids of machinery that overlap with metabolic reactions and expression reactions 
 # but that are not used in the expression reactions for this specific model
-excess_reactions = sorted(set(metabolic_machinery).intersection(expression_machinery).difference(set(metabolic_machinery).intersection(expression_machinery_me)))
+excess_reactions = sorted(set(mach.metabolic_machinery).intersection(mach.expression_machinery).difference(set(mach.metabolic_machinery).intersection(expression_machinery_me)))
 # filter for excess reactions with different protein localization for the expression reactions they catalyze
 # than the metabolic reaction they catalyze
 excess_reactions = [hgnc_id for hgnc_id in excess_reactions if len(id_protein_map[hgnc_id])>1]
@@ -148,7 +196,7 @@ if len(excess_reactions) > 0:
 
 # # Complex Formation
 
-# In[7]:
+# In[17]:
 
 
 def eval_complex(expr):
@@ -172,14 +220,14 @@ def parse_me_reaction_id(x):
         return x
 
 
-# In[8]:
+# In[22]:
 
 
 print('Get metabolic model complex information')
 complex_df = pd.DataFrame(columns = ['reaction_id', 'compartment', 'machinery', 'is_complex', 'creates_multiple_reactions'])
 
-for r in tqdm(human_model.reactions):
-    compartment_ = get_reaction_compartment(r)
+for r in tqdm(params.human_model.reactions):
+    compartment_ = func.get_reaction_compartment(r)
     if len(r.genes) == 1: 
         complex_df.loc[complex_df.shape[0], :] = [r.id, compartment_, list(r.genes)[0].id, False, False]
     elif 'and' in r.gene_reaction_rule and 'or' in r.gene_reaction_rule: 
@@ -221,7 +269,7 @@ print('Get me reaction complex information')
 me_complex_df = pd.DataFrame(columns = ['reaction_id', 'compartment', 'machinery', 'is_complex', 'creates_multiple_reactions'])
 
 for r in tqdm(me_reactions):
-    compartment_ = get_reaction_compartment(r)
+    compartment_ = func.get_reaction_compartment(r)
     if len(r.genes) == 1: 
         me_complex_df.loc[me_complex_df.shape[0], :] = [r.id, compartment_, list(r.genes)[0].id, False, False]
     elif 'and' in r.gene_reaction_rule and 'or' in r.gene_reaction_rule: 
@@ -266,7 +314,7 @@ complex_df = pd.concat([complex_df, me_complex_df], axis = 0)
 complex_df.reset_index(inplace = True, drop = True)
 
 
-# In[9]:
+# In[23]:
 
 
 # assign complex ids for reactions that have complexes in them
@@ -281,7 +329,7 @@ for i in dup_complexes.index:
     complex_df.loc[dups.index,'complex_id'] = '_'.join(dups.reaction_id)
 
 
-# In[10]:
+# In[24]:
 
 
 # create a mapping of the unique complex_df ids to the actual complex metabolite
@@ -317,7 +365,7 @@ for i in unique_complexes.index:
 
     complex_info = {'METABOLITES': machinery_metabolites, 'IDS': [m.id for m in machinery_metabolites], 
                    'METABOLITE_TYPES': metabolite_types}
-    complex_reaction, complex_metabolite = form_complex(reaction_id = complex_id, complex_id = complex_id, **complex_info)
+    complex_reaction, complex_metabolite = func.form_complex(reaction_id = complex_id, complex_id = complex_id, **complex_info)
 
 
     complex_formation_reactions.append(complex_reaction)
@@ -330,13 +378,13 @@ for k,v in new_complex_ids.items():
 
 # # Insert Machinery in Reactions
 
-# In[12]:
+# In[25]:
 
 
 coupling_constraint = 1
 
 
-# In[13]:
+# In[26]:
 
 
 # move to end once biomass is added
@@ -344,25 +392,25 @@ if len([r.id for r in me_reactions + complex_formation_reactions if len(r.check_
     raise ValueError('No mass balance for at least one of the expression module reactions')
 
 
-# In[14]:
+# In[28]:
 
 
 # for reactions that show up more than once
-reactions_to_track = human_model.reactions + me_reactions
+reactions_to_track = params.human_model.reactions + me_reactions
 reaction_counter = dict(zip(sorted(set([r.id for r in reactions_to_track])), [0]*len(reactions_to_track))) 
 
 
-# In[15]:
+# In[33]:
 
 
 print('Add machinery to metabolic module reactions')
-metabolic_reactions = [r.id for r in human_model.reactions]
+metabolic_reactions = [r.id for r in params.human_model.reactions]
 final_reactions = complex_formation_reactions # ALL reactions list, to create the ME model
 
 # deal with metabolic reactions first
-for i in complex_df[complex_df.category == 'metabolic_reaction'].index:
+for i in tqdm(complex_df[complex_df.category == 'metabolic_reaction'].index):
     reaction_id = complex_df.loc[i, 'reaction_id'] # original reaction id
-    r = human_model.reactions.get_by_id(reaction_id).copy() 
+    r = params.human_model.reactions.get_by_id(reaction_id).copy() 
     metabolites = r.metabolites.copy() # original reaction metabolites
 
     if not complex_df.loc[i, 'is_complex']:
@@ -397,12 +445,12 @@ for i in complex_df[complex_df.category == 'metabolic_reaction'].index:
     final_reactions += reactions
 
 # only reactions without machinery should be left
-if sorted(metabolic_reactions) != sorted([r.id for r in human_model.reactions if len(r.genes) == 0]):
+if sorted(metabolic_reactions) != sorted([r.id for r in params.human_model.reactions if len(r.genes) == 0]):
     raise ValueErorr('Not all metabolic reactions that require machinery have been accounted for')
-final_reactions += [r.copy() for r in human_model.reactions if len(r.genes) == 0]
+final_reactions += [r.copy() for r in params.human_model.reactions if len(r.genes) == 0]
 
 
-# In[16]:
+# In[34]:
 
 
 # filter out metabolic reactions
@@ -410,7 +458,7 @@ complex_df = complex_df[complex_df.category == 'expression_reaction']
 complex_df.reset_index(inplace = True, drop = True)
 
 print('Add machinery to expression module reactions')
-for rxn in [r__ for r__ in me_reactions if len(r__.genes) > 0]:
+for rxn in tqdm([r__ for r__ in me_reactions if len(r__.genes) > 0]):
     reaction_id_short = parse_me_reaction_id(rxn.id) # abbreviated version
     reaction_id = rxn.id # original reaction id
     idx = complex_df[complex_df.reaction_id == reaction_id_short].index.tolist()
@@ -448,11 +496,11 @@ for rxn in [r__ for r__ in me_reactions if len(r__.genes) > 0]:
 final_reactions += [r_ for r_ in me_reactions if len(r_.genes) == 0]
 
 
-# In[17]:
+# In[35]:
 
 
 print('Generate and save ME-Model')
 me_model = cobra.Model('HUMAN_ME_MODEL')
 me_model.add_reactions(final_reactions)
-cobra.io.json.save_json_model(me_model, local_data_path + 'processed/human_me_model.json')
+# cobra.io.json.save_json_model(me_model, local_data_path + 'processed/human_me_model.json')
 

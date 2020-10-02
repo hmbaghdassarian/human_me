@@ -2,7 +2,6 @@
 .env
 data/
 notebooks/.pybiomart.sqlite
-scripts/__pycache__/
 __pycache__/
 
 # change in the future - large files
