@@ -43,6 +43,7 @@ allowed_trna_modifications = {}
 # universal variables and inputs
 
 rate_intron = 10/67000 # 10 introns / 67 kbp
+# L_polyA_n = 250 # https://www.nature.com/articles/s41592-019-0503-y
 n_ub = 4 # see this - no. of ubiquitins to add to protein
 
 transport_translocation_atp_cost = 0.5 # 1 ATP/2 residues
@@ -54,7 +55,7 @@ L_sp = 22 # secretory pathway signal peptide degradation
 Kv = 0.7 # secretory pathway vesicle coat coefficients
 
 
-# In[65]:
+# In[2]:
 
 
 # kinetic parameters
@@ -65,8 +66,10 @@ keff_median = 3.983*3600 # units: hr^-1 (3.983 in s^-1)
 
 # central dogma
 mrna_half_life = 10 #units: hours
-alpha_m = np.log(2)/mrna_half_life
 alpha_p = 0.02 # units: hours ^-1
+
+coupling_params = {'mrna_half_life': mrna_half_life, 
+                  'alpha_p': alpha_p}
 
 
 # In[ ]:

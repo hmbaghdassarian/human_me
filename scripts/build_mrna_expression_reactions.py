@@ -26,7 +26,7 @@ from uniform_processes import biomass
 # from gene_information import gene_information
 
 
-# In[88]:
+# In[6]:
 
 
 def transcribe_premrna(gene_info):
@@ -97,7 +97,7 @@ def process_mrna(gene_info, premrna_transcript_n, L_premrna, premrna_base_counts
         mrna_transcript_n.charge += (-polyA_length + 2) 
         
         mw_mrna = func.get_metabolite_mw(mrna_transcript_n)
-        rxn[premrna_transcript_n], rxn[biomass.premrna_] = -1, -gene_info.premrna_mass
+        rxn[premrna_transcript_n], rxn[biomass.premrna_] = -1, -premrna_mw
         rxn[mrna_transcript_n], rxn[biomass.mrna_] = 1, mw_mrna
         
         processing_reactions = list()
@@ -175,6 +175,7 @@ def degrade_mrna(gene_info, mrna_transcript_c, polyA_length, L_mrna, mrna_base_c
     
     degradation_reactions = list()
     
+    
     rxn = dict()
     rxn[metab.h2o_c] = -(L_mrna + polyA_length)+1
     rxn[metab.h_c] = L_mrna + polyA_length-1
@@ -186,6 +187,12 @@ def degrade_mrna(gene_info, mrna_transcript_c, polyA_length, L_mrna, mrna_base_c
 
     # no m7g metabolite in recon2.2, so just reverse the methylation instead
     rxn[metab.amet_c], rxn[metab.ahcys_c] = 2, -2 # reverse methyltransferase - cap0 and cap1 structure
+    
+    # proxy metabolite for coupling mRNA degradation to protein synthesis flux
+    mrna_deg_proxy = cobra.Metabolite(gene_info.hgnc_id + 'mrna_deg_proxy')
+    rxn[mrna_deg_proxy] = 1 
+    
+    
 
     # 3'-->5' degradation------------------------------------------------------------------------------------
     if three_to_five:
@@ -221,7 +228,7 @@ def degrade_mrna(gene_info, mrna_transcript_c, polyA_length, L_mrna, mrna_base_c
         transcript_degradation_2_decapping.gene_reaction_rule = mach.decapping_rule
         degradation_reactions.append(transcript_degradation_2_decapping)
     
-    return degradation_reactions
+    return degradation_reactions, mrna_deg_proxy
     
     
 def get_mrna_expression_reactions(gene_info):
@@ -236,10 +243,10 @@ def get_mrna_expression_reactions(gene_info):
     processing_reactions, mrna_transcript_n, polyA_length, L_mrna, mrna_base_counts, mw_mrna = processing_res
     
     mrna_export, mrna_transcript_c = export_mrna(gene_info, mrna_transcript_n)
-    degradation_reactions = degrade_mrna(gene_info, mrna_transcript_c, polyA_length, L_mrna, mrna_base_counts, mw_mrna)
+    degradation_reactions, mrna_deg_proxy = degrade_mrna(gene_info, mrna_transcript_c, polyA_length, L_mrna, mrna_base_counts, mw_mrna)
     
     
     
     reactions = [transcript_elongation] + processing_reactions + [mrna_export] + degradation_reactions
-    return reactions, mrna_transcript_c 
+    return reactions, mrna_transcript_c, mrna_deg_proxy 
 

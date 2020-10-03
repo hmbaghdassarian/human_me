@@ -5,6 +5,7 @@
 
 
 import pandas as pd
+import numpy as np
 import random
 
 import cobra
@@ -41,7 +42,8 @@ class gene_information():
     
     def __init__(self, hgnc_id, premrna_seq, mrna_seq, protein_seq,
                  machinery_list = mach.metabolic_machinery, #expression_machinery = list()
-                 ptms = {}, tmd = 0, sp = False, keff = None, polyA_length = None, n_introns = None):
+                 ptms = {}, tmd = 0, sp = False, polyA_length = None, n_introns = None, 
+                coupling_params = params.coupling_params):
         '''
         
         1) HGNC ID is a string in the format HGNC:#### - required.
@@ -59,17 +61,18 @@ class gene_information():
         7) TMD is an integer indicating the number of transmembrane domains the protein has. This is only relevant
         for proteins processed into secretory pathway. - optional
         
-        9) SP is a boolean indicating whether a protein has a signal peptide. 
+        8) SP is a boolean indicating whether a protein has a signal peptide. 
         Not used in current format (automatically defaults to True for secretory pathway proteins) - unimplemented
-        
-        10) keff is a float representing the kinetic constant the enzyme in [units]. - unimplemented
-        
-        11) polyA_length is an floating point representing the length of the polyA tail. This information will be 
+                
+        9) polyA_length is an floating point representing the length of the polyA tail. This information will be 
         estimated by a statistical model if not provided. - optional
         
-        12) n_introns is an integer representing the length of the polyA tail. This information will be estimated
+        10) n_introns is an integer representing the length of the polyA tail. This information will be estimated
         if not provided. Should be specific to the transcript isoform. - optional
         
+        11) coupling_params is a dictionary with required parameters for coupling constraints. The key-value pairs are as follows:
+            a) 'mrna_half_life': The half life for the mrna in units of hours. If not provided, defaults to 10.
+            b) 'alpha_p': The protein first-order degradation constant in units of hours^-1. If not provided, defaults to 0.02. 
         '''
         
         self.hgnc_id = hgnc_id
@@ -139,7 +142,7 @@ class gene_information():
             warnings.warn(self.hgnc_id + ': The mrna and protein sequence lengths are inconsistent')
 
         self.premrna_seq = Seq(premrna_seq, generic_rna)
-        self.premrna_mass = calculate_molecular_weight(seq = self.premrna_seq)/1000 #kDa
+#         self.premrna_mass = calculate_molecular_weight(seq = self.premrna_seq)/1000 #kDa
         self.mrna_seq = Seq(mrna_seq, generic_rna)
         self.protein_seq = protein_seq
         
@@ -190,6 +193,22 @@ class gene_information():
             
             
         self.final_locations = None
+        
+        
+        # coupling parameters
+        if coupling_params == None or pd.isna(coupling_params):
+            coupling_params = params.coupling_params
+        else:
+            if 'mrna_half_life' not in coupling_params.keys() or coupling_params['mrna_half_life'] == None or pd.isna(coupling_params['mrna_half_life']):
+                coupling_params['mrna_half_life'] = params.mrna_half_life
+            if 'alpha_p' not in coupling_params.keys() or coupling_params['alpha_p'] == None or pd.isna(coupling_params['alpha_p']):
+                coupling_params['alpha_p'] = params.alpha_p
+#             if 'keff' not in coupling_params.keys() pd.isna(coupling_params['keff']):
+#                 coupling_params['keff'] = None
+
+        # NOT COMPLETE, NEED TO ADD MU
+        self.coupling_c2 = (np.log(2)/coupling_params['mrna_half_life'])/coupling_params['alpha_p'] #+mu
+        self.coupling_c1B = 1/coupling_params['alpha_p']
        
     def get_final_locations(self, metabolic_model = params.human_model, final_locations = None):
         '''Assigns a set of final compartments for the protein. For machinery, extracts this from the inputer
@@ -255,6 +274,14 @@ class gene_information():
                     self.final_locations[loc] = 'Canonical Secretion'
                 else:
                     self.final_locations[loc] = 'Non-Canonical Secretion'
+        
+        # in the case that protein synthesis flux spread across multiple reactions due to multi-localization
+        if len(set(self.final_locations.keys())) > 1:
+            if len(set(self.final_locations.keys())) == 2:
+                self.coupling_c2 = 2*self.coupling_c2
+                self.coupling_c1B = 2*self.coupling_c1B
+            else:
+                raise ValueError('Have not yet accounted for Non-Canonical Secretion or other synthesis forms in coupling of mrna degradataion to protein synthesis')
 
     def check_gene_information(self):
         if self.final_locations == None:
