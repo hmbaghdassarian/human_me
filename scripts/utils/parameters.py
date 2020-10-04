@@ -72,7 +72,7 @@ coupling_params = {'mrna_half_life': mrna_half_life,
                   'alpha_p': alpha_p}
 
 
-# In[ ]:
+# In[5]:
 
 
 # biomass
@@ -82,4 +82,6 @@ dna_frac = 0.014
 carb_frac = 0.071
 lipid_frac = 0.097
 other_frac = 0.054
+
+unmodeled_protein_frac = 1-0.12041534186261499
 

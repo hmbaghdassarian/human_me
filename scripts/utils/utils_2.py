@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[3]:
+# In[2]:
 
 
 import sys
@@ -9,15 +9,22 @@ sys.path.insert(1, '../../scripts/') # comment out in python script
 # from utils.load_environmental_variables import *
 from utils import machinery as mach
 from utils import parameters as params
+from utils import functions as func
 
-from uniform_processes.build_trna_expression_reactions import charged_trna_metabolites, modified_trna_transcript_c
+from uniform_processes.build_trna_expression_reactions import charged_trna_metabolites, modified_trna_transcript_c, modified_trna_transcript_c_mw
 from gene_information import gene_information
+
+
+# In[4]:
+
+
+charged_trna_map = {v.id.split('_')[2]: v for v in charged_trna_metabolites}
+charged_trna_map_mw = {aa_code: func.get_metabolite_mw(aa_metab) for aa_code, aa_metab in charged_trna_map.items()}
 
 
 # In[ ]:
 
 
-charged_trna_map = {v.id.split('_')[2]: v for v in charged_trna_metabolites}
 sp_dict = {1: True, 0: False, float('nan'): False}
 ptm_cols = ['DSB', 'GPI', 'NG', 'OG']
 ptm_keys = list(params.allowed_ptms.keys())

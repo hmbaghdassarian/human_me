@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[6]:
+# In[22]:
 
 
 import cobra
@@ -14,7 +14,7 @@ from utils import metabolites as metab
 from utils import functions as func
 
 
-# In[3]:
+# In[23]:
 
 
 # make the metabolites
@@ -27,7 +27,7 @@ lipid_ = cobra.Metabolite('biomass_lipid')
 other_ = cobra.Metabolite('biomass_other')
 
 # variable
-protein_ = cobra.Metabolite('biomass_protein')
+protein_, unmodeled_protein_ = cobra.Metabolite('biomass_protein'),  cobra.Metabolite('biomass_unmodeled_protein')
 trna_ = cobra.Metabolite('biomass_tRNA')
 rrna_ = cobra.Metabolite('biomass_rRNA')
 mrna_ = cobra.Metabolite('biomass_mRNA')
@@ -35,20 +35,29 @@ premrna_ = cobra.Metabolite('biomass_premRNA')
 other_rna_ = cobra.Metabolite('biomass_other_RNA')
 
 
-# In[4]:
+# In[24]:
 
 
 # biomass formation reactions
 biomass_reactions = list()
-biomass_metabolites = [dna_, carb_, lipid_, other_, protein_, trna_, rrna_, mrna_, premrna_, other_rna_]
+biomass_metabolites = [dna_, carb_, lipid_, other_, trna_, rrna_, mrna_, premrna_, other_rna_]
 for bm in biomass_metabolites:
     reaction_ = cobra.Reaction(bm.id.split('_')[1] + '_biomass_to_biomass')
     reaction_.add_metabolites({bm: -1, biomass_: 1})
+    biomass_reactions.append(reaction_)
+
+# protein biomass with unmodeled protein
+upc=(params.unmodeled_protein_frac)/(1-params.unmodeled_protein_frac)
+reaction_ = cobra.Reaction('protein_biomass_to_biomass')
+reaction_.add_metabolites({protein_: -1, 
+                         unmodeled_protein_: upc, 
+                         biomass_: 1 + upc})
+biomass_reactions.append(reaction_)
 
 
 # The following reactions convert the biomass components which are a constant proportion from the metabolic model formulation to the ME model formulation. Briefly, the coefficients of the precursor reactions must be scaled by their molecular weight, and the product must be equal to the constant proportion of that class of biomass, bounded by growth (flux through reaction = growth rate). 
 
-# In[5]:
+# In[25]:
 
 
 # constant biomass reactions

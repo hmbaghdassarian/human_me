@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[1]:
+# In[17]:
 
 
 import warnings
@@ -17,6 +17,8 @@ from utils import parameters as params
 from utils import metabolites as metab
 from utils import functions as func
 
+from uniform_processes import biomass
+
 
 # -To change to individual tRNA molecules rather than a generic one, start with the charge_trna function and also change the trna_biogenesis function
 # 
@@ -24,7 +26,7 @@ from utils import functions as func
 
 # # TRNA Information Class
 
-# In[2]:
+# In[18]:
 
 
 class trna_information():
@@ -98,7 +100,7 @@ class trna_information():
 
 # # Reactions
 
-# In[3]:
+# In[19]:
 
 
 def update_trna_degradation(trna_degradation_reaction):
@@ -107,7 +109,7 @@ def update_trna_degradation(trna_degradation_reaction):
     return trna_degradation_reaction
 
 
-# In[4]:
+# In[45]:
 
 
 def transcribe_pretrna(trna_info):
@@ -121,12 +123,13 @@ def transcribe_pretrna(trna_info):
     for ntp, base_letter in metab.seq_metabolite_map.items():
         rxn[ntp] = -1*pretrna_base_counts[base_letter]
     rxn[metab.ppi_n] = len(trna_info.pretrna_sequence) - 1
-    rxn[pretrna_transcript_n] = 1
+    pretrna_mw = func.get_metabolite_mw(pretrna_transcript_n)
+    rxn[pretrna_transcript_n], rxn[biomass.trna_] = 1, pretrna_mw
     pretrna_transcription.add_metabolites(rxn)
     pretrna_transcription.gene_reaction_rule = ' and '.join(mach.rnap3_transcription_machinery)     
-    return pretrna_transcription, pretrna_transcript_n
+    return pretrna_transcription, pretrna_transcript_n, pretrna_mw
 
-def process_trna(trna_info, pretrna_transcript_n):
+def process_trna(trna_info, pretrna_transcript_n, pretrna_mw):
     '''
     
     This reaction processes pre-tRNA into mature tRNA in the nucleus. 
@@ -148,11 +151,15 @@ def process_trna(trna_info, pretrna_transcript_n):
     reactions = list()
     rxn[metab.h2o_n] = 0 
     
+    other_trna_biomass = 0 # initialize
+    
     # 5' cleavage
     if trna_info.five_leader_seq != None: # if there is a 5' leader sequence
         five_frag_n, five_frag_base_counts = func.make_rna_metabolite(trna_info.id + "_5'_leader_fragment", 
                                              trna_info.five_leader_seq, compartment = 'n', molecule_type = 'trna',
                                              triphosphate = True)
+        five_frag_mw = func.get_metabolite_mw(five_frag_n)
+        other_trna_biomass += five_frag_mw
         rxn[five_frag_n] = 1
         rxn[metab.h2o_n] -= 1 #endonuclolytic cleavage (RNAse P)
         trna_processing_machinery += mach.RNASEP
@@ -160,6 +167,7 @@ def process_trna(trna_info, pretrna_transcript_n):
         five_leader_degradation = func.rna_exonucleolytic_degradation(five_frag_n, five_frag_base_counts, trna_info.five_leader_seq, 
                               trna_info.id + "_5'_leader_fragment_tRNA", triphosphate = True, 
                                   nucleus = True)
+        five_leader_degradation.add_metabolites({biomass.other_rna_: -five_frag_mw})
         five_leader_degradation = update_trna_degradation(five_leader_degradation)
         reactions += [five_leader_degradation]
         
@@ -170,13 +178,16 @@ def process_trna(trna_info, pretrna_transcript_n):
     # mature tRNA
     trna_transcript_n, trna_base_counts = func.make_rna_metabolite(trna_info.id, trna_info.maturetrna_sequence, 
                                           molecule_type = 'trna', compartment = 'n', triphosphate = tp)
-    rxn[trna_transcript_n] = 1
+    biomass_change = func.get_metabolite_mw(trna_transcript_n) - pretrna_mw
+    rxn[trna_transcript_n], rxn[biomass.trna_] = 1, biomass_change
 
     # 3' cleavage
     if trna_info.three_trailer_seq != None:
         three_frag_n, three_frag_base_counts = func.make_rna_metabolite(trna_info.id + "_3'_trailer_fragment", 
                                                trna_info.three_trailer_seq, molecule_type = 'trna', 
                                                compartment = 'n',triphosphate = False)
+        three_frag_mw = func.get_metabolite_mw(three_frag_n)
+        other_trna_biomass += three_frag_mw
         rxn[three_frag_n] = 1
         rxn[metab.h2o_n] -= 1 #endonuclolytic cleavage (RNase Z)
         trna_processing_machinery += mach.RNASEZ
@@ -185,6 +196,7 @@ def process_trna(trna_info, pretrna_transcript_n):
         three_trailer_degradation = func.rna_exonucleolytic_degradation(three_frag_n, three_frag_base_counts, 
                                     trna_info.three_trailer_seq,trna_info.id + "_3'_trailer_fragment_tRNA", 
                                     triphosphate = False,nucleus = True)
+        three_trailer_degradation.add_metabolites({biomass.other_rna_: -three_frag_mw})
         three_trailer_degradation = update_trna_degradation(three_trailer_degradation)
         reactions += [three_trailer_degradation]
 
@@ -198,6 +210,8 @@ def process_trna(trna_info, pretrna_transcript_n):
             trna_intron_n, trna_intron_base_counts = func.make_rna_metabolite(trna_info.id + "_intron_" + str(i), 
                                                      trna_info.intron_sequences[i], molecule_type = 'trna',
                                                      compartment = 'n',triphosphate = False)
+            intron_mw = func.get_metabolite_mw(trna_intron_n)
+            other_trna_biomass += intron_mw
             rxn[trna_intron_n] = 1
             trna_processing_machinery += mach.trna_splicing_machinery
             
@@ -205,11 +219,14 @@ def process_trna(trna_info, pretrna_transcript_n):
                                                            trna_info.intron_sequences[i],
                                                            trna_info.id + "_intron_" + str(i) + '_tRNA', 
                                                            triphosphate = False, nucleus = True)
+            intron_degradation.add_metabolites({biomass.other_rna_: -intron_mw})
             intron_degradation = update_trna_degradation(intron_degradation)
             reactions += [intron_degradation]
 
         rxn[h2o_n] -= n_introns
-
+    
+    if other_trna_biomass > 0:
+        rxn[biomass.other_rna_] = other_trna_biomass
     trna_processing = cobra.Reaction('PROCESSING_TRNA_' + trna_info.id)
     trna_processing.subsytem = 'tRNA_Biogenesis'
     trna_processing.add_metabolites(rxn)
@@ -256,9 +273,11 @@ def modify_trna_cytosolic(trna_info, trna_transcript_c):
     else:
         trna_modifications_cytosolic = None
         modified_trna_transcript_c = trna_transcript_c
-    return trna_modifications_cytosolic, modified_trna_transcript_c
+    
+    modified_trna_transcript_c_mw = func.get_metabolite_mw(modified_trna_transcript_c)
+    return trna_modifications_cytosolic, modified_trna_transcript_c, modified_trna_transcript_c_mw
 
-def degrade_trna(trna_info, modified_trna_transcript_c):
+def degrade_trna(trna_info, modified_trna_transcript_c, modified_trna_transcript_c_mw):
     # currently built on the assumption that there are no post-transcriptional modifications on trna 
     
     if trna_info.five_leader_seq != None: # if there is a 5' leader sequence
@@ -267,12 +286,13 @@ def degrade_trna(trna_info, modified_trna_transcript_c):
         tp = True
     trna_degradation = func.rna_exonucleolytic_degradation(modified_trna_transcript_c, trna_info.trna_base_counts, 
                        trna_info.maturetrna_sequence, trna_info.id + '_tRNA', triphosphate = tp, nucleus = False)
+    trna_degradation.add_metabolites({biomass.trna_: -modified_trna_transcript_c_mw})
     trna_degradation.subsytem = 'tRNA_Biogenesis'
     trna_degradation.gene_reaction_rule = mach.XRN1[0]
-    return trna_degradation
+    return trna_degradation 
     
 
-def charge_trna(trna_info, modified_trna_transcript_c):
+def charge_trna(trna_info, modified_trna_transcript_c, modified_trna_transcript_c_mw):
     '''tRNA charging reaction combines the activation and charging steps into one reaction.'''
     
     
@@ -302,8 +322,9 @@ def charge_trna(trna_info, modified_trna_transcript_c):
 
         trna_charging = cobra.Reaction('CHARGING_TRNA_' + trna_info.id + '_' + code)
         trna_charging.subsytem = 'tRNA_Biogenesis'
+        biomass_change = func.get_metabolite_mw(charged_trna_c) - modified_trna_transcript_c_mw
         rxn = {modified_trna_transcript_c: -1, aa: -1, charged_trna_c: 1, metab.atp_c: -1, metab.ppi_c: 1, 
-               metab.amp_c: 1}
+               metab.amp_c: 1, biomass.trna_: biomass_change}
         trna_charging.add_metabolites(rxn)
         # add gprs
         genes = mach.seq_synthetase_map[code]
@@ -320,14 +341,14 @@ def charge_trna(trna_info, modified_trna_transcript_c):
 
 def trna_biogenesis(trna_info):
     '''trna_info is an object of class trna_information'''
-    pretrna_transcription, pretrna_transcript_n = transcribe_pretrna(trna_info)
-    trna_processing_reactions, trna_transcript_n = process_trna(trna_info, pretrna_transcript_n)
+    pretrna_transcription, pretrna_transcript_n, pretrna_mw = transcribe_pretrna(trna_info)
+    trna_processing_reactions, trna_transcript_n = process_trna(trna_info, pretrna_transcript_n, pretrna_mw)
     # right now, no modification reaction and modified and non-modified are same metabolite
     trna_modifications_nuclear, modified_trna_transcript_n = modify_trna_nuclear(trna_info, trna_transcript_n) 
     trna_primary_export, trna_transcript_c = primary_export_trna(trna_info, modified_trna_transcript_n)
-    trna_modifications_cytosolic, modified_trna_transcript_c = modify_trna_cytosolic(trna_info, trna_transcript_c)
-    trna_degradation = degrade_trna(trna_info, modified_trna_transcript_c)
-    trna_charging_reactions, charged_trna_metabolites = charge_trna(trna_info, modified_trna_transcript_c)
+    trna_modifications_cytosolic, modified_trna_transcript_c, modified_trna_transcript_c_mw  = modify_trna_cytosolic(trna_info, trna_transcript_c)
+    trna_degradation = degrade_trna(trna_info, modified_trna_transcript_c, modified_trna_transcript_c_mw)
+    trna_charging_reactions, charged_trna_metabolites = charge_trna(trna_info, modified_trna_transcript_c, modified_trna_transcript_c_mw)
     #---------------------------------------------------------------------------------------------------
     
     reactions = [pretrna_transcription] + trna_processing_reactions + [trna_primary_export, trna_degradation] 
@@ -338,7 +359,7 @@ def trna_biogenesis(trna_info):
         reactions += [trna_modifications_cytosolic]
     
     # reactiosn will be added to model, both charged and uncharged (modified) trna will be involved in translationr reactions
-    return reactions, charged_trna_metabolites, modified_trna_transcript_c
+    return reactions, charged_trna_metabolites, modified_trna_transcript_c, modified_trna_transcript_c_mw
      
 
 
@@ -346,7 +367,7 @@ def trna_biogenesis(trna_info):
 # 
 # positionally-independent (position won't effect .elements of cobra.Metabolite in cobra.Reaction)
 
-# In[5]:
+# In[39]:
 
 
 def get_base_frequency(seq_col, L):
@@ -403,16 +424,16 @@ mature_seq += 'CCA'
 
 # # Generate reactions
 
-# In[6]:
+# In[46]:
 
 
 trna_info = trna_information(maturetrna_sequence = mature_seq , id_ = 'generic', three_trailer_seq = trailer_seq, 
                              five_leader_seq = leader_seq, modifications = {},
                              intron_sequences = None)
-trna_biogenesis_reactions, charged_trna_metabolites, modified_trna_transcript_c = trna_biogenesis(trna_info)
+trna_biogenesis_reactions, charged_trna_metabolites, modified_trna_transcript_c, modified_trna_transcript_c_mw  = trna_biogenesis(trna_info)
 
 
-# In[7]:
+# In[24]:
 
 
 # trna_model = cobra.Model('trna_biogenesis')
@@ -420,13 +441,13 @@ trna_biogenesis_reactions, charged_trna_metabolites, modified_trna_transcript_c 
 # cobra.io.save_json_model(trna_model, local_data_path + 'interim/trna_biogenesis.json')
 
 
-# In[8]:
+# In[25]:
 
 
 # trna_model
 
 
-# In[9]:
+# In[26]:
 
 
 # import escher
