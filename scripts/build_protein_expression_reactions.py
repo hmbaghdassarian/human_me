@@ -39,8 +39,6 @@ def translate_protein_cytosolic(gene_info, mrna_transcript_c, mrna_deg_proxy):
     
     rxn[utils_2.modified_trna_transcript_c]  = gene_info.L_protein 
     biomass_change = (gene_info.L_protein*utils_2.modified_trna_transcript_c_mw)-tb_reactant_bm
-    print(biomass_change)
-    print(tb_reactant_bm)
     rxn[biomass.trna_] = biomass_change
     
     rxn[metab.h2o_c] = -gene_info.L_protein # release of peptide from tRNA, addition of -OH to uncharged tRNA

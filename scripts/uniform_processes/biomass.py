@@ -34,6 +34,8 @@ mrna_ = cobra.Metabolite('biomass_mRNA')
 premrna_ = cobra.Metabolite('biomass_premRNA')
 other_rna_ = cobra.Metabolite('biomass_other_RNA')
 
+type_to_object = {'rrna': rrna_, 'protein': protein_, 'mrna': mrna_, 'trna': trna_}
+
 
 # In[24]:
 
@@ -46,7 +48,7 @@ for bm in biomass_metabolites:
     reaction_.add_metabolites({bm: -1, biomass_: 1})
     biomass_reactions.append(reaction_)
 
-# protein biomass with unmodeled protein
+# protein biomass with unmodeled protein 
 upc=(params.unmodeled_protein_frac)/(1-params.unmodeled_protein_frac)
 reaction_ = cobra.Reaction('protein_biomass_to_biomass')
 reaction_.add_metabolites({protein_: -1, 

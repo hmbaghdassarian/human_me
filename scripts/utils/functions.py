@@ -275,102 +275,102 @@ def make_protein_metabolite(id_, amino_acid_counts, L_protein, compartment):
 # In[1]:
 
 
-def make_complex_metabolite(complex_id = None, **complex_info):# metabolites, *ids, *metabolite_types):
-    '''
+# def make_complex_metabolite(complex_id = None, **complex_info):# metabolites, *ids, *metabolite_types):
+#     '''
     
-    Inputs:
-    Complex info is a dictionary with three keys ['METABOLITES', 'IDS', 'METABOLITE_TYPES']
-    Each value is a list:
-        metabolites is a list of cobra.Metabolite objects
-        IDs is a list of string identifiers corresponding to each metabolite object
-        Metabolite_types is a list of strings; possible values are ['protein', 'rrna', 'trna', 'mrna',  'metabolite']
-        This means complexes can form between any of these species, including other complexes; metabolite is a M-model metabolite
-    complex_id is a string for the id of the complex metabolite, otherwise will form one from metabolite ids
-    Output:
-    A cobra.Metabolite object representing the complex formed between metabolites
+#     Inputs:
+#     Complex info is a dictionary with three keys ['METABOLITES', 'IDS', 'METABOLITE_TYPES']
+#     Each value is a list:
+#         metabolites is a list of cobra.Metabolite objects
+#         IDs is a list of string identifiers corresponding to each metabolite object
+#         Metabolite_types is a list of strings; possible values are ['protein', 'rrna', 'trna', 'mrna',  'metabolite']
+#         This means complexes can form between any of these species, including other complexes; metabolite is a M-model metabolite
+#     complex_id is a string for the id of the complex metabolite, otherwise will form one from metabolite ids
+#     Output:
+#     A cobra.Metabolite object representing the complex formed between metabolites
     
-    '''
-    if sorted(set(complex_info.keys())) != ['IDS', 'METABOLITES', 'METABOLITE_TYPES']:
-        raise ValueError('Invalid complex information keys or insufficient complex information keys')
+#     '''
+#     if sorted(set(complex_info.keys())) != ['IDS', 'METABOLITES', 'METABOLITE_TYPES']:
+#         raise ValueError('Invalid complex information keys or insufficient complex information keys')
     
-    metabolites_, ids, metabolite_types = complex_info['METABOLITES'], complex_info['IDS'], complex_info['METABOLITE_TYPES']
+#     metabolites_, ids, metabolite_types = complex_info['METABOLITES'], complex_info['IDS'], complex_info['METABOLITE_TYPES']
     
-    if len(set(metabolite_types).difference(['protein', 'rrna', 'trna', 'mrna',  'metabolite', 'complex']))>1:
-        raise ValueError('At least one of the metabolite types is not considered in complex formation currently')
+#     if len(set(metabolite_types).difference(['protein', 'rrna', 'trna', 'mrna',  'metabolite', 'complex']))>1:
+#         raise ValueError('At least one of the metabolite types is not considered in complex formation currently')
     
     
-    compartments = list(set([m.compartment for m in metabolites_]))
-    if len(compartments) == 1:
-        compartment = compartments[0]
-    # exception of ribosome complex
-    elif (len(compartments) == 2) and ('c' in compartments) and ('mature_ribosome_complex_complex[c]' in [m.id for m in metabolites_]):
-        compartment = 'c'
-    else:
-        raise ValueError('metabolites are not in the same compartment')
+#     compartments = list(set([m.compartment for m in metabolites_]))
+#     if len(compartments) == 1:
+#         compartment = compartments[0]
+#     # exception of ribosome complex
+#     elif (len(compartments) == 2) and ('c' in compartments) and ('mature_ribosome_complex_complex[c]' in [m.id for m in metabolites_]):
+#         compartment = 'c'
+#     else:
+#         raise ValueError('metabolites are not in the same compartment')
     
-    mt_type = '_'.join(list(set(metabolite_types)))
+#     mt_type = '_'.join(list(set(metabolite_types)))
     
-    ids_ = '_'.join(ids)
+#     ids_ = '_'.join(ids)
     
-    if complex_id == None:
-        id_ = ids_ + '_' + mt_type
-    else: 
-        id_ = complex_id + '_' + mt_type
+#     if complex_id == None:
+#         id_ = ids_ + '_' + mt_type
+#     else: 
+#         id_ = complex_id + '_' + mt_type
     
-    complex_id = id_ + '_complex' + '[' + compartment + ']'
-    if len(complex_id)>(256-8-4-len(mt_type)): #-8 and -4 for _complex and compartment appended to end
-        err_msg = 'Cobrapy requires metabolite ids to be less than 256 characters, please specify a '
-        err_msg += 'shorter user-defined complex id'
-        raise ValueError(err_msg)
+#     complex_id = id_ + '_complex' + '[' + compartment + ']'
+#     if len(complex_id)>(256-8-4-len(mt_type)): #-8 and -4 for _complex and compartment appended to end
+#         err_msg = 'Cobrapy requires metabolite ids to be less than 256 characters, please specify a '
+#         err_msg += 'shorter user-defined complex id'
+#         raise ValueError(err_msg)
     
         
-    complex_metabolite = cobra.Metabolite(complex_id)
-    complex_metabolite.compartment = compartment
-    complex_metabolite.charge = sum([m.charge for m in metabolites_])
+#     complex_metabolite = cobra.Metabolite(complex_id)
+#     complex_metabolite.compartment = compartment
+#     complex_metabolite.charge = sum([m.charge for m in metabolites_])
     
-    elements = dict()
-    for m in metabolites_:
-        for k,v in m.elements.items():
-            if k in elements.keys():
-                elements[k] += v
-            else:
-                elements[k] = v
-    complex_metabolite.elements = elements
+#     elements = dict()
+#     for m in metabolites_:
+#         for k,v in m.elements.items():
+#             if k in elements.keys():
+#                 elements[k] += v
+#             else:
+#                 elements[k] = v
+#     complex_metabolite.elements = elements
     
-    return complex_metabolite, id_
+#     return complex_metabolite, id_
 
-def form_complex(reaction_id = None, complex_id = None, **complex_info):
+# def form_complex(reaction_id = None, complex_id = None, **complex_info):
     
-    '''
+#     '''
     
-    Inputs:
-    Complex info is a dictionary with three keys ['METABOLITES', 'IDS', 'METABOLITE_TYPES']
-    Each value is a list:
-        metabolites is a list of cobra.Metabolite objects
-        IDs is a list of string identifiers corresponding to each metabolite object
-        Metabolite_types is a list of strings; possible values are ['protein', 'rrna', 'trna', 'mrna',  'metabolite', 'complex']
+#     Inputs:
+#     Complex info is a dictionary with three keys ['METABOLITES', 'IDS', 'METABOLITE_TYPES']
+#     Each value is a list:
+#         metabolites is a list of cobra.Metabolite objects
+#         IDs is a list of string identifiers corresponding to each metabolite object
+#         Metabolite_types is a list of strings; possible values are ['protein', 'rrna', 'trna', 'mrna',  'metabolite', 'complex']
   
-    Output:
-    A cobra.Reaction object representing the complex formation between metabolites
+#     Output:
+#     A cobra.Reaction object representing the complex formation between metabolites
     
-    '''
+#     '''
     
-    complex_metabolite, id_ = make_complex_metabolite(complex_id, **complex_info)
-    metabolites_ = complex_info['METABOLITES']
-    compartment = list(set([m.compartment for m in metabolites_]))[0]
+#     complex_metabolite, id_ = make_complex_metabolite(complex_id, **complex_info)
+#     metabolites_ = complex_info['METABOLITES']
+#     compartment = list(set([m.compartment for m in metabolites_]))[0]
 
-    if reaction_id == None:
-        reaction_id = id_ + '_COMPLEX_FORMATION' + compartment
-    else:
-        reaction_id = reaction_id + '_COMPLEX_FORMATION' + compartment
-    complex_formation = cobra.Reaction(reaction_id)
+#     if reaction_id == None:
+#         reaction_id = id_ + '_COMPLEX_FORMATION' + compartment
+#     else:
+#         reaction_id = reaction_id + '_COMPLEX_FORMATION' + compartment
+#     complex_formation = cobra.Reaction(reaction_id)
     
-    rxn = {m: -1 for m in metabolites_}
-    rxn[complex_metabolite] = 1
-    complex_formation.add_metabolites(rxn)
-    complex_formation.lower_bound = -1000 # reversible
+#     rxn = {m: -1 for m in metabolites_}
+#     rxn[complex_metabolite] = 1
+#     complex_formation.add_metabolites(rxn)
+#     complex_formation.lower_bound = -1000 # reversible
     
-    return complex_formation, complex_metabolite
+#     return complex_formation, complex_metabolite
 
 
 # In[1]:
@@ -394,4 +394,212 @@ def get_metabolite_mw(metabolite, no_copies = 1, metabolite_elements = None,
         else:
             raise ValueError('Must provide a cobra.Metabolite object or dictionary of elements')
     
+
+
+# In[8]:
+
+
+class COMPLEX(cobra.Metabolite):
+    def __init__(self, complex_id = None, reaction_id = None, **complex_info):
+        '''
+        Inputs:
+        Complex info is a dictionary with three keys ['METABOLITES', 'IDS', 'METABOLITE_TYPES']
+        Each value is a list:
+            metabolites is a list of cobra.Metabolite objects
+            IDs is a list of string identifiers corresponding to each metabolite object
+            component_types is a list of strings; possible values are ['protein', 'rrna', 'trna', 'mrna', 'metabolite']
+            This means complexes can form between any of these species, including other complexes; metabolite is a M-model metabolite
+        complex_id is a string for the id of the complex metabolite, otherwise will form one from metabolite ids
+
+        Output:
+        A cobra.Metabolite object representing the complex formed between metabolites stored in self.complex_metabolite
+        
+        '''
+        # checks
+        if sorted(set(complex_info.keys())) != ['IDS', 'METABOLITES', 'METABOLITE_TYPES']:
+            raise ValueError('Invalid complex information keys or insufficient complex information keys')
+
+        self.subcomponents, ids, self.component_types = complex_info['METABOLITES'], complex_info['IDS'], complex_info['METABOLITE_TYPES']
+        
+        if len(set(self.component_types).difference(['protein', 'rrna', 'trna', 'mrna',  'metabolite', 'complex']))>1:
+            raise ValueError('At least one of the metabolite types is not considered in complex formation currently')
+        
+        if len(self.subcomponents) != len(self.component_types):
+            raise ValueError('Each metabolite must have a corresponding metabolite type')
+        # parse compartment    
+        compartments = list(set([m.compartment for m in self.subcomponents]))
+        if len(compartments) == 1:
+            compartment = compartments[0]
+        # exception of ribosome complex
+        elif (len(compartments) == 2) and ('c' in compartments) and ('mature_ribosome_complex_complex[c]' in [m.id for m in self.subcomponents]):
+            compartment = 'c'
+        else:
+            raise ValueError('metabolites are not in the same compartment')
+
+        # parse metabolite id
+        mt_type = '_'.join(list(set(self.component_types)))
+        ids_ = '_'.join(ids)
+        if complex_id == None:
+            id_ = ids_ + '_' + mt_type
+        else: 
+            id_ = complex_id + '_' + mt_type
+            
+        if reaction_id == None:
+            self.reaction_id = id_ + '_COMPLEX_FORMATION' + compartment
+        else:
+            self.reaction_id = reaction_id + '_COMPLEX_FORMATION' + compartment
+            
+        
+        complex_id = id_ + '_complex' + '[' + compartment + ']'
+        if len(complex_id)>(256-8-4-len(mt_type)): #-8 and -4 for _complex and compartment appended to end
+            err_msg = 'Cobrapy requires metabolite ids to be less than 256 characters, please specify a '
+            err_msg += 'shorter user-defined complex id'
+            raise ValueError(err_msg)
+        
+        # make the metabolite
+        cobra.Metabolite.__init__(self, id = complex_id, 
+                                  compartment = compartment, charge = sum([m.charge for m in self.subcomponents]))
+        elements = dict()
+        for m in self.subcomponents:
+            for k,v in m.elements.items():
+                if k in elements.keys():
+                    elements[k] += v
+                else:
+                    elements[k] = v
+        self.elements = elements
+        
+    def form_complex(self):
+
+        '''
+        Output: A cobra.Reaction object representing the complex formation between metabolites stored in self.complex_formation
+
+        '''
+        
+        # expected no biomass change
+        complex_formation = cobra.Reaction(self.reaction_id)
+        rxn = {m: -1 for m in self.subcomponents}
+        rxn[self] = 1
+        complex_formation.add_metabolites(rxn)
+        complex_formation.lower_bound = -1000 # reversible
+        
+        return complex_formation
+#         self.complex_formation = complex_formation
+        
+        
+    def get_complex_biomass(self, decomposed_complex = None):
+        '''Recursive method to get the complex biomass by its individual components'''
+    
+        if decomposed_complex == None:
+            decomposed_complex = COMPLEX(complex_id = 'foo', reaction_id = 'foo',
+                                         **{'METABOLITES': self.subcomponents, 
+                                           'IDS': [str(i) for i in list(range(len(self.subcomponents)))],
+                                           'METABOLITE_TYPES': self.component_types})
+            
+            
+        if 'complex' not in decomposed_complex.component_types:
+            total_components = len(decomposed_complex.subcomponents)
+
+            biomass_by_type = dict(zip(decomposed_complex.component_types, [0]* total_components))
+            for i in range(total_components): # in case repeated metabolites in complex (homodimers)
+                m_ = decomposed_complex.subcomponents[i]
+                mt_ = decomposed_complex.component_types[i]
+                biomass_by_type[mt_] += get_metabolite_mw(m_)
+            
+#             if sum(biomass_by_type.values()) != get_metabolite_mw(self): # sanity check
+#                 raise ValueError('Something went wrong in decomposing complex biomass')
+            
+            return biomass_by_type
+        else: # unpack nested complexes
+            complex_idx = [i for i in range(len(decomposed_complex.component_types)) if decomposed_complex.component_types[i] == 'complex']
+            non_complex_idx = sorted(set(list(range(len(decomposed_complex.component_types)))).difference(complex_idx))
+
+
+            metabolites_ = [decomposed_complex.subcomponents[i] for i in non_complex_idx] + [item for sublist in [decomposed_complex.subcomponents[i].subcomponents for i in complex_idx] for item in sublist]
+            ids = [str(i) for i in list(range(len(metabolites_)))]
+            metabolite_types = [decomposed_complex.component_types[i] for i in non_complex_idx] + [item for sublist in [decomposed_complex.subcomponents[i].component_types for i in complex_idx] for item in sublist]
+            new_complex_info = {'METABOLITES': metabolites_, 'IDS': ids, 'METABOLITE_TYPES': metabolite_types}
+
+            return self.get_complex_biomass(decomposed_complex = COMPLEX(complex_id = 'foo', reaction_id = 'foo', 
+                                                                         **new_complex_info))  
+
+
+# In[ ]:
+
+
+# def get_complex_biomass(self):
+#     '''Recursive method to get the complex biomass by its individual components'''
+
+#     if 'complex' not in self.component_types:
+#         total_components = len(self.subcomponents)
+
+#         biomass_by_type = dict(zip(self.component_types, [0]* total_components))
+#         for i in range(total_components): # in case repeated metabolites in complex (homodimers)
+#             m_ = self.subcomponents[i]
+#             mt_ = self.component_types[i]
+#             biomass_by_type[mt_] += get_metabolite_mw(m_)
+#         return biomass_by_type
+#     else: # unpack nested complexes
+#         complex_idx = [i for i in range(len(self.component_types)) if self.component_types[i] == 'complex']
+#         non_complex_idx = sorted(set(list(range(len(self.component_types)))).difference(complex_idx))
+
+
+#         metabolites_ = [self.subcomponents[i] for i in non_complex_idx] + [item for sublist in [self.subcomponents[i].subcomponents for i in complex_idx] for item in sublist]
+#         ids = [str(i) for i in list(range(len(metabolites_)))]
+#         metabolite_types = [self.component_types[i] for i in non_complex_idx] + [item for sublist in [self.subcomponents[i].component_types for i in complex_idx] for item in sublist]
+#         new_complex_info = {'METABOLITES': metabolites_, 'IDS': ids, 'METABOLITE_TYPES': metabolite_types}
+
+#         return get_complex_biomass(COMPLEX(**new_complex_info))  
+
+
+# In[ ]:
+
+
+
+
+
+# In[ ]:
+
+
+
+
+
+# In[ ]:
+
+
+
+
+
+# In[ ]:
+
+
+def get_complex_biomass_change(complex_products, complex_reactants):
+    '''Input is two lists of type COMPLEX, one representing those on the product side, one representing those on the reactant side
+    output is a dictionary of biomass change for each respective biomass type.'''
+    
+    product_biomass = dict()
+    for cp in complex_products:
+        if type(cp)!= COMPLEX:
+            raise TypeError('All complex products must be a COMPLEX object')
+        for bt, mw in cp.get_complex_biomass().items():
+            if bt in product_biomass.keys():
+                product_biomass[bt] += mw
+            else:
+                product_biomass[bt] = mw
+    
+    reactant_biomass = dict()
+    for cr in complex_reactants:
+        if type(cr)!= COMPLEX:
+            raise TypeError('All complex reactants must be a COMPLEX object')
+        for bt, mw in cr.get_complex_biomass().items():
+            if bt in reactant_biomass.keys():
+                reactant_biomass[bt] += mw
+            else:
+                reactant_biomass[bt] = mw
+    
+    for bt in set(product_biomass.keys()).difference(reactant_biomass.keys()):
+        reactant_biomass[bt] = 0
+    for bt in set(reactant_biomass.keys()).difference(product_biomass.keys()):
+        product_biomass[bt] = 0    
+    
+    return {bt: product_biomass[bt] - reactant_biomass[bt] for bt in product_biomass.keys() if product_biomass[bt] - reactant_biomass[bt] != 0}
 
