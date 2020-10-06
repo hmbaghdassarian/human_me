@@ -574,7 +574,7 @@ def transport_peroxisome(gene_info, folded_protein_c):
     if folded_protein_c.compartment != 'c':
         raise ValueError('Only cytoplasmic proteins can be transported to mitochondrial matrix')
     
-    peroxisomal_transport = cobra.Reaction(gene_info.hgnc_id + 'IMPORTtx')
+    peroxisomal_transport = cobra.Reaction(gene_info.hgnc_id + '_IMPORTtx')
     peroxisomal_transport.subsytem = 'Protein_Expression'
     folded_protein_x = folded_protein_c.copy()
     folded_protein_x.id = folded_protein_x.id.replace('[c]', '[x]')
@@ -593,7 +593,7 @@ def transport_peroxisome(gene_info, folded_protein_c):
 
 def degrade_peroxisomal_protein(gene_info, folded_protein_x):
     
-    peroxisomal_degradation = cobra.Reaction(gene_info.hgnc_id + 'DEGRADATIONx')
+    peroxisomal_degradation = cobra.Reaction(gene_info.hgnc_id + '_DEGRADATIONx')
     peroxisomal_degradation.subsytem = 'Protein_Expression'
     peroxisomal_degradation.gene_reaction_rule = mach.LONP2[0]
 

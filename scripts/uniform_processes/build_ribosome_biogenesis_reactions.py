@@ -362,7 +362,7 @@ def build_other_rrna_reactions(rrna5s_complex_n, rs_protein_metabolites, rl_prot
     rrna_21s_n_mw, ets_5_frag4_n_mw = func.get_metabolite_mw(rrna_21s_n), func.get_metabolite_mw(ets_5_frag4_n)
     rxn[metab.h2o_n] = -1 # endonuclolytic cleavage event at site 1
     rxn[rrna_26s_n], rxn[rrna_21s_n], rxn[ets_5_frag4_n] = -1, 1, 1
-    rxn[biomass.rrna_], rxn[biomass.other_rna_] = rrna_21s_n_mw - rrna_26s_n_mw, ets_5_frag4_n
+    rxn[biomass.rrna_], rxn[biomass.other_rna_] = rrna_21s_n_mw - rrna_26s_n_mw, ets_5_frag4_n_mw
     rrna_21s_formation.add_metabolites(rxn)
     rrna_21s_formation.gene_reaction_rule = mach.UTP24[0]
     ets_5_frag4_degradation = func.rna_exonucleolytic_degradation(ets_5_frag4_n, base_counts_ets_5_frag4, ets_5_frag4_seq, reaction_name = 'ets_5_frag4_rRNA', triphosphate = False)

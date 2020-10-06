@@ -554,24 +554,6 @@ class COMPLEX(cobra.Metabolite):
 # In[ ]:
 
 
-
-
-
-# In[ ]:
-
-
-
-
-
-# In[ ]:
-
-
-
-
-
-# In[ ]:
-
-
 def get_complex_biomass_change(complex_products, complex_reactants):
     '''Input is two lists of type COMPLEX, one representing those on the product side, one representing those on the reactant side
     output is a dictionary of biomass change for each respective biomass type.'''
@@ -602,4 +584,35 @@ def get_complex_biomass_change(complex_products, complex_reactants):
         product_biomass[bt] = 0    
     
     return {bt: product_biomass[bt] - reactant_biomass[bt] for bt in product_biomass.keys() if product_biomass[bt] - reactant_biomass[bt] != 0}
+
+
+# In[ ]:
+
+
+def SASA(mw):
+    return mw**(0.75)
+
+
+# In[ ]:
+
+
+def check_me_mass_balance(r, metabolic_model = params.human_model):
+    '''r is a cobra.Reaction object'''
+    if len(r.genes) == 0:
+        return r.check_mass_balance()
+    else:
+    
+        metabolic_reaction_names = [r.name for r in metabolic_model.reactions if len(r.genes)>0]
+        if r.name in metabolic_reaction_names: # metabolic reactions
+            # remove coupling constraint
+            rxn = {m:c for m,c in r.metabolites.items()  if ('protein' not in m.id) and ('complex' not in m.id)}
+        else: # expression reactions
+            raise ValueError('Do not currently have code base to get mass balance of expression reactions')
+#             if 'TRANSLATION' in r.id:
+#                 rxn = {m:c for m,c in r[0].metabolites.items()  if ('protein' not in m.id) and ('complex' not in m.id)}
+#                 rxn = {m:c for m,c in rxn.items()  if ('mrna' not in m.id) or ('proxy' in m.id)}
+    r_ = cobra.Reaction(' ')
+    r_.add_metabolites(rxn) 
+    
+    return r_.check_mass_balance()
 

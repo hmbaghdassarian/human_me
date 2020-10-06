@@ -276,8 +276,8 @@ class gene_information():
                     self.final_locations[loc] = 'Non-Canonical Secretion'
         
         # in the case that protein synthesis flux spread across multiple reactions due to multi-localization
-        if len(set(self.final_locations.keys())) > 1:
-            if len(set(self.final_locations.keys())) == 2:
+        if len(set(self.final_locations.values())) > 1:
+            if len(set(self.final_locations.values())) == 2:
                 self.coupling_c2 = 2*self.coupling_c2
                 self.coupling_c1B = 2*self.coupling_c1B
             else:

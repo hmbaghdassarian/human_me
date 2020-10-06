@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[1]:
+# In[3]:
 
 
 import cobra
@@ -11,6 +11,7 @@ import warnings
 import sys
 sys.path.insert(1, '../scripts/') # comment out in python script
 from utils.load_environmental_variables import *
+from utils import machinery as mach
 
 compartments_ = {'c': 'cytosolic',  'l': 'lysosomal', 'm': 'mitochondrial', 'r': 'endoplasmic reticulum', 
                 'e': 'extracellular space', 'x': 'peroxisomal', 'n': 'nuclear', 'g': 'golgi apparatus',
@@ -23,24 +24,30 @@ compartments_me = {'c': 'cytosol',  'l': 'lysosome', 'm': 'mitochondria', 'r': '
 
 # # Inputs
 
-# In[2]:
+# In[4]:
 
 
 psim_me = pd.read_csv(input_psim_file)
 human_model = cobra.io.json.load_json_model(input_model_file)
+# may want to make biomass_reaction_id an input string for removing the biomass reaction
 non_machinery = open(input_non_machinery_file).read().splitlines()
 
     
-# psim_me = pd.read_csv(root_path + 'psim_recon2_2.csv', index_col= 0)
+
+
+# In[6]:
+
+
+# psim_me = pd.read_csv(root_path + 'project_files/psim_recon2_2.csv', index_col= 0)
 # non_machinery = None
 # import random
-# non_machinery = random.choices(list(set(psim_me.HGNC_ID.dropna().tolist()).difference(expression_machinery + metabolic_machinery)), k = 30)
-# non_machinery += metabolic_machinery[:10]
+# non_machinery = random.choices(list(set(psim_me.HGNC_ID.dropna().tolist()).difference(mach.expression_machinery + mach.metabolic_machinery)), k = 30)
+# non_machinery += mach.metabolic_machinery[:10]
 
 
 # # Basic formatting
 
-# In[3]:
+# In[7]:
 
 
 psim_me.reset_index(inplace = True, drop = True)
@@ -193,6 +200,48 @@ for amino_acid in amino_acids_:
         for compartment in compartments:
             metabolite_id = amino_acid + '[' + compartment + ']'
             add_required_metabolites(metabolite_id, compartment)
+
+
+# # Remove biomass reactions
+
+# In[35]:
+
+
+metabolites_1 = [m.id for m in human_model.metabolites]
+try:
+    biomass_reaction = human_model.reactions.get_by_id('biomass_reaction')
+    try:
+        biomass_m = list(biomass_reaction.metabolites.keys())
+
+        human_model.remove_reactions(['biomass_reaction'], remove_orphans = True)
+
+        for bm in biomass_m:
+            reactions = list(bm.reactions)
+            if len(reactions) != 1:
+                raise ValueError('Unexpected  reactions associated with biomass constituent')
+            bmr = reactions[0]
+            human_model.remove_reactions([bmr], remove_orphans = True)
+    except:
+        raise ValueError('Biomass reactions formatted differently than expected, please emulate RECON2.2')
+except:
+    wrn_ = 'No biomass reaction identified in input model. Assuming that biomass reactions and metabolites '
+    wrn_ = " are not present. If present, please make sure the biomass reaction id is 'biomass_reaction'"
+    warnings.warn(wrn_)
+    raise ValueErorr()
+
+if len([m.id for m in human_model.metabolites if 'biomass' in m.id]) != 0:
+    err_ = 'Extraneous biomass metabolites not associated with the biomass reaction are present,'
+    err_ += ' please remove from input cobrapy model'
+    raise ValueError(err_)
+
+rm = sorted(set(metabolites_1).difference([m.id for m in human_model.metabolites]))
+if len([i for i in rm if 'biomass' not in i]) != 0:
+    warnings.warn('Non biomass metabolites removed as orphan metabolites from biomass reactions')
+
+
+# In[53]:
+
+
 cobra.io.save_json_model(human_model, local_data_path + 'processed/corrected_model.json')
 
 
@@ -201,10 +250,19 @@ cobra.io.save_json_model(human_model, local_data_path + 'processed/corrected_mod
 # In[4]:
 
 
-human_model = cobra.io.json.load_json_model(local_data_path + 'processed/corrected_model.json')
+# human_model = cobra.io.json.load_json_model(local_data_path + 'processed/corrected_model.json')
 
 
-# In[12]:
+# In[8]:
+
+
+essential_cols = ['HGNC_ID', 'PREMRNA_SEQ', 'MRNA_SEQ', 'PROTEIN_SEQ']
+optional_cols = ['POLYA_LENGTH', 'TMD', 'SP', 'N_INTRONS', 'DSB', 'GPI', 'OG'] # NG
+other_cols = ['LOCATION'] # essential depending on other inputs, otherwise optional
+all_columns = essential_cols + optional_cols + other_cols
+
+
+# In[11]:
 
 
 essential_cols = ['HGNC_ID', 'PREMRNA_SEQ', 'MRNA_SEQ', 'PROTEIN_SEQ']
@@ -212,21 +270,12 @@ optional_cols = ['POLYA_LENGTH', 'TMD', 'SP', 'N_INTRONS', 'DSB', 'GPI', 'OG'] #
 other_cols = ['LOCATION']
 all_columns = essential_cols + optional_cols + other_cols
 
-
-# In[5]:
-
-
-essential_cols = ['HGNC_ID', 'PREMRNA_SEQ', 'MRNA_SEQ', 'PROTEIN_SEQ']
-optional_cols = ['POLYA_LENGTH', 'TMD', 'SP', 'N_INTRONS', 'DSB', 'GPI', 'OG'] # NG
-other_cols = ['LOCATION']
-all_columns = essential_cols + optional_cols + other_cols
-
-expression_psim = pd.read_csv(root_path + 'expression_module_psim.csv', index_col = 0)
-expression_machinery = expression_psim.HGNC_ID.tolist()
+expression_psim = pd.read_csv(root_path + 'project_files/expression_module_psim.csv', index_col = 0)
+expression_machinery = mach.expression_machinery
 expression_psim = expression_psim[all_columns] 
 
 
-# In[6]:
+# In[12]:
 
 
 # check that essential cols are all present and appropriately formatted
@@ -248,7 +297,7 @@ psim_me = psim_me[all_columns]
 # similarly put expression psim columns in order; this shouldn't be necessary but just in case
 
 
-# In[7]:
+# In[16]:
 
 
 # add expression module machinery to psim if it is not already there
@@ -261,15 +310,13 @@ if len(set(expression_machinery).difference(psim_me.HGNC_ID.tolist())) > 0:
             psim_me.loc[psim_me.shape[0], :] = expression_psim.loc[i,:]
 
 # check all genes in metabolic model are in the psim
-metabolic_machinery = sorted(set([g.id for g in human_model.genes]))
-if len(set(metabolic_machinery).difference(psim_me.HGNC_ID.tolist())) > 0:
+if len(set(mach.metabolic_machinery).difference(psim_me.HGNC_ID.tolist())) > 0:
     msg = 'Not all genes in provided metabolic model are in the the PSIM '
     msg += 'Please add their information to the PSIM'
     raise ValueError(msg)
 
 
 # In[9]:
-
 
 
 if type(non_machinery) != list():
@@ -311,7 +358,7 @@ for loc in loc_vals:
             raise ValueError('The non-machinery final locations specified are not a compartment considered in the ME model')
 
 
-# In[8]:
+# In[ ]:
 
 
 psim_me.to_csv(local_data_path + 'processed/corrected_psim_me.csv')

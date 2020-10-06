@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[7]:
+# In[1]:
 
 
 import pandas as pd
@@ -13,27 +13,15 @@ from utils.load_environmental_variables import *
 from utils.parameters import human_model
 
 
-# In[8]:
+# In[2]:
 
 
 # define necessary variables 
 rs = pd.read_csv(local_data_path + 'raw/small_ribosomal_protein.csv', index_col = None, skiprows = [0])
 rl = pd.read_csv(local_data_path + 'raw/large_ribosomal_protein.csv', index_col = None, skiprows = [0])
 
-expression_model = cobra.io.json.load_json_model(root_path + 'expression_module_model.json')
-# to work with gene_information class
-expression_model_2 = expression_model.copy()
-for r in expression_model_2.genes.get_by_id('ribosome').reactions:
-    r.gene_reaction_rule = r.gene_reaction_rule.replace('ribosome', ' and '.join(rs['HGNC ID (gene)'].tolist() + rl['HGNC ID (gene)'].tolist()))
 
-
-expression_psim = pd.read_csv(root_path + 'expression_module_psim.csv', index_col = 0)
-metabolic_machinery = [g.id for g in human_model.genes] # not efficient to do this each time
-expression_machinery = expression_psim.HGNC_ID.tolist()
-all_machinery = metabolic_machinery + expression_machinery
-
-
-# In[9]:
+# In[3]:
 
 
 # mrna expression
@@ -104,7 +92,7 @@ degradation_rule1 = ' and '.join(deadenylation_machinery + mrna_degradation_mach
 decapping_rule = ' and '.join(deadenylation_machinery + decapping_degradation_machinery)
 
 
-# In[10]:
+# In[4]:
 
 
 #rrna expression
@@ -137,7 +125,7 @@ RAN = ['HGNC:9846']
 XPO1 = ['HGNC:12825']
 
 
-# In[11]:
+# In[5]:
 
 
 # trna expression
@@ -185,7 +173,7 @@ seq_synthetase_map = {
 }
 
 
-# In[12]:
+# In[6]:
 
 
 # cytoplasmic transport
@@ -263,7 +251,7 @@ LONP2 = ['HGNC:20598']
 importins = ['HGNC:6400', 'HGNC:6394']
 
 
-# In[13]:
+# In[7]:
 
 
 # ribosome biogenesis
@@ -278,7 +266,7 @@ eif5 = ['HGNC:3299', 'HGNC:30793']
 eifs = eif1 + eif2 + eif3 + eif4f + eif5 + ['HGNC:8554']
 
 
-# In[14]:
+# In[8]:
 
 
 # secretory pathway
@@ -330,4 +318,61 @@ eps = ['HGNC:3419', 'HGNC:21604']
 endocytic_machinery = sorted(set(proteasome_ubiquitin + escrt + eps + clathrin_m))
 
 cathepsins = ['HGNC:2527', 'HGNC:2529', 'HGNC:9251']
+
+
+# # List all expression machinery
+
+# In[9]:
+
+
+# from cobra.core.gene import parse_gpr
+# from utils.load_environmental_variables  import *
+
+# all_vars = locals().copy()
+# expression_machinery = []
+# for k,v in all_vars.items():
+#     if type(v) == str:
+#         try:
+#             genes = list(parse_gpr(v)[1])
+#         except:
+#             pass
+#     elif type(v) == list:
+#         genes = v
+#     elif type(v) == pd.core.frame.DataFrame:
+#         if 'HGNC' in ''.join(v.columns.tolist()):
+#             genes = v['HGNC ID (gene)'].tolist()
+#     elif type(v) == dict:
+#         genes = list()
+#         for k_,v_ in v.items():
+#             genes += v_
+        
+#     if 'HGNC' in ''.join([str(i) for i in genes]) and 'pd.read_csv' not in ''.join([str(i) for i in genes]):
+#         expression_machinery += genes
+    
+# expression_machinery = sorted(set(expression_machinery))
+# expression_machinery = [m for m in expression_machinery if 'HGNC:' in m]
+
+# with open(root_path + 'project_files/expression_machinery.txt', 'w') as f:
+#     for m in expression_machinery:
+#         f.write(m + '\n')
+
+#---------------------------------------------
+# expression_model = cobra.io.json.load_json_model(root_path + 'expression_module_model.json')
+# # to work with gene_information class
+# expression_model_2 = expression_model.copy()
+# for r in expression_model_2.genes.get_by_id('ribosome').reactions:
+#     r.gene_reaction_rule = r.gene_reaction_rule.replace('ribosome', ' and '.join(rs['HGNC ID (gene)'].tolist() + rl['HGNC ID (gene)'].tolist()))
+
+
+# expression_psim = pd.read_csv(root_path + 'expression_module_psim.csv', index_col = 0)
+# expression_machinery_2 = expression_psim.HGNC_ID.tolist()
+# set(expression_machinery_2).difference(expression_machinery)
+
+
+# In[41]:
+
+
+metabolic_machinery = sorted([g.id for g in human_model.genes]) # not efficient to do this each time
+expression_machinery = sorted(open(root_path + 'project_files/expression_machinery.txt').read().splitlines())
+all_machinery = sorted(set(metabolic_machinery + expression_machinery))
 

@@ -19,6 +19,9 @@ from utils import functions as func
 
 # make the metabolites
 biomass_ = cobra.Metabolite('biomass')
+biomass_dilution = cobra.Reaction('biomass_dilution')
+biomass_dilution.add_metabolites({biomass_: -1})
+biomass_reactions = [biomass_dilution]
 
 # constant
 dna_ = cobra.Metabolite('biomass_DNA')
@@ -41,12 +44,16 @@ type_to_object = {'rrna': rrna_, 'protein': protein_, 'mrna': mrna_, 'trna': trn
 
 
 # biomass formation reactions
-biomass_reactions = list()
-biomass_metabolites = [dna_, carb_, lipid_, other_, trna_, rrna_, mrna_, premrna_, other_rna_]
+
+biomass_metabolites = [dna_, carb_, lipid_, other_, trna_, rrna_, mrna_, premrna_]
 for bm in biomass_metabolites:
     reaction_ = cobra.Reaction(bm.id.split('_')[1] + '_biomass_to_biomass')
     reaction_.add_metabolites({bm: -1, biomass_: 1})
     biomass_reactions.append(reaction_)
+    
+reaction_ = cobra.Reaction('other_rna_biomass_to_biomass')
+reaction_.add_metabolites({other_rna_: -1, biomass_: 1})
+biomass_reactions.append(reaction_)
 
 # protein biomass with unmodeled protein 
 upc=(params.unmodeled_protein_frac)/(1-params.unmodeled_protein_frac)
