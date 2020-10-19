@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[6]:
+# In[1]:
 
 
 import pandas as pd
@@ -167,7 +167,7 @@ class gene_information():
         if pd.isna(sp) or sp == None:
             self.sp = False 
         elif type(sp) != bool:
-            raise ValueError(self.hgnc_id + ': SP must be a boolean')
+            raise TypeError(self.hgnc_id + ': SP must be a boolean')
         else:
             self.sp = sp
         
@@ -183,7 +183,7 @@ class gene_information():
         elif n_introns >= 0:
             self.n_introns = round(n_introns) # must be an integer
         else:
-            raise ValueError(self.hgnc_id + ': n_introns must either be an integer >= 0 or None/nan')
+            raise TypeError(self.hgnc_id + ': n_introns must either be an integer >= 0 or None/nan')
         
 #         self.keff = keff
 #         if self.keff == None and self.module == 'Machinery':
@@ -207,8 +207,8 @@ class gene_information():
 #                 coupling_params['keff'] = None
 
         # NOT COMPLETE, NEED TO ADD MU
-        self.coupling_c2 = (np.log(2)/coupling_params['mrna_half_life'])/coupling_params['alpha_p'] #+mu
-        self.coupling_c1B = 1/coupling_params['alpha_p']
+        self.coupling_c2 = (np.log(2)/coupling_params['mrna_half_life'])/(coupling_params['alpha_p'] + params.mu)
+        self.coupling_c1B = params.mu/(coupling_params['alpha_p'] + params.mu)
        
     def get_final_locations(self, metabolic_model = params.human_model, final_locations = None):
         '''Assigns a set of final compartments for the protein. For machinery, extracts this from the inputer
@@ -278,8 +278,8 @@ class gene_information():
         # in the case that protein synthesis flux spread across multiple reactions due to multi-localization
         if len(set(self.final_locations.values())) > 1:
             if len(set(self.final_locations.values())) == 2:
-                self.coupling_c2 = 2*self.coupling_c2
-                self.coupling_c1B = 2*self.coupling_c1B
+                self.coupling_c2 = 0.5*self.coupling_c2
+                self.coupling_c1B = 0.5*self.coupling_c1B
             else:
                 raise ValueError('Have not yet accounted for Non-Canonical Secretion or other synthesis forms in coupling of mrna degradataion to protein synthesis')
 

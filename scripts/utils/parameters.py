@@ -7,6 +7,7 @@
 import pandas as pd 
 import numpy as np
 import cobra
+from sympy.parsing.sympy_parser import parse_expr 
 
 import sys
 sys.path.insert(1, '../../scripts/') # comment out in python script
@@ -20,6 +21,12 @@ from utils.load_environmental_variables import *
 psim_me = pd.read_csv(local_data_path + 'processed/corrected_psim_me.csv', index_col = 0) #psim_me = pd.read_csv(root_path+'TRASH.csv', index_col = 0)
 psim_me['SP'] = psim_me['SP'].map({1: True, 0: False})
 human_model = cobra.io.load_json_model(local_data_path + 'processed/corrected_model.json')
+
+
+# In[ ]:
+
+
+mu = parse_expr('mu')
 
 
 # In[ ]:

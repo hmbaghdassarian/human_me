@@ -1,13 +1,18 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[10]:
+# In[20]:
 
 
 import cobra
-import pandas as pd
-import os
+from cobra.core.gene import parse_gpr
 
+import pandas as pd
+import itertools
+import ast
+
+
+import os
 import sys
 sys.path.insert(1, '../../scripts/') # comment out in python script
 from utils.load_environmental_variables import *
@@ -275,107 +280,6 @@ def make_protein_metabolite(id_, amino_acid_counts, L_protein, compartment):
 # In[1]:
 
 
-# def make_complex_metabolite(complex_id = None, **complex_info):# metabolites, *ids, *metabolite_types):
-#     '''
-    
-#     Inputs:
-#     Complex info is a dictionary with three keys ['METABOLITES', 'IDS', 'METABOLITE_TYPES']
-#     Each value is a list:
-#         metabolites is a list of cobra.Metabolite objects
-#         IDs is a list of string identifiers corresponding to each metabolite object
-#         Metabolite_types is a list of strings; possible values are ['protein', 'rrna', 'trna', 'mrna',  'metabolite']
-#         This means complexes can form between any of these species, including other complexes; metabolite is a M-model metabolite
-#     complex_id is a string for the id of the complex metabolite, otherwise will form one from metabolite ids
-#     Output:
-#     A cobra.Metabolite object representing the complex formed between metabolites
-    
-#     '''
-#     if sorted(set(complex_info.keys())) != ['IDS', 'METABOLITES', 'METABOLITE_TYPES']:
-#         raise ValueError('Invalid complex information keys or insufficient complex information keys')
-    
-#     metabolites_, ids, metabolite_types = complex_info['METABOLITES'], complex_info['IDS'], complex_info['METABOLITE_TYPES']
-    
-#     if len(set(metabolite_types).difference(['protein', 'rrna', 'trna', 'mrna',  'metabolite', 'complex']))>1:
-#         raise ValueError('At least one of the metabolite types is not considered in complex formation currently')
-    
-    
-#     compartments = list(set([m.compartment for m in metabolites_]))
-#     if len(compartments) == 1:
-#         compartment = compartments[0]
-#     # exception of ribosome complex
-#     elif (len(compartments) == 2) and ('c' in compartments) and ('mature_ribosome_complex_complex[c]' in [m.id for m in metabolites_]):
-#         compartment = 'c'
-#     else:
-#         raise ValueError('metabolites are not in the same compartment')
-    
-#     mt_type = '_'.join(list(set(metabolite_types)))
-    
-#     ids_ = '_'.join(ids)
-    
-#     if complex_id == None:
-#         id_ = ids_ + '_' + mt_type
-#     else: 
-#         id_ = complex_id + '_' + mt_type
-    
-#     complex_id = id_ + '_complex' + '[' + compartment + ']'
-#     if len(complex_id)>(256-8-4-len(mt_type)): #-8 and -4 for _complex and compartment appended to end
-#         err_msg = 'Cobrapy requires metabolite ids to be less than 256 characters, please specify a '
-#         err_msg += 'shorter user-defined complex id'
-#         raise ValueError(err_msg)
-    
-        
-#     complex_metabolite = cobra.Metabolite(complex_id)
-#     complex_metabolite.compartment = compartment
-#     complex_metabolite.charge = sum([m.charge for m in metabolites_])
-    
-#     elements = dict()
-#     for m in metabolites_:
-#         for k,v in m.elements.items():
-#             if k in elements.keys():
-#                 elements[k] += v
-#             else:
-#                 elements[k] = v
-#     complex_metabolite.elements = elements
-    
-#     return complex_metabolite, id_
-
-# def form_complex(reaction_id = None, complex_id = None, **complex_info):
-    
-#     '''
-    
-#     Inputs:
-#     Complex info is a dictionary with three keys ['METABOLITES', 'IDS', 'METABOLITE_TYPES']
-#     Each value is a list:
-#         metabolites is a list of cobra.Metabolite objects
-#         IDs is a list of string identifiers corresponding to each metabolite object
-#         Metabolite_types is a list of strings; possible values are ['protein', 'rrna', 'trna', 'mrna',  'metabolite', 'complex']
-  
-#     Output:
-#     A cobra.Reaction object representing the complex formation between metabolites
-    
-#     '''
-    
-#     complex_metabolite, id_ = make_complex_metabolite(complex_id, **complex_info)
-#     metabolites_ = complex_info['METABOLITES']
-#     compartment = list(set([m.compartment for m in metabolites_]))[0]
-
-#     if reaction_id == None:
-#         reaction_id = id_ + '_COMPLEX_FORMATION' + compartment
-#     else:
-#         reaction_id = reaction_id + '_COMPLEX_FORMATION' + compartment
-#     complex_formation = cobra.Reaction(reaction_id)
-    
-#     rxn = {m: -1 for m in metabolites_}
-#     rxn[complex_metabolite] = 1
-#     complex_formation.add_metabolites(rxn)
-#     complex_formation.lower_bound = -1000 # reversible
-    
-#     return complex_formation, complex_metabolite
-
-
-# In[1]:
-
-
 def get_metabolite_mw(metabolite, no_copies = 1, metabolite_elements = None, 
                       element_mw = {'C': 0.0120107, 'H': 0.00100784, 'N': 0.0140067, 'O': 0.015999, 
                                     'P': 0.030973762, 'S': 0.032065}):
@@ -526,34 +430,6 @@ class COMPLEX(cobra.Metabolite):
 # In[ ]:
 
 
-# def get_complex_biomass(self):
-#     '''Recursive method to get the complex biomass by its individual components'''
-
-#     if 'complex' not in self.component_types:
-#         total_components = len(self.subcomponents)
-
-#         biomass_by_type = dict(zip(self.component_types, [0]* total_components))
-#         for i in range(total_components): # in case repeated metabolites in complex (homodimers)
-#             m_ = self.subcomponents[i]
-#             mt_ = self.component_types[i]
-#             biomass_by_type[mt_] += get_metabolite_mw(m_)
-#         return biomass_by_type
-#     else: # unpack nested complexes
-#         complex_idx = [i for i in range(len(self.component_types)) if self.component_types[i] == 'complex']
-#         non_complex_idx = sorted(set(list(range(len(self.component_types)))).difference(complex_idx))
-
-
-#         metabolites_ = [self.subcomponents[i] for i in non_complex_idx] + [item for sublist in [self.subcomponents[i].subcomponents for i in complex_idx] for item in sublist]
-#         ids = [str(i) for i in list(range(len(metabolites_)))]
-#         metabolite_types = [self.component_types[i] for i in non_complex_idx] + [item for sublist in [self.subcomponents[i].component_types for i in complex_idx] for item in sublist]
-#         new_complex_info = {'METABOLITES': metabolites_, 'IDS': ids, 'METABOLITE_TYPES': metabolite_types}
-
-#         return get_complex_biomass(COMPLEX(**new_complex_info))  
-
-
-# In[ ]:
-
-
 def get_complex_biomass_change(complex_products, complex_reactants):
     '''Input is two lists of type COMPLEX, one representing those on the product side, one representing those on the reactant side
     output is a dictionary of biomass change for each respective biomass type.'''
@@ -584,6 +460,142 @@ def get_complex_biomass_change(complex_products, complex_reactants):
         product_biomass[bt] = 0    
     
     return {bt: product_biomass[bt] - reactant_biomass[bt] for bt in product_biomass.keys() if product_biomass[bt] - reactant_biomass[bt] != 0}
+
+
+# In[ ]:
+
+
+def parse_me_reaction_id(x):
+    if 'HGNC' in x.split('_')[0]:
+        return '_'.join(x.split('_')[1:])
+    else:
+        return x
+
+
+# In[47]:
+
+
+# def eval_complex(expr):
+#     '''
+    
+#     Recursive parsing of gprs into lists of complexes. Input expr is a cobra.parse_gpr(gpr_string), 
+#     output is a list of netsted lists, each entry of which is a complex joined by 'AND'; netsted lists are joined 
+#     with each other by 'OR'
+    
+#     Inspired by corda source code, should cite them.
+    
+#     '''
+    
+#     # corda: https://github.com/resendislab/corda/blob/master/corda/util.py
+#     if isinstance(expr, ast.Expression):
+#         return eval_complex_recur(expr.body)
+#     elif isinstance(expr, ast.Name):
+#         return cobra.core.gene.ast2str(expr)
+#     elif isinstance(expr, ast.BoolOp):
+#         op = expr.op
+#         if isinstance(op, ast.Or):
+#             return [eval_complex_recur(i) for i in expr.values]
+#         elif isinstance(op, ast.And):
+#             return [eval_complex_recur(i) for i in expr.values]
+
+
+
+def eval_complex_recur_full(expr):
+    '''
+    
+    Recursive parsing of gprs into lists of complexes. Input expr is a cobra.parse_gpr(gpr_string), 
+    output is a list of lists, each entry of which is a complex joined by 'AND'; netsted lists are joined 
+    with each other by 'OR'. 
+    
+    Inspired by corda source code, should cite them.
+    
+    '''
+    
+    
+    # corda: https://github.com/resendislab/corda/blob/master/corda/util.py
+    if isinstance(expr, ast.Expression):
+        return eval_complex_recur_full(expr.body) # Here!
+    elif isinstance(expr, ast.Name):
+        return cobra.core.gene.ast2str(expr)
+    elif isinstance(expr, ast.BoolOp):
+        op = expr.op
+        if isinstance(op, ast.Or):
+            return [eval_complex_recur_full(i) for i in expr.values] # Here!
+        elif isinstance(op, ast.And):
+            or_op = False
+            names = []
+            bool_ors = []
+            bool_ands = []
+            for e in expr.values:
+                if isinstance(e, ast.BoolOp):
+                    if isinstance(e.op, ast.Or):
+                        or_op = True
+                        bool_ors.append(e)
+                    else:
+                        bool_ands.append(e)
+                elif isinstance(e, ast.Name):
+                    names.append(eval_complex_recur_full(e))
+            
+            if or_op:
+                product = []
+                if len(bool_ors) > 1:
+                    product = list(itertools.product(*[eval_complex_recur_full(i) for i in bool_ors]))
+                    
+                    
+                ba_lists = []
+                for ba in bool_ands:
+                    ba_list = [eval_complex_recur_full(j) for i in bool_ands for j in i.values]
+                    ba_lists.append(ba_list)
+                
+                result = []    
+                if len(ba_lists) > 0:
+                    bal_results = [eval_complex_recur_full(bal) for bal in ba_lists]
+                    for br in bal_results:
+                        if len(product) == 0:
+                            result += [[eval_complex_recur_full(j)] + names + br for i in bool_ors for j in i.values] # Here!
+                        else:
+                            result += [list(p) + names + br for p in product]
+                else:
+                    if len(product) == 0:
+                        result += [[eval_complex_recur_full(j)] + names for i in bool_ors for j in i.values] # Here!
+                    else:
+                        result += [list(p) + names for p in product]
+                return result
+                    
+            else:
+                return [eval_complex_recur_full(i) for i in expr.values] # Here!
+
+
+def unnested_list(nested_list):
+    lists = []
+    non_lists = []
+    for l in nested_list:
+        if isinstance(l, list):
+            lists.append(l)
+        else:
+            non_lists.append(l)
+    size = len(lists)
+    if size == len(nested_list):
+        new_list = []
+        for l in lists:
+            new_list += unnested_list(l)
+        return new_list
+    elif size == 0:
+        return [nested_list]
+    else:
+        return [item for sublist in [unnested_list(l) for l in lists] for item in sublist] + non_lists
+    
+def eval_complex(expr):
+    '''Input is a gene reaction rule, output is a list. If the length of the list is longer than 1, these are
+    due to the presence of OR. If the entry itself is a list longer than one, this entry is a complex.'''
+    
+    complexes = unnested_list(eval_complex_recur_full(parse_gpr(expr)[0]))
+    
+    # make sure machinery is always output in the same order
+    for i in range(len(complexes)):
+        if isinstance(complexes[i],list):
+            complexes[i] = sorted(complexes[i])
+    return complexes
 
 
 # In[ ]:
