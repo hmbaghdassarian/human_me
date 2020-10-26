@@ -189,7 +189,7 @@ def degrade_mrna(gene_info, mrna_transcript_c, polyA_length, L_mrna, mrna_base_c
     rxn[metab.amet_c], rxn[metab.ahcys_c] = 2, -2 # reverse methyltransferase - cap0 and cap1 structure
     
     # proxy metabolite for coupling mRNA degradation to protein synthesis flux
-    mrna_deg_proxy = cobra.Metabolite(gene_info.hgnc_id + 'mrna_deg_proxy')
+    mrna_deg_proxy = cobra.Metabolite(gene_info.hgnc_id + '_mrna_deg_proxy')
     rxn[mrna_deg_proxy] = 1 
     
     

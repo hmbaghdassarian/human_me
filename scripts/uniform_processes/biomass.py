@@ -73,7 +73,7 @@ biomass_reactions.append(reaction_)
 
 
 #DNA------------------------------------------------------
-dna_reaction = cobra.Reaction('DNA_biomass_formation')
+dna_reaction = func.ME_Reaction('DNA_biomass_formation', type_ = ['biomass'])
 
 # coefs from original RECON2.2
 datp_coef = 0.941642857142857
@@ -92,7 +92,7 @@ dna_reaction._lower_bound, dna_reaction._upper_bound = params.mu, params.mu
 
 # CARBOHYDRATE------------------------------------------------------
 g6p_coef = 3.87591549295775
-carbohydrate_reaction = cobra.Reaction('carbohydrate_biomass_formation')
+carbohydrate_reaction = func.ME_Reaction('carbohydrate_biomass_formation', type_ = ['biomass'])
 rxn = {metab.g6p_c: -g6p_coef*func.get_metabolite_mw(metab.g6p_c), 
       carb_: params.carb_frac}
 carbohydrate_reaction.add_metabolites(rxn)
@@ -118,7 +118,7 @@ ps_hs_c_mw = 312.14740/1000 #ChEBI 58436
 sphmyln_hs_c_mw = 492.630 #ChEBI 62490
 
 
-lipid_reaction = cobra.Reaction('lipid_biomass_formation')
+lipid_reaction = func.ME_Reaction('lipid_biomass_formation', type_ = ['biomass'])
 rxn = {metab.chsterol_c: -chsterol_coef*func.get_metabolite_mw(metab.chsterol_c),
        metab.clpn_hs_c: -clpn_hs_coef*clpn_hs_c_mw,
        metab.pail_hs_c: -pail_hs_coef*pail_hs_c_mw,

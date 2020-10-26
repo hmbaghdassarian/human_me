@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[50]:
+# In[1]:
 
 
 import cobra
@@ -66,7 +66,8 @@ def translate_protein_cytosolic(gene_info, mrna_transcript_c, mrna_deg_proxy):
     # biomas
     rxn_c[biomass.protein_] = gene_info.protein_mass
     
-    translation_elongation = cobra.Reaction(gene_info.hgnc_id + '_TRANSLATION_ELONGATIONc')
+    translation_elongation = func.ME_Reaction(gene_info.hgnc_id + '_TRANSLATION_ELONGATIONc', 
+                                             type_ = ['translation'])
     translation_elongation.subsytem = 'Protein_Expression'
     translation_elongation.add_metabolites(rxn_c)
 
@@ -701,7 +702,8 @@ def co_translational_translocation(gene_info, mrna_transcript_c, mrna_deg_proxy)
     rxn[mrna_transcript_c] = -gene_info.coupling_c1B # couple mrna dilution to protein synthesis
     #------------------------------------------------------------------------------------
 
-    co_translational_translocation_r = cobra.Reaction(gene_info.hgnc_id + '_co_TRANSLOC_IMPORTtr')
+    co_translational_translocation_r = func.ME_Reaction(gene_info.hgnc_id + '_co_TRANSLOC_IMPORTtr', 
+                                                       type_ = ['translation'])
     co_translational_translocation_r.subsytem = 'Protein_Expression'
     co_translational_translocation_r.add_metabolites(rxn)
     co_translational_translocation_r.gene_reaction_rule = ' and '.join(mach.ctnm + mach.translation_efs + ['ribosome'])
@@ -959,10 +961,13 @@ def secrete_protein(gene_info, modified_protein_g):
     for secreted_protein in secreted_proteins:
 
         rxn = {modified_protein_g: -clathrin_coeff, secreted_protein: clathrin_coeff}
+        # gtph hydrolysis
         rxn[metab.ntp_map_c['G']], rxn[metab.h2o_c], rxn[metab.ndp_map_c['G']], rxn[metab.pi_c], rxn[metab.h_c]  = -44, -44, 44, 44, 44
 
         secrete_protein = cobra.Reaction(gene_info.hgnc_id + '_Clathrin_IMPORTt' + secreted_protein.compartment)
         secrete_protein.subsystem = 'Protein Expression'
+        if secreted_protein.compartment == 'e':
+            rxn[biomass.protein_] = -func.get_metabolite_mw(secreted_protein, no_copies = clathrin_coeff)
         secrete_protein.add_metabolites(rxn)
         secrete_protein.gene_reaction_rule = ' and '.join(mach.clathrin_m)
         secreted_protein_reactions += [secrete_protein]

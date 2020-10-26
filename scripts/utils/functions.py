@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[20]:
+# In[1]:
 
 
 import cobra
@@ -22,7 +22,7 @@ from utils import parameters as params
 
 # # Functions
 
-# In[ ]:
+# In[2]:
 
 
 # def blockPrint():
@@ -40,7 +40,7 @@ class HiddenPrints:
         sys.stdout = self._original_stdout
 
 
-# In[ ]:
+# In[3]:
 
 
 def get_reaction_compartment(reaction):
@@ -61,7 +61,7 @@ def get_reaction_compartment(reaction):
         return compartments_[0]
 
 
-# In[ ]:
+# In[4]:
 
 
 def hydrolyze_atp(rxn, n_atp, compartment):
@@ -141,7 +141,7 @@ def get_base_counts_and_elements(seq, triphosphate = True):
     return base_counts, elements
 
 
-# In[ ]:
+# In[6]:
 
 
 def make_rna_metabolite(metabolite_name, seq, molecule_type, compartment = 'n', triphosphate = True):
@@ -177,7 +177,7 @@ def make_rna_metabolite(metabolite_name, seq, molecule_type, compartment = 'n', 
     return rna_metabolite, base_counts
 
 
-# In[ ]:
+# In[7]:
 
 
 def rna_exonucleolytic_degradation(rna_metabolite, rna_base_counts, rna_sequence, reaction_name, 
@@ -241,7 +241,7 @@ def rna_exonucleolytic_degradation(rna_metabolite, rna_base_counts, rna_sequence
     return rna_degradation 
 
 
-# In[ ]:
+# In[8]:
 
 
 def make_protein_metabolite(id_, amino_acid_counts, L_protein, compartment):
@@ -277,7 +277,7 @@ def make_protein_metabolite(id_, amino_acid_counts, L_protein, compartment):
     return protein_metabolite
 
 
-# In[1]:
+# In[9]:
 
 
 def get_metabolite_mw(metabolite, no_copies = 1, metabolite_elements = None, 
@@ -300,7 +300,7 @@ def get_metabolite_mw(metabolite, no_copies = 1, metabolite_elements = None,
     
 
 
-# In[8]:
+# In[312]:
 
 
 class COMPLEX(cobra.Metabolite):
@@ -427,7 +427,7 @@ class COMPLEX(cobra.Metabolite):
                                                                          **new_complex_info))  
 
 
-# In[ ]:
+# In[11]:
 
 
 def get_complex_biomass_change(complex_products, complex_reactants):
@@ -462,7 +462,7 @@ def get_complex_biomass_change(complex_products, complex_reactants):
     return {bt: product_biomass[bt] - reactant_biomass[bt] for bt in product_biomass.keys() if product_biomass[bt] - reactant_biomass[bt] != 0}
 
 
-# In[ ]:
+# In[12]:
 
 
 def parse_me_reaction_id(x):
@@ -472,7 +472,7 @@ def parse_me_reaction_id(x):
         return x
 
 
-# In[47]:
+# In[13]:
 
 
 # def eval_complex(expr):
@@ -497,6 +497,27 @@ def parse_me_reaction_id(x):
 #             return [eval_complex_recur(i) for i in expr.values]
 #         elif isinstance(op, ast.And):
 #             return [eval_complex_recur(i) for i in expr.values]
+
+## code for original eval_complex function in build_me_model script when looping through complex_df 
+# machinery_final = list()
+# for m in machinery: # deals with nested or's--func.eval_complex returns them as a nested list
+#     if list in [type(i) for i in m]:
+#         idx = [i for i in range(len(m)) if type(m[i]) == list]
+#         m_ = [i for i in m if type(i) != list]
+#         for i in idx:
+#             or_mach = m[i]
+#             for or_mach_ in or_mach:
+#                 machinery_final.append(m_ + [or_mach_])
+#     else:
+#         machinery_final.append(m)
+#     # machinery_final should be a list of lists. Each inner list is a complex, the outter lists represent
+#     # ORs
+# for m in machinery_final:
+#     if type(m) == list:
+#         m = sorted(m)
+#         me_complex_df.loc[me_complex_df.shape[0], :] = [r.id, compartment_, ';'.join(m), True, True]
+#     else:
+#         me_complex_df.loc[me_complex_df.shape[0], :] = [r.id, compartment_, m, False, True]
 
 
 
@@ -598,33 +619,483 @@ def eval_complex(expr):
     return complexes
 
 
-# In[ ]:
+# In[14]:
 
 
 def SASA(mw):
     return mw**(0.75)
 
 
-# In[ ]:
+# In[15]:
 
 
-def check_me_mass_balance(r, metabolic_model = params.human_model):
-    '''r is a cobra.Reaction object'''
-    if len(r.genes) == 0:
-        return r.check_mass_balance()
-    else:
+# def check_me_mass_balance(r, metabolic_model = params.human_model):
+#     '''r is a cobra.Reaction object'''
+#     if len(r.genes) == 0:
+#         return r.check_mass_balance()
+#     else:
     
-        metabolic_reaction_names = [r.name for r in metabolic_model.reactions if len(r.genes)>0]
-        if r.name in metabolic_reaction_names: # metabolic reactions
-            # remove coupling constraint
-            rxn = {m:c for m,c in r.metabolites.items()  if ('protein' not in m.id) and ('complex' not in m.id)}
-        else: # expression reactions
-            raise ValueError('Do not currently have code base to get mass balance of expression reactions')
-#             if 'TRANSLATION' in r.id:
-#                 rxn = {m:c for m,c in r[0].metabolites.items()  if ('protein' not in m.id) and ('complex' not in m.id)}
-#                 rxn = {m:c for m,c in rxn.items()  if ('mrna' not in m.id) or ('proxy' in m.id)}
-    r_ = cobra.Reaction(' ')
-    r_.add_metabolites(rxn) 
+#         metabolic_reaction_names = [r.name for r in metabolic_model.reactions if len(r.genes)>0]
+#         if r.name in metabolic_reaction_names: # metabolic reactions
+#             # remove coupling constraint
+#             rxn = {m:c for m,c in r.metabolites.items()  if ('protein' not in m.id) and ('complex' not in m.id)}
+#         else: # expression reactions
+#             raise ValueError('Do not currently have code base to get mass balance of expression reactions')
+# #             if 'TRANSLATION' in r.id:
+# #                 rxn = {m:c for m,c in r[0].metabolites.items()  if ('protein' not in m.id) and ('complex' not in m.id)}
+# #                 rxn = {m:c for m,c in rxn.items()  if ('mrna' not in m.id) or ('proxy' in m.id)}
+#     r_ = cobra.Reaction(' ')
+#     r_.add_metabolites(rxn) 
     
-    return r_.check_mass_balance()
+#     return r_.check_mass_balance()
+
+
+# In[589]:
+
+
+import sympy
+from operator import attrgetter
+from collections import defaultdict
+import warnings
+from math import isinf
+from six import iteritems
+
+
+class ME_Reaction(cobra.Reaction):
+    '''Inherited from cobra.Reaction. Allows stochiometric coefficient and reaction bounds to be a function of mu.'''
+
+    def __init__(self,  id, type_, name='', subsystem='', lower_bound=0.0, upper_bound=None, 
+                cobra_id = None):
+        '''Helps distinguish between these reactions, which have mu in bounds, and coupling reactions, which 
+        have mu in stochiometric coefficient.
+        
+        Cobra ID can be input to keep track of original cobra model id from which this reaction was derived.
+        
+        '''
+        
+        if len(set(type_).difference(['biomass', 'translation', 'catalysis'])) > 0:
+            raise ValueError('Specified reaction type is not known')
+        
+        super().__init__(id, name, subsystem, lower_bound, upper_bound)
+        self.type = type_
+        self.cobra_id = cobra_id
+    
+    def check_me_bounds(self, lb, ub):
+        if self.type == ['biomass']:
+            if isinstance(lb, sympy.Expr) or isinstance(ub, sympy.Expr):
+                if not params.mu in lb.free_symbols and params.mu in ub.free_symbols:
+                    raise ValueError('Currently, if reaction bounds are a function of mu, they must be for both the upper and lower bound')
+        else:
+            if isinstance(lb, sympy.Expr) or isinstance(ub, sympy.Expr):
+                raise ValueError('Reaction bounds can only be a function of mu for reactions of type biomass')
+
+            
+    def replace_bound_mu(self, mu_val = 1, values = None, _ = True, inplace = False):
+        '''
+        Assumes growth is always > 0. Gives numeric values to bounds for certain methods.
+        
+        '''
+        
+        if _:
+            lb, ub = self._lower_bound, self._upper_bound
+        else:
+            lb, ub = self.lower_bound, self.upper_bound
+            
+        self.check_me_bounds(lb,ub)    
+        
+        if isinstance(lb, sympy.Expr):  # check_me_bounds makes sure both lb and ub are symp.Expr objects
+            # replace growth with 1 (assuming growth always > 0)
+            lb,ub = float(lb.subs(params.mu,mu_val)), float(ub.subs(params.mu,mu_val)) 
+        else:
+            if self.type == ['biomass']:
+                warnings.warn('Bounds do not have a mu value')
+        
+        if values == None:
+            if not inplace:
+                return lb, ub
+            else:
+                self._lower_bound, self._upper_bound = lb,ub
+        else:
+            if not isinstance(values, list):
+                raise TypeError('values must a list')
+                
+            for i in range(len(values)):
+                if isinstance(values[i], sympy.Expr): # assumes the sympy expression always containts mu
+                    values[i] = values[i].subs(params.mu, mu_val)
+            if not inplace:
+                return lb, ub, values
+            else:
+                raise ValueError('Either values must be None or inplace False')
+    
+    @property
+    def reversibility(self):
+        """Whether the reaction can proceed in both directions (reversible)
+
+        This is computed from the current upper and lower bounds.
+
+        """
+        lb,ub = self.replace_bound_mu() 
+        if not (isinstance(lb,sympy.Expr) and isinstance(ub,sympy.Expr)):
+            return lb < 0 < ub
+#         else: # if mu is just in one bound 
+#             raise ValueError('For now, mu must be in both reaction bounds if boundaries are a function of mu')
+    
+    def build_reaction_string(self, use_metabolite_names=False):
+        """Generate a human readable reaction string"""
+
+        def format(number):
+            return "" if number == 1 else str(number).rstrip(".") + " "
+
+        id_type = 'id'
+        if use_metabolite_names:
+            id_type = 'name'
+        reactant_bits = []
+        product_bits = []
+        for met in sorted(self._metabolites, key=attrgetter("id")):
+            coefficient = self._metabolites[met]
+            name = str(getattr(met, id_type))
+            
+            if not isinstance(coefficient, sympy.Expr):
+                if coefficient >= 0:
+                    product_bits.append(format(coefficient) + name)
+                else:
+                    reactant_bits.append(format(abs(coefficient)) + name)
+            else:
+                if float(coefficient.subs(params.mu, 1)) >= 0:
+                    product_bits.append(format(coefficient) + name)
+                else:
+                    reactant_bits.append(format(coefficient).replace('-', '') + name)
+
+        reaction_string = ' + '.join(reactant_bits)
+        if not self.reversibility:
+            lb,ub = self.replace_bound_mu(_ = False)
+            if lb < 0 and ub <= 0:
+                reaction_string += ' <-- '
+            else:
+                reaction_string += ' --> '
+        else:
+            reaction_string += ' <=> '
+        reaction_string += ' + '.join(product_bits)
+        return reaction_string 
+
+    def check_mass_balance(self):
+        """Compute mass and charge balance for the reaction
+
+        returns a dict of {element: amount} for unbalanced elements.
+        "charge" is treated as an element in this dict
+        This should be empty for balanced reactions.
+        """
+        reaction_element_dict = defaultdict(int)
+        for metabolite, coefficient in iteritems(self._metabolites):
+            if not isinstance(coefficient, sympy.Expr): # don't include coupled metabolites
+                if metabolite.charge is not None:
+                    reaction_element_dict["charge"] +=                         coefficient * metabolite.charge
+                if metabolite.elements is None:
+                    raise ValueError("No elements found in metabolite %s"
+                                     % metabolite.id)
+                for element, amount in iteritems(metabolite.elements):
+                    reaction_element_dict[element] += coefficient * amount
+            else:
+                if len(set(self.type).difference(['translation', 'catalysis'])) > 0:
+                    raise ValueError('Mu can only be a coefficient in translation and catalysis reactions')
+                else:
+                    # for the exceptional situaiton in which a machinery is catalyzing its own expression reaction
+                    # assume it is a reactant with coefficient -1...not robust
+                    
+                    # should only happen with peroxisomal protein degradation and 
+                    if len(self.genes) == 1 and self.genes == metabolite.split('_')[0]:
+                        for element, amount in iteritems(metabolite.elements):
+                            reaction_element_dict[element] = -1*amount
+                    
+        # filter out 0 values
+        return {k: v for k, v in iteritems(reaction_element_dict) if v != 0}
+    
+    def replace_coefficient_mu(self, mu_val):
+        if len(set(self.type).difference(['translation', 'catalysis'])) > 0:
+            raise ValueError('Mu can only be a coefficient in translation and catalysis reactions')
+        
+        if not (mu_val > 0):
+            raise ValueError('Mu must be > 0')
+        
+#         # this method is quicker then looping through all metabolites - 
+#         # specifically coded for current coupling format so not very robust
+#         new_rxn = self.metabolites.copy()
+#         if 'translation' in self.type:
+#             mtr = [m for m in self.reactants if ('mrna_deg_proxy' in m.id) or ('mrna[c]' in m.id)]
+#             for m in mtr:
+#                 new_val = float(new_rxn[m].subs(params.mu, mu_val))
+#                 new_rxn[m] = new_val
+#         if 'catalysis' in self.type:
+#             raise ValueError('Not yet encoded')
+#         return self.add_metabolites(new_rxn, combine = False)
+            
+            
+        new_rxn = self.metabolites.copy()
+#         counter = 0
+        for met, coeff in self.metabolites.items():
+            if isinstance(coeff, sympy.Expr):
+                new_rxn[met] = float(coeff.subs(params.mu, mu_val))
+#                 counter += 1
+        self.add_metabolites(new_rxn, combine = False)
+        
+#         if counter < 1:
+#             warnings.warn('No mu values to replace')
+        
+    
+    @property
+    def reactants(self):
+        """Return a list of reactants for the reaction."""
+        
+        reactants_ = list()
+        for k,v in iteritems(self._metabolites):
+            if not isinstance(v, sympy.Expr) and v < 0:
+                reactants_.append(k)
+            elif isinstance(v, sympy.Expr):
+                if float(v.subs(params.mu, 1)) < 0:
+                    reactants_.append(k)
+        return reactants_
+
+    @property
+    def products(self):
+        """Return a list of products for the reaction"""
+        products_ = list()
+        for k,v in iteritems(self._metabolites):
+            if not isinstance(v, sympy.Expr) and v >= 0:
+                products_.append(k)
+            elif isinstance(v, sympy.Expr):
+                if float(v.subs(params.mu, 1)) >= 0:
+                    products_.append(k)
+        return products_
+    
+#     def update_variable_bounds(self): ## needs to be modified for cobra.Model.add_reactions to work
+#         if self.model is None:
+#             return
+#         # We know that `lb <= ub`.
+#         # assume bounds as function of mu always > 0 so can add to the first conditional statemnt
+#         if isinstance(self._lower_bound, sympy.Expr) or (self._lower_bound > 0): 
+#             self.forward_variable.set_bounds(
+#                 lb=self._lower_bound if (isinstance(self._lower_bound, sympy.Expr) or not isinf(self._lower_bound)) else None,
+#                 ub=self._upper_bound if (isinstance(self._upper_bound, sympy.Expr) or not isinf(self._upper_bound)) else None
+#             )
+#             self.reverse_variable.set_bounds(lb=0, ub=0)
+#         elif self._upper_bound < 0:
+#             self.forward_variable.set_bounds(lb=0, ub=0)
+#             self.reverse_variable.set_bounds(
+#                 lb=None if isinf(self._upper_bound) else -self._upper_bound,
+#                 ub=None if isinf(self._lower_bound) else -self._lower_bound
+#             )
+#         else:
+#             self.forward_variable.set_bounds(
+#                 lb=0,
+#                 ub=None if isinf(self._upper_bound) else self._upper_bound
+#             )
+#             self.reverse_variable.set_bounds(
+#                 lb=0,
+#                 ub=None if isinf(self._lower_bound) else -self._lower_bound
+#             )
+
+
+# In[791]:
+
+
+from cobra.core.dictlist import DictList
+from cobra.util.context import get_context
+from sympy import lambdify
+
+import numpy as np
+import pandas as pd
+
+# from sympy.parsing.sympy_parser import parse_expr
+class ME_Model(cobra.Model):
+    def __init__(self,  id_or_model, name = None):
+        '''
+        A simple object with an identifier
+    
+        Parameters
+        ----------
+        id: None or a string
+            the identifier to associate with the object
+            
+        '''
+        
+        super().__init__(id_or_model, name)
+        self.S = None
+
+    def add_reactions(self, reaction_list):
+        """Add reactions to the model.
+
+        Reactions with identifiers identical to a reaction already in the
+        model are ignored.
+
+        The change is reverted upon exit when using the model as a context.
+
+        Parameters
+        ----------
+        reaction_list : list
+            A list of `cobra.Reaction` objects
+        """
+        def existing_filter(rxn):
+            if rxn.id in self.reactions:
+                logger.warning(
+                    "Ignoring reaction '%s' since it already exists.", rxn.id)
+                return False
+            return True
+
+        # First check whether the reactions exist in the model.
+        pruned = DictList(filter(existing_filter, reaction_list))
+
+        context = get_context(self)
+
+                # Add reactions. Also take care of genes and metabolites in the loop.
+        for reaction in pruned:
+            reaction._model = self
+            # Build a `list()` because the dict will be modified in the loop.
+            for metabolite in list(reaction.metabolites):
+                # TODO: Should we add a copy of the metabolite instead?
+                if metabolite not in self.metabolites:
+                    self.add_metabolites(metabolite)
+                # A copy of the metabolite exists in the model, the reaction
+                # needs to point to the metabolite in the model.
+                else:
+                    # FIXME: Modifying 'private' attributes is horrible.
+                    stoichiometry = reaction._metabolites.pop(metabolite)
+                    model_metabolite = self.metabolites.get_by_id(
+                        metabolite.id)
+                    reaction._metabolites[model_metabolite] = stoichiometry
+                    model_metabolite._reaction.add(reaction)
+                    if context:
+                        context(partial(
+                            model_metabolite._reaction.remove, reaction))
+        for gene in list(reaction._genes):
+            # If the gene is not in the model, add it
+            if not self.genes.has_id(gene.id):
+                self.genes += [gene]
+                gene._model = self
+
+                if context:
+                    # Remove the gene later
+                    context(partial(self.genes.__isub__, [gene]))
+                    context(partial(setattr, gene, '_model', None))
+
+            # Otherwise, make the gene point to the one in the model
+            else:
+                model_gene = self.genes.get_by_id(gene.id)
+                if model_gene is not gene:
+                    reaction._dissociate_gene(gene)
+                    reaction._associate_gene(model_gene)
+
+        self.reactions += pruned
+
+        if context:
+            context(partial(self.reactions.__isub__, pruned))
+    def create_stoichiometric_matrix(self, array_type = 'sympy'):
+
+        """
+        Adapted from cobra.util.array.create_stoichiometric_matrix to take in sympy.Expr objects
+
+        Return a stoichiometric array representation of the given model.
+
+        The the columns represent the reactions and rows represent
+        metabolites. S[i,j] therefore contains the quantity of metabolite `i`
+        produced (negative for consumed) by reaction `j`.
+
+        Parameters
+        -------
+        array_type: one of ['numpy', 'pandas']
+            Specifies the type of the stoichiometric matrix to be return
+
+        Returns
+        -------
+        matrix of class `sympy.matrices.dense.MutableDenseMatrix` by default
+            The stoichiometric matrix for the given model.
+        """
+
+        if array_type not in ['sympy', 'numpy', 'pandas']:
+            raise ValueError('Incorrect array type specified')
+
+        n_metabolites = len(self.metabolites)
+        n_reactions = len(self.reactions)
+        # initialize empty matrix
+        array = np.zeros((n_metabolites, n_reactions))
+        if array_type == 'sympy':
+            array = sympy.Matrix(array)
+
+        m_ind = self.metabolites.index
+        r_ind = self.reactions.index
+
+        for reaction in self.reactions:
+            for metabolite, stoich in iteritems(reaction.metabolites):
+                array[m_ind(metabolite), r_ind(reaction)] = stoich
+
+        if array_type == 'pandas':
+            metabolite_ids = [met.id for met in self.metabolites]
+            reaction_ids = [rxn.id for rxn in self.reactions]
+            self.S = pd.DataFrame(array, index=metabolite_ids, columns=reaction_ids)
+        else:
+            self.S = array
+            if array_type == 'sympy':
+                self.replace_S_mu = lambdify(params.mu, self.S, modules='numpy')
+    
+   
+
+            
+
+
+# In[808]:
+
+
+# test_reaction = ME_Reaction('test', type_ = ['catalysis'])
+# # test_reaction._upper_bound = params.mu
+# # test_reaction._lower_bound = params.mu
+
+# A, B, C = cobra.Metabolite('mA'), cobra.Metabolite('mB'), cobra.Metabolite('mC')
+# rxn_A, rxn_B = cobra.Reaction('rA'), cobra.Reaction('rB')
+# rxn_A.add_metabolites({A: -2*params.mu, B: 3*params.mu, C: 2})
+# rxn_B.add_metabolites({C: -5*params.mu, B: 10})
+
+
+# # test_reaction.replace_coefficient_mu(mu_val = 2)
+# # test_reaction.replace_bound_mu(mu_val = 2, inplace = True)
+
+# test_model = ME_Model('test')
+# test_model.add_reactions([rxn_A, rxn_B])
+
+
+# In[813]:
+
+
+# test_model.create_stoichiometric_matrix()
+# test_model.S
+
+
+# In[814]:
+
+
+# test_model.replace_S_mu(1)
+
+
+# In[815]:
+
+
+# import time
+# from tqdm import tqdm
+# run_time = pd.DataFrame(columns = ['No_Reactions', 'Build_Matrix', 'Replace_Matrix'])
+# counter = 0
+# for mn in tqdm(['ecoli', 'textbook', 'salmonella']):
+#     model = ME_Model(cobra.test.create_test_model(model_name="ecoli"))
+
+#     n_reactions = len(model.reactions)
+    
+#     start_time = time.time()
+#     model.create_stoichiometric_matrix()
+#     end_time = time.time()
+#     build_time = (end_time - start_time)/3600
+    
+#     start_time = time.time()
+#     S = model.replace_S_mu(3)
+#     end_time = time.time()
+#     replace_time = (end_time - start_time)/3600
+    
+#     run_time.loc[counter, :] = n_reactions, build_time, replace_time
+#     counter += 1 
 
