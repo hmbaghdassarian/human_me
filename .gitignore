@@ -4,7 +4,7 @@ data/
 notebooks/.pybiomart.sqlite
 __pycache__/
 Software/
-
+soplex-5.0.1.tgz
 # change in the future - large files
 non_machinery.txt
 psim_recon2_2.csv
