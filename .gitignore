@@ -3,6 +3,7 @@
 data/
 notebooks/.pybiomart.sqlite
 __pycache__/
+Software/
 
 # change in the future - large files
 non_machinery.txt
