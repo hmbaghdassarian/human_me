@@ -1,11 +1,19 @@
 # Byte-compiled / optimized / DLL files
 .env
+.env_template
+*.json
+
+project_files/
 data/
 notebooks/.pybiomart.sqlite
 __pycache__/
+MammalianSecretoryRecon/
+
+requirements.txt
+
 Software/
 soplex-5.0.1.tgz
-# change in the future - large files
+
 non_machinery.txt
 psim_recon2_2.csv
 recon2_2.json
@@ -13,12 +21,6 @@ expression_module_model.json
 expression_module_psim.csv
 psim_recon2_2.csv
 required_metabolic_model_metabolites.txt
-
-
-#*.py[cod]
-
-# C extensions
-#*.so
 
 # R extensions
 *.rda
