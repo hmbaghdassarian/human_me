@@ -1,5 +1,5 @@
 # Byte-compiled / optimized / DLL files
-.env
+*.env
 .env_template
 *.json
 
