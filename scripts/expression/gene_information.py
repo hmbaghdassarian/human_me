@@ -16,7 +16,7 @@ from Bio.SeqUtils import molecular_weight as calculate_molecular_weight
 import requests, sys, json, re, warnings
 
 import sys
-sys.path.insert(1, '../scripts/') # comment out in python script
+sys.path.insert(1, '../../scripts/') # comment out in python script
 # from utils.load_environmental_variables import *
 from utils import machinery as mach
 from utils import parameters as params

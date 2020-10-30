@@ -11,11 +11,10 @@ import pandas as pd
 import itertools
 import ast
 
-
 import os
 import sys
 sys.path.insert(1, '../../scripts/') # comment out in python script
-from utils.load_environmental_variables import *
+# from utils.load_environmental_variables import *
 from utils import metabolites as metab
 from utils import parameters as params
 
@@ -24,11 +23,6 @@ from utils import parameters as params
 
 # In[2]:
 
-
-# def blockPrint():
-#     sys.stdout = open(os.devnull, 'w')
-# def enablePrint():
-#     sys.stdout = sys.__stdout__
 
 class HiddenPrints:
     def __enter__(self):
@@ -300,7 +294,7 @@ def get_metabolite_mw(metabolite, no_copies = 1, metabolite_elements = None,
     
 
 
-# In[312]:
+# In[10]:
 
 
 class COMPLEX(cobra.Metabolite):
@@ -650,7 +644,7 @@ def SASA(mw):
 #     return r_.check_mass_balance()
 
 
-# In[589]:
+# In[16]:
 
 
 import sympy
@@ -895,15 +889,20 @@ class ME_Reaction(cobra.Reaction):
 #             )
 
 
-# In[791]:
+# In[17]:
 
 
 from cobra.core.dictlist import DictList
 from cobra.util.context import get_context
 from sympy import lambdify
-
+import warnings
+# import scipy
 import numpy as np
-import pandas as pd
+import sys
+sys.path.insert(1, '../../scripts/')
+from me_solver import solve_me
+
+
 
 # from sympy.parsing.sympy_parser import parse_expr
 class ME_Model(cobra.Model):
@@ -988,7 +987,17 @@ class ME_Model(cobra.Model):
 
         if context:
             context(partial(self.reactions.__isub__, pruned))
-    def create_stoichiometric_matrix(self, array_type = 'sympy'):
+        
+        
+        # make sure index and metabolite/list order are the same
+        for idx, r_id in enumerate(self.reactions):
+            if idx != self.reactions.index(r_id):
+                raise ValueError('Indexing should be changed')
+
+        for idx, m_id in enumerate(self.metabolites):
+            if idx != self.metabolites.index(m_id):
+                raise ValueError('Indexing should be changed')
+    def create_stoichiometric_matrix(self, array_type = 'numpy', mu_val = None, inplace = True):
 
         """
         Adapted from cobra.util.array.create_stoichiometric_matrix to take in sympy.Expr objects
@@ -1001,7 +1010,7 @@ class ME_Model(cobra.Model):
 
         Parameters
         -------
-        array_type: one of ['numpy', 'pandas']
+        array_type: one of ['numpy', 'pandas', 'sympy']
             Specifies the type of the stoichiometric matrix to be return
 
         Returns
@@ -1012,6 +1021,10 @@ class ME_Model(cobra.Model):
 
         if array_type not in ['sympy', 'numpy', 'pandas']:
             raise ValueError('Incorrect array type specified')
+        if array_type != 'sympy' and mu_val is None:
+            raise ValueError('Must specify a mu_val for non-sympy matrices')
+        if array_type == 'sympy' and mu_val is not None:
+            warnings.warn('Sympy array type will generate expression entries, mu_val will be disregarded. Use .replace_S_mu() to generate a numpy matrix with a specific mu_val')
 
         n_metabolites = len(self.metabolites)
         n_reactions = len(self.reactions)
@@ -1022,80 +1035,99 @@ class ME_Model(cobra.Model):
 
         m_ind = self.metabolites.index
         r_ind = self.reactions.index
-
-        for reaction in self.reactions:
-            for metabolite, stoich in iteritems(reaction.metabolites):
-                array[m_ind(metabolite), r_ind(reaction)] = stoich
+        
+        if array_type == 'sympy':
+            for reaction in self.reactions:
+                for metabolite, stoich in iteritems(reaction.metabolites):
+                    array[m_ind(metabolite), r_ind(reaction)] = stoich
+        else:
+            for reaction in self.reactions:
+                reaction_type = isinstance(reaction, ME_Reaction) and reaction.type != ['biomass']
+                for metabolite, stoich in iteritems(reaction.metabolites):
+                    if reaction_type and isinstance(stoich, sympy.Expr):
+                        array[m_ind(metabolite), r_ind(reaction)] = stoich.subs(params.mu, mu_val)
+                    else:
+                        array[m_ind(metabolite), r_ind(reaction)] = stoich
 
         if array_type == 'pandas':
             metabolite_ids = [met.id for met in self.metabolites]
             reaction_ids = [rxn.id for rxn in self.reactions]
-            self.S = pd.DataFrame(array, index=metabolite_ids, columns=reaction_ids)
+            array = pd.DataFrame(array, index=metabolite_ids, columns=reaction_ids)
         else:
-            self.S = array
             if array_type == 'sympy':
-                self.replace_S_mu = lambdify(params.mu, self.S, modules='numpy')
+                self.replace_S_mu = lambdify(params.mu, array, modules='numpy')
+        
+        if inplace:
+            self.S = array
+        else:
+            return array
+        
     
-   
+    def solve_lp(self, mu_val, 
+                 objective = {'biomass_dilution': 1}, solver_type = 'qminos', precision = 'quad'):
+        
+        '''
+        
+        mu_val is the growth value at which to optimize. 
+        objective is a dictionary with keys as reaction ids to maximize as some linear combination and values as the coefficient for the linear objective
+        Solver is a string, options of [qminos] - must have solveME and qMINOS installed
+        
+        Returns same outputs as qminospy.solver.solvelp:
+        x: optimal solution
+        stat: status
+        hs: optimal basis
+        
+        
+        stat:
+        0     Optimal solution found.
+        1     The problem is infeasible.
+        2     The problem is unbounded (or badly scaled).
+        3     Too many iterations.
+        4     Apparent stall.  The solution has not changed
+              for a large number of iterations (e.g. 1000).
+        
+        '''
+        
+        return solve_me.solve_lp(me_model = self, mu_val = mu_val, objective = objective, 
+                                 solver_type = solver_type, precision = precision)
 
-            
+
+# In[19]:
 
 
-# In[808]:
+# # test LP
+# test_model = ME_Model(cobra.io.load_json_model('/data2/hratch/Software/qminos_solver/solvemepy/examples/models/iJO1366.json'))
+# # test_model.constraints[0].lb = -5
+# # test_model.constraints[0].ub = 2
+
+# # test_model.constraints[20].ub = 50
+# # test_model.constraints[20].lb = 30
+# xq,statq,hsq = test_model.solve_lp(mu_val = 0.03, objective = {'BIOMASS_Ec_iJO1366_core_53p95M': 1}, 
+#                                   precision = 'quad')
+
+
+# In[20]:
+
+
+# test_model = cobra.io.load_json_model('/data2/hratch/Software/qminos_solver/solvemepy/examples/models/iJO1366.json')
+# test_model.objective = {test_model.reactions.BIOMASS_Ec_iJO1366_core_53p95M: 1}
+
+
+# In[21]:
 
 
 # test_reaction = ME_Reaction('test', type_ = ['catalysis'])
-# # test_reaction._upper_bound = params.mu
-# # test_reaction._lower_bound = params.mu
+
 
 # A, B, C = cobra.Metabolite('mA'), cobra.Metabolite('mB'), cobra.Metabolite('mC')
-# rxn_A, rxn_B = cobra.Reaction('rA'), cobra.Reaction('rB')
+# rxn_A, rxn_B = ME_Reaction('rA', type_ = ['translation']), ME_Reaction('rB', type_ = ['translation'])
+# rxn_C = ME_Reaction('rC', type_ = ['biomass'])
 # rxn_A.add_metabolites({A: -2*params.mu, B: 3*params.mu, C: 2})
 # rxn_B.add_metabolites({C: -5*params.mu, B: 10})
-
-
-# # test_reaction.replace_coefficient_mu(mu_val = 2)
-# # test_reaction.replace_bound_mu(mu_val = 2, inplace = True)
+# rxn_C._lower_bound, rxn_C._upper_bound = params.mu, params.mu
 
 # test_model = ME_Model('test')
-# test_model.add_reactions([rxn_A, rxn_B])
+# test_model.add_reactions([rxn_A, rxn_B, rxn_C])
 
-
-# In[813]:
-
-
-# test_model.create_stoichiometric_matrix()
-# test_model.S
-
-
-# In[814]:
-
-
-# test_model.replace_S_mu(1)
-
-
-# In[815]:
-
-
-# import time
-# from tqdm import tqdm
-# run_time = pd.DataFrame(columns = ['No_Reactions', 'Build_Matrix', 'Replace_Matrix'])
-# counter = 0
-# for mn in tqdm(['ecoli', 'textbook', 'salmonella']):
-#     model = ME_Model(cobra.test.create_test_model(model_name="ecoli"))
-
-#     n_reactions = len(model.reactions)
-    
-#     start_time = time.time()
-#     model.create_stoichiometric_matrix()
-#     end_time = time.time()
-#     build_time = (end_time - start_time)/3600
-    
-#     start_time = time.time()
-#     S = model.replace_S_mu(3)
-#     end_time = time.time()
-#     replace_time = (end_time - start_time)/3600
-    
-#     run_time.loc[counter, :] = n_reactions, build_time, replace_time
-#     counter += 1 
+# xq,statq,hsq = test_model.solve_lp(mu_val = 0.03, objective = {'rA': 1})
 

@@ -15,7 +15,7 @@ import statsmodels.api as sm
 import scipy.stats as st
 
 import sys
-sys.path.insert(1, '../scripts/') # comment out in python script
+sys.path.insert(1, '../../scripts/') # comment out in python script
 # from utils.load_environmental_variables import *
 from utils import machinery as mach
 from utils import parameters as params
@@ -23,7 +23,6 @@ from utils import metabolites as metab
 from utils import functions as func
 from utils.polyA_statistics import calculate_polyA_length
 from uniform_processes import biomass
-# from gene_information import gene_information
 
 
 # In[6]:

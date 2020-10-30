@@ -1,40 +1,25 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[6]:
+# In[16]:
 
 
 from dotenv import load_dotenv, find_dotenv, dotenv_values
 import os
 
 
-# In[8]:
+# In[9]:
 
 
-print('load environmental variables')
 # find .env automatically by walking up directories until it's found
 dotenv_path = find_dotenv()
-try:
-    # load up the entries as environment variables
-    load_dotenv(dotenv_path)
+# load up the entries as environment variables
+load_dotenv(dotenv_path)
 
-    root_path = os.environ.get("ROOT_DIR")
-    print('The project root is: ' + root_path)
-    local_data_path = os.environ.get("LOCAL_DATA_PATH")
-    general_analyses_path = os.environ.get("GENERAL_ANALYSES_DIR")
+root_path = os.path.join(os.environ.get("ROOT_PATH"),'')
+raw_data_path = os.path.join(os.environ.get("RAW_PATH"),'')
+build_files_path = os.path.join(os.environ.get("BUILD_FILES"),'')
+processed_data_path = os.path.join(os.environ.get("PROCESSED_PATH"),'')
 
-    folder_id = os.environ.get("FOLDER_ID")
-#     zip_name = os.environ.get("ZIP_NAME")
-    n_cores = int(os.environ.get("NO_CORES"))
-    
-    # INPUTS
-    input_model_file = os.environ.get("INPUT_MODEL")
-    input_psim_file = os.environ.get("INPUT_PSIM")
-    input_non_machinery_file = os.environ.get("INPUT_NON_MACHINERY")
-
-#     email = os.environ.get("EMAIL")
-
-    
-except:
-    raise ValueError('Create a .env file in root directory with appropriate variables filled in (see .env_template)')
+n_cores = int(os.environ.get("N_CORES"))
 

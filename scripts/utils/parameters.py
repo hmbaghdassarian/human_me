@@ -11,16 +11,15 @@ from sympy.parsing.sympy_parser import parse_expr
 
 import sys
 sys.path.insert(1, '../../scripts/') # comment out in python script
-from utils.load_environmental_variables import *
+from utils.load_environmental_variables import processed_data_path
 
 
 # In[ ]:
 
 
-# inputs
-psim_me = pd.read_csv(local_data_path + 'processed/corrected_psim_me.csv', index_col = 0) #psim_me = pd.read_csv(root_path+'TRASH.csv', index_col = 0)
+psim_me = pd.read_csv(processed_data_path + 'corrected_psim_me.csv', index_col = 0) 
 psim_me['SP'] = psim_me['SP'].map({1: True, 0: False})
-human_model = cobra.io.load_json_model(local_data_path + 'processed/corrected_model.json')
+human_model = cobra.io.load_json_model(processed_data_path + 'corrected_model.json')
 
 
 # In[ ]:

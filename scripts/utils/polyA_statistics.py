@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[1]:
+# In[ ]:
 
 
 import numpy as np
@@ -11,12 +11,14 @@ import pandas as pd
 
 import requests, sys, json, re
 sys.path.insert(1, '../../scripts/') # comment out in python script
-from utils.load_environmental_variables import *
+from utils.load_environmental_variables import build_files_path
 
-polyA = pd.read_csv(local_data_path + 'processed/polyA_length.csv', index_col = 0)
+
+# In[1]:
+
 
 # polyA polyA_params
-polyA = pd.read_csv(local_data_path + 'processed/polyA_length.csv', index_col = 0)
+polyA = pd.read_csv(build_files_path + 'polyA_length.csv', index_col = 0)
 polyA_params = st.johnsonsu.fit(polyA.MEAN)
 idx = sorted(set(polyA.SD.dropna().index.tolist()).intersection(polyA.MEAN.dropna().index.tolist()))
 reg_data = polyA.loc[idx, ['SD', 'MEAN']]

@@ -12,7 +12,7 @@ from utils import parameters as params
 from utils import functions as func
 
 from uniform_processes.build_trna_expression_reactions import charged_trna_metabolites, modified_trna_transcript_c, modified_trna_transcript_c_mw
-from gene_information import gene_information
+from expression.gene_information import gene_information
 
 
 # In[4]:

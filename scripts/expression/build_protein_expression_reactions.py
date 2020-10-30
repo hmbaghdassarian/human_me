@@ -9,8 +9,7 @@ from Bio.SeqUtils import molecular_weight as calculate_molecular_weight
 
 
 import sys
-sys.path.insert(1, '../scripts/') # comment out in python script
-# from utils.load_environmental_variables import *
+sys.path.insert(1, '../../scripts/') # comment out in python script
 from utils import machinery as mach
 from utils import parameters as params
 from utils import metabolites as metab
@@ -19,11 +18,11 @@ from utils import utils_2
 
 from uniform_processes import biomass
 
-from gene_information import gene_information
-import build_mrna_expression_reactions as build_mrna
+from expression.gene_information import gene_information
+import expression.build_mrna_expression_reactions as build_mrna
 
 
-# In[51]:
+# In[2]:
 
 
 def translate_protein_cytosolic(gene_info, mrna_transcript_c, mrna_deg_proxy):    
@@ -100,7 +99,7 @@ def fold_protein_cytosolic(gene_info, unfolded_protein_c):
 
 # Ubiquitin expression
 
-# In[52]:
+# In[3]:
 
 
 # UBC

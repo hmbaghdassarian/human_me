@@ -1,0 +1,114 @@
+1
+ 
+      ==============================
+      quadMINOS  5.6      (Jul 2016)
+      ==============================
+      Maximize
+      Solution No
+      New basis file              11
+      Save frequency          500000
+      Print level               0
+      Print frequency          100000
+      Scale option               2
+      Iteration limit         2000000
+      Expand frequency          100000
+      Penalty parameter  1.00000000E+02
+      LU factor tol  1.00000000E+01
+      LU update tol  1.00000000E+01
+      LU singularity tol  1.00000000E-30
+      Feasibility tol  1.00000000E-20
+      Optimality tol  1.00000000E-20
+      Unbounded step size  1.00000000E+30
+
+ Nonzeros allowed for in LU factors 66650180
+
+ Scale option  2,      Partial price      10
+ Partial price section size (A)          258
+ Partial price section size (I)          180
+
+
+
+ Matrix Statistics
+ -----------------
+               Total      Normal        Free       Fixed     Bounded
+ Rows           1806           0           1        1805           0
+ Columns        2583           0           0          10        2573
+
+ No. of matrix elements                10184     Density       0.218
+ Biggest                          5.4125E+01  (excluding fixed columns,
+ Smallest                         2.0000E-06   free rows, and RHS)
+
+ No. of objective coefficients             1
+ Biggest                          1.0000E+00  (excluding fixed columns)
+ Smallest                         1.0000E+00
+
+
+ Nonlinear constraints       0     Linear constraints    1806
+ Nonlinear variables         0     Linear variables      2583
+ Jacobian  variables         0     Objective variables      0
+
+ Initial basis
+ -------------
+ No basis file supplied
+
+
+ Scaling
+ -------
+             Min elem    Max elem       Max col ratio
+ After  0    2.00E-06    5.41E+01         27062415.50
+ After  1    2.72E-03    1.00E+02            36784.79
+ After  2    1.39E-02    7.21E+01             5200.05
+ After  3    1.39E-02    7.21E+01             5193.86
+
+            Min scale                       Max scale      Between 0.5 and 2.0
+ Col      7   5.3E-02            Col   1633   2.6E+01             1366    52.9
+ Row    317   2.7E-03            Row    307   1.7E+01             1049    58.1
+
+ Norm of fixed columns and slacks             3.1E+00
+ (before and after row scaling)               2.4E-01
+
+
+ Crash option  3
+
+ Crash on linear E  rows:
+ Slacks     0  Free cols     9  Preferred     0
+ Unit     359  Double      514  Triangle    535  Pad   388
+1
+ 
+ Iterations
+ ----------
+
+      Itn     dj     ninf   sinf       objective       LU
+        1 -4.9E+02      1 9.025E-01  0.00000000E+00     5006
+ 
+ Itn      930 -- linear E rows feasible.   Obj =   9.459410926E-20
+
+ Crash on linear LG rows:
+ Slacks     1  Free cols     0  Preferred     0
+ Unit       0  Double        0  Triangle      0  Pad     0
+ 
+ Itn      930 -- feasible solution.  Objective =  -9.459410926E-20
+ 
+ Itn     1264 --     141  nonbasics set on bound, basics recomputed
+ 
+ Itn     1264 -- feasible solution.  Objective =   9.823718127E-01
+ 
+1
+ 
+ EXIT -- optimal solution found
+
+ NEW BASIS file saved on file  11    itn =   1264
+
+ Problem name                 lp      
+ No. of iterations                1264   Objective value      9.8237181273E-01
+ No. of degenerate steps           824   Percentage                      65.19
+ Max x       (scaled)      618 1.1E+03   Max pi      (scaled)     1806 1.9E+01
+ Max x                     127 1.0E+03   Max pi                   1674 2.1E+00
+ Max Prim inf(scaled)     2053 9.4E-28   Max Dual inf(scaled)        8 1.8E-31
+ Max Primal infeas        2053 6.1E-27   Max Dual infeas             8 9.3E-33
+
+ Time for MPS input                           0.00 seconds
+ Time for solving problem                     1.04 seconds
+ Time for solution output                     0.00 seconds
+ Time for constraint functions                0.00 seconds
+ Time for objective function                  0.00 seconds

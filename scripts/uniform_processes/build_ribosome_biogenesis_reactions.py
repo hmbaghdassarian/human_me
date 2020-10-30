@@ -14,7 +14,7 @@ from Bio import SeqIO
 
 import sys
 sys.path.insert(1, '../../scripts/') # comment out in python script
-from utils.load_environmental_variables import *
+from utils.load_environmental_variables import raw_data_path
 from utils import machinery as mach
 from utils import parameters as params
 from utils import metabolites as metab
@@ -25,8 +25,8 @@ from utils import utils_2
 from uniform_processes import biomass
 
 
-import build_mrna_expression_reactions as build_mrna
-import build_protein_expression_reactions as build_protein
+import expression.build_mrna_expression_reactions as build_mrna
+import expression.build_protein_expression_reactions as build_protein
 
 
 # # rRNA
@@ -36,16 +36,16 @@ import build_protein_expression_reactions as build_protein
 
 # rrna sequences
 # assume the ncbi 45s is actually 47s...see notes for details
-rrna_47s_seq = SeqIO.read(local_data_path + 'raw/45s_rrna_seq.txt', "fasta").seq.transcribe()
-rrna_18s_seq = SeqIO.read(local_data_path + 'raw/18s_rrna_seq.txt', "fasta").seq.transcribe()
-rrna_28s_seq = SeqIO.read(local_data_path + 'raw/28s_rrna_seq.txt', "fasta").seq.transcribe()
-rrna_5_8s_seq = SeqIO.read(local_data_path + 'raw/5_8s_rrna_seq.txt', "fasta").seq.transcribe()
+rrna_47s_seq = SeqIO.read(raw_data_path + '45s_rrna_seq.txt', "fasta").seq.transcribe()
+rrna_18s_seq = SeqIO.read(raw_data_path + '18s_rrna_seq.txt', "fasta").seq.transcribe()
+rrna_28s_seq = SeqIO.read(raw_data_path + '28s_rrna_seq.txt', "fasta").seq.transcribe()
+rrna_5_8s_seq = SeqIO.read(raw_data_path + '5_8s_rrna_seq.txt', "fasta").seq.transcribe()
 ets_5_seq = rrna_47s_seq[:rrna_47s_seq.index(rrna_18s_seq)]
 its_1_seq = rrna_47s_seq[rrna_47s_seq.index(rrna_18s_seq) + len(rrna_18s_seq):rrna_47s_seq.index(rrna_5_8s_seq)]
 its_2_seq = rrna_47s_seq[rrna_47s_seq.index(rrna_5_8s_seq) + len(rrna_5_8s_seq):rrna_47s_seq.index(rrna_28s_seq)]
 ets_3_seq = rrna_47s_seq[rrna_47s_seq.index(rrna_28s_seq) + len(rrna_28s_seq):]
 
-pre_rrna_5s_seq = SeqIO.read(local_data_path + 'raw/5s_rrna_seq.txt', "fasta").seq.transcribe()
+pre_rrna_5s_seq = SeqIO.read(raw_data_path + '5s_rrna_seq.txt', "fasta").seq.transcribe()
 rrna_5s_seq = pre_rrna_5s_seq[:120] # 120 is length of mature 5s_rrna
 
 
