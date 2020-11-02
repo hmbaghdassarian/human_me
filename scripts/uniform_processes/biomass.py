@@ -18,9 +18,12 @@ from utils import functions as func
 
 
 # make the metabolites
+
 biomass_ = cobra.Metabolite('biomass')
-biomass_dilution = cobra.Reaction('biomass_dilution')
+biomass_dilution = func.ME_Reaction('biomass_dilution', type_ = ['biomass'])
 biomass_dilution.add_metabolites({biomass_: -1})
+biomass_dilution._lower_bound, biomass_dilution._upper_bound = params.mu, params.mu 
+
 biomass_reactions = [biomass_dilution]
 
 # constant

@@ -1063,7 +1063,7 @@ class ME_Model(cobra.Model):
             return array
         
     
-    def solve_lp(self, mu_val, 
+    def solve_lp(self, mu_val, close_biomass_dilution = True, 
                  objective = {'biomass_dilution': 1}, solver_type = 'qminos', precision = 'quad'):
         
         '''
@@ -1089,10 +1089,11 @@ class ME_Model(cobra.Model):
         '''
         
         return solve_me.solve_lp(me_model = self, mu_val = mu_val, objective = objective, 
+                                 close_biomass_dilution = close_biomass_dilution,
                                  solver_type = solver_type, precision = precision)
 
 
-# In[19]:
+# In[18]:
 
 
 # # test LP
@@ -1106,14 +1107,14 @@ class ME_Model(cobra.Model):
 #                                   precision = 'quad')
 
 
-# In[20]:
+# In[19]:
 
 
 # test_model = cobra.io.load_json_model('/data2/hratch/Software/qminos_solver/solvemepy/examples/models/iJO1366.json')
 # test_model.objective = {test_model.reactions.BIOMASS_Ec_iJO1366_core_53p95M: 1}
 
 
-# In[21]:
+# In[20]:
 
 
 # test_reaction = ME_Reaction('test', type_ = ['catalysis'])
