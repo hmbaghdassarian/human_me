@@ -797,7 +797,7 @@ class ME_Reaction(cobra.Reaction):
                     # assume it is a reactant with coefficient -1...not robust
                     
                     # should only happen with peroxisomal protein degradation and 
-                    if len(self.genes) == 1 and self.genes == metabolite.split('_')[0]:
+                    if len(self.genes) == 1 and self.genes == metabolite.id.split('_')[0]:
                         for element, amount in iteritems(metabolite.elements):
                             reaction_element_dict[element] = -1*amount
                     

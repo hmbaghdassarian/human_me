@@ -143,7 +143,7 @@ def run(mu_val, fctn):
     fctn(mu_val)
     
 def runSimultaneously(mu_val):
-    pool = multiprocessing.Pool(2)
+    pool = multiprocessing.Pool(2, maxtasksperchild=500)
     functions_ = [qminos_double_closed, qminos_quad_closed, qminos_double_open, qminos_quad_open]
     pool.starmap(run, zip([mu_val]*len(functions_), functions_))
     pool.close()
@@ -161,7 +161,7 @@ mu_vals = [0, 1e-9, 0.001, 0.01, 0.05, 0.5, 1]
 n_cores = len(mu_vals)
 
 start = time.time()
-pool = MyPool(4, maxtasksperchild=500) # run before to save memory
+pool = MyPool(2, maxtasksperchild=500) # run before to save memory
 pool.map(runSimultaneously, mu_vals)        
 pool.close()
 pool.join()
