@@ -518,18 +518,18 @@ class me_builder():
 #                     err = True
 #         if err:
 #             raise ValueError('Not all expression module reactions are mass balanced') 
-    def build_me_model(self):
+    def build_me_model(self, model_id = 'HUMAN_ME_MODEL'):
         self.final_reactions += biomass_reactions
 #         self.check_me_mass_balance()
 
         print('Generate ME-Model')
-        me_model = func.ME_Model('HUMAN_ME_MODEL')
-        me_model.add_reactions(final_reactions)
+        me_model = func.ME_Model(model_id)
+        me_model.add_reactions(self.final_reactions)
 
         return me_model
 
 
-def build_me(non_machinery = [], minimal_proteome = False, 
+def build_me(non_machinery = [], minimal_proteome = False, model_id = 'HUMAN_ME_MODEL', 
                   psim_me = params.psim_me, human_model = params.human_model,):
     '''
     Returns a human ME_model. 
@@ -539,6 +539,7 @@ def build_me(non_machinery = [], minimal_proteome = False,
         minimal_proteome: bool; For reactions with OR in the GPR, the builder by default (False) generates a 
         separate reaction for each protein complex (False). If True, builder instead will create one reaction, 
         choosing the protein complex with the lowest molecular weight to catalyze the reaction.
+        model_id: string; id for the me model
     
     '''
     start = time.time()
@@ -552,23 +553,12 @@ def build_me(non_machinery = [], minimal_proteome = False,
     if minimal_proteome:
         builder.minimize_proteome()
     builder.add_metabolic_machinery()
-    try:
-        builder.add_expression_machinery()
+    builder.add_expression_machinery()
+    me_model = builder.build_me_model(model_id = model_id)
 
-        me_model = builder.build_me_model()
-
-        end = time.time()
-        print('Time to build: {} minutes'.format((end-start)/60))
+    end = time.time()
+    print('Time to build: {} minutes'.format((end-start)/60))
 
 
-        return me_model, builder
-    except:
-        return None, builder
+    return me_model, builder
 
-# import pickle
-# lp_path = '/data2/hratch/human_me/test_lp/'
-# with open(lp_path + 'me_model.pickle', 'wb') as handle:
-#     pickle.dump(me_model, handle)
-
-# with open(lp_path + 'final_reactions.pickle', 'wb') as handle:
-#     pickle.dump(final_reactions, handle)
