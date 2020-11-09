@@ -710,8 +710,8 @@ def build_other_rrna_reactions(rrna5s_complex_n, rs_protein_metabolites, rl_prot
                      rrna_18se_processing, pre40s_complex_formation, pre40s_transport, 
                      rrna_18s_formation, rrna_18s_degradation, its_1_frag2_degradation, 
                      rrna_32s_formation, rrna_12s_28_5s_formation, rrna_28s_formation, 
-                    rrna_7s_formation, rrna_5_8s_plus_40_formation, rrna_6s_formation, 
-                    rrna_5_8s_formation, rrna_28s_degradation, rrna_5_8s_degradation]
+                    rrna_7s_formation, rrna_5_8s_plus_40_formation, rrna_6s_formation, pre60s_complex_formation, 
+                     pre60s_transport, rrna_5_8s_formation, rrna_28s_degradation, rrna_5_8s_degradation]
     
     for i in range(len(all_reactions)): # because degradation reactions don't have proper subsystem assigned
         r = all_reactions[i]
@@ -725,7 +725,7 @@ def build_other_rrna_reactions(rrna5s_complex_n, rs_protein_metabolites, rl_prot
     return all_reactions, mature_ribosomal_precomplexes, mature_rrna_metabolites
 
 
-# In[22]:
+# In[7]:
 
 
 def build_ribosome():
@@ -762,7 +762,7 @@ def build_ribosome():
     return  all_reactions, ribosome_complex_c
 
 
-# In[23]:
+# In[8]:
 
 
 ribosomal_reactions, ribosome_complex_c = build_ribosome()

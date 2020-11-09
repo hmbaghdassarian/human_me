@@ -1,3 +1,8 @@
+#!/usr/bin/env python
+# coding: utf-8
+
+# In[1]:
+
 
 import cobra
 from tqdm import tqdm
@@ -5,6 +10,7 @@ import warnings
 import ast
 import os
 import pandas as pd
+import numpy as np
 import copy
 import time
 
@@ -28,6 +34,12 @@ with warnings.catch_warnings():
         from uniform_processes.build_ribosome_biogenesis_reactions import ribosomal_reactions, ribosome_complex_c
         from uniform_processes.build_trna_expression_reactions import trna_biogenesis_reactions
         from uniform_processes.biomass import biomass_reactions
+
+
+# # Generate Protein Expression Reactions for All Machinery
+
+# In[10]:
+
 
 def get_all_expression_reactions(hgnc_id, psim = params.psim_me, machinery_list = mach.metabolic_machinery, 
                              metabolic_model = params.human_model):
@@ -60,6 +72,10 @@ def generate_expression_module(me_reactions):
     if len(set(expression_machinery_me).difference(mach.expression_machinery)) > 0:
            raise ValueError('The expression module model contains unexpected machinery')
     return expression_machinery_me, expression_module
+
+
+# In[11]:
+
 
 class me_builder():
     def __init__(self, non_machinery = [], psim_me = params.psim_me, human_model = params.human_model):
@@ -248,13 +264,23 @@ class me_builder():
         complex_df = pd.concat([complex_df, me_complex_df], axis = 0)
         complex_df.reset_index(inplace = True, drop = True)        
         
+        print('Assign unique complex ids for unique machinery-compartment sets across all reactions')
         # assign complex ids for reactions that have complexes in them
         complex_df['complex_id'] = float('nan')
         complex_df.loc[complex_df[complex_df.is_complex].index, 'complex_id'] = complex_df.loc[complex_df[complex_df.is_complex].index, 'reaction_id']
-
-        # creates one singular complex id for complexes shared across multiple reactions (same compartment, same machinery)
-        dup_complexes = complex_df[complex_df.is_complex].drop_duplicates(subset = ['compartment', 'machinery'], keep = 'first')
-        dup_complexes.reset_index(inplace = True, drop = True)
+        
+        # if a reaction generates multiple complexes, make sure each complex has a unique ID
+        crm_ = complex_df[(complex_df.creates_multiple_reactions) & (complex_df.is_complex)].reaction_id.unique()
+        for crm in crm_:
+            df = complex_df[(complex_df.reaction_id == crm) & (complex_df.is_complex)]
+            if df.shape[0]>1: # reaction creates multiple complexes
+                counter = 0
+                for i in df.index:
+                    complex_df.loc[i, 'complex_id'] = complex_df.loc[i, 'complex_id'] + '_' + str(counter)
+                    counter += 1
+        
+        dup_complexes = complex_df[complex_df.is_complex].duplicated(subset = ['compartment', 'machinery'], keep = 'first')
+        dup_complexes = complex_df.loc[dup_complexes.index[np.where(dup_complexes)]]
         for i in dup_complexes.index:
             dups = complex_df[(complex_df.compartment == dup_complexes.loc[i,'compartment']) & (complex_df.machinery == dup_complexes.loc[i, 'machinery'])]
             complex_df.loc[dups.index,'complex_id'] = '_'.join(dups.reaction_id)
@@ -332,11 +358,16 @@ class me_builder():
 
         drop_index = list()
         reaction_multiple = self.complex_df[self.complex_df.creates_multiple_reactions].reaction_id.unique().tolist()
+
         for rm in reaction_multiple:
             df = self.complex_df[self.complex_df.reaction_id == rm]
             # don't directly drop machinery in case they are used in multiple reactions and are minimal in 
             # another one of those reactions
-            drop_index += df[df.MW_kDa != df.MW_kDa.min()].index.tolist() 
+            to_drop = df[df.MW_kDa != df.MW_kDa.min()].index.tolist() 
+            if df.shape[0] - len(to_drop) == 1:
+                drop_index += to_drop
+            else:
+                raise ValueError('Something went wrong in selecting a complex by lowerst molecular weight')
 
         self.complex_df.drop(index = drop_index, inplace = True)
 
@@ -529,8 +560,29 @@ class me_builder():
         return me_model
 
 
+# In[12]:
+
+
+# non_machinery = []
+# minimal_proteome = False
+# model_id = 'HUMAN_ME_MODEL' 
+# psim_me = params.psim_me
+# human_model = params.human_model
+
+
+# In[ ]:
+
+
+# builder = me_builder(non_machinery = non_machinery, psim_me = psim_me, human_model = human_model)
+# builder.express_metabolic_enzymes()
+# builder.express_expression_enzymes()
+
+
+# In[ ]:
+
+
 def build_me(non_machinery = [], minimal_proteome = False, model_id = 'HUMAN_ME_MODEL', 
-                  psim_me = params.psim_me, human_model = params.human_model,):
+                  psim_me = params.psim_me, human_model = params.human_model):
     '''
     Returns a human ME_model. 
     
