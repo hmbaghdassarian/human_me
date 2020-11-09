@@ -274,23 +274,23 @@ def make_protein_metabolite(id_, amino_acid_counts, L_protein, compartment):
 # In[9]:
 
 
-def get_metabolite_mw(metabolite, no_copies = 1, metabolite_elements = None, 
-                      element_mw = {'C': 0.0120107, 'H': 0.00100784, 'N': 0.0140067, 'O': 0.015999, 
-                                    'P': 0.030973762, 'S': 0.032065}):
-    '''Input is a cobra.Metabolite object. 
-    Alternatively, a dicitonary (metabolite_elements) with elements as keys and element counts as values can be provided. 
-    The cobra.Metabolite object takes precedent over the dictionary if both are provided.
-    no_copies is the number of molecules of that metabolite (i.e., stoichiometric coefficient in the reaction)
-    output is the molecular weight of that metabolite in kDa'''
+# def get_metabolite_mw(metabolite, no_copies = 1, metabolite_elements = None, 
+#                       element_mw = {'C': 0.0120107, 'H': 0.00100784, 'N': 0.0140067, 'O': 0.015999, 
+#                                     'P': 0.030973762, 'S': 0.032065}):
+#     '''Input is a cobra.Metabolite object. 
+#     Alternatively, a dicitonary (metabolite_elements) with elements as keys and element counts as values can be provided. 
+#     The cobra.Metabolite object takes precedent over the dictionary if both are provided.
+#     no_copies is the number of molecules of that metabolite (i.e., stoichiometric coefficient in the reaction)
+#     output is the molecular weight of that metabolite in kDa'''
     
-    if metabolite != None:
-        return no_copies*sum([element_mw[element]*count for element, count in metabolite.elements.items()])
+#     if metabolite != None:
+#         return no_copies*sum([element_mw[element]*count for element, count in metabolite.elements.items()])
 
-    else:
-        if metabolite_elements != None:
-            mw = no_copies*sum([element_mw[element]*count for element, count in metabolite_elements.items()])
-        else:
-            raise ValueError('Must provide a cobra.Metabolite object or dictionary of elements')
+#     else:
+#         if metabolite_elements != None:
+#             mw = no_copies*sum([element_mw[element]*count for element, count in metabolite_elements.items()])
+#         else:
+#             raise ValueError('Must provide a cobra.Metabolite object or dictionary of elements')
     
 
 
