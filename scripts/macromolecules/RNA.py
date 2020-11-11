@@ -203,7 +203,7 @@ class RNA(cobra.Metabolite):
             raise ValueError('Situation in which RNA sequence is removed or replaced has not been implemented yet')
 
 
-# In[9]:
+# In[14]:
 
 
 class pre_mRNA(RNA):
@@ -213,8 +213,8 @@ class pre_mRNA(RNA):
         
         RNA.__init__(self, metabolite_name = gene_info.hgnc_id, seq = gene_info.premrna_seq, 
                      compartment = compartment, triphosphate = triphosphate)
-        self.id = self.id.replace('RNA', 'premRNA')
         self.type = 'premrna'
+        self.id = self.id.replace('RNA', self.type)
 
 class mRNA(RNA):
     def __init__(self, gene_info, compartment = 'n', triphosphate = True):

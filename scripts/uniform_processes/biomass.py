@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[6]:
+# In[20]:
 
 
 import cobra
@@ -14,7 +14,7 @@ from utils import metabolites as metab
 from utils import functions as func
 
 
-# In[9]:
+# In[21]:
 
 
 # make the metabolites
@@ -45,7 +45,7 @@ biomass_mapper = {'rrna': rrna_, 'protein': protein_, 'mrna': mrna_, 'trna': trn
 biomass_rna_mapper = {k:v for k,v in biomass_mapper.items() if 'rna' in k}
 
 
-# In[3]:
+# In[22]:
 
 
 # biomass formation reactions
@@ -63,15 +63,16 @@ biomass_reactions.append(reaction_)
 # protein biomass with unmodeled protein 
 upc=(params.unmodeled_protein_frac)/(1-params.unmodeled_protein_frac)
 reaction_ = cobra.Reaction('protein_biomass_to_biomass')
-reaction_.add_metabolites({protein_: -1, 
-                         unmodeled_protein_: upc, 
-                         biomass_: 1 + upc})
+# reaction_.add_metabolites({protein_: -1, 
+#                          unmodeled_protein_: -upc, 
+#                          biomass_: 1 + upc})
+reaction_.add_metabolites({protein_: -1, biomass_: 1})
 biomass_reactions.append(reaction_)
 
 
 # The following reactions convert the biomass components which are a constant proportion from the metabolic model formulation to the ME model formulation. Briefly, the coefficients of the precursor reactions must be scaled by their molecular weight, and the product must be equal to the constant proportion of that class of biomass, bounded by growth (flux through reaction = growth rate). 
 
-# In[4]:
+# In[23]:
 
 
 # constant biomass reactions

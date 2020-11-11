@@ -56,7 +56,7 @@ class express_mrna():
         self.mrna_n.charge += 2#(-self.polyA_length + 2) 
 
         transcript_processing = cobra.Reaction(self.gene_info.hgnc_id + '_TRANSCRIPTION_PROCESSING')
-        transcript_processing.subsytem = 'mrna_expression'
+        transcript_processing.subsytem = 'mRNA_expression'
         rxn = dict()
         
         rxn[metab.atp_n], rxn[metab.ppi_n] = -self.polyA_length, self.polyA_length # polyA tail 
@@ -145,6 +145,11 @@ class express_mrna():
         mrna_export.subsytem = 'mRNA_expression'
         rxn = dict()
         rxn[self.mrna_n], rxn[self.mrna_c] = -1, 1
+        
+#         # NEW
+#         self.mrna_dilution_proxy = cobra.Metabolite(self.gene_info.hgnc_id + '_mrna_dilution_proxy')
+#         rxn[self.mrna_dilution_proxy] = 1 
+        
         # 10 ATP consumer per transcript exported
         rxn = func.hydrolyze_atp(rxn, n_atp = 10, compartment = 'n')
 
@@ -267,69 +272,7 @@ def get_mrna_expression_reactions(gene_info, compress_mrna = False):
     self.degrade_mrna()
     if compress_mrna:
         self.compress_mrna_module()
-        
-    
+
+#     return self.reactions, self.mrna_dilution_proxy, self.mrna_deg_proxy 
     return self.reactions, self.mrna_c, self.mrna_deg_proxy 
-
-
-# In[10]:
-
-
-# import random
-# import pandas as pd
-# from utils import parameters as params
-# psim_toy = pd.DataFrame(columns = ['HGNC_ID', 'PREMRNA_SEQ', 'MRNA_SEQ', 'PROTEIN_SEQ', 'POLYA_LENGTH', 'TMD', 
-#                                'SP', 'N_INTRONS', 'DSB', 'GPI', 'OG', 'LOCATION'])
-
-# hgnc_id, premrna_seq = 'HGNC:TOY', ''.join(random.choices(['U', 'C', 'G', 'A'], k = 100))
-# mrna_seq = premrna_seq[25:75]
-# # note that there is no check that the protein_sequence corresponds to the mrna_sequence beyond checking for the length
-# protein_seq = ''.join(random.choices(params.amino_acids, k = int(len(mrna_seq)/3)))
-# polyA_length, tmd, sp, n_introns, dsb, gpi, og  = None, 1, True, 0, 2, 2, 2
-# location = ['c'] # cytoplasm and golgi
-
-# psim_toy.loc[0,:] = [hgnc_id, premrna_seq, mrna_seq, protein_seq, polyA_length, tmd, sp, n_introns, dsb, gpi, og, location]
-# from expression.gene_information import gene_information
-
-# # metabolic_machinery is a list of all the genes in the input cobrapy model
-# # utils makes this default to list(model.genes), see utils.metabolic_machinery
-# # this checks whether the protein is metabolic machinery or non-machinery, and assigns it to .module
-# # there is also an internal check to see whether the gene is expression machinery
-# gene_info = gene_information(hgnc_id, premrna_seq, mrna_seq, protein_seq,
-#                  ptms = {'dsb': dsb, 'og': og, 'gpi': gpi}, tmd = tmd, sp = sp, polyA_length = polyA_length, 
-#                  n_introns = n_introns)
-# gene_info.module
-
-
-# In[5]:
-
-
-# from utils import utils_2
-# psim_rib = params.psim_me.copy()
-# def format_location(x):
-#     return ['n', 'c']
-# psim_rib.LOCATION = psim_rib.LOCATION.apply(lambda x: format_location(x))
-
-# gene_info = utils_2.generate_geneinfo_object(hgnc_id = i, psim = psim_rib, 
-#                     machinery_list = list(), metabolic_model = cobra.Model())
-# gene_info.final_locations = {'c': 'Cytosolic Tranport', 'n': 'Cytosolic Tranport'}
-
-
-# In[6]:
-
-
-# compress_mrna = False
-# self = express_mrna(gene_info)
-# self.transcribe_premrna()
-# self.process_mrna()
-# self.export_mrna()
-# self.degrade_mrna()
-# if compress_mrna:
-#     self.compress_mrna_module()
-
-
-# In[7]:
-
-
-# self.reactions
 
