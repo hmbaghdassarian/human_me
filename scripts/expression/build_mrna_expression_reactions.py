@@ -24,228 +24,312 @@ from utils import functions as func
 from utils.polyA_statistics import calculate_polyA_length
 from uniform_processes import biomass
 
+from macromolecules.RNA import RNA_fragment, pre_mRNA, mRNA
 
-# In[6]:
+
+# In[2]:
 
 
-def transcribe_premrna(gene_info):
-    # elongation reaction
-    # https://www.google.com/search?q=rna+polymerization+reaction&source=lnms&tbm=isch&sa=X&ved=2ahUKEwiN_73Vk7rqAhXOsJ4KHW5lB4UQ_AUoAXoECA4QAw&biw=1920&bih=1001#imgrc=w7XH4mHmJglCuM
-    premrna_transcript_n, premrna_base_counts = func.make_rna_metabolite(gene_info.hgnc_id + '_premrna', 
-                                            gene_info.premrna_seq, molecule_type = 'mrna', compartment = 'n', 
-                                            triphosphate = True)  
-    premrna_mw = func.get_metabolite_mw(premrna_transcript_n)
-        
-    transcript_elongation = cobra.Reaction(gene_info.hgnc_id + '_TRANSCRIPTION_ELONGATION')
-    transcript_elongation.subsytem = 'mRNA_expression'
-        
-    rxn = dict()
-    for ntp, base_letter in metab.seq_metabolite_map.items():
-        rxn[ntp] = -1*premrna_base_counts[base_letter]
-    # pyrophosphate released per base added, -1 for 3/5' ends
-    L_premrna = len(gene_info.premrna_seq)
-    rxn[metab.ppi_n] = L_premrna - 1
-    rxn[premrna_transcript_n] = 1
-    rxn[biomass.premrna_] = premrna_mw # biomass reaction
-    # ATP consumption due to PTMs of nucleosomes
-    # https://www.pnas.org/content/pnas/suppl/2015/10/29/1514974112.DCSupplemental/pnas.1514974112.sapp.pdf
-    # can perhaps add later
-
-    transcript_elongation.add_metabolites(rxn)
-    transcript_elongation.gene_reaction_rule = ' and '.join(mach.ec) # GPRs
+class express_mrna():
+    def __init__(self, gene_info):
+        self.gene_info = gene_info
+        self.reactions = []
     
-    return transcript_elongation, premrna_transcript_n, L_premrna, premrna_base_counts, premrna_mw
-
-def process_mrna(gene_info, premrna_transcript_n, L_premrna, premrna_base_counts, premrna_mw):
+    def transcribe_premrna(self):
+        # elongation reaction
+        # https://www.google.com/search?q=rna+polymerization+reaction&source=lnms&tbm=isch&sa=X&ved=2ahUKEwiN_73Vk7rqAhXOsJ4KHW5lB4UQ_AUoAXoECA4QAw&biw=1920&bih=1001#imgrc=w7XH4mHmJglCuM
+        
+        self.premrna = pre_mRNA(self.gene_info)
+        self.transcript_elongation = self.premrna.synthesize(id_ = self.gene_info.hgnc_id + '_TRANSCRIPTION_ELONGATION')
+        self.reactions.append(self.transcript_elongation)   
+        
+    def process_mrna(self):
         '''Processing includes capping, splicing, and polyA tail.'''
         # combine in to one to not create too many reactions (capping itself is 4 reactions)
+        # make mrna_n metabolite
+        self.mrna_n = mRNA(self.gene_info, compartment = 'n')
+        self.polyA_length = int(calculate_polyA_length(self.gene_info.polyA_length))
+        self.mrna_n.update_metabolite(seq = ''.join(['A']*self.polyA_length), 
+                                     append = True, append_to = '3_primed')
         
+        #+2 for cap
+        self.mrna_n.charge += 2#(-self.polyA_length + 2) 
 
-        transcript_processing = cobra.Reaction(gene_info.hgnc_id + '_TRANSCRIPTION_PROCESSING')
-        transcript_processing.subsytem = 'mRNA_expression'
+        transcript_processing = cobra.Reaction(self.gene_info.hgnc_id + '_TRANSCRIPTION_PROCESSING')
+        transcript_processing.subsytem = 'mrna_expression'
         rxn = dict()
         
-        polyA_length = calculate_polyA_length(gene_info.polyA_length)
-        rxn[metab.atp_n], rxn[metab.ppi_n] = -polyA_length, polyA_length # polyA tail 
-        
+        rxn[metab.atp_n], rxn[metab.ppi_n] = -self.polyA_length, self.polyA_length # polyA tail 
+
         # 5' cap: https://sites.google.com/site/learnorganicchem/organic-molecules/biomolecules/rna/rna-processing?tmpl=%2Fsystem%2Fapp%2Ftemplates%2Fprint%2F&showPrintDialog=1
         rxn[metab.h2o_n], rxn[metab.pi_n] = -1, 1 #rtpase
         rxn[metab.gtp_n] = -1 #gp transfer
         rxn[metab.ppi_n] += 1 # gp transfer
         rxn[metab.amet_n], rxn[metab.ahcys_n] = -2, 2 # methyltransferase - cap0 and cap1 structure
         rxn[metab.h_n] = 1 # methyltransferase cap1
-        
+
         #4 ATP consumed per capping reaction
         rxn = func.hydrolyze_atp(rxn, n_atp = 4, compartment = 'n')
 
-        # transcripts
-        mrna_transcript_n, mrna_base_counts = func.make_rna_metabolite(gene_info.hgnc_id, gene_info.mrna_seq, 
-                                              molecule_type = 'mrna', compartment = 'n',triphosphate = True) 
-        processed_elements = mrna_transcript_n.elements
+        processed_elements = self.mrna_n.elements.copy()
         for element in processed_elements.keys():
-            processed_elements[element] += (polyA_length* metab.seq_element_map['A'][element]) # polyA tail
+#             processed_elements[element] += (self.polyA_length* metab.seq_element_map['A'][element]) # polyA tail
             processed_elements[element] += metab.gp[element] #5' cap rxn2 - addition of Gp
+
         # 5' cap 
         processed_elements['P'] -= 1 # rxn 1: lost of third triphosphate by RTPase
         processed_elements['O'] -= 4 # rxn 1: loss of third triophosphate by RTPase
         processed_elements['C'] += 2 # rxn 3-4: methyltransferase - cap0 and cap1 structure
         processed_elements['H'] += 5 # methyltransferase - cap0 and cap1 structure
-        mrna_transcript_n.elements = processed_elements
-        
-        #+2 for cap
-        mrna_transcript_n.charge += (-polyA_length + 2) 
-        
-        mw_mrna = func.get_metabolite_mw(mrna_transcript_n)
-        rxn[premrna_transcript_n], rxn[biomass.premrna_] = -1, -premrna_mw
-        rxn[mrna_transcript_n], rxn[biomass.mrna_] = 1, mw_mrna
-        
-        processing_reactions = list()
-        
+        self.mrna_n.elements = processed_elements
+
+        rxn[self.premrna], rxn[biomass.premrna_] = -1, -self.premrna.formula_weight/1000
+        rxn[self.mrna_n], rxn[biomass.mrna_] = 1, self.mrna_n.formula_weight/1000
+
         # splicing
-        L_mrna = len(gene_info.mrna_seq)
-        if L_premrna > L_mrna: 
-            lariat_seq = ''.join([k*(v - mrna_base_counts[k]) for k,v in premrna_base_counts.items()])
-            lariats_n, lariats_base_counts = func.make_rna_metabolite(gene_info.hgnc_id + '_lariats', 
-                                             lariat_seq,molecule_type = 'mrna', compartment = 'n',
-                                             triphosphate = False)
+        if self.premrna.length > self.mrna_n.length - self.polyA_length: 
+            lariat_seq = ''
+            for nt in ['A', 'U', 'G', 'C']:
+
+                if nt != 'A':
+                    diff = self.premrna.sequence.count(nt) - self.mrna_n.sequence.count(nt)
+                    lariat_seq += ''.join([nt]*diff)
+                else:
+                    diff = self.premrna.sequence.count(nt) - (self.mrna_n.sequence.count(nt)-self.polyA_length)
+                    lariat_seq += ''.join([nt]*diff)
             
-            if gene_info.n_introns == None:
-                n_lariats = round(L_premrna * params.rate_intron)
+            self.lariat = RNA_fragment(metabolite_name = self.gene_info.hgnc_id, fragment_type='lariat', 
+                                       seq = lariat_seq, triphosphate = False)
+
+            if self.gene_info.n_introns == None:
+                n_lariats = self.premrna.length * params.rate_intron # removed ROUND()
                 if n_lariats < 1: # atleast one intron must be generated
                     n_lariats = 1
-    #             n_splices = n_lariats * 2 # because on average, one more exon than intron
+            #             n_splices = n_lariats * 2 # because on average, one more exon than intron
             else:
-                n_lariats = gene_info.n_introns                    
-            
-            mw_lariats = func.get_metabolite_mw(lariats_n)
-            rxn[lariats_n], rxn[biomass.other_rna_] = 1, mw_lariats
+                n_lariats = self.gene_info.n_introns  
+
+            rxn[self.lariat], rxn[biomass.other_rna_] = 1, self.lariat.formula_weight/1000
             rxn[metab.h2o_n] -= 1 # endonucleolytic cleavage
             # 10 ATP consumed per intron during splicing
-           
             rxn = func.hydrolyze_atp(rxn, n_atp = 10*n_lariats, compartment = 'n')
-            
             # lariat degradation - no linearization reaction (just one triphosphate consumption)
-            lariat_degradation = func.rna_exonucleolytic_degradation(lariats_n, lariats_base_counts, lariat_seq, 
-                                  gene_info.hgnc_id + '_lariats',triphosphate = False, nucleus = True)
-            lariat_degradation.add_metabolites({biomass.other_rna_: - mw_lariats})
+            lariat_degradation = self.lariat.exonucleolytic_degradation(reaction_name = self.gene_info.hgnc_id + '_lariats')
             lariat_degradation.subsystem = 'mRNA_expression'
-            lariat_degradation.gene_reaction_rule = mach.lm_rule
-            processing_reactions += [lariat_degradation]
+            lariat_degradation.gene_reaction_rule = mach.lm_rule  
+            if list(lariat_degradation.compartments) != ['n']:
+                raise ValueError('Lariat degradation must be confined to nuclear compartment')
+            else:
+                self.reactions.append(lariat_degradation)
         else:
             lariat_degradation = None
 
         transcript_processing.add_metabolites(rxn)
         transcript_processing.gene_reaction_rule = ' and '.join(mach.polyA + mach.capping + mach.spliceosome) 
-        processing_reactions += [transcript_processing]   
+        if len(transcript_processing.check_mass_balance()) > 0:
+            raise ValueError('Transcript processing for ' + self.gene_info.hgnc_id + ' is unbalanced')
+        elif list(transcript_processing.compartments) != ['n']:
+            raise ValueError('Transcript processing must be confined to nuclear compartment')
+        else:
+            self.transcript_processing = transcript_processing
+            self.reactions.append(transcript_processing)
+    def export_mrna(self):
+        # make the cytosolic mrna metabolite
+        self.mrna_c = self.mrna_n.copy()
+        self.mrna_c.id = self.mrna_c.id.replace('[n]', '[c]')
+        self.mrna_c.compartment = 'c'
+
+        # make the transport reaction
+        mrna_export = cobra.Reaction(self.gene_info.hgnc_id + '_mRNA_EXPORTtn')
+        mrna_export.name = 'mRNA nuclear export'
+        mrna_export.subsytem = 'mRNA_expression'
+        rxn = dict()
+        rxn[self.mrna_n], rxn[self.mrna_c] = -1, 1
+        # 10 ATP consumer per transcript exported
+        rxn = func.hydrolyze_atp(rxn, n_atp = 10, compartment = 'n')
+
+        mrna_export.add_metabolites(rxn)
+        # can change this GPR as an if statement in future based on following source:
+        # https://journals.plos.org/plosone/article/figure?id=10.1371/journal.pone.0010144.g005
+        mrna_export.gene_reaction_rule = ' and '.join(mach.trex)
         
-        return processing_reactions, mrna_transcript_n, polyA_length, L_mrna, mrna_base_counts, mw_mrna
+        if len(mrna_export.check_mass_balance()) > 0:
+            raise ValueError('mRNA export for ' + self.gene_info.hgnc_id + ' is unbalanced')
+        else:
+            self.mrna_export = mrna_export
+            self.reactions.append(mrna_export)
+            
+    def degrade_mrna(self, decapping = True, three_to_five = False):
+        '''
 
-def export_mrna(gene_info, mrna_transcript_n):
-    # make the cytosolic mrna metabolite
-    mrna_transcript_c = mrna_transcript_n.copy()
-    mrna_transcript_c.id = mrna_transcript_c.id.replace('[n]', '[c]')
-    mrna_transcript_c.compartment = 'c'
+        Right now, only one of the two degradation pathways is included. We assume the 5' to 3' pathway is present.
+        This is simply to limit the total number of reactions
 
-    # make the transport reaction
-    mrna_export = cobra.Reaction(gene_info.hgnc_id + '_mRNA_EXPORTtn')
-    mrna_export.name = 'mRNA nuclear export'
-    mrna_export.subsytem = 'mRNA_expression'
-    rxn = dict()
-    rxn[mrna_transcript_n], rxn[mrna_transcript_c] = -1, 1
-    # 10 ATP consumer per transcript exported
-    rxn = func.hydrolyze_atp(rxn, n_atp = 10, compartment = 'n')
-
-    mrna_export.add_metabolites(rxn)
-    # can change this GPR as an if statement in future based on following source:
-    # https://journals.plos.org/plosone/article/figure?id=10.1371/journal.pone.0010144.g005
-    mrna_export.gene_reaction_rule = ' and '.join(mach.trex)
-    
-    return mrna_export, mrna_transcript_c
+        '''
         
+        rxn = self.mrna_c.exonucleolytic_degradation(reaction_name = '', balanced = False)
+        rxn = rxn.metabolites.copy()
+        del rxn[[m for m in rxn.keys() if m.id == metab.ntp_map_c[self.gene_info.mrna_seq[0]].id][0]]
 
-def degrade_mrna(gene_info, mrna_transcript_c, polyA_length, L_mrna, mrna_base_counts, mw_mrna, decapping = True, 
-                three_to_five = False):
-    '''
-    
-    Right now, only one of the two degradation pathways is included. We assume the 5' to 3' pathway is present.
-    This is simply to limit the total number of reactions
-    
-    '''
-    
-    degradation_reactions = list()
-    
-    
-    rxn = dict()
-    rxn[metab.h2o_c] = -(L_mrna + polyA_length)+1
-    rxn[metab.h_c] = L_mrna + polyA_length-1
-    rxn[mrna_transcript_c], rxn[biomass.mrna_] = -1, -mw_mrna
-    
-    for k,v in metab.nmp_map_c.items():
-        rxn[v] = mrna_base_counts[k]
-    rxn[metab.amp_c] += polyA_length
+        # no m7g metabolite in recon2.2, so just reverse the methylation instead
+        rxn[metab.amet_c], rxn[metab.ahcys_c] = 2, -2 # reverse methyltransferase - cap0 and cap1 structure
 
-    # no m7g metabolite in recon2.2, so just reverse the methylation instead
-    rxn[metab.amet_c], rxn[metab.ahcys_c] = 2, -2 # reverse methyltransferase - cap0 and cap1 structure
-    
-    # proxy metabolite for coupling mRNA degradation to protein synthesis flux
-    mrna_deg_proxy = cobra.Metabolite(gene_info.hgnc_id + '_mrna_deg_proxy')
-    rxn[mrna_deg_proxy] = 1 
-    
-    
+        # proxy metabolite for coupling mRNA degradation to protein synthesis flux
+        self.mrna_deg_proxy = cobra.Metabolite(self.gene_info.hgnc_id + '_mrna_deg_proxy')
+        rxn[self.mrna_deg_proxy] = 1 
 
-    # 3'-->5' degradation------------------------------------------------------------------------------------
-    if three_to_five:
-        transcript_degradation_1 = cobra.Reaction(gene_info.hgnc_id + "_3'to5'_mRNA_DEGRADATIONc")
-        transcript_degradation_1.subsytem = 'Transcription'
+        h2o_c = [m for m in rxn.keys() if m.id == 'h2o[c]'][0] # won't load directly from metab for some reason
+        h_c = [m for m in rxn.keys() if m.id == 'h[c]'][0]
 
-        rxn_1 = rxn.copy()
-        # fig 1 https://www.ncbi.nlm.nih.gov/pmc/articles/PMC6565619/
-        # 5' cap - degradation from 3'-->5' direction (scavenger - HIT mechanism)
-        rxn_1[metab.nmp_map_c[gene_info.mrna_seq[0]]] -= 1
-        rxn_1[metab.ndp_map_c[gene_info.mrna_seq[0]]] = 1
-        rxn_1[metab.h2o_c] -= 1
-        rxn_1[metab.h_c] += 1
-        rxn_1[metab.nmp_map_c['G']] += 1
-        transcript_degradation_1.add_metabolites(rxn_1)
-        transcript_degradation_1.gene_reaction_rule = mach.degradation_rule1
-        degradation_reactions.append(transcript_degradation_1)
+        if three_to_five: 
+            transcript_degradation_1 = cobra.Reaction(self.gene_info.hgnc_id + "_3'to5'_mRNA_DEGRADATIONc")
+            transcript_degradation_1.subsytem = 'mRNA_expression'
+            rxn_1 = rxn.copy()
+
+            rxn_1[metab.ndp_map_c[self.gene_info.mrna_seq[0]]] = 1
+
+            gmp_c = [m for m in rxn.keys() if m.id == 'gmp[c]'][0]
+            rxn_1[h2o_c] -= 1
+            rxn_1[h_c] += 1
+            rxn_1[gmp_c] += 1
+            transcript_degradation_1.add_metabolites(rxn_1)
+            transcript_degradation_1.gene_reaction_rule = mach.degradation_rule1
+
+            if len(transcript_degradation_1.check_mass_balance()) > 0:
+                raise ValueError('3 primed to 5 primed degradation for ' + self.gene_info.hgnc_id + ' is unbalanced')
+            elif list(transcript_degradation_1.compartments) != ['c']:
+                raise ValueError('Transcript degradation must be confined to cytosolic compartment')
+            else:
+                self.reactions.append(transcript_degradation_1)
+        if decapping:
+            transcript_degradation_2_decapping = cobra.Reaction(self.gene_info.hgnc_id + "_DECAPPING_mRNA_DEGRADATIONc")
+            transcript_degradation_2_decapping.subsytem = 'mRNA_expression'
+
+            rxn_2 = rxn.copy()
+            rxn_2[[m for m in rxn_2.keys() if m.id == metab.nmp_map_c[self.gene_info.mrna_seq[0]].id][0]] += 1
+            # 5' cap - from 5'-->3' direction (DCP1/DCP2 - NUDIX mechanism)
+            rxn_2[h2o_c] -= 1
+            rxn_2[h_c] += 1
+            rxn_2[metab.ndp_map_c['G']] = 1
 
 
-    # 5'->3' degradation (decapping) ------------------------------------------------------------------------------------
-    if decapping:
-        transcript_degradation_2_decapping = cobra.Reaction(gene_info.hgnc_id + "_DECAPPING_mRNA_DEGRADATIONc")
-        transcript_degradation_2_decapping.subsytem = 'Transcription'
+            transcript_degradation_2_decapping.add_metabolites(rxn_2)
+            transcript_degradation_2_decapping.gene_reaction_rule = mach.decapping_rule
+            if len(transcript_degradation_2_decapping.check_mass_balance()) > 0:
+                raise ValueError('Decapping degradation for ' + self.gene_info.hgnc_id + ' is unbalanced')
+            elif list(transcript_degradation_2_decapping.compartments) != ['c']:
+                raise ValueError('Transcript degradation must be confined to cytosolic compartment')
+            else:
+                self.reactions.append(transcript_degradation_2_decapping)
+    def compress_mrna_module(self):
+        rxns_to_remove = [self.transcript_elongation, self.transcript_processing, self.mrna_export]
+        rxn = dict()
+        rxn_map = dict()
+        for r in rxns_to_remove:
+            for met, coeff in r.metabolites.items():
+                if met.id in rxn.keys():
+                    rxn[met.id] += coeff
+                else:
+                    rxn[met.id] = coeff
+                    rxn_map[met.id] = met
+        rxn = {rxn_map[k]: v for k,v in rxn.items()}
 
-        rxn_2_decapping = rxn.copy()
-        # 5' cap - from 5'-->3' direction (DCP1/DCP2 - NUDIX mechanism)
-        rxn_2_decapping[metab.h2o_c] -= 1
-        rxn_2_decapping[metab.h_c] += 1
-        rxn_2_decapping[metab.ndp_map_c['G']] = 1
+        transcription = cobra.Reaction(self.gene_info.hgnc_id + "_TRANSCRIPTION")
+        transcription.subsytem = 'mRNA_expression'
+        transcription.add_metabolites(rxn)
+
+        transcription.gene_reaction_rule = ' and '.join(sorted(set([item.id for sublist in [list(r.genes) for r in rxns_to_remove] for item in sublist])))
+
+        if len(transcription.check_mass_balance()) > 0:
+            raise ValueError('Condensed transcription reaction for ' + self.gene_info.hgnc_id + ' is unbalanced')
+        
+        for r in rxns_to_remove:
+            self.reactions.remove(r)
+        self.reactions.append(transcription)
 
 
-        transcript_degradation_2_decapping.add_metabolites(rxn_2_decapping)
-        transcript_degradation_2_decapping.gene_reaction_rule = mach.decapping_rule
-        degradation_reactions.append(transcript_degradation_2_decapping)
-    
-    return degradation_reactions, mrna_deg_proxy
-    
-    
-def get_mrna_expression_reactions(gene_info):
+# In[3]:
+
+
+def get_mrna_expression_reactions(gene_info, compress_mrna = False):
     '''
     gene_info is an object of the gene_information class. Returns all reactions associated with mRNA
     expression and necessary metabolites for other modules in the ME model. 
     
+    compress_mrna is a boolean. If True, will make the transcription, processing, and export reactions one 
+    single reaction
+    
     '''
-    transcript_elongation, premrna_transcript_n, L_premrna, premrna_base_counts, premrna_mw = transcribe_premrna(gene_info)
+    self = express_mrna(gene_info)
+    self.transcribe_premrna()
+    self.process_mrna()
+    self.export_mrna()
+    self.degrade_mrna()
+    if compress_mrna:
+        self.compress_mrna_module()
+        
     
-    processing_res = process_mrna(gene_info, premrna_transcript_n, L_premrna, premrna_base_counts, premrna_mw)
-    processing_reactions, mrna_transcript_n, polyA_length, L_mrna, mrna_base_counts, mw_mrna = processing_res
-    
-    mrna_export, mrna_transcript_c = export_mrna(gene_info, mrna_transcript_n)
-    degradation_reactions, mrna_deg_proxy = degrade_mrna(gene_info, mrna_transcript_c, polyA_length, L_mrna, mrna_base_counts, mw_mrna)
-    
-    
-    
-    reactions = [transcript_elongation] + processing_reactions + [mrna_export] + degradation_reactions
-    return reactions, mrna_transcript_c, mrna_deg_proxy 
+    return self.reactions, self.mrna_c, self.mrna_deg_proxy 
+
+
+# In[10]:
+
+
+# import random
+# import pandas as pd
+# from utils import parameters as params
+# psim_toy = pd.DataFrame(columns = ['HGNC_ID', 'PREMRNA_SEQ', 'MRNA_SEQ', 'PROTEIN_SEQ', 'POLYA_LENGTH', 'TMD', 
+#                                'SP', 'N_INTRONS', 'DSB', 'GPI', 'OG', 'LOCATION'])
+
+# hgnc_id, premrna_seq = 'HGNC:TOY', ''.join(random.choices(['U', 'C', 'G', 'A'], k = 100))
+# mrna_seq = premrna_seq[25:75]
+# # note that there is no check that the protein_sequence corresponds to the mrna_sequence beyond checking for the length
+# protein_seq = ''.join(random.choices(params.amino_acids, k = int(len(mrna_seq)/3)))
+# polyA_length, tmd, sp, n_introns, dsb, gpi, og  = None, 1, True, 0, 2, 2, 2
+# location = ['c'] # cytoplasm and golgi
+
+# psim_toy.loc[0,:] = [hgnc_id, premrna_seq, mrna_seq, protein_seq, polyA_length, tmd, sp, n_introns, dsb, gpi, og, location]
+# from expression.gene_information import gene_information
+
+# # metabolic_machinery is a list of all the genes in the input cobrapy model
+# # utils makes this default to list(model.genes), see utils.metabolic_machinery
+# # this checks whether the protein is metabolic machinery or non-machinery, and assigns it to .module
+# # there is also an internal check to see whether the gene is expression machinery
+# gene_info = gene_information(hgnc_id, premrna_seq, mrna_seq, protein_seq,
+#                  ptms = {'dsb': dsb, 'og': og, 'gpi': gpi}, tmd = tmd, sp = sp, polyA_length = polyA_length, 
+#                  n_introns = n_introns)
+# gene_info.module
+
+
+# In[5]:
+
+
+# from utils import utils_2
+# psim_rib = params.psim_me.copy()
+# def format_location(x):
+#     return ['n', 'c']
+# psim_rib.LOCATION = psim_rib.LOCATION.apply(lambda x: format_location(x))
+
+# gene_info = utils_2.generate_geneinfo_object(hgnc_id = i, psim = psim_rib, 
+#                     machinery_list = list(), metabolic_model = cobra.Model())
+# gene_info.final_locations = {'c': 'Cytosolic Tranport', 'n': 'Cytosolic Tranport'}
+
+
+# In[6]:
+
+
+# compress_mrna = False
+# self = express_mrna(gene_info)
+# self.transcribe_premrna()
+# self.process_mrna()
+# self.export_mrna()
+# self.degrade_mrna()
+# if compress_mrna:
+#     self.compress_mrna_module()
+
+
+# In[7]:
+
+
+# self.reactions
 

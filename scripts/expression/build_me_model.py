@@ -25,7 +25,7 @@ with warnings.catch_warnings():
     from utils import functions as func  
     
     with func.HiddenPrints():
-        from utils.functions import COMPLEX
+        from macromolecules.complex import Complex
         from utils import utils_2
 
         import expression.build_mrna_expression_reactions as build_mrna
@@ -38,17 +38,17 @@ with warnings.catch_warnings():
 
 # # Generate Protein Expression Reactions for All Machinery
 
-# In[10]:
+# In[2]:
 
 
 def get_all_expression_reactions(hgnc_id, psim = params.psim_me, machinery_list = mach.metabolic_machinery, 
-                             metabolic_model = params.human_model):
+                             metabolic_model = params.human_model, compress_mrna = False):
     '''Generates all the expression reactions for a given protein from the HGNC ID and the PSIM'''
     with warnings.catch_warnings():
         warnings.simplefilter('ignore')
         with func.HiddenPrints():
             gene_info = utils_2.generate_geneinfo_object(hgnc_id, psim, machinery_list, metabolic_model)
-            mrna_reactions, mrna_transcript_c, mrna_deg_proxy  = build_mrna.get_mrna_expression_reactions(gene_info)
+            mrna_reactions, mrna_transcript_c, mrna_deg_proxy  = build_mrna.get_mrna_expression_reactions(gene_info, compress_mrna = compress_mrna)
             protein_reactions, protein_metabolites = build_protein.get_protein_expression_reactions(gene_info, mrna_transcript_c, mrna_deg_proxy)
 
     return mrna_reactions + protein_reactions, protein_metabolites
@@ -74,11 +74,12 @@ def generate_expression_module(me_reactions):
     return expression_machinery_me, expression_module
 
 
-# In[11]:
+# In[3]:
 
 
 class me_builder():
-    def __init__(self, non_machinery = [], psim_me = params.psim_me, human_model = params.human_model):
+    def __init__(self, non_machinery = [], psim_me = params.psim_me, human_model = params.human_model, 
+                 compress_mrna = False):
         self.non_machinery = non_machinery
         self.psim_me = psim_me
         self.human_model = human_model
@@ -90,6 +91,8 @@ class me_builder():
         
         self.id_reactions_map = dict()
         self.complex_reactions_map = dict()
+        
+        self.compress_mrna = compress_mrna
     
     def express_metabolic_enzymes(self):
         # get protein expression for all metabolic reactions
@@ -99,7 +102,7 @@ class me_builder():
 
         for hgnc_id in tqdm(loop_machinery):
             # None bc will add later for expression model specific to this
-            expr_reactions, protein_metabolites = get_all_expression_reactions(hgnc_id)
+            expr_reactions, protein_metabolites = get_all_expression_reactions(hgnc_id, compress_mrna = self.compress_mrna)
             self.id_protein_map[hgnc_id] = {p.compartment: p for p in protein_metabolites} # store compartments and metabolite objects for each gene
             
             self.id_reactions_map[hgnc_id] = expr_reactions
@@ -125,7 +128,7 @@ class me_builder():
         
         for hgnc_id in tqdm(list(set(expression_machinery_me))):
             expr_reactions, protein_metabolites = get_all_expression_reactions(hgnc_id, machinery_list = expression_machinery_me,
-                                                  metabolic_model = expression_module)
+                                                  metabolic_model = expression_module, compress_mrna = self.compress_mrna)
 
 
             if hgnc_id not in set(expression_machinery_me).intersection(mach.metabolic_machinery):
@@ -158,7 +161,7 @@ class me_builder():
             print('No. iterations for new expression machinery: {}'.format(counter))
             for hgnc_id in tqdm(list(set(expression_machinery_me_2))):
                 expr_reactions, protein_metabolites = get_all_expression_reactions(hgnc_id, machinery_list = expression_machinery_me_2,
-                                                      metabolic_model = expression_module)
+                                                      metabolic_model = expression_module, compress_mrna = self.compress_mrna)
 
 
                 if hgnc_id not in set(expression_machinery_me_2).intersection(expression_machinery_me + mach.metabolic_machinery):
@@ -320,7 +323,7 @@ class me_builder():
 
             complex_info = {'METABOLITES': machinery_metabolites, 'IDS': [m.id for m in machinery_metabolites], 
                            'METABOLITE_TYPES': metabolite_types}
-            complex_metabolite = COMPLEX(reaction_id = complex_id, complex_id = complex_id, **complex_info)
+            complex_metabolite = Complex(reaction_id = complex_id, complex_id = complex_id, **complex_info)
             complex_reaction = complex_metabolite.form_complex()
 
             complex_formation_reactions.append(complex_reaction)
@@ -347,7 +350,7 @@ class me_builder():
             else:
                 enzyme_to_couple = self.complex_id_metabolite_map[self.complex_df.loc[i, 'complex_id']]
 
-            self.complex_df.loc[i, 'MW_kDa'] = func.get_metabolite_mw(enzyme_to_couple)
+            self.complex_df.loc[i, 'MW_kDa'] = enzyme_to_couple.formula_weight/1000 
 
         self.complex_df['SASA'] = self.complex_df.MW_kDa.apply(lambda x: func.SASA(x))
         median_SASA = self.complex_df.SASA.median()
@@ -560,28 +563,10 @@ class me_builder():
         return me_model
 
 
-# In[12]:
+# In[4]:
 
 
-# non_machinery = []
-# minimal_proteome = False
-# model_id = 'HUMAN_ME_MODEL' 
-# psim_me = params.psim_me
-# human_model = params.human_model
-
-
-# In[ ]:
-
-
-# builder = me_builder(non_machinery = non_machinery, psim_me = psim_me, human_model = human_model)
-# builder.express_metabolic_enzymes()
-# builder.express_expression_enzymes()
-
-
-# In[ ]:
-
-
-def build_me(non_machinery = [], minimal_proteome = False, model_id = 'HUMAN_ME_MODEL', 
+def build_me(non_machinery = [], minimal_proteome = False, model_id = 'HUMAN_ME_MODEL', compress_mrna = False,
                   psim_me = params.psim_me, human_model = params.human_model):
     '''
     Returns a human ME_model. 
@@ -592,11 +577,14 @@ def build_me(non_machinery = [], minimal_proteome = False, model_id = 'HUMAN_ME_
         separate reaction for each protein complex (False). If True, builder instead will create one reaction, 
         choosing the protein complex with the lowest molecular weight to catalyze the reaction.
         model_id: string; id for the me model
+        compress_mrna: boolean, whether to merge the 3 transcription, mrna processing, and mrna export to cytosol 
+        reactions into one single reaction
     
     '''
     start = time.time()
     
-    builder = me_builder(non_machinery = non_machinery, psim_me = psim_me, human_model = human_model)
+    builder = me_builder(non_machinery = non_machinery, psim_me = psim_me, human_model = human_model, 
+                        compress_mrna = compress_mrna)
     builder.express_metabolic_enzymes()
     builder.express_expression_enzymes()
     builder.get_complex_info()

@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[1]:
+# In[6]:
 
 
 import cobra
@@ -14,7 +14,7 @@ from utils import metabolites as metab
 from utils import functions as func
 
 
-# In[2]:
+# In[9]:
 
 
 # make the metabolites
@@ -40,7 +40,9 @@ mrna_ = cobra.Metabolite('biomass_mRNA')
 premrna_ = cobra.Metabolite('biomass_premRNA')
 other_rna_ = cobra.Metabolite('biomass_other_RNA')
 
-type_to_object = {'rrna': rrna_, 'protein': protein_, 'mrna': mrna_, 'trna': trna_}
+biomass_mapper = {'rrna': rrna_, 'protein': protein_, 'mrna': mrna_, 'trna': trna_, 'fragment_rna': other_rna_, 
+                     'premrna': premrna_}
+biomass_rna_mapper = {k:v for k,v in biomass_mapper.items() if 'rna' in k}
 
 
 # In[3]:
@@ -85,10 +87,10 @@ dgtp_coef = 0.707
 dttp_coef = 0.935071428571429
 
 # original coefficient from DNA biomass formation reaction*metabolite molecular weight
-rxn = {metab.datp_n: -datp_coef*func.get_metabolite_mw(metab.datp_n),
-      metab.dctp_n: -dctp_coef*func.get_metabolite_mw(metab.dctp_n),
-      metab.dgtp_n: -dgtp_coef*func.get_metabolite_mw(metab.dgtp_n),
-      metab.dttp_n: -dttp_coef*func.get_metabolite_mw(metab.dttp_n),
+rxn = {metab.datp_n: -datp_coef*metab.datp_n.formula_weight/1000,
+      metab.dctp_n: -dctp_coef*metab.dctp_n.formula_weight/1000, 
+      metab.dgtp_n: -dgtp_coef*metab.dgtp_n.formula_weight/1000,
+      metab.dttp_n: -dttp_coef*metab.dttp_n.formula_weight/1000,
       dna_: params.dna_frac}
 dna_reaction.add_metabolites(rxn)
 dna_reaction._lower_bound, dna_reaction._upper_bound = params.mu, params.mu 
@@ -96,7 +98,7 @@ dna_reaction._lower_bound, dna_reaction._upper_bound = params.mu, params.mu
 # CARBOHYDRATE------------------------------------------------------
 g6p_coef = 3.87591549295775
 carbohydrate_reaction = func.ME_Reaction('carbohydrate_biomass_formation', type_ = ['biomass'])
-rxn = {metab.g6p_c: -g6p_coef*func.get_metabolite_mw(metab.g6p_c), 
+rxn = {metab.g6p_c: -g6p_coef*metab.g6p_c.formula_weight/1000, 
       carb_: params.carb_frac}
 carbohydrate_reaction.add_metabolites(rxn)
 carbohydrate_reaction._lower_bound, carbohydrate_reaction._upper_bound = params.mu, params.mu 
@@ -122,7 +124,7 @@ sphmyln_hs_c_mw = 492.630 #ChEBI 62490
 
 
 lipid_reaction = func.ME_Reaction('lipid_biomass_formation', type_ = ['biomass'])
-rxn = {metab.chsterol_c: -chsterol_coef*func.get_metabolite_mw(metab.chsterol_c),
+rxn = {metab.chsterol_c: -chsterol_coef*metab.chsterol_c.formula_weight/1000,
        metab.clpn_hs_c: -clpn_hs_coef*clpn_hs_c_mw,
        metab.pail_hs_c: -pail_hs_coef*pail_hs_c_mw,
        metab.pchol_hs_c: -pchol_hs_coef*pchol_hs_c_mw,

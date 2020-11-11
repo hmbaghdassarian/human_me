@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[2]:
+# In[1]:
 
 
 import sys
@@ -11,15 +11,16 @@ from utils import machinery as mach
 from utils import parameters as params
 from utils import functions as func
 
-from uniform_processes.build_trna_expression_reactions import charged_trna_metabolites, modified_trna_transcript_c, modified_trna_transcript_c_mw
+from uniform_processes.build_trna_expression_reactions import charged_trna_metabolites, modified_trna_transcript_c
 from expression.gene_information import gene_information
 
 
-# In[4]:
+# In[2]:
 
 
 charged_trna_map = {v.id.split('_')[2]: v for v in charged_trna_metabolites}
-charged_trna_map_mw = {aa_code: func.get_metabolite_mw(aa_metab) for aa_code, aa_metab in charged_trna_map.items()}
+charged_trna_map_mw = {aa_code: aa_metab.formula_weight/1000 for aa_code, aa_metab in charged_trna_map.items()}
+modified_trna_transcript_c_mw = modified_trna_transcript_c.formula_weight/1000
 
 
 # In[ ]:

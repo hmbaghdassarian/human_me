@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[2]:
+# In[65]:
 
 
 import sys
@@ -10,7 +10,7 @@ sys.path.insert(1, '../../scripts/') # comment out in python script
 from utils.parameters import human_model
 
 
-# In[3]:
+# In[66]:
 
 
 atp_n = human_model.metabolites.get_by_id('atp[n]')
@@ -79,7 +79,7 @@ udpacgal_l = human_model.metabolites.get_by_id('udpacgal[l]')
 udp_l = human_model.metabolites.get_by_id('udp[l]')
 
 
-# In[5]:
+# In[67]:
 
 
 # mrna expression
@@ -156,7 +156,7 @@ seq_amino_acid_map_compartments = {'c': seq_amino_acid_map_c, 'x': seq_amino_aci
 
 
 
-# In[ ]:
+# In[74]:
 
 
 
@@ -194,7 +194,7 @@ pi_compartments = {'c': pi_c, 'm': pi_m, 'i': pi_m, 'x': pi_x, 'n': pi_n, 'r': p
 h_compartments = {'c': h_c, 'm': h_m, 'i': h_i, 'x': h_x, 'n': h_n, 'r': h_r, 'l': h_l}
 
 
-# In[2]:
+# In[69]:
 
 
 # biomass
@@ -217,4 +217,12 @@ pe_hs_c = human_model.metabolites.get_by_id('pe_hs[c]')
 pglyc_hs_c = human_model.metabolites.get_by_id('pglyc_hs[c]')
 ps_hs_c = human_model.metabolites.get_by_id('ps_hs[c]')
 sphmyln_hs_c = human_model.metabolites.get_by_id('sphmyln_hs[c]')
+
+
+# In[75]:
+
+
+h2o = {'r': h2o_r, 'c': h2o_c, 'l': h2o_l, 'm': h2o_m, 'n': h2o_n, 'x': h2o_x}
+nmp_map = {'n': nmp_map_n, 'c': nmp_map_c}
+ntp_map = {'n': ntp_map_n, 'c': ntp_map_c}
 
