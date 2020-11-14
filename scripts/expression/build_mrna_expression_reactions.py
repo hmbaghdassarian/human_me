@@ -162,31 +162,33 @@ class express_mrna():
             self.reactions.append(mrna_export)
     
     def demand_mrna(self):
-#         mrna_demand = cobra.Reaction('DM_mRNA_' + self.gene_info.hgnc_id)
-#         mrna_demand.add_metabolites({self.mrna_c: -1, self.premrna: -1, 
-#                                      biomass.mrna_: -(self.mrna_c.formula_weight+ self.mrna_n.formula_weight)/1000,
-#                                     biomass.premrna_: -self.premrna.formula_weight/1000})
-        
-#         mrna_demand.add_metabolites({self.mrna_c: -1, biomass.mrna_: -self.mrna_c.formula_weight/1000})
-        
-#         self.reactions.append(mrna_demand)
-        mrna_c_demand = cobra.Reaction('DM_mrna[c]_' + self.gene_info.hgnc_id)
-        mrna_n_demand = cobra.Reaction('DM_mrna[n]_' + self.gene_info.hgnc_id)
-        premrna_demand = cobra.Reaction('DM_premrna_' + self.gene_info.hgnc_id)
-        other_rna_demand = cobra.Reaction('DM_other_rna_' + self.gene_info.hgnc_id)
-        
-        mrna_c_demand.add_metabolites({self.mrna_c: -1, biomass.mrna_: -self.mrna_c.formula_weight/1000})
-        mrna_n_demand.add_metabolites({self.mrna_n: -1, biomass.mrna_: -self.mrna_n.formula_weight/1000})
-        premrna_demand.add_metabolites({self.premrna: -1, biomass.premrna_: -self.premrna.formula_weight/1000})
-        self.reactions += [mrna_c_demand, mrna_n_demand, premrna_demand]
-        
+        rxn = {self.premrna: -1, self.mrna_n: -1, self.mrna_c: -1, 
+               biomass.mrna_: -(self.mrna_c.formula_weight+ self.mrna_n.formula_weight)/1000,
+               biomass.premrna_: -self.premrna.formula_weight/1000}
         if self.lariat is not None:
-            other_rna_demand.add_metabolites({self.lariat: -1, biomass.other_rna_: -self.lariat.formula_weight/1000})
-            self.reactions.append(other_rna_demand)
+            rxn[self.lariat] = -1
+            rxn[biomass.other_rna_] = -self.lariat.formula_weight/1000
+            
+        mrna_demand = cobra.Reaction('DM_mrna_' + self.gene_info.hgnc_id)
+        mrna_demand.add_metabolites(rxn)
         
+        self.reactions.append(mrna_demand)
         
-        # TRY PREMRNA DEMAND AS WELL
+        # either of these two versions work
+#         mrna_c_demand = cobra.Reaction('DM_mrna[c]_' + self.gene_info.hgnc_id)
+#         mrna_n_demand = cobra.Reaction('DM_mrna[n]_' + self.gene_info.hgnc_id)
+#         premrna_demand = cobra.Reaction('DM_premrna_' + self.gene_info.hgnc_id)
+#         other_rna_demand = cobra.Reaction('DM_other_rna_' + self.gene_info.hgnc_id)
         
+#         mrna_c_demand.add_metabolites({self.mrna_c: -1, biomass.mrna_: -self.mrna_c.formula_weight/1000})
+#         mrna_n_demand.add_metabolites({self.mrna_n: -1, biomass.mrna_: -self.mrna_n.formula_weight/1000})
+#         premrna_demand.add_metabolites({self.premrna: -1, biomass.premrna_: -self.premrna.formula_weight/1000})
+#         self.reactions += [mrna_c_demand, mrna_n_demand, premrna_demand]
+        
+#         if self.lariat is not None:
+#             other_rna_demand.add_metabolites({self.lariat: -1, biomass.other_rna_: -self.lariat.formula_weight/1000})
+#             self.reactions.append(other_rna_demand)
+                
             
     def degrade_mrna(self, decapping = True, three_to_five = False):
         '''
@@ -293,16 +295,10 @@ def get_mrna_expression_reactions(gene_info, compress_mrna = False):
     em.transcribe_premrna()
     em.process_mrna()
     em.export_mrna()
-    em.demand_mrna()
+#     em.demand_mrna()
     em.degrade_mrna()
     if compress_mrna:
         em.compress_mrna_module()
 
     return em.reactions, em.mrna_c, None#em.mrna_deg_proxy 
-
-
-# In[ ]:
-
-
-
 
