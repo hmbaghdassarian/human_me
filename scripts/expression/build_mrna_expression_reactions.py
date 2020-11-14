@@ -34,6 +34,7 @@ class express_mrna():
     def __init__(self, gene_info):
         self.gene_info = gene_info
         self.reactions = []
+        self.lariat = None
     
     def transcribe_premrna(self):
         # elongation reaction
@@ -146,10 +147,6 @@ class express_mrna():
         rxn = dict()
         rxn[self.mrna_n], rxn[self.mrna_c] = -1, 1
         
-#         # NEW
-#         self.mrna_dilution_proxy = cobra.Metabolite(self.gene_info.hgnc_id + '_mrna_dilution_proxy')
-#         rxn[self.mrna_dilution_proxy] = 1 
-        
         # 10 ATP consumer per transcript exported
         rxn = func.hydrolyze_atp(rxn, n_atp = 10, compartment = 'n')
 
@@ -163,6 +160,33 @@ class express_mrna():
         else:
             self.mrna_export = mrna_export
             self.reactions.append(mrna_export)
+    
+    def demand_mrna(self):
+#         mrna_demand = cobra.Reaction('DM_mRNA_' + self.gene_info.hgnc_id)
+#         mrna_demand.add_metabolites({self.mrna_c: -1, self.premrna: -1, 
+#                                      biomass.mrna_: -(self.mrna_c.formula_weight+ self.mrna_n.formula_weight)/1000,
+#                                     biomass.premrna_: -self.premrna.formula_weight/1000})
+        
+#         mrna_demand.add_metabolites({self.mrna_c: -1, biomass.mrna_: -self.mrna_c.formula_weight/1000})
+        
+#         self.reactions.append(mrna_demand)
+        mrna_c_demand = cobra.Reaction('DM_mrna[c]_' + self.gene_info.hgnc_id)
+        mrna_n_demand = cobra.Reaction('DM_mrna[n]_' + self.gene_info.hgnc_id)
+        premrna_demand = cobra.Reaction('DM_premrna_' + self.gene_info.hgnc_id)
+        other_rna_demand = cobra.Reaction('DM_other_rna_' + self.gene_info.hgnc_id)
+        
+        mrna_c_demand.add_metabolites({self.mrna_c: -1, biomass.mrna_: -self.mrna_c.formula_weight/1000})
+        mrna_n_demand.add_metabolites({self.mrna_n: -1, biomass.mrna_: -self.mrna_n.formula_weight/1000})
+        premrna_demand.add_metabolites({self.premrna: -1, biomass.premrna_: -self.premrna.formula_weight/1000})
+        self.reactions += [mrna_c_demand, mrna_n_demand, premrna_demand]
+        
+        if self.lariat is not None:
+            other_rna_demand.add_metabolites({self.lariat: -1, biomass.other_rna_: -self.lariat.formula_weight/1000})
+            self.reactions.append(other_rna_demand)
+        
+        
+        # TRY PREMRNA DEMAND AS WELL
+        
             
     def degrade_mrna(self, decapping = True, three_to_five = False):
         '''
@@ -179,9 +203,9 @@ class express_mrna():
         # no m7g metabolite in recon2.2, so just reverse the methylation instead
         rxn[metab.amet_c], rxn[metab.ahcys_c] = 2, -2 # reverse methyltransferase - cap0 and cap1 structure
 
-        # proxy metabolite for coupling mRNA degradation to protein synthesis flux
-        self.mrna_deg_proxy = cobra.Metabolite(self.gene_info.hgnc_id + '_mrna_deg_proxy')
-        rxn[self.mrna_deg_proxy] = 1 
+# #         proxy metabolite for coupling mRNA degradation to protein synthesis flux
+#         self.mrna_deg_proxy = cobra.Metabolite(self.gene_info.hgnc_id + '_mrna_deg_proxy')
+#         rxn[self.mrna_deg_proxy] = 1 
 
         h2o_c = [m for m in rxn.keys() if m.id == 'h2o[c]'][0] # won't load directly from metab for some reason
         h_c = [m for m in rxn.keys() if m.id == 'h[c]'][0]
@@ -265,14 +289,20 @@ def get_mrna_expression_reactions(gene_info, compress_mrna = False):
     single reaction
     
     '''
-    self = express_mrna(gene_info)
-    self.transcribe_premrna()
-    self.process_mrna()
-    self.export_mrna()
-    self.degrade_mrna()
+    em = express_mrna(gene_info)
+    em.transcribe_premrna()
+    em.process_mrna()
+    em.export_mrna()
+    em.demand_mrna()
+    em.degrade_mrna()
     if compress_mrna:
-        self.compress_mrna_module()
+        em.compress_mrna_module()
 
-#     return self.reactions, self.mrna_dilution_proxy, self.mrna_deg_proxy 
-    return self.reactions, self.mrna_c, self.mrna_deg_proxy 
+    return em.reactions, em.mrna_c, None#em.mrna_deg_proxy 
+
+
+# In[ ]:
+
+
+
 

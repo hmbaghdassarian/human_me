@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[2]:
+# In[1]:
 
 
 import cobra
@@ -38,7 +38,7 @@ with warnings.catch_warnings():
 
 # # Generate Protein Expression Reactions for All Machinery
 
-# In[3]:
+# In[2]:
 
 
 def get_all_expression_reactions(hgnc_id, psim = params.psim_me, machinery_list = mach.metabolic_machinery, 
@@ -74,7 +74,7 @@ def generate_expression_module(me_reactions):
     return expression_machinery_me, expression_module
 
 
-# In[4]:
+# In[3]:
 
 
 class me_builder():
@@ -563,7 +563,7 @@ class me_builder():
         return me_model
 
 
-# In[5]:
+# In[4]:
 
 
 def build_me(non_machinery = [], minimal_proteome = False, model_id = 'HUMAN_ME_MODEL', compress_mrna = False,
@@ -601,4 +601,31 @@ def build_me(non_machinery = [], minimal_proteome = False, model_id = 'HUMAN_ME_
 
 
     return me_model, builder
+
+
+# In[6]:
+
+
+# non_machinery = []
+# minimal_proteome = True
+# model_id = 'HUMAN_ME_MODEL'
+# compress_mrna = False,
+# psim_me = params.psim_me
+# human_model = params.human_model
+
+
+# In[12]:
+
+
+# builder = me_builder(non_machinery = non_machinery, psim_me = psim_me, human_model = human_model, 
+#                     compress_mrna = compress_mrna)
+# builder.express_metabolic_enzymes()
+# builder.express_expression_enzymes()
+# builder.get_complex_info()
+
+
+# In[10]:
+
+
+# builder_ = copy.copy(builder)
 

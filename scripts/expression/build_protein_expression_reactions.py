@@ -58,9 +58,12 @@ def translate_protein_cytosolic(gene_info, mrna_transcript_c, mrna_deg_proxy):
                 compartment = 'c')
     rxn_c[unfolded_protein_c] = 1
     
-    # coupling
-    rxn_c[mrna_deg_proxy] = -gene_info.coupling_c2 # couple mrna degradation to protein synthesis 
+    # coupling OLD 
+#     rxn_c[mrna_deg_proxy] = -gene_info.coupling_c2 # couple mrna degradation to protein synthesis 
     rxn_c[mrna_transcript_c] = -gene_info.coupling_c1B # couple mrna dilution to protein synthesis
+    
+#     # coupling NEW
+#     rxn_c[mrna_transcript_c] = -gene_info.coupling_c1 # couple mrna synthesis to protein synthesis
     
     # biomas
     rxn_c[biomass.protein_] = gene_info.protein_mass
@@ -697,9 +700,14 @@ def co_translational_translocation(gene_info, mrna_transcript_c, mrna_deg_proxy)
     rxn[unprocessed_protein_r], rxn[biomass.protein_] = 1, mw_upr
     rxn = func.hydrolyze_atp(rxn, n_atp = number_BiP, compartment = 'r')
     
-    # coupling
-    rxn[mrna_deg_proxy] = -gene_info.coupling_c2 # couple mrna degradation to protein synthesis 
+    # coupling OLD 
+#     rxn[mrna_deg_proxy] = -gene_info.coupling_c2 # couple mrna degradation to protein synthesis 
     rxn[mrna_transcript_c] = -gene_info.coupling_c1B # couple mrna dilution to protein synthesis
+    
+    # coupling NEW
+#     rxn[mrna_transcript_c] = -gene_info.coupling_c1 # couple mrna synthesis to protein synthesis
+    
+
     #------------------------------------------------------------------------------------
 
     co_translational_translocation_r = func.ME_Reaction(gene_info.hgnc_id + '_co_TRANSLOC_IMPORTtr', 

@@ -203,12 +203,14 @@ class gene_information():
                 coupling_params['mrna_half_life'] = params.mrna_half_life
             if 'alpha_p' not in coupling_params.keys() or coupling_params['alpha_p'] == None or pd.isna(coupling_params['alpha_p']):
                 coupling_params['alpha_p'] = params.alpha_p
-#             if 'keff' not in coupling_params.keys() pd.isna(coupling_params['keff']):
-#                 coupling_params['keff'] = None
 
-        # NOT COMPLETE, NEED TO ADD MU
+
+        # ORIGINAL
         self.coupling_c2 = (np.log(2)/coupling_params['mrna_half_life'])/(coupling_params['alpha_p'] + params.mu)
         self.coupling_c1B = params.mu/(coupling_params['alpha_p'] + params.mu)
+#         # new
+#         alpha_m = np.log(2)/coupling_params['mrna_half_life']
+#         self.coupling_c1 = (params.mu + alpha_m)/(params.mu + coupling_params['alpha_p'])
        
     def get_final_locations(self, metabolic_model = params.human_model, final_locations = None):
         '''Assigns a set of final compartments for the protein. For machinery, extracts this from the inputer
@@ -224,11 +226,6 @@ class gene_information():
                 warnings.warn(self.hgnc_id + ': Final location extacted from cobrapy model, will disregard user input.')
               
             rxns = list(metabolic_model.genes.get_by_id(self.hgnc_id).reactions)
-#             rxns = list()
-#             if 'Metabolic Machinery' in self.module:
-#                 rxns += list(metabolic_model.genes.get_by_id(self.hgnc_id).reactions)
-#             if 'Expression Machinery' in self.module:
-#                 rxns += list(expression_model_2.genes.get_by_id(self.hgnc_id).reactions)
             final_locations = sorted(set([func.get_reaction_compartment(r) for r in rxns])) # redundancy from multiple reactions
 
         elif self.module == 'Non-Machinery':
@@ -275,6 +272,7 @@ class gene_information():
                 else:
                     self.final_locations[loc] = 'Non-Canonical Secretion'
         
+        # OLD
         # in the case that protein synthesis flux spread across multiple reactions due to multi-localization
         if len(set(self.final_locations.values())) > 1:
             if len(set(self.final_locations.values())) == 2:
@@ -282,7 +280,12 @@ class gene_information():
                 self.coupling_c1B = 0.5*self.coupling_c1B
             else:
                 raise ValueError('Have not yet accounted for Non-Canonical Secretion or other synthesis forms in coupling of mrna degradataion to protein synthesis')
-
+#         #NEW
+#         if len(set(self.final_locations.values())) > 1:
+#             if len(set(self.final_locations.values())) == 2:
+#                 self.coupling_c1 = 0.5*self.coupling_c1
+#             else:
+#                 raise ValueError('Have not yet accounted for Non-Canonical Secretion or other synthesis forms in coupling of mrna degradataion to protein synthesis')
     def check_gene_information(self):
         if self.final_locations == None:
             raise ValueError(self.hgnc_id + ': Must specify a final location for the gene. Use the get_final_locations() method')
