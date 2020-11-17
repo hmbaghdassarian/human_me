@@ -23,6 +23,14 @@ from utils import parameters as params
 from utils import functions as func
 
 
+# In[14]:
+
+
+from sympy.parsing.sympy_parser import parse_expr 
+x = parse_expr('x')
+y = parse_expr('y')
+
+
 # In[12]:
 
 
@@ -205,12 +213,18 @@ class gene_information():
                 coupling_params['alpha_p'] = params.alpha_p
 
 
-        # ORIGINAL
+        #ORIGINAL
         self.coupling_c2 = (np.log(2)/coupling_params['mrna_half_life'])/(coupling_params['alpha_p'] + params.mu)
-        self.coupling_c1B = params.mu/(coupling_params['alpha_p'] + params.mu)
-#         # new
+        self.coupling_c1C = params.mu/(coupling_params['alpha_p'] + params.mu)
+        
+#         # new 1 - doesn't work 
 #         alpha_m = np.log(2)/coupling_params['mrna_half_life']
 #         self.coupling_c1 = (params.mu + alpha_m)/(params.mu + coupling_params['alpha_p'])
+        
+#         # new 2 - doesn't work 
+#         self.coupling_c2 = (np.log(2)/coupling_params['mrna_half_life'])/(coupling_params['alpha_p'] + params.mu)
+#         self.coupling_c1A = params.mu/(np.log(2)/coupling_params['mrna_half_life'])
+#         self.coupling_c1B = self.coupling_c2*(self.coupling_c1A + 1)
        
     def get_final_locations(self, metabolic_model = params.human_model, final_locations = None):
         '''Assigns a set of final compartments for the protein. For machinery, extracts this from the inputer
@@ -277,13 +291,23 @@ class gene_information():
         if len(set(self.final_locations.values())) > 1:
             if len(set(self.final_locations.values())) == 2:
                 self.coupling_c2 = 0.5*self.coupling_c2
-                self.coupling_c1B = 0.5*self.coupling_c1B
+                self.coupling_c1C = 0.5*self.coupling_c1C
             else:
                 raise ValueError('Have not yet accounted for Non-Canonical Secretion or other synthesis forms in coupling of mrna degradataion to protein synthesis')
-#         #NEW
+#         #NEW 1
 #         if len(set(self.final_locations.values())) > 1:
 #             if len(set(self.final_locations.values())) == 2:
 #                 self.coupling_c1 = 0.5*self.coupling_c1
+#             else:
+#                 raise ValueError('Have not yet accounted for Non-Canonical Secretion or other synthesis forms in coupling of mrna degradataion to protein synthesis')
+
+
+        # new 2
+                # OLD
+#         # in the case that protein synthesis flux spread across multiple reactions due to multi-localization
+#         if len(set(self.final_locations.values())) > 1:
+#             if len(set(self.final_locations.values())) == 2:
+#                 self.coupling_c1B = 0.5*self.coupling_c1B
 #             else:
 #                 raise ValueError('Have not yet accounted for Non-Canonical Secretion or other synthesis forms in coupling of mrna degradataion to protein synthesis')
     def check_gene_information(self):

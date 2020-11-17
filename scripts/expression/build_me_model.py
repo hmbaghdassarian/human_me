@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[1]:
+# In[76]:
 
 
 import cobra
@@ -18,7 +18,7 @@ import sys
 sys.path.insert(1, '../../scripts/') # comment out in python script
 with warnings.catch_warnings():
     warnings.simplefilter('ignore')
-#     from load_environmental_variables import *
+    from utils.load_environmental_variables import build_files_path
     from utils import parameters as params
     from utils import machinery as mach
     
@@ -33,7 +33,7 @@ with warnings.catch_warnings():
 
         from uniform_processes.build_ribosome_biogenesis_reactions import ribosomal_reactions, ribosome_complex_c
         from uniform_processes.build_trna_expression_reactions import trna_biogenesis_reactions
-        from uniform_processes.biomass import biomass_reactions
+        from uniform_processes import biomass
 
 
 # # Generate Protein Expression Reactions for All Machinery
@@ -204,6 +204,25 @@ class me_builder():
         excess_reactions = [hgnc_id for hgnc_id in excess_reactions if len(self.id_protein_map[hgnc_id])>1]
         if len(excess_reactions) > 0:
             raise ValueError('There are excess expression machinery reactions')
+    
+    def express_dummy_protein(self):
+        ups = pd.read_csv(build_files_path + 'dummy_protein_features.tab', sep = '\t', header = None, index_col = 0)
+        ups_ = pd.DataFrame(columns = params.psim_me.columns)
+        ups_.loc[0, 'PREMRNA_SEQ'], ups_.loc[0,'MRNA_SEQ'], ups_.loc[0,'PROTEIN_SEQ'] = ups.loc['premrna_seq', 1], ups.loc['mrna_seq', 1], ups.loc['protein_seq', 1]
+        dummy_id = 'HGNC:DUMMY'
+        ups_['HGNC_ID'], ups_['LOCATION'] = dummy_id, '[c]'
+        dummy_reactions, dm = get_all_expression_reactions(hgnc_id = dummy_id, psim = ups_, machinery_list = [], 
+                                                            metabolic_model = cobra.Model(''), compress_mrna = self.compress_mrna) 
+
+        for r in dummy_reactions:
+            if biomass.protein_ in r.metabolites.keys():
+                rxn = r.metabolites.copy()
+                rxn[biomass.unmodeled_protein_] = rxn[biomass.protein_]
+                rxn[biomass.protein_] = 0
+                r.add_metabolites(rxn, combine = False)
+        self.me_reactions += dummy_reactions
+        self.dummy_protein = dm[0]
+        
     def get_complex_info(self):
         print('Get metabolic model complex information')
         complex_df = pd.DataFrame(columns = ['reaction_id', 'compartment', 'machinery', 'is_complex', 'creates_multiple_reactions'])
@@ -288,7 +307,7 @@ class me_builder():
             dups = complex_df[(complex_df.compartment == dup_complexes.loc[i,'compartment']) & (complex_df.machinery == dup_complexes.loc[i, 'machinery'])]
             complex_df.loc[dups.index,'complex_id'] = '_'.join(dups.reaction_id)
         
-        self.complex_df = complex_df
+        self.complex_df = complex_df    
         
     def generate_complex_reactions(self):
         # create a mapping of the unique self.complex_df ids to the actual complex metabolite
@@ -553,7 +572,7 @@ class me_builder():
 #         if err:
 #             raise ValueError('Not all expression module reactions are mass balanced') 
     def build_me_model(self, model_id = 'HUMAN_ME_MODEL'):
-        self.final_reactions += biomass_reactions
+        self.final_reactions += biomass.biomass_reactions
 #         self.check_me_mass_balance()
 
         print('Generate ME-Model')
@@ -561,6 +580,12 @@ class me_builder():
         me_model.add_reactions(self.final_reactions)
 
         return me_model
+
+
+# In[ ]:
+
+
+
 
 
 # In[4]:
@@ -587,6 +612,7 @@ def build_me(non_machinery = [], minimal_proteome = False, model_id = 'HUMAN_ME_
                         compress_mrna = compress_mrna)
     builder.express_metabolic_enzymes()
     builder.express_expression_enzymes()
+    builder.express_dummy_protein()
     builder.get_complex_info()
     builder.generate_complex_reactions()
     builder.get_keff()

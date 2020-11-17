@@ -205,7 +205,7 @@ class express_mrna():
         # no m7g metabolite in recon2.2, so just reverse the methylation instead
         rxn[metab.amet_c], rxn[metab.ahcys_c] = 2, -2 # reverse methyltransferase - cap0 and cap1 structure
 
-# #         proxy metabolite for coupling mRNA degradation to protein synthesis flux
+#         proxy metabolite for coupling mRNA degradation to protein synthesis flux
 #         self.mrna_deg_proxy = cobra.Metabolite(self.gene_info.hgnc_id + '_mrna_deg_proxy')
 #         rxn[self.mrna_deg_proxy] = 1 
 
@@ -300,5 +300,5 @@ def get_mrna_expression_reactions(gene_info, compress_mrna = False):
     if compress_mrna:
         em.compress_mrna_module()
 
-    return em.reactions, em.mrna_c, None#em.mrna_deg_proxy 
+    return em.reactions, em.mrna_c, em.mrna_deg_proxy 
 
