@@ -137,7 +137,12 @@ class express_mrna():
     def export_mrna(self):
         # make the cytosolic mrna metabolite
         self.mrna_c = self.mrna_n.copy()
-        self.mrna_c.id = self.mrna_c.id.replace('[n]', '[c]')
+        
+        if self.mrna_c.id.count('_n') > 1:
+            # internal use
+            raise ValueError('mrna id will not be parse correctly')
+            
+        self.mrna_c.id = '_'.join(self.mrna_c.id.split('_'))[:-1] + '_c'
         self.mrna_c.compartment = 'c'
 
         # make the transport reaction
@@ -206,11 +211,11 @@ class express_mrna():
         rxn[metab.amet_c], rxn[metab.ahcys_c] = 2, -2 # reverse methyltransferase - cap0 and cap1 structure
 
 #         proxy metabolite for coupling mRNA degradation to protein synthesis flux
-#         self.mrna_deg_proxy = cobra.Metabolite(self.gene_info.hgnc_id + '_mrna_deg_proxy')
-#         rxn[self.mrna_deg_proxy] = 1 
+        self.mrna_deg_proxy = cobra.Metabolite(self.gene_info.hgnc_id + '_mrna_deg_proxy')
+        rxn[self.mrna_deg_proxy] = 1 
 
-        h2o_c = [m for m in rxn.keys() if m.id == 'h2o[c]'][0] # won't load directly from metab for some reason
-        h_c = [m for m in rxn.keys() if m.id == 'h[c]'][0]
+        h2o_c = [m for m in rxn.keys() if m.id == 'h2o_c'][0] # won't load directly from metab for some reason
+        h_c = [m for m in rxn.keys() if m.id == 'h_c'][0]
 
         if three_to_five: 
             transcript_degradation_1 = cobra.Reaction(self.gene_info.hgnc_id + "_3'to5'_mRNA_DEGRADATIONc")
@@ -219,7 +224,7 @@ class express_mrna():
 
             rxn_1[metab.ndp_map_c[self.gene_info.mrna_seq[0]]] = 1
 
-            gmp_c = [m for m in rxn.keys() if m.id == 'gmp[c]'][0]
+            gmp_c = [m for m in rxn.keys() if m.id == 'gmp_c'][0]
             rxn_1[h2o_c] -= 1
             rxn_1[h_c] += 1
             rxn_1[gmp_c] += 1

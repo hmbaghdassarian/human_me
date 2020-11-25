@@ -223,7 +223,7 @@ def build_rrna5s_reactions(rpl5_n, rpl11_n):
     # ribosome dissociates in cytoplasm
     # must add nucleocytoplasmic export via ran gtp: https://www.sciencedirect.com/science/article/pii/S0171933504702575?via%3Dihub
     rrna5s_c = rrna5s_n.copy()
-    rrna5s_c.id = rrna5s_c.id.replace('[n]', '[c]')
+    rrna5s_c.id = '_'.join(rrna5s_c.id.split('_')[:-1]) + '_c'
     rrna5s_c.compartment = 'c'
 
     # Degradation
@@ -241,12 +241,12 @@ def build_rrna5s_reactions(rpl5_n, rpl11_n):
 
 
 rs_expression_reactions, rs_protein_metabolites, rl_expression_reactions, rl_protein_metabolites = build_ribosome_protein_expression_reactions()
-rpl5_n = [m for m in rl_protein_metabolites if m.id == 'HGNC:10360_folded_protein[n]'][0]
-rpl11_n = [m for m in rl_protein_metabolites if m.id == 'HGNC:10301_folded_protein[n]'][0]
+rpl5_n = [m for m in rl_protein_metabolites if m.id == 'HGNC:10360_folded_protein_n'][0]
+rpl11_n = [m for m in rl_protein_metabolites if m.id == 'HGNC:10301_folded_protein_n'][0]
 rrna5s_reactions, rrna5s_complex_n, rrna5s_c = build_rrna5s_reactions(rpl5_n, rpl11_n)
 
 
-# In[21]:
+# In[ ]:
 
 
 # ets_5_frag1 is from 5' end of 47s to A' site
@@ -406,7 +406,7 @@ def build_other_rrna_reactions(rrna5s_complex_n, rs_protein_metabolites, rl_prot
     # pre40s complex------------------------------------------------------------------------------------
     metabolites = [m for m in rs_protein_metabolites if m.compartment == 'n'] + [rrna_18se_processed_n]
     complex_info = {'METABOLITES': metabolites, 'IDS': [m.id.split('_')[0] for m in metabolites], 
-                                   'METABOLITE_TYPES': [m.id.split('_')[-1].split('[')[0] for m in metabolites]}
+                                   'METABOLITE_TYPES': [m.id.split('_')[-2] for m in metabolites]}
     pre40s_complex_n = Complex(complex_id = 'pre40s', **complex_info)
     pre40s_complex_formation = pre40s_complex_n.form_complex()
     pre40s_complex_formation.lower_bound = 0
@@ -414,7 +414,7 @@ def build_other_rrna_reactions(rrna5s_complex_n, rs_protein_metabolites, rl_prot
 
     # pre40s nucleocytoplasmic export-----------------------------------------------------------------------
     pre40s_complex_c = pre40s_complex_n.copy()
-    pre40s_complex_c.id = pre40s_complex_c.id.replace('[n]', '[c]')
+    pre40s_complex_c.id = '_'.join(pre40s_complex_c.id.split('_')[:-1]) + '_c'
     pre40s_complex_c.compartment = 'c'
 
     pre40s_transport = cobra.Reaction('pre40s_NUCLEAR_EXPORTtn')
@@ -437,7 +437,7 @@ def build_other_rrna_reactions(rrna5s_complex_n, rs_protein_metabolites, rl_prot
     # endonuclolytic cleavage event at site 3
     metabolites = [m for m in rs_protein_metabolites if m.compartment == 'c'] + [rrna_18s_c]
     complex_info = {'METABOLITES': metabolites, 'IDS': [m.id.split('_')[0] for m in metabolites], 
-                                   'METABOLITE_TYPES': [m.id.split('_')[-1].split('[')[0] for m in metabolites]}
+                                   'METABOLITE_TYPES': [m.id.split('_')[-2] for m in metabolites]}
     forty_s_complex_c = Complex(complex_id = '40s', **complex_info)
 
     rrna_18s_formation.add_metabolites({metab.h2o_n: -1, pre40s_complex_c: -1, forty_s_complex_c: 1, its_1_frag2_c: 1, 
@@ -575,7 +575,7 @@ def build_other_rrna_reactions(rrna5s_complex_n, rs_protein_metabolites, rl_prot
     rl_2 = list(set(rl_protein_metabolites).difference([rpl5_n, rpl11_n]))
     metabolites = [m for m in rl_2 if m.compartment == 'n'] + [rrna_28s_n, rrna_6s_n, rrna5s_complex_n]
     complex_info = {'METABOLITES': metabolites, 'IDS': [m.id.split('_')[0] for m in metabolites], 
-                                   'METABOLITE_TYPES': [m.id.split('_')[-1].split('[')[0] for m in metabolites]}
+                                   'METABOLITE_TYPES': [m.id.split('_')[-2] for m in metabolites]}
 
     pre60s_complex_n = Complex(complex_id = 'pre60s', reaction_id = 'pre60s', 
                                **complex_info)
@@ -590,7 +590,7 @@ def build_other_rrna_reactions(rrna5s_complex_n, rs_protein_metabolites, rl_prot
 
     # pre60s nucleocytoplasmic export-----------------------------------------------------------------------
     pre60s_complex_c = pre60s_complex_n.copy()
-    pre60s_complex_c.id = pre60s_complex_c.id.replace('[n]', '[c]')
+    pre60s_complex_c.id = '_'.join(pre60s_complex_c.id.split('_')[:-1]) + '_c'
     pre60s_complex_c.compartment = 'c'
 
     pre60s_transport = cobra.Reaction('pre60s_NUCLEAR_EXPORTtn')
@@ -609,12 +609,12 @@ def build_other_rrna_reactions(rrna5s_complex_n, rs_protein_metabolites, rl_prot
     base_counts_deg, elements_deg = func.get_base_counts_and_elements(deg_seq)
 
     rrna_28s_c = rrna_28s_n.copy()
-    rrna_28s_c.id = rrna_28s_c.id.replace('[n]', '[c]')
+    rrna_28s_c.id = '_'.join(rrna_28s_c.id.split('_')[:-1]) + '_c'
     rrna_28s_c.compartment = 'c'
 
     metabolites = [m for m in rl_2 if m.compartment == 'c'] + [rrna_28s_c, rrna_5_8s_c, rrna5s_c]
     complex_info = {'METABOLITES': metabolites, 'IDS': [m.id.split('_')[0] for m in metabolites], 
-                                   'METABOLITE_TYPES': [m.id.split('_')[-1].split('[')[0] for m in metabolites]}
+                                   'METABOLITE_TYPES': [m.id.split('_')[-2] for m in metabolites]}
 
     sixty_s_complex_c = Complex(complex_id = '60s', **complex_info)
     rrna_5_8s_formation = cobra.Reaction('60s_maturation')
@@ -661,13 +661,13 @@ def build_other_rrna_reactions(rrna5s_complex_n, rs_protein_metabolites, rl_prot
     return all_reactions, mature_ribosomal_precomplexes, mature_rrna_metabolites
 
 
-# In[23]:
+# In[8]:
 
 
 def build_ribosome():
     rs_expression_reactions, rs_protein_metabolites, rl_expression_reactions, rl_protein_metabolites = build_ribosome_protein_expression_reactions()
-    rpl5_n = [m for m in rl_protein_metabolites if m.id == 'HGNC:10360_folded_protein[n]'][0]
-    rpl11_n = [m for m in rl_protein_metabolites if m.id == 'HGNC:10301_folded_protein[n]'][0]
+    rpl5_n = [m for m in rl_protein_metabolites if m.id == 'HGNC:10360_folded_protein_n'][0]
+    rpl11_n = [m for m in rl_protein_metabolites if m.id == 'HGNC:10301_folded_protein_n'][0]
     rrna5s_reactions, rrna5s_complex_n, rrna5s_c = build_rrna5s_reactions(rpl5_n, rpl11_n)
     other_rrna_reactions, mature_ribosomal_precomplexes, mature_rrna_metabolites = build_other_rrna_reactions(rrna5s_complex_n, rs_protein_metabolites, rl_protein_metabolites, rpl5_n, rpl11_n, rrna5s_c)
 
@@ -698,7 +698,7 @@ def build_ribosome():
     return  all_reactions, ribosome_complex_c
 
 
-# In[24]:
+# In[25]:
 
 
 ribosomal_reactions, ribosome_complex_c = build_ribosome()

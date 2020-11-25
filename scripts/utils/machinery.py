@@ -136,8 +136,6 @@ RNASEZ = ['HGNC:14198']
 trna_splicing_machinery = ['HGNC:28422', 'HGNC:16791', 'HGNC:15506', 'HGNC:27561']
 XPOT = ['HGNC:12826'] # nuclear export of trna
 
-ppi_c =  human_model.metabolites.get_by_id('ppi[c]')
-
 classI_synthetase = pd.read_csv(raw_data_path + 'classI_aa_trna_synthetases.csv', index_col = None, 
                                 skiprows = [0])
 classII_synthetase = pd.read_csv(raw_data_path + 'classII_aa_trna_synthetases.csv', index_col = None, 

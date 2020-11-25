@@ -42,7 +42,7 @@ class Complex(cobra.Metabolite):
         if len(compartments) == 1:
             compartment = compartments[0]
         # exception of ribosome complex
-        elif (len(compartments) == 2) and ('c' in compartments) and ('mature_ribosome_complex_complex[c]' in [m.id for m in self.subcomponents]):
+        elif (len(compartments) == 2) and ('c' in compartments) and ('mature_ribosome_complex_complex_c' in [m.id for m in self.subcomponents]):
             compartment = 'c'
         else:
             raise ValueError('metabolites are not in the same compartment')
@@ -61,7 +61,7 @@ class Complex(cobra.Metabolite):
             self.reaction_id = reaction_id + '_COMPLEX_FORMATION' + compartment
             
         
-        complex_id = id_ + '_complex' + '[' + compartment + ']'
+        complex_id = id_ + '_complex_' + compartment 
         if len(complex_id)>(256-8-4-len(mt_type)): #-8 and -4 for _complex and compartment appended to end
             err_msg = 'Cobrapy requires metabolite ids to be less than 256 characters, please specify a '
             err_msg += 'shorter user-defined complex id'

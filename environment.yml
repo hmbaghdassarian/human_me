@@ -15,6 +15,7 @@ dependencies:
   - ipykernel=5.3.1
   - jupyter=1.0.0
   - json=2.0.9
+  - logging=0.5.1.2  
   - more-itertools=8.4.0
   - nb_conda=2.2.1
   - numpy=1.18.5

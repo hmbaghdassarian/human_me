@@ -25,7 +25,7 @@ class RNA(cobra.Metabolite):
         assumes a monophosphate. 
         
         '''
-        rna_id = metabolite_name + '_RNA[' + compartment + ']'
+        rna_id = metabolite_name + '_RNA_' + compartment 
         
         self.sequence = seq
         self.triphosphate = triphosphate

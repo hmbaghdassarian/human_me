@@ -1,57 +1,61 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[2]:
+# In[1]:
 
 
 import cobra
+
 import pandas as pd
 import warnings
 import os
 import json
+import itertools
+
+import logging
+logging.basicConfig()
+logger = logging.getLogger(cobra.__name__)
+logger.setLevel(logging.ERROR)
 
 # make sure the creat_environment function from the preprocesss script is run before thise
 import sys
 sys.path.insert(1, '../../scripts/')
 from utils.load_environmental_variables import root_path, build_files_path, processed_data_path
-
-compartments_ = {'c': 'cytosolic',  'l': 'lysosomal', 'm': 'mitochondrial', 'r': 'endoplasmic reticulum', 
-                'e': 'extracellular space', 'x': 'peroxisomal', 'n': 'nuclear', 'g': 'golgi apparatus',
-                'i': 'inner mitochondrial compartment', 'pm': 'plasma membrane'}
+from preprocess import parse_complex 
 
 compartments_me = {'c': 'cytosol',  'l': 'lysosome', 'm': 'mitochondria', 'r': 'endoplasmic reticulum', 
                 'e': 'extracellular space', 'x': 'peroxisome/glyoxysome', 'n': 'nucleus', 'g': 'golgi apparatus',
-                'i': 'inner mitochondrial compartment', 'pm': 'plasma membrane'}
+                'i': 'inner mitochondrial compartment', 'pm': 'plasma membrane', 'b': 'boundary'}
 
 
-# In[3]:
+# In[2]:
 
 
 required_metabolites = json.load(open(build_files_path + "required_metabolic_model_metabolites.json"))
 rmd = pd.read_csv(build_files_path + 'required_metabolic_model_metabolites.csv', index_col = 0)
 
 
-# In[6]:
+# In[30]:
 
 
 def bool_metabolite(m_id, compartment, m_model):
     try: 
-        m_id = m_id.split('[')[0]
-        m = m_model.metabolites.get_by_id(m_id + '[' + compartment + ']')
+        m_id = '_'.join(m_id.split('_')[:-1])
+        m = m_model.metabolites.get_by_id(m_id + '_' + compartment )
         return True, m 
     except:
         return False, None
 
-def correct_model(model_file = root_path + 'recon2_2.json', 
+def correct_model(model_file = root_path + 'recon2_2.xml', 
                  psim_file = root_path + 'psim_recon2_2.csv'):
     '''
     Makes some necessary changes to cobrapy model, largely based on issues encountered with Recon2.2.
-    model_file is path/to/cobra_json_model
+    model_file is path/to/cobra_smbl_model
     psim_file is path/to/psim_csv
     
     '''
     
-    human_model = cobra.io.json.load_json_model(model_file)
+    human_model = cobra.io.read_sbml_model(model_file)
     
     psim_me = pd.read_csv(psim_file)
     psim_me.reset_index(inplace = True, drop = True)
@@ -66,17 +70,40 @@ def correct_model(model_file = root_path + 'recon2_2.json',
         err = 'The input metabolic model contains compartments not considered by the ME model. '
         err += 'Please remove the following compartments from your model: ' + ', '.join(different_compartments)
         raise ValueError(err)
-    
+
+    # incase GPR has redundant complexes (recon2.2 had atleast one instance of this - id = OIVD1m)
+    for r in human_model.reactions:
+        if 'and' in r.gene_reaction_rule and 'or' in r.gene_reaction_rule:
+            machinery_final = parse_complex.eval_complex(r.gene_reaction_rule)
+
+            idx = list(itertools.combinations(range(len(machinery_final)), 2))
+
+            rm = list()
+            for i in idx:
+                if machinery_final[i[0]] == machinery_final[i[1]]:
+                    rm.append(i[1])
+
+            if len(rm) > 0:
+                msg = r.id + ' contains redundant complexes according to GPR, editing GPR'
+                warnings.warn(msg)
+                machinery_final = [machinery_final[i] for i in range(len(machinery_final)) if i not in rm]
+                new_gpr = ''
+                for complex_ in machinery_final:
+                    new_gpr += '(' + ' and '.join(complex_) + ')' + ' or '
+                new_gpr = new_gpr[:-4]
+
+                human_model.reactions.get_by_id(r.id).gene_reaction_rule = new_gpr
+            
     # check for minimum required metabolites
     all_required_metabolites = [item for sublist in list(required_metabolites.values()) for item in sublist]
     all_metabolites = [m.id for m in human_model.metabolites]
     missing_metabolites = sorted(set(all_required_metabolites).difference(all_metabolites))
-
+    
     comp_ = ['c', 'n', 'r', 'g', 'm', 'l', 'x', 'i', 'pm']
-    reactions_to_add = list()
+#     reactions_to_add = list()
 
     for m_id in missing_metabolites:
-        nc = m_id.split('[')[1].split(']')[0]
+        nc = m_id.split('_')[-1]
 
         counter_ = 0
         found = False
@@ -90,48 +117,58 @@ def correct_model(model_file = root_path + 'recon2_2.json',
             new_metab.compartment = nc
             new_metab.id = m_id
 
-            transport_rxn = cobra.Reaction(m_t.id.split('[')[0] + 't' + nc)
+            transport_rxn = cobra.Reaction('_'.join(m_t.id.split('_')[:-1]) + 't' + nc)
             transport_rxn.add_metabolites({m_t: -1, new_metab: 1})
             transport_rxn.lower_bound = -1000
-
-            reactions_to_add.append(transport_rxn)
-        else: # metabolite does not exist anywhere in model, add an exchange and transport from [e] to compartment
-            core_id = m_id.split('[')[0]
             
+            human_model.add_reactions([transport_rxn])#reactions_to_add.append(transport_rxn)
+        else: # metabolite does not exist anywhere in model, add an exchange and transport from [e] to compartment
+            core_id = '_'.join(m_id.split('_')[:-1])
+
             wrn = core_id + ' does not exist in model. Adding to compartment ' + nc + ' via exchange and '
             wrn += ' transport reactions. This allows ' + core_id + ' to be in the model at no cost.'
             warnings.warn(wrn)
-            
+
             new_metab = cobra.Metabolite(m_id)
             info = rmd.loc[core_id,]
 
             new_metab.name = info['name']
             new_metab.compartment = nc
-            new_metab.charge = float(info['charge'])
+            new_metab.charge = int(info['charge'])
             new_metab.elements = eval(info['elements'])
             new_metab.formula = info['formula']
 
-            exchange_rxn = cobra.Reaction('EX_' + core_id + '(e)')
-            exchange_rxn.name = new_metab.name + ' exchange'
-            exchange_rxn.lower_bound = -1000
+            exchange_rxn_1 = cobra.Reaction('EX_' + core_id + '_b')
+            exchange_rxn_1.name = exchange_rxn_1.id
+            exchange_rxn_1.lower_bound = -1000
 
-            if new_metab.compartment != 'e':
-                m_t = new_metab.copy()
-                m_t.compartment = 'e'
-                m_t.id = core_id + '[e]'
-                exchange_rxn.add_metabolites({m_t: -1})
+            if new_metab.compartment != 'b':
+                m_t_1, m_t_2 = new_metab.copy(), new_metab.copy()
+                m_t_1.compartment, m_t_2.compartment = 'b', 'e'
+                m_t_1.id, m_t_2.id = core_id + '_b', core_id + '_e'
 
+                # boundary exchange
+                exchange_rxn_1.add_metabolites({m_t_1: -1})
+
+                # extracellular exchange
+                exchange_rxn_2 = cobra.Reaction('EX_' + core_id + '_LPAREN_e_RPAREN_')
+                exchange_rxn_2.lower_bound,exchange_rxn_2.upper_bound  = -float('inf'), float('inf')
+                exchange_rxn_2.name = 'exchange reaction for ' + core_id
+                exchange_rxn_2.add_metabolites({m_t_2: -1, m_t_1: 1})
+
+                # exchange to compartment
                 transport_rxn = cobra.Reaction(core_id + 't' + nc)
-                transport_rxn.add_metabolites({m_t: -1, new_metab: 1})
+                transport_rxn.add_metabolites({m_t_2: -1, new_metab: 1})
                 transport_rxn.lower_bound = -1000
-
-                reactions_to_add += [exchange_rxn, transport_rxn]
+                
+                human_model.add_reactions([exchange_rxn_1, exchange_rxn_2, transport_rxn])#reactions_to_add += [exchange_rxn_1, exchange_rxn_2, transport_rxn]
 
             else:
-                exchange_rxn.add_metabolites({new_metab: -1})
-                reactions_to_add.append(exchange_rxn)
+                
+                exchange_rxn_1.add_metabolites({new_metab: -1})
+                human_model.add_reactions([exchange_rxn_1])#reactions_to_add.append(exchange_rxn_1)
 
-    human_model.add_reactions(reactions_to_add)
+#     human_model.add_reactions(reactions_to_add)
 
     print('Check for the recon2.2 HGNC:HGNC error')
     # correct genes with HGNC:HGNC:, recon2.2 has this
@@ -142,7 +179,7 @@ def correct_model(model_file = root_path + 'recon2_2.json',
 
     if len(genes_to_format) > 0:
         warnings.warn('Your metabolic model contains genes with HGNC:HGNC:####, changing to HGNC:####')
-        correct_format = [g[5:] for g in genes_to_format]
+        correct_format = ['HGNC:' + g.split('HGNC:')[-1] for g in genes_to_format]
         formatting_dict = dict(zip(genes_to_format, correct_format))
 
         for g in genes_to_format:
@@ -180,7 +217,6 @@ def correct_model(model_file = root_path + 'recon2_2.json',
         wrn_ = 'No biomass reaction identified in input model. Assuming that biomass reactions and metabolites '
         wrn_ = " are not present. If present, please make sure the biomass reaction id is 'biomass_reaction'"
         warnings.warn(wrn_)
-        raise ValueErorr()
 
     if len([m.id for m in human_model.metabolites if 'biomass' in m.id]) != 0:
         err_ = 'Extraneous biomass metabolites not associated with the biomass reaction are present,'
@@ -190,8 +226,7 @@ def correct_model(model_file = root_path + 'recon2_2.json',
     rm = sorted(set(metabolites_1).difference([m.id for m in human_model.metabolites]))
     if len([i for i in rm if 'biomass' not in i]) != 0:
         warnings.warn('Non biomass metabolites removed as orphan metabolites from biomass reactions')
-    
-    cobra.io.save_json_model(human_model, processed_data_path + 'corrected_model.json')
+    cobra.io.write_sbml_model(cobra_model = human_model, filename = processed_data_path + 'corrected_model.xml')
     del human_model
     
 
@@ -219,9 +254,9 @@ def correct_psim(psim_file = root_path + 'psim_recon2_2.csv'):
     expression_machinery = sorted(open(build_files_path + 'expression_machinery.txt').read().splitlines())
     expression_psim = expression_psim[all_columns] 
     
-    if not os.path.isfile(processed_data_path + 'corrected_model.json'):
+    if not os.path.isfile(processed_data_path + 'corrected_model.xml'):
         raise ValueError('Run correc_inputs.correct_model befor running this function')
-    human_model = cobra.io.load_json_model(processed_data_path + 'corrected_model.json')
+    human_model = cobra.io.read_sbml_model(processed_data_path + 'corrected_model.xml')
     metabolic_machinery = sorted([g.id for g in human_model.genes])
     #------------------------------------
     
@@ -281,7 +316,7 @@ def check_non_machinery(nonmachinery_file = root_path + 'non_machinery.txt'):
     
     if not os.path.isfile(processed_data_path + 'corrected_model.json'):
         raise ValueError('Run correc_inputs.correct_model befor running this function')
-    human_model = cobra.io.load_json_model(processed_data_path + 'corrected_model.json')
+    human_model = cobra.io.read_sbml_model(processed_data_path + 'corrected_model.json')
     metabolic_machinery = sorted([g.id for g in human_model.genes])
     
     if not os.path.isfile(processed_data_path + 'corrected_psim_me.csv'):
@@ -328,109 +363,4 @@ def check_non_machinery(nonmachinery_file = root_path + 'non_machinery.txt'):
     
     del psim_me
     del human_model
-
-
-# In[ ]:
-
-
-# def add_required_metabolites(metabolite_id, compartment, human_model, all_metabolites):
-#     '''Assures metabolite with id metabolite_id exists, and that an exchange reaction with cytoplasm exists.'''
-    
-#     # metabolite exists
-#     if metabolite_id not in all_metabolites: # assume in 'C'
-#         met_ = human_model.metabolites.get_by_id(metabolite_id.replace('[' + compartment + ']', '[c]')).copy()
-#         met_.compartment = compartment
-#         met_.id = met_.id.replace('[c]', '[' + compartment + ']')
-#         human_model.add_metabolites([met_])
-
-#     # transport from cytosol exists
-#     met_1 = human_model.metabolites.get_by_id(metabolite_id)
-#     met_2 = human_model.metabolites.get_by_id(metabolite_id.replace('[' + compartment + ']', '[c]'))
-    
-#     if met_2.id not in all_metabolites:
-#         err = met_1.id + ' must be in the metabolic model. Attempted to add, but for this, must have the'
-#         err += 'cytoplasmic version of this metabolite. Please manually add ' + met_2.id + ' to model'
-#         raise ValueError(err)
-    
-#     all_reactions = list(human_model.reactions)
-#     r_ = [r for r in all_reactions if met_1 in r.metabolites.keys() and met_2 in r.metabolites.keys()]
-#     if len(r_) == 0:
-#         # add transport
-#         m_name = met_2.id.replace('[c]', '').upper()
-#         transport = cobra.Reaction(m_name + 't' + compartment)
-#         transport.name = m_name + ' ' + compartments_[compartment] + ' transport'
-#         transport.add_metabolites({met_2: -1, met_1: 1})
-#         transport.lower_bound = -1000
-#         human_model.add_reactions([transport])
-#     elif len(r_) == 1:
-#         r_ = r_[0]
-#         if not r_.reversibility: # make all exchanges reversible
-#             r_.lower_bound = -1000
-#     else:
-#         reactants, products = list(), list()
-#         for r in r_:
-#             reactants += r.reactants
-#             products += r.products
-#         if not((met_1 in reactants and met_2 in products) or (met_2 in reactants and met_1 in products)):
-#             raise ValueError('No reversibility')
-
-# # check for minimum required metabolites
-# required_metabolites = pd.read_csv(build_files_path + 'required_metabolic_model_metabolites.csv', index_col = 0)
-# all_metabolites = [m.id for m in human_model.metabolites]
-
-# missing_metabolites = sorted(set(required_metabolites.index.tolist()).difference(all_metabolites))
-# mm_obj = []
-# if len(missing_metabolites) > 0:
-#     err = 'The input CobraPy model is missing the minimal required metabolites. Manually adding them to the model.'
-#     warnings.warn(err)
-#     for mm in missing_metabolites:
-#         met = cobra.Metabolite(mm)
-#         info = required_metabolites.loc[mm]
-
-#         met.name = info['name']
-#         met.compartment = info['compartment']
-#         met.charge = float(info['charge'])
-#         met.elements = eval(info['elements'])
-#         met.formula = info['formula']
-
-#         mm_obj.append(met)
-#         all_metabolites.append(mm)
-# human_model.add_metabolites(mm_obj) 
-
-# print('Adding necessary metabolites and reactions')
-# # h2o and pi
-# for met_name_ in ['h2o', 'pi']:
-#     for compartment in ['l', 'm', 'n', 'r', 'x']:
-#         metabolite_id = met_name_ + '[' + compartment + ']'
-#         add_required_metabolites(metabolite_id, compartment, human_model, all_metabolites)
-
-# # h
-# for compartment in ['l', 'g', 'n', 'r', 'x']: # i and m must be in model for proton gradient appropriate rxns
-#     metabolite_id = 'h' + '[' + compartment + ']'
-#     add_required_metabolites(metabolite_id, compartment, human_model, all_metabolites)
-
-# #ppi
-# add_required_metabolites('ppi[n]', 'n', human_model, all_metabolites)
-
-# # nucleotides
-# compartments1, compartments2 = ['n'], ['l', 'm', 'r', 'x']
-# for nucleotide in ['a', 'c', 'u', 'g']:
-#     for phosphate in ['tp', 'dp', 'mp']:
-#         if nucleotide == 'u' and phosphate == 'dp':
-#             compartments = ['g', 'r', 'l']
-#         elif nucleotide != 'a' or phosphate == 'mp' or nucleotide == 'g':
-#             compartments = compartments1
-#         else:
-#             compartments = compartments1 + compartments2
-#         for compartment in compartments:
-#             metabolite_id = nucleotide + phosphate + '[' + compartment + ']'
-#             add_required_metabolites(metabolite_id, compartment, human_model, all_metabolites)
-
-# compartments = ['n', 'm', 'x', 'r', 'l']
-# amino_acids_ = ['ala_L', 'arg_L', 'asn_L', 'asp_L', 'cys_L', 'glu_L', 'gln_L', 'gly', 'his_L', 'ile_L', 'leu_L', 
-#               'lys_L', 'met_L', 'phe_L', 'pro_L', 'ser_L', 'thr_L', 'trp_L', 'tyr_L', 'val_L']
-# for amino_acid in amino_acids_:
-#         for compartment in compartments:
-#             metabolite_id = amino_acid + '[' + compartment + ']'
-#             add_required_metabolites(metabolite_id, compartment, human_model, all_metabolites)
 

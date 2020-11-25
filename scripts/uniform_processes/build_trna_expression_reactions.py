@@ -226,7 +226,7 @@ class express_trna():
             self.modified_trna_n = self.trna_n # not copy, same object
     def primary_export_trna(self):
         self.trna_c = self.modified_trna_n.copy()
-        self.trna_c.id = self.trna_c.id.replace('[n]', '[c]')
+        self.trna_c.id = '_'.join(self.trna_c.id.split('_')[:-1]) + '_c'
         self.trna_c.compartment = 'c'
 
         trna_primary_export = cobra.Reaction(self.trna_info.id + 'PRIMARY_EXPORTtn')
@@ -282,7 +282,7 @@ class express_trna():
                 else:
                     elements[element] = count
 
-            charged_trna_c = cobra.Metabolite('charged_' + self.trna_info.id + '_' + code + '_trna[c]')
+            charged_trna_c = cobra.Metabolite('charged_' + self.trna_info.id + '_' + code + '_trna_c')
             charged_trna_c.compartment = 'c'
             charged_trna_c.elements = elements
             # +1 for loss of negative charge on oxygen of amino acid

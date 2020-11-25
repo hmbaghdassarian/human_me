@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[76]:
+# In[1]:
 
 
 import cobra
@@ -23,6 +23,7 @@ with warnings.catch_warnings():
     from utils import machinery as mach
     
     from utils import functions as func  
+    from preprocess import parse_complex
     
     with func.HiddenPrints():
         from macromolecules.complex import Complex
@@ -232,7 +233,7 @@ class me_builder():
             if len(r.genes) == 1: 
                 complex_df.loc[complex_df.shape[0], :] = [r.id, compartment_, list(r.genes)[0].id, False, False]
             elif 'and' in r.gene_reaction_rule and 'or' in r.gene_reaction_rule: 
-                machinery_final = func.eval_complex(r.gene_reaction_rule)
+                machinery_final = parse_complex.eval_complex(r.gene_reaction_rule)
                 for m in machinery_final:
                     if type(m) == list:
                         complex_df.loc[complex_df.shape[0], :] = [r.id, compartment_, ';'.join(m), True, True]
@@ -260,7 +261,7 @@ class me_builder():
             if len(r.genes) == 1: 
                 me_complex_df.loc[me_complex_df.shape[0], :] = [r.id, compartment_, list(r.genes)[0].id, False, False]
             elif 'and' in r.gene_reaction_rule and 'or' in r.gene_reaction_rule: 
-                machinery_final = func.eval_complex(r.gene_reaction_rule)
+                machinery_final = parse_complex.eval_complex(r.gene_reaction_rule)
                 for m in machinery_final:
                     if type(m) == list:
                         me_complex_df.loc[me_complex_df.shape[0], :] = [r.id, compartment_, ';'.join(m), True, True]
@@ -293,6 +294,7 @@ class me_builder():
         
         # if a reaction generates multiple complexes, make sure each complex has a unique ID
         crm_ = complex_df[(complex_df.creates_multiple_reactions) & (complex_df.is_complex)].reaction_id.unique()
+
         for crm in crm_:
             df = complex_df[(complex_df.reaction_id == crm) & (complex_df.is_complex)]
             if df.shape[0]>1: # reaction creates multiple complexes
@@ -301,11 +303,28 @@ class me_builder():
                     complex_df.loc[i, 'complex_id'] = complex_df.loc[i, 'complex_id'] + '_' + str(counter)
                     counter += 1
         
+        # if complexes are duplicated across different reactions assigned to the same compartment, 
+        # generate a singular unique id
         dup_complexes = complex_df[complex_df.is_complex].duplicated(subset = ['compartment', 'machinery'], keep = 'first')
         dup_complexes = complex_df.loc[dup_complexes.index[np.where(dup_complexes)]]
+        track_dups = dict()
         for i in dup_complexes.index:
             dups = complex_df[(complex_df.compartment == dup_complexes.loc[i,'compartment']) & (complex_df.machinery == dup_complexes.loc[i, 'machinery'])]
-            complex_df.loc[dups.index,'complex_id'] = '_'.join(dups.reaction_id)
+            new_id = '_'.join(dups.reaction_id)
+            if new_id in track_dups.keys():
+                track_dups[new_id] += 1
+            else:
+                track_dups[new_id] = 0
+
+            new_id = new_id + '_' + str(track_dups[new_id])
+
+
+            complex_df.loc[dups.index,'complex_id'] = new_id
+
+        # those that didn't need _0
+        simplify = [k for k,v in track_dups.items() if v == 0]
+        for cid in simplify:
+            complex_df.loc[complex_df[complex_df.complex_id == cid + '_0'].index, 'complex_id'] = complex_df[complex_df.complex_id == cid + '_0'].complex_id.apply(lambda x: x[:-2]).tolist()
         
         self.complex_df = complex_df    
         
@@ -582,12 +601,6 @@ class me_builder():
         return me_model
 
 
-# In[ ]:
-
-
-
-
-
 # In[4]:
 
 
@@ -629,7 +642,7 @@ def build_me(non_machinery = [], minimal_proteome = False, model_id = 'HUMAN_ME_
     return me_model, builder
 
 
-# In[6]:
+# In[ ]:
 
 
 # non_machinery = []
@@ -640,7 +653,7 @@ def build_me(non_machinery = [], minimal_proteome = False, model_id = 'HUMAN_ME_
 # human_model = params.human_model
 
 
-# In[12]:
+# In[ ]:
 
 
 # builder = me_builder(non_machinery = non_machinery, psim_me = psim_me, human_model = human_model, 
@@ -650,7 +663,7 @@ def build_me(non_machinery = [], minimal_proteome = False, model_id = 'HUMAN_ME_
 # builder.get_complex_info()
 
 
-# In[10]:
+# In[ ]:
 
 
 # builder_ = copy.copy(builder)

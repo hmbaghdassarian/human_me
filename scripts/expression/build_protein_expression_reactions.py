@@ -59,7 +59,7 @@ def translate_protein_cytosolic(gene_info, mrna_transcript_c, mrna_deg_proxy):
     rxn_c[unfolded_protein_c] = 1
     
     # coupling OLD 
-    rxn_c[mrna_deg_proxy] = -gene_info.coupling_c2 # couple mrna degradation to protein synthesis 
+#     rxn_c[mrna_deg_proxy] = -gene_info.coupling_c2 # couple mrna degradation to protein synthesis 
     rxn_c[mrna_transcript_c] = -gene_info.coupling_c1C # couple mrna dilution to protein synthesis
     
 #     # coupling NEW 1 - fails
@@ -181,7 +181,7 @@ ubiquitin_monomerization_polyub.gene_reaction_rule = mach.USP5[0]
 nuclear_import_ub_mono = cobra.Reaction('UBIQUITIN_MONOMER_IMPORTtn')
 nuclear_import_ub_mono.subsytem = 'Protein_Expression'
 ub_n = ub_c.copy()
-ub_n.id, ub_n.compartment = ub_n.id.replace('[c]', '[n]'), 'n'
+ub_n.id, ub_n.compartment = '_'.join(ub_n.id.split('_')[:-1]) + '_n', 'n'
 nuclear_import_ub_mono.add_metabolites({ub_n: 1, ub_c: -1})
 nuclear_import_ub_mono.lower_bound = -1000
 
@@ -189,7 +189,7 @@ nuclear_import_ub_mono.lower_bound = -1000
 nuclear_export_ub_poly = cobra.Reaction('POLYUBIQUITIN_MOIETY_EXPORTtn')
 nuclear_export_ub_poly.subsytem = 'Protein_Expression'
 polyub_n = polyub_c.copy()
-polyub_n.id, polyub_n.compartment = polyub_n.id.replace('[c]', '[n]'), 'n'
+polyub_n.id, polyub_n.compartment = '_'.join(polyub_n.id.split('_')[:-1]) + '_n', 'n'
 nuclear_export_ub_poly.add_metabolites({polyub_n: -1, polyub_c: 1})
 nuclear_export_ub_poly.lower_bound = -1000
 
@@ -287,7 +287,7 @@ def protein_polyubiquitination(gene_info, protein_metabolite, compartment):
         polyubiquitinate_protein.subsytem = 'Protein_Expression'
         
         polyub_protein_pm = protein_metabolite.copy()
-        polyub_protein_pm.id = polyub_protein_pm.id.replace('_protein[pm]', '_polyub_protein[pm]')
+        polyub_protein_pm.id = polyub_protein_pm.id.replace('_protein_pm', '_polyub_protein_pm')
         
         elements = polyub_protein_pm.elements.copy()
         for aa_code, aa_count in monoub_aa_counts.items():
@@ -413,7 +413,7 @@ def degrade_cytosolic_protein(gene_info, folded_protein_c):
 def transport_nuclear_protein(gene_info, folded_protein_c):
 
     folded_protein_n = folded_protein_c.copy()
-    folded_protein_n.id, folded_protein_n.compartment = folded_protein_n.id.replace('[c]', '[n]'), 'n' 
+    folded_protein_n.id, folded_protein_n.compartment = '_'.join(folded_protein_n.id.split('_')[:-1]) + '_n', 'n' 
 
     nuclear_import = cobra.Reaction(gene_info.hgnc_id + '_IMPORTtn')
     nuclear_import.subsytem = 'Protein_Expression'
@@ -470,7 +470,7 @@ def transport_mitochondrial_matrix(gene_info, unfolded_protein_c):
     mitochondrial_matrix_transport = cobra.Reaction(gene_info.hgnc_id + '_IMPORTtm')
     mitochondrial_matrix_transport.subsytem = 'Protein_Expression'
     pre_protein_m = unfolded_protein_c.copy()
-    pre_protein_m.id = pre_protein_m.id.replace('[c]', '[m]')
+    pre_protein_m.id = '_'.join(pre_protein_m.id.split('_')[:-1]) + '_m'
     pre_protein_m.compartment = 'm'
     pre_protein_m.id = pre_protein_m.id.replace('unfolded', 'folded_pre')
     
@@ -529,7 +529,7 @@ def transport_mitochondrial_inter(gene_info, processed_protein_m):
     mitochondrial_inter_transport = cobra.Reaction(gene_info.hgnc_id + '_IMPORTti')
     mitochondrial_inter_transport.subsytem = 'Protein_Expression'
     pre_protein_i = processed_protein_m.copy()
-    pre_protein_i.id = processed_protein_m.id.replace('[m]', '[i]')
+    pre_protein_i.id = '_'.join(pre_protein_i.id.split('_')[:-1]) + '_i'
     pre_protein_i.compartment = 'i'
     
     rxn = {processed_protein_m: -1, pre_protein_i: 1}
@@ -584,7 +584,7 @@ def transport_peroxisome(gene_info, folded_protein_c):
     peroxisomal_transport = cobra.Reaction(gene_info.hgnc_id + '_IMPORTtx')
     peroxisomal_transport.subsytem = 'Protein_Expression'
     folded_protein_x = folded_protein_c.copy()
-    folded_protein_x.id = folded_protein_x.id.replace('[c]', '[x]')
+    folded_protein_x.id = '_'.join(folded_protein_x.id.split('_')[:-1]) + '_x'
     folded_protein_x.compartment = 'x'
     
     rxn = {folded_protein_c: -1, folded_protein_x: 1}
@@ -638,7 +638,7 @@ def post_translational_translocation(gene_info, unfolded_protein_c):
     ptt_reactions = list()
     
     folded_protein_r = unfolded_protein_c.copy()
-    folded_protein_r.id = folded_protein_r.id.replace('[c]', '[r]')
+    folded_protein_r.id = '_'.join(folded_protein_r.id.split('_')[:-1]) + '_r'
     folded_protein_r.id = folded_protein_r.id.replace('unfolded', 'folded')
     folded_protein_r.compartment = 'r'
     rxn = {unfolded_protein_c: -1, folded_protein_r: 1}
@@ -704,7 +704,7 @@ def co_translational_translocation(gene_info, mrna_transcript_c, mrna_deg_proxy)
     rxn = func.hydrolyze_atp(rxn, n_atp = number_BiP, compartment = 'r')
     
     # coupling OLD 
-    rxn[mrna_deg_proxy] = -gene_info.coupling_c2 # couple mrna degradation to protein synthesis 
+#     rxn[mrna_deg_proxy] = -gene_info.coupling_c2 # couple mrna degradation to protein synthesis 
     rxn[mrna_transcript_c] = -gene_info.coupling_c1C # couple mrna dilution to protein synthesis
     
     # coupling NEW 1
@@ -848,7 +848,7 @@ def import_golgi(gene_info, modified_protein_r):
     copii_coeff = int(round(268082.35 * params.Kv / V))
     
     protein_g = modified_protein_r.copy()
-    protein_g.id = protein_g.id.replace('[r]', '[g]')
+    protein_g.id = '_'.join(protein_g.id.split('_')[:-1]) + '_g'
     protein_g.compartment = 'g'
     
     rxn = {modified_protein_r: -copii_coeff, protein_g: copii_coeff}
@@ -922,7 +922,7 @@ def retrograde_er(gene_info, modified_protein_g):
     copi_coeff = int(round(143793.19 * params.Kv / V))
 
     retro_protein_r = modified_protein_g.copy()
-    retro_protein_r.id = retro_protein_r.id.replace('[g]', '[r]')
+    retro_protein_r.id = '_'.join(retro_protein_r.id.split('_')[:-1]) + '_r'
     retro_protein_r.compartment = 'r'
 
     rxn = {modified_protein_g: -copi_coeff, retro_protein_r: copi_coeff}
@@ -949,7 +949,7 @@ def secrete_protein(gene_info, modified_protein_g):
     secreted_proteins = list()
     if 'e' in gene_info.final_locations.keys():
         secreted_protein = modified_protein_g.copy()
-        secreted_protein.id = secreted_protein.id.replace('[g]', '[e]')
+        secreted_protein.id = '_'.join(secreted_protein.id.split('_')[:-1]) + '_e'
         secreted_protein.compartment = 'e'
         secreted_proteins += [secreted_protein]
     
@@ -959,12 +959,12 @@ def secrete_protein(gene_info, modified_protein_g):
 #     if statement1 or lysosomal_degradation_ptm_condition:
     if 'pm' in gene_info.final_locations.keys():
         secreted_protein = modified_protein_g.copy()
-        secreted_protein.id = secreted_protein.id.replace('[g]', '[pm]')
+        secreted_protein.id = '_'.join(secreted_protein.id.split('_')[:-1]) + '_pm'
         secreted_protein.compartment = 'pm'
         secreted_proteins += [secreted_protein]
     if 'l' in gene_info.final_locations.keys():
         secreted_protein = modified_protein_g.copy()
-        secreted_protein.id = secreted_protein.id.replace('[g]', '[l]')
+        secreted_protein.id = '_'.join(secreted_protein.id.split('_')[:-1]) + '_l'
         secreted_protein.compartment = 'l'
         secreted_proteins += [secreted_protein]
 
@@ -1111,7 +1111,7 @@ def build_erad_reactions(gene_info, retro_protein_r, unfolded_protein_c = None):
     retrotranslocate_protein.subsystem = 'Protein Expression'
     if unfolded_protein_c == None: # those that underwent co-translational rather than post-translational
         unfolded_protein_c = unmodified_protein_r.copy()
-        unfolded_protein_c.id = unmodified_protein_r.id.replace('[r]', '[c]')
+        unfolded_protein_c.id = '_'.join(unfolded_protein_c.id.split('_')[:-1]) + '_c'
         # replace unfolded bc, if it underwent co-translational translocation
         # the signal peptide degradation step makes it such that it is not the same as any 
         # cytosolically translated unfolded proteins (multi-localization), i.e., 'i' destined proteins
@@ -1143,7 +1143,7 @@ def build_endocytosis_reactions(gene_info, protein_pm, protein_l = None):
     polyubiquitinate_protein, polyub_protein_pm = protein_polyubiquitination(gene_info, protein_pm, compartment = 'pm')
     
     polyub_protein_l = polyub_protein_pm.copy()
-    polyub_protein_l.id = polyub_protein_l.id.replace('[pm]', '[l]')
+    polyub_protein_l.id = '_'.join(polyub_protein_l.id.split('_')[:-1]) + '_l'
     polyub_protein_l.compartment = 'pm'
     
     
@@ -1151,7 +1151,7 @@ def build_endocytosis_reactions(gene_info, protein_pm, protein_l = None):
     # combine dequbiquitination with endocytosis https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3987138/
     if protein_l == None:
         protein_l = protein_pm.copy()
-        protein_l.id = protein_l.id.replace('[pm]', '[l]')
+        protein_l.id = '_'.join(protein_l.id.split('_')[:-1]) + '_l'
         protein_l.compartment = 'l'
         
 

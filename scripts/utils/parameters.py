@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[63]:
+# In[1]:
 
 
 import pandas as pd 
@@ -14,26 +14,26 @@ sys.path.insert(1, '../../scripts/') # comment out in python script
 from utils.load_environmental_variables import processed_data_path
 
 
-# In[ ]:
+# In[2]:
 
 
 psim_me = pd.read_csv(processed_data_path + 'corrected_psim_me.csv', index_col = 0) 
 psim_me['SP'] = psim_me['SP'].map({1: True, 0: False})
-human_model = cobra.io.load_json_model(processed_data_path + 'corrected_model.json')
+human_model = cobra.io.read_sbml_model(processed_data_path + 'corrected_model.xml')
 
 
-# In[ ]:
+# In[3]:
 
 
 mu = parse_expr('mu')
 
 
-# In[ ]:
+# In[4]:
 
 
-compartments = {'c': 'cytosol',  'l': 'lysosome', 'm': 'mitochondria', 'r': 'endoplasmic reticulum', 
-                'e': 'extracellular space', 'x': 'peroxisome/glyoxysome', 'n': 'nucleus', 'g': 'golgi apparatus',
-                'i': 'inner mitochondrial compartment', 'pm': 'plasma membrane'}
+compartments = human_model.compartments.copy()
+compartments['pm'] = 'plasma membrane'
+
 allowed_ptms = {'dsb': 'disulfide bond formation', 'gpi': 'GPI Anchor', 'og': 'O-linked glycosylation'}#,
                #'ng': 'N-linked glycosylation'}
 
@@ -43,7 +43,7 @@ allowed_trna_modifications = {}
 #number_BiP = len(gene_info.protein_seq)/40
 
 
-# In[6]:
+# In[5]:
 
 
 # universal variables and inputs
@@ -61,7 +61,7 @@ L_sp = 22 # secretory pathway signal peptide degradation
 Kv = 0.7 # secretory pathway vesicle coat coefficients
 
 
-# In[2]:
+# In[6]:
 
 
 # kinetic parameters
@@ -78,7 +78,7 @@ coupling_params = {'mrna_half_life': mrna_half_life,
                   'alpha_p': alpha_p}
 
 
-# In[5]:
+# In[7]:
 
 
 # biomass
@@ -87,7 +87,7 @@ coupling_params = {'mrna_half_life': mrna_half_life,
 dna_frac = 0.014
 carb_frac = 0.071
 lipid_frac = 0.097
-other_frac = 0.054
+# other_frac = 0.054
 
 unmodeled_protein_frac = 1-0.12041534186261499
 
