@@ -11,6 +11,12 @@ import warnings
 import os
 import json
 import itertools
+import more_itertools as mit
+import copy
+
+
+
+
 
 import logging
 logging.basicConfig()
@@ -35,7 +41,7 @@ required_metabolites = json.load(open(build_files_path + "required_metabolic_mod
 rmd = pd.read_csv(build_files_path + 'required_metabolic_model_metabolites.csv', index_col = 0)
 
 
-# In[30]:
+# In[3]:
 
 
 def bool_metabolite(m_id, compartment, m_model):
@@ -89,7 +95,10 @@ def correct_model(model_file = root_path + 'recon2_2.xml',
                 machinery_final = [machinery_final[i] for i in range(len(machinery_final)) if i not in rm]
                 new_gpr = ''
                 for complex_ in machinery_final:
-                    new_gpr += '(' + ' and '.join(complex_) + ')' + ' or '
+                    if type(complex_) == list:
+                        new_gpr += '(' + ' and '.join(complex_) + ')' + ' or '
+                    else:
+                        new_gpr += complex_ + ' or '
                 new_gpr = new_gpr[:-4]
 
                 human_model.reactions.get_by_id(r.id).gene_reaction_rule = new_gpr
@@ -231,7 +240,7 @@ def correct_model(model_file = root_path + 'recon2_2.xml',
     
 
 
-# In[ ]:
+# In[4]:
 
 
 def correct_psim(psim_file = root_path + 'psim_recon2_2.csv'):
@@ -241,13 +250,13 @@ def correct_psim(psim_file = root_path + 'psim_recon2_2.csv'):
     
     '''
     # load files------------------------------------
-    psim_me = pd.read_csv(psim_file)
+    psim_me = pd.read_csv(psim_file, index_col = 0)
     psim_me.reset_index(inplace = True, drop = True)
     psim_me_genes = psim_me.HGNC_ID.tolist()
     
     essential_cols = ['HGNC_ID', 'PREMRNA_SEQ', 'MRNA_SEQ', 'PROTEIN_SEQ']
-    optional_cols = ['POLYA_LENGTH', 'TMD', 'SP', 'N_INTRONS', 'DSB', 'GPI', 'OG', 'ALPHA_P', 
-                    'MRNA_HALF_LIFE', 'PTR', 'PTR_TISSUE', 'CONSTANT_PTR'] # NG
+    optional_cols = ['POLYA_LENGTH', 'TMD', 'SP', 'N_INTRONS', 'DSB', 'GPI', 'OG', 
+                    'MRNA_HALF_LIFE', 'ALPHA_P', 'PTR', 'PTR_TISSUE', 'CONSTANT_PTR'] # NG
     other_cols = ['LOCATION']
     all_columns = essential_cols + optional_cols + other_cols
 
@@ -256,7 +265,7 @@ def correct_psim(psim_file = root_path + 'psim_recon2_2.csv'):
     expression_psim = expression_psim[all_columns] 
     
     if not os.path.isfile(processed_data_path + 'corrected_model.xml'):
-        raise ValueError('Run correc_inputs.correct_model befor running this function')
+        raise ValueError('Run correct_inputs.correct_model befor running this function')
     human_model = cobra.io.read_sbml_model(processed_data_path + 'corrected_model.xml')
     metabolic_machinery = sorted([g.id for g in human_model.genes])
     #------------------------------------
@@ -265,11 +274,17 @@ def correct_psim(psim_file = root_path + 'psim_recon2_2.csv'):
     if len(set(essential_cols).difference(psim_me.columns.tolist()))>0:
         raise ValueError('Must specify the following columns in PSIM: ' + ', '.join(essential_cols))
 
-    # add optional cols that aren't present
+    # add optional cols that aren't present - FIX THIS
+    em_0_idx = psim_me[psim_me.HGNC_ID.isin(expression_machinery)].index
+    em_temp = expression_psim.copy()
+    em_temp.index = em_temp.HGNC_ID
+
     for col in optional_cols + other_cols:
         if col not in psim_me.columns.tolist():
             warnings.warn(col + ' not in provided PSIM, adding as default values to gene_information')
             psim_me[col] = float('nan')
+            # make sure default values from expression matrix are includes
+            psim_me.loc[em_0_idx, col] = em_temp.loc[psim_me.loc[em_0_idx, 'HGNC_ID'].tolist(), col]
 
     # get rid of excess psim columns and put columns in order
     if len(set(psim_me).difference(all_columns)) > 1:
@@ -278,6 +293,19 @@ def correct_psim(psim_file = root_path + 'psim_recon2_2.csv'):
     # do regardless of above if statement to put columns in order 
     psim_me = psim_me[all_columns]
     # similarly put expression psim columns in order; this shouldn't be necessary but just in case
+    
+    
+    # add missing expression module details to psim if it is not already there - CHECK THIS
+    em_overlap = set(expression_machinery).intersection(psim_me.HGNC_ID.tolist())
+    if len(em_overlap) > 0:
+        for e in em_overlap:
+            i_p = psim_me[psim_me.HGNC_ID == e].index
+            i_e = expression_psim[expression_psim.HGNC_ID == e].index
+
+            vals = psim_me.loc[i_p,:].T.iloc[:,0]
+
+            for col_ in vals[vals.isna()].index:
+                psim_me.loc[i_p, col_] = expression_psim.loc[i_e, col_]
     
     # add expression module machinery to psim if it is not already there
     if len(set(expression_machinery).difference(psim_me.HGNC_ID.tolist())) > 0:
@@ -299,7 +327,7 @@ def correct_psim(psim_file = root_path + 'psim_recon2_2.csv'):
     del human_model
 
 
-# In[ ]:
+# In[5]:
 
 
 def check_non_machinery(nonmachinery_file = root_path + 'non_machinery.txt'):
