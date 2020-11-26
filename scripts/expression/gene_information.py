@@ -17,21 +17,12 @@ import requests, sys, json, re, warnings
 
 import sys
 sys.path.insert(1, '../../scripts/') # comment out in python script
-# from utils.load_environmental_variables import *
 from utils import machinery as mach
 from utils import parameters as params
 from utils import functions as func
 
 
-# In[14]:
-
-
-from sympy.parsing.sympy_parser import parse_expr 
-x = parse_expr('x')
-y = parse_expr('y')
-
-
-# In[12]:
+# In[30]:
 
 
 class gene_information():
@@ -49,9 +40,9 @@ class gene_information():
     
     
     def __init__(self, hgnc_id, premrna_seq, mrna_seq, protein_seq,
-                 machinery_list = mach.metabolic_machinery, #expression_machinery = list()
+                 machinery_list = mach.metabolic_machinery,
                  ptms = {}, tmd = 0, sp = False, polyA_length = None, n_introns = None, 
-                coupling_params = params.coupling_params):
+                coupling_params = None):
         '''
         
         1) HGNC ID is a string in the format HGNC:#### - required.
@@ -81,6 +72,12 @@ class gene_information():
         11) coupling_params is a dictionary with required parameters for coupling constraints. The key-value pairs are as follows:
             a) 'mrna_half_life': The half life for the mrna in units of hours. If not provided, defaults to 10.
             b) 'alpha_p': The protein first-order degradation constant in units of hours^-1. If not provided, defaults to 0.02. 
+            c) 'ptr': A value for the protein-to-RNA ratio
+            d) 'ptr_tissue': A tissue from which to get or estimate the PTR, if a ptr value is not provided. Options include:
+            ['Median', Adrenal', 'Appendices', 'Brain', 'Colon', 'Duodenum', 'Endometrium', 'Esophagus', 'Fallopiantube', 'Fat', 'Gallbladder', 'Heart', 
+            'Kidney', 'Liver', 'Lung', 'Lymphnode', 'Ovary', 'Pancreas', 'Placenta', 'Prostate', 'Rectum', 'Salivarygland', 'Smallintestine', 'Smoothmuscle', 
+            'Spleen', 'Stomach', 'Testis', 'Thyroid', 'Tonsil', 'Urinarybladder']
+            e) 'constant_ptr': bool - whether to estimate the same PTR for all genes (True). Not recommended. Will override provided ptr/ptr_tissue
         '''
         
         self.hgnc_id = hgnc_id
@@ -204,27 +201,45 @@ class gene_information():
         
         
         # coupling parameters
+        ptr_tissue_orig = None
         if coupling_params == None or pd.isna(coupling_params):
             coupling_params = params.coupling_params
         else:
-            if 'mrna_half_life' not in coupling_params.keys() or coupling_params['mrna_half_life'] == None or pd.isna(coupling_params['mrna_half_life']):
-                coupling_params['mrna_half_life'] = params.mrna_half_life
-            if 'alpha_p' not in coupling_params.keys() or coupling_params['alpha_p'] == None or pd.isna(coupling_params['alpha_p']):
-                coupling_params['alpha_p'] = params.alpha_p
-
-
-        #ORIGINAL
-        self.coupling_c2 = (np.log(2)/coupling_params['mrna_half_life'])/(coupling_params['alpha_p'] + params.mu)
-        self.coupling_c1C = params.mu/(coupling_params['alpha_p'] + params.mu)
+            if 'ptr_tissue' in coupling_params.keys():
+                ptr_tissue_orig = coupling_params['ptr_tissue']
+            for k in params.coupling_params.keys():
+                if (k not in coupling_params.keys()) or (coupling_params[k] == None) or (pd.isna(coupling_params[k])):
+                    coupling_params[k] = params.coupling_params[k]
+                    
+        # get the PTR
+        if not coupling_params['constant_ptr']:
+            if not (coupling_params['ptr'] is None or pd.isna(coupling_params['ptr'])):
+                self.ptr = coupling_params['ptr']
+                if not (ptr_tissue_orig is None or pd.isna(ptr_tissue_orig)):
+                    warnings.warn('You have indicated using a specific PTR, ignoring user input PTR tissue')
+                
+            else:
+                if coupling_params['ptr_tissue'] not in params.ptr.columns:
+                    raise ValueError('Specified tissue type for PTR is not available')
+                else: # tissue estimation
+                    if self.hgnc_id in params.ptr[coupling_params['ptr_tissue']].dropna().index:
+                        self.ptr = params.ptr.loc[self.hgnc_id, coupling_params['ptr_tissue']]
+                    else:
+                        self.ptr = params.ptr[coupling_params['ptr_tissue']].median()
+        else:
+            self.ptr = params.constant_ptr
+            if not (coupling_params['ptr'] is None or pd.isna(coupling_params['ptr'])):
+                warnings.warn('You have indicated using a constant PTR, ignoring user input PTR')
+            if not (ptr_tissue_orig is None or pd.isna(ptr_tissue_orig)):
+                warnings.warn('You have indicated using a constant PTR, ignoring user input PTR tissue')
         
-#         # new 1 - doesn't work 
-#         alpha_m = np.log(2)/coupling_params['mrna_half_life']
-#         self.coupling_c1 = (params.mu + alpha_m)/(params.mu + coupling_params['alpha_p'])
-        
-#         # new 2 - doesn't work 
-#         self.coupling_c2 = (np.log(2)/coupling_params['mrna_half_life'])/(coupling_params['alpha_p'] + params.mu)
-#         self.coupling_c1A = params.mu/(np.log(2)/coupling_params['mrna_half_life'])
-#         self.coupling_c1B = self.coupling_c2*(self.coupling_c1A + 1)
+        self.coupling = dict()
+        self.coupling['c2'] = (np.log(2)/coupling_params['mrna_half_life'])/((coupling_params['alpha_p'] + params.mu)*self.ptr)
+        # c1c
+#         self.coupling['c1'] = params.mu/((coupling_params['alpha_p'] + params.mu)*self.ptr)
+        # c1b
+        self.coupling['c1'] = ((np.log(2)/coupling_params['mrna_half_life']) + params.mu)/((coupling_params['alpha_p'] + params.mu)*self.ptr)
+
        
     def get_final_locations(self, metabolic_model = params.human_model, final_locations = None):
         '''Assigns a set of final compartments for the protein. For machinery, extracts this from the inputer
@@ -290,8 +305,8 @@ class gene_information():
         # in the case that protein synthesis flux spread across multiple reactions due to multi-localization
         if len(set(self.final_locations.values())) > 1:
             if len(set(self.final_locations.values())) == 2:
-                self.coupling_c2 = 0.5*self.coupling_c2
-                self.coupling_c1C = 0.5*self.coupling_c1C
+                self.coupling['c2'] = 0.5*self.coupling['c2']
+                self.coupling['c1'] = 0.5*self.coupling['c1']
             else:
                 raise ValueError('Have not yet accounted for Non-Canonical Secretion or other synthesis forms in coupling of mrna degradataion to protein synthesis')
 #         #NEW 1

@@ -246,7 +246,8 @@ def correct_psim(psim_file = root_path + 'psim_recon2_2.csv'):
     psim_me_genes = psim_me.HGNC_ID.tolist()
     
     essential_cols = ['HGNC_ID', 'PREMRNA_SEQ', 'MRNA_SEQ', 'PROTEIN_SEQ']
-    optional_cols = ['POLYA_LENGTH', 'TMD', 'SP', 'N_INTRONS', 'DSB', 'GPI', 'OG'] # NG
+    optional_cols = ['POLYA_LENGTH', 'TMD', 'SP', 'N_INTRONS', 'DSB', 'GPI', 'OG', 'ALPHA_P', 
+                    'MRNA_HALF_LIFE', 'PTR', 'PTR_TISSUE', 'CONSTANT_PTR'] # NG
     other_cols = ['LOCATION']
     all_columns = essential_cols + optional_cols + other_cols
 

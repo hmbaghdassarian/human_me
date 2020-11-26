@@ -27,7 +27,7 @@ from uniform_processes import biomass
 from macromolecules.RNA import RNA_fragment, pre_mRNA, mRNA
 
 
-# In[2]:
+# In[19]:
 
 
 class express_mrna():
@@ -137,12 +137,8 @@ class express_mrna():
     def export_mrna(self):
         # make the cytosolic mrna metabolite
         self.mrna_c = self.mrna_n.copy()
-        
-        if self.mrna_c.id.count('_n') > 1:
-            # internal use
-            raise ValueError('mrna id will not be parse correctly')
             
-        self.mrna_c.id = '_'.join(self.mrna_c.id.split('_'))[:-1] + '_c'
+        self.mrna_c.id = '_'.join(self.mrna_c.id.split('_'))[:-1] + 'c'
         self.mrna_c.compartment = 'c'
 
         # make the transport reaction
@@ -284,7 +280,7 @@ class express_mrna():
         self.reactions.append(transcription)
 
 
-# In[3]:
+# In[20]:
 
 
 def get_mrna_expression_reactions(gene_info, compress_mrna = False):

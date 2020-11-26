@@ -1,9 +1,5 @@
 #!/usr/bin/env python
 # coding: utf-8
-
-# In[1]:
-
-
 import cobra
 from Bio.SeqUtils import molecular_weight as calculate_molecular_weight
 
@@ -20,8 +16,6 @@ from uniform_processes import biomass
 
 from expression.gene_information import gene_information
 import expression.build_mrna_expression_reactions as build_mrna
-
-
 # In[2]:
 
 
@@ -58,15 +52,9 @@ def translate_protein_cytosolic(gene_info, mrna_transcript_c, mrna_deg_proxy):
                 compartment = 'c')
     rxn_c[unfolded_protein_c] = 1
     
-    # coupling OLD 
-#     rxn_c[mrna_deg_proxy] = -gene_info.coupling_c2 # couple mrna degradation to protein synthesis 
-    rxn_c[mrna_transcript_c] = -gene_info.coupling_c1C # couple mrna dilution to protein synthesis
-    
-#     # coupling NEW 1 - fails
-#     rxn_c[mrna_transcript_c] = -gene_info.coupling_c1 # couple mrna synthesis to protein synthesis
-    
-    # coupling NEW 2 - fails
-#    rxn_c[mrna_transcript_c] = -gene_info.coupling_c1B # couple mrna synthesis to protein synthesis
+    # coupling
+    rxn_c[mrna_deg_proxy] = -gene_info.coupling['c2']# couple mrna degradation to protein synthesis 
+    rxn_c[mrna_transcript_c] = -gene_info.coupling['c1'] # couple mrna dilution to protein synthesis
     
     # biomas
     rxn_c[biomass.protein_] = gene_info.protein_mass
@@ -703,13 +691,10 @@ def co_translational_translocation(gene_info, mrna_transcript_c, mrna_deg_proxy)
     rxn[unprocessed_protein_r], rxn[biomass.protein_] = 1, mw_upr
     rxn = func.hydrolyze_atp(rxn, n_atp = number_BiP, compartment = 'r')
     
-    # coupling OLD 
-#     rxn[mrna_deg_proxy] = -gene_info.coupling_c2 # couple mrna degradation to protein synthesis 
-    rxn[mrna_transcript_c] = -gene_info.coupling_c1C # couple mrna dilution to protein synthesis
-    
-    # coupling NEW 1
-#     rxn[mrna_transcript_c] = -gene_info.coupling_c1 # couple mrna synthesis to protein synthesis
-  
+    # coupling
+    rxn[mrna_deg_proxy] = -gene_info.coupling['c2']# couple mrna degradation to protein synthesis 
+    rxn[mrna_transcript_c] = -gene_info.coupling['c1'] # couple mrna dilution to protein synthesis
+
 
     #------------------------------------------------------------------------------------
 

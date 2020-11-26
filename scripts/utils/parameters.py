@@ -11,14 +11,17 @@ from sympy.parsing.sympy_parser import parse_expr
 
 import sys
 sys.path.insert(1, '../../scripts/') # comment out in python script
-from utils.load_environmental_variables import processed_data_path
+from utils.load_environmental_variables import processed_data_path, build_files_path
 
 
 # In[2]:
 
 
+bool_dict = {1: True, 0: False, True: True, False: False}
+
 psim_me = pd.read_csv(processed_data_path + 'corrected_psim_me.csv', index_col = 0) 
-psim_me['SP'] = psim_me['SP'].map({1: True, 0: False})
+psim_me['SP'] = psim_me['SP'].map(bool_dict)
+psim_me['CONSTANT_PTR'] = psim_me['CONSTANT_PTR'].map(bool_dict)
 human_model = cobra.io.read_sbml_model(processed_data_path + 'corrected_model.xml')
 
 
@@ -61,7 +64,7 @@ L_sp = 22 # secretory pathway signal peptide degradation
 Kv = 0.7 # secretory pathway vesicle coat coefficients
 
 
-# In[6]:
+# In[11]:
 
 
 # kinetic parameters
@@ -75,7 +78,13 @@ mrna_half_life = 10 #units: hours
 alpha_p = 0.02 # units: hours ^-1
 
 coupling_params = {'mrna_half_life': mrna_half_life, 
-                  'alpha_p': alpha_p}
+                  'alpha_p': alpha_p, 
+                  'ptr': None,
+                  'ptr_tissue': 'Median',
+                  'constant_ptr': False}
+
+ptr = pd.read_csv(build_files_path + 'PTR_Gagneur_processed.tsv', sep = '\t', index_col = 0)
+constant_ptr = ptr.Median.median()
 
 
 # In[7]:
