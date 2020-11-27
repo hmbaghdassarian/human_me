@@ -28,7 +28,8 @@ from uniform_processes import biomass
 
 
 import expression.build_mrna_expression_reactions as build_mrna
-import expression.build_protein_expression_reactions as build_protein
+from expression.protein import cytosolic_translation as c_trln
+from expression.protein import build_protein_expression_reactions as build_protein
 
 
 # # rRNA
@@ -97,7 +98,7 @@ psim_rib.LOCATION = psim_rib.LOCATION.apply(lambda x: format_location(x))
 # In[4]:
 
 
-def build_ribosome_protein_expression_reactions():
+def build_ribosome_protein_expression_reactions(ub_args, compress_mrna = False):
     '''Reactions associated with transcription and translation of ribosomal proteins'''
     
     # small ribosome proteins
@@ -107,8 +108,8 @@ def build_ribosome_protein_expression_reactions():
         gene_info = utils_2.generate_geneinfo_object(hgnc_id = i, psim = psim_rib, 
                     machinery_list = list(), metabolic_model = cobra.Model())
         gene_info.final_locations = {'c': 'Cytosolic Tranport', 'n': 'Cytosolic Tranport'}
-        mrna_expression_reactions, mrna_transcript_c, mrna_deg_proxy = build_mrna.get_mrna_expression_reactions(gene_info)
-        protein_expression_reactions, protein_metabolites = build_protein.get_protein_expression_reactions(gene_info, mrna_transcript_c, mrna_deg_proxy)
+        mrna_expression_reactions, mrna_transcript_c, mrna_deg_proxy = build_mrna.get_mrna_expression_reactions(gene_info, compress_mrna = compress_mrna)
+        protein_expression_reactions, protein_metabolites = build_protein.get_protein_expression_reactions(gene_info, mrna_transcript_c, mrna_deg_proxy, ub_args)
         protein_expression_reactions = protein_expression_reactions[:-3] # no nuclear degradation
         rs_expression_reactions += mrna_expression_reactions + protein_expression_reactions
         rs_protein_metabolites += protein_metabolites
@@ -122,8 +123,8 @@ def build_ribosome_protein_expression_reactions():
         gene_info = utils_2.generate_geneinfo_object(hgnc_id = i, psim = psim_rib, 
                     machinery_list = list(), metabolic_model = cobra.Model())
         gene_info.final_locations = {'c': 'Cytosolic Tranport', 'n': 'Cytosolic Tranport'}
-        mrna_expression_reactions, mrna_transcript_c, mrna_deg_proxy = build_mrna.get_mrna_expression_reactions(gene_info)
-        protein_expression_reactions, protein_metabolites = build_protein.get_protein_expression_reactions(gene_info, mrna_transcript_c, mrna_deg_proxy)
+        mrna_expression_reactions, mrna_transcript_c, mrna_deg_proxy = build_mrna.get_mrna_expression_reactions(gene_info, compress_mrna = compress_mrna)
+        protein_expression_reactions, protein_metabolites = build_protein.get_protein_expression_reactions(gene_info, mrna_transcript_c, mrna_deg_proxy, ub_args)
         protein_expression_reactions = protein_expression_reactions[:-3] # no nuclear degradation
         rl_expression_reactions += mrna_expression_reactions + protein_expression_reactions
         rl_protein_metabolites += protein_metabolites
@@ -133,12 +134,12 @@ def build_ribosome_protein_expression_reactions():
     gene_info = utils_2.generate_geneinfo_object(hgnc_id = RPL40_HGNC, psim = psim_rib, 
                     machinery_list = list(), metabolic_model = cobra.Model())
     gene_info.final_locations = {'n': 'Cytosolic Tranport'}
-    mrna_expression_reactions, mrna_transcript_c, mrna_deg_proxy = build_mrna.get_mrna_expression_reactions(gene_info)
-    translation_elongation_c, unfolded_protein_c = build_protein.translate_protein_cytosolic(gene_info, mrna_transcript_c, mrna_deg_proxy)
+    mrna_expression_reactions, mrna_transcript_c, mrna_deg_proxy = build_mrna.get_mrna_expression_reactions(gene_info, compress_mrna = compress_mrna)
+    translation_elongation_c, unfolded_protein_c = build_protein.c_trln.translate_protein_cytosolic(gene_info, mrna_transcript_c, mrna_deg_proxy)
     protein_expression_reactions.append(translation_elongation_c)
 
     # cleaved protein sequence, gene_info object, and cobra.Metabolite
-    processed_seq = gene_info.protein_seq[:gene_info.protein_seq.index(build_protein.single_ubiquitin_sequence)] + gene_info.protein_seq[gene_info.protein_seq.index(build_protein.single_ubiquitin_sequence) + len(build_protein.single_ubiquitin_sequence):]
+    processed_seq = gene_info.protein_seq[:gene_info.protein_seq.index(ub_args['single_ubiquitin_sequence'])] + gene_info.protein_seq[gene_info.protein_seq.index(ub_args['single_ubiquitin_sequence']) + len(ub_args['single_ubiquitin_sequence']):]
     psim_temp = psim_rib.copy()
     psim_temp.loc[psim_temp[psim_temp.HGNC_ID == RPL40_HGNC].index, 'PROTEIN_SEQ'] = processed_seq
     gene_info = utils_2.generate_geneinfo_object(hgnc_id = RPL40_HGNC, psim = psim_temp, 
@@ -153,22 +154,22 @@ def build_ribosome_protein_expression_reactions():
     ub_cleavage.subsytem = 'Protein_Expression'
     
     
-    biomass_product = (processed_unfolded_protein_c.formula_weight - build_protein.ub_c.formula_weight)/1000
+    biomass_product = (processed_unfolded_protein_c.formula_weight - ub_args['ub_c'].formula_weight)/1000
     biomass_reactant = unfolded_protein_c.formula_weight/1000 
     biomass_change = biomass_product - biomass_reactant
     ub_cleavage.add_metabolites({unfolded_protein_c:-1, metab.h2o_c: -1, 
-                                 build_protein.ub_c: 1, processed_unfolded_protein_c: 1, 
+                                 ub_args['ub_c']: 1, processed_unfolded_protein_c: 1, 
                                 biomass.protein_: biomass_change})
     ub_cleavage.gene_reaction_rule = mach.UCHL3[0]
     ub_cleavage.add_metabolites({unfolded_protein_c:-1, metab.h2o_c: -1, 
-                                 build_protein.ub_c: 1, processed_unfolded_protein_c: 1})
+                                 ub_args['ub_c']: 1, processed_unfolded_protein_c: 1})
     ub_cleavage.gene_reaction_rule = mach.UCHL3[0]
 
     protein_folding_cytosolic, folded_protein_c = build_protein.fold_protein_cytosolic(gene_info, 
                                                                                        processed_unfolded_protein_c)
     nuclear_import, folded_protein_n = build_protein.transport_nuclear_protein(gene_info, folded_protein_c)
 
-    rl_expression_reactions += mrna_expression_reactions + [translation_elongation_c, ub_cleavage, protein_folding_cytosolic, nuclear_import] + build_protein.degrade_cytosolic_protein(gene_info, folded_protein_c)
+    rl_expression_reactions += mrna_expression_reactions + [translation_elongation_c, ub_cleavage, protein_folding_cytosolic, nuclear_import] + build_protein.degrade_cytosolic_protein(gene_info, folded_protein_c, ub_args)
     rl_protein_metabolites += [folded_protein_c, folded_protein_n]
     
     return rs_expression_reactions, rs_protein_metabolites, rl_expression_reactions, rl_protein_metabolites
@@ -238,15 +239,6 @@ def build_rrna5s_reactions(rpl5_n, rpl11_n):
 
 
 # In[6]:
-
-
-rs_expression_reactions, rs_protein_metabolites, rl_expression_reactions, rl_protein_metabolites = build_ribosome_protein_expression_reactions()
-rpl5_n = [m for m in rl_protein_metabolites if m.id == 'HGNC:10360_folded_protein_n'][0]
-rpl11_n = [m for m in rl_protein_metabolites if m.id == 'HGNC:10301_folded_protein_n'][0]
-rrna5s_reactions, rrna5s_complex_n, rrna5s_c = build_rrna5s_reactions(rpl5_n, rpl11_n)
-
-
-# In[ ]:
 
 
 # ets_5_frag1 is from 5' end of 47s to A' site
@@ -664,8 +656,9 @@ def build_other_rrna_reactions(rrna5s_complex_n, rs_protein_metabolites, rl_prot
 # In[8]:
 
 
-def build_ribosome():
-    rs_expression_reactions, rs_protein_metabolites, rl_expression_reactions, rl_protein_metabolites = build_ribosome_protein_expression_reactions()
+def build_ribosome(ub_args, compress_mrna = False):
+    with func.HiddenPrints():
+        rs_expression_reactions, rs_protein_metabolites, rl_expression_reactions, rl_protein_metabolites = build_ribosome_protein_expression_reactions(ub_args, compress_mrna)
     rpl5_n = [m for m in rl_protein_metabolites if m.id == 'HGNC:10360_folded_protein_n'][0]
     rpl11_n = [m for m in rl_protein_metabolites if m.id == 'HGNC:10301_folded_protein_n'][0]
     rrna5s_reactions, rrna5s_complex_n, rrna5s_c = build_rrna5s_reactions(rpl5_n, rpl11_n)
@@ -696,11 +689,4 @@ def build_ribosome():
     all_reactions = rrna5s_reactions + other_rrna_reactions + rs_expression_reactions +  rl_expression_reactions
     all_reactions += [ribosome_complex_formation, ribosome_complex_dissociation]
     return  all_reactions, ribosome_complex_c
-
-
-# In[25]:
-
-
-ribosomal_reactions, ribosome_complex_c = build_ribosome()
-del psim_rib
 

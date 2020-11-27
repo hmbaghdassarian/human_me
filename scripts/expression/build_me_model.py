@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[1]:
+# In[11]:
 
 
 import cobra
@@ -30,19 +30,20 @@ with warnings.catch_warnings():
         from utils import utils_2
 
         import expression.build_mrna_expression_reactions as build_mrna
-        import expression.build_protein_expression_reactions as build_protein
-
-        from uniform_processes.build_ribosome_biogenesis_reactions import ribosomal_reactions, ribosome_complex_c
+        from expression.protein import ubiquitin
+        from expression.protein import build_protein_expression_reactions as build_protein
+        
+        from uniform_processes.build_ribosome_biogenesis_reactions import build_ribosome
         from uniform_processes.build_trna_expression_reactions import trna_biogenesis_reactions
         from uniform_processes import biomass
 
 
 # # Generate Protein Expression Reactions for All Machinery
 
-# In[2]:
+# In[12]:
 
 
-def get_all_expression_reactions(hgnc_id, psim = params.psim_me, machinery_list = mach.metabolic_machinery, 
+def get_all_expression_reactions(hgnc_id, ub_args, psim = params.psim_me, machinery_list = mach.metabolic_machinery, 
                              metabolic_model = params.human_model, compress_mrna = False):
     '''Generates all the expression reactions for a given protein from the HGNC ID and the PSIM'''
     with warnings.catch_warnings():
@@ -50,7 +51,8 @@ def get_all_expression_reactions(hgnc_id, psim = params.psim_me, machinery_list 
         with func.HiddenPrints():
             gene_info = utils_2.generate_geneinfo_object(hgnc_id, psim, machinery_list, metabolic_model)
             mrna_reactions, mrna_transcript_c, mrna_deg_proxy  = build_mrna.get_mrna_expression_reactions(gene_info, compress_mrna = compress_mrna)
-            protein_reactions, protein_metabolites = build_protein.get_protein_expression_reactions(gene_info, mrna_transcript_c, mrna_deg_proxy)
+            protein_reactions, protein_metabolites = build_protein.get_protein_expression_reactions(gene_info, mrna_transcript_c, mrna_deg_proxy, 
+                                                                                                    ub_args = ub_args)
 
     return mrna_reactions + protein_reactions, protein_metabolites
 
@@ -75,7 +77,7 @@ def generate_expression_module(me_reactions):
     return expression_machinery_me, expression_module
 
 
-# In[3]:
+# In[13]:
 
 
 class me_builder():
@@ -84,16 +86,21 @@ class me_builder():
         self.non_machinery = non_machinery
         self.psim_me = psim_me
         self.human_model = human_model
-        # get pre-generated reactions
-        self.me_reactions = ribosomal_reactions + trna_biogenesis_reactions + build_protein.ub_reactions
+        
+        # get pre-generated reactions - the compress_mrna arg requires that they be run with that input
+        self.compress_mrna = compress_mrna
+        print('Generate ubiquitin reactions for proteasomal degrdation')
+        self.ub_args = ubiquitin.express_ubiquitin(compress_mrna = self.compress_mrna)
+        print('Generate ribosome')
+        ribosomal_reactions, self.ribosome_complex_c = build_ribosome(self.ub_args, self.compress_mrna )
+        
+        self.me_reactions = ribosomal_reactions + trna_biogenesis_reactions + self.ub_args['ub_reactions']
         # map HGNC ID to a dictionary of compartments and cobra.Metabolite proteins
         self.id_protein_map = dict() 
         self.complex_id_metabolite_map = dict() # map complex id to the complex cobra.Metabolite
         
         self.id_reactions_map = dict()
         self.complex_reactions_map = dict()
-        
-        self.compress_mrna = compress_mrna
     
     def express_metabolic_enzymes(self):
         # get protein expression for all metabolic reactions
@@ -103,7 +110,8 @@ class me_builder():
 
         for hgnc_id in tqdm(loop_machinery):
             # None bc will add later for expression model specific to this
-            expr_reactions, protein_metabolites = get_all_expression_reactions(hgnc_id, compress_mrna = self.compress_mrna)
+            expr_reactions, protein_metabolites = get_all_expression_reactions(hgnc_id, compress_mrna = self.compress_mrna, 
+                                                                              ub_args = self.ub_args)
             self.id_protein_map[hgnc_id] = {p.compartment: p for p in protein_metabolites} # store compartments and metabolite objects for each gene
             
             self.id_reactions_map[hgnc_id] = expr_reactions
@@ -129,7 +137,8 @@ class me_builder():
         
         for hgnc_id in tqdm(list(set(expression_machinery_me))):
             expr_reactions, protein_metabolites = get_all_expression_reactions(hgnc_id, machinery_list = expression_machinery_me,
-                                                  metabolic_model = expression_module, compress_mrna = self.compress_mrna)
+                                                  metabolic_model = expression_module, compress_mrna = self.compress_mrna, 
+                                                  ub_args = self.ub_args)
 
 
             if hgnc_id not in set(expression_machinery_me).intersection(mach.metabolic_machinery):
@@ -162,7 +171,8 @@ class me_builder():
             print('No. iterations for new expression machinery: {}'.format(counter))
             for hgnc_id in tqdm(list(set(expression_machinery_me_2))):
                 expr_reactions, protein_metabolites = get_all_expression_reactions(hgnc_id, machinery_list = expression_machinery_me_2,
-                                                      metabolic_model = expression_module, compress_mrna = self.compress_mrna)
+                                                      metabolic_model = expression_module, compress_mrna = self.compress_mrna, 
+                                                      ub_args = self.ub_args)
 
 
                 if hgnc_id not in set(expression_machinery_me_2).intersection(expression_machinery_me + mach.metabolic_machinery):
@@ -213,7 +223,8 @@ class me_builder():
         dummy_id = 'HGNC:DUMMY'
         ups_['HGNC_ID'], ups_['LOCATION'] = dummy_id, '[c]'
         dummy_reactions, dm = get_all_expression_reactions(hgnc_id = dummy_id, psim = ups_, machinery_list = [], 
-                                                            metabolic_model = cobra.Model(''), compress_mrna = self.compress_mrna) 
+                                                            metabolic_model = cobra.Model(''), compress_mrna = self.compress_mrna, 
+                                                          ub_args = self.ub_args) 
 
         for r in dummy_reactions:
             if biomass.protein_ in r.metabolites.keys():
@@ -356,7 +367,7 @@ class me_builder():
                     machinery_metabolites.append(self.id_protein_map[m][compartment])
                     metabolite_types.append('protein')
                 else:
-                    machinery_metabolites.append(ribosome_complex_c)
+                    machinery_metabolites.append(self.ribosome_complex_c)
                     metabolite_types.append('complex')
 
             complex_info = {'METABOLITES': machinery_metabolites, 'IDS': [m.id for m in machinery_metabolites], 
@@ -601,7 +612,7 @@ class me_builder():
         return me_model
 
 
-# In[4]:
+# In[14]:
 
 
 def build_me(non_machinery = [], minimal_proteome = False, model_id = 'HUMAN_ME_MODEL', compress_mrna = False,
@@ -642,7 +653,7 @@ def build_me(non_machinery = [], minimal_proteome = False, model_id = 'HUMAN_ME_
     return me_model, builder
 
 
-# In[ ]:
+# In[15]:
 
 
 # non_machinery = []
@@ -653,7 +664,7 @@ def build_me(non_machinery = [], minimal_proteome = False, model_id = 'HUMAN_ME_
 # human_model = params.human_model
 
 
-# In[ ]:
+# In[40]:
 
 
 # builder = me_builder(non_machinery = non_machinery, psim_me = psim_me, human_model = human_model, 
@@ -666,5 +677,5 @@ def build_me(non_machinery = [], minimal_proteome = False, model_id = 'HUMAN_ME_
 # In[ ]:
 
 
-# builder_ = copy.copy(builder)
+
 
