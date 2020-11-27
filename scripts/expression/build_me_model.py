@@ -30,8 +30,8 @@ with warnings.catch_warnings():
         from utils import utils_2
 
         import expression.build_mrna_expression_reactions as build_mrna
-        from expression.protein import ubiquitin
-        from expression.protein import build_protein_expression_reactions as build_protein
+        from expression.protein_expression import ubiquitin
+        from expression.protein_expression import build_protein_expression_reactions as build_protein
         
         from uniform_processes.build_ribosome_biogenesis_reactions import build_ribosome
         from uniform_processes.build_trna_expression_reactions import trna_biogenesis_reactions

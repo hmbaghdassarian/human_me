@@ -11,7 +11,7 @@ import random
 import cobra
 from Bio.Seq import Seq
 from Bio.Alphabet import generic_dna, generic_rna
-from Bio.SeqUtils import molecular_weight as calculate_molecular_weight
+# from Bio.SeqUtils import molecular_weight as calculate_molecular_weight
 
 import requests, sys, json, re, warnings
 
@@ -151,7 +151,7 @@ class gene_information():
         self.mrna_seq = Seq(mrna_seq, generic_rna)
         self.protein_seq = protein_seq
         
-        self.protein_mass = calculate_molecular_weight(seq=self.protein_seq, seq_type='protein')/1000 #kDa
+#         self.protein_mass = calculate_molecular_weight(seq=self.protein_seq, seq_type='protein')/1000 #kDa
         self.L_protein = len(self.protein_seq)
         self.amino_acid_counts = {k: self.protein_seq.count(k) for k in params.amino_acids}
         

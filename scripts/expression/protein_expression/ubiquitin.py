@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[4]:
+# In[25]:
 
 
 import cobra
@@ -18,12 +18,14 @@ from uniform_processes import biomass
 
 from expression.gene_information import gene_information
 import expression.build_mrna_expression_reactions as build_mrna
-from expression.protein import cytosolic_translation as c_trln
+from expression.protein_expression import cytosolic_translation as c_trln
+
+from macromolecules.protein import Protein
 
 
 # Ubiquitin expression
 
-# In[5]:
+# In[26]:
 
 
 def express_ubiquitin(compress_mrna = False):
@@ -43,8 +45,7 @@ def express_ubiquitin(compress_mrna = False):
     monoub_aa_counts = {k: single_ubiquitin_sequence.count(k) for k in params.amino_acids}
     L_monoub = len(single_ubiquitin_sequence)
     n_ub_monomers = ubc_info.protein_seq.count(single_ubiquitin_sequence)
-    ub_c = func.make_protein_metabolite(id_ = 'ubiquitin_monomer', amino_acid_counts = monoub_aa_counts,
-                                   L_protein = L_monoub, compartment = 'c')
+    ub_c = Protein(compartment = 'c', id_ = 'ubiquitin_monomer', amino_acid_counts = monoub_aa_counts)
 
 
     ubc_translation_reaction_cytosolic, ubc_c = c_trln.translate_protein_cytosolic(ubc_info, ubc_transcript_c, ubc_deg_proxy)
@@ -53,7 +54,7 @@ def express_ubiquitin(compress_mrna = False):
     ubiquitin_monomerization_ubc.subsytem = 'Protein_Expression'
 
 
-    biomass_change = n_ub_monomers*(ub_c.formula_weight/1000) - ubc_c.formula_weight/1000 
+    biomass_change = n_ub_monomers*(ub_c.mass) - ubc_c.mass
     rxn = {ubc_c:-1, ub_c: n_ub_monomers, metab.seq_amino_acid_map_c[ubc_info.protein_seq[n_ub_monomers*76:]]: 1, 
           metab.h2o_c: -n_ub_monomers, biomass.protein_: biomass_change}
     ubiquitin_monomerization_ubc.add_metabolites(rxn)
@@ -77,7 +78,7 @@ def express_ubiquitin(compress_mrna = False):
     ubiquitin_monomerization_ubb = cobra.Reaction(ubb_info.hgnc_id + '_MONOMERIZATIONc')
     ubiquitin_monomerization_ubb.subsytem = 'Protein_Expression'
 
-    biomass_change = n_ub_monomers*(ub_c.formula_weight/1000) - ubb_c.formula_weight/1000 
+    biomass_change = n_ub_monomers*(ub_c.mass) - ubb_c.mass 
     rxn = {ubb_c:-1, ub_c: n_ub_monomers, metab. seq_amino_acid_map_c[ubb_info.protein_seq[n_ub_monomers*76:]]: 1, 
           metab.h2o_c: -n_ub_monomers, biomass.protein_: biomass_change}
     ubiquitin_monomerization_ubb.add_metabolites(rxn)
@@ -85,13 +86,13 @@ def express_ubiquitin(compress_mrna = False):
 
     # breakdown of the polyubiquitin cleaved from proteins in ubiquitin-proteasome pathway
     polyub_aa_counts = {aa_code: aa_count*params.n_ub for aa_code, aa_count in monoub_aa_counts.items()}
-    polyub_c = func.make_protein_metabolite(id_ = 'cleaved_polyubiquitin_moiety', amino_acid_counts = polyub_aa_counts,
-                                   L_protein = L_monoub*params.n_ub, compartment = 'c')
+    polyub_c = Protein(id_ = 'cleaved_polyubiquitin_moiety', amino_acid_counts = polyub_aa_counts,
+                        compartment = 'c')
     ubiquitin_monomerization_polyub = cobra.Reaction('POLYUBIQUITIN_MONOMERIZATIONc')
     ubiquitin_monomerization_polyub.subsytem = 'Protein_Expression'
 
 
-    biomass_change = params.n_ub*(ub_c.formula_weight/1000) - polyub_c.formula_weight/1000 
+    biomass_change = params.n_ub*(ub_c.mass) - polyub_c.mass 
     rxn = {polyub_c:-1, ub_c: params.n_ub, metab.h2o_c: -(params.n_ub-1), biomass.protein_: biomass_change}
     ubiquitin_monomerization_polyub.add_metabolites(rxn)
     ubiquitin_monomerization_polyub.gene_reaction_rule = mach.USP5[0]
@@ -116,7 +117,7 @@ def express_ubiquitin(compress_mrna = False):
     degradation_ub = cobra.Reaction('UBIQUITIN_MONOMER_DEGRADATIONc')
     degradation_ub.subsytem = 'Protein_Expression'
     rxn = {metab.seq_amino_acid_map_c[aa_code]: aa_counts for aa_code, aa_counts in monoub_aa_counts.items()}
-    rxn[ub_c], rxn[biomass.protein_] = -1, -ub_c.formula_weight/1000 
+    rxn[ub_c], rxn[biomass.protein_] = -1, -ub_c.mass 
     rxn[metab.h2o_c] =  -(L_monoub-1)
     # atp hydrolysis for translocation/unfolding by 26S - known 1 ATP per 2 residues - https://www.nature.com/articles/s41586-018-0736-4
     rxn = func.hydrolyze_atp(rxn, n_atp = L_monoub/2, compartment = 'c')

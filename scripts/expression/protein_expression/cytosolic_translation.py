@@ -15,9 +15,10 @@ from utils import functions as func
 from utils import utils_2
 
 from uniform_processes import biomass
+from macromolecules.protein import Protein
 
 
-# In[2]:
+# In[8]:
 
 
 def translate_protein_cytosolic(gene_info, mrna_transcript_c, mrna_deg_proxy):    
@@ -48,9 +49,7 @@ def translate_protein_cytosolic(gene_info, mrna_transcript_c, mrna_deg_proxy):
     
 
     rxn_c = rxn.copy()
-    unfolded_protein_c = func.make_protein_metabolite(id_ = gene_info.hgnc_id + '_unfolded', 
-                amino_acid_counts = gene_info.amino_acid_counts, L_protein = gene_info.L_protein,
-                compartment = 'c')
+    unfolded_protein_c = Protein(compartment = 'c', id_ = 'unfolded', gene_info = gene_info)
     rxn_c[unfolded_protein_c] = 1
     
     # coupling
@@ -58,7 +57,7 @@ def translate_protein_cytosolic(gene_info, mrna_transcript_c, mrna_deg_proxy):
     rxn_c[mrna_transcript_c] = -gene_info.coupling['c1'] # couple mrna dilution to protein synthesis
     
     # biomas
-    rxn_c[biomass.protein_] = gene_info.protein_mass
+    rxn_c[biomass.protein_] = unfolded_protein_c.mass
     
     translation_elongation = func.ME_Reaction(gene_info.hgnc_id + '_TRANSLATION_ELONGATIONc', 
                                              type_ = ['translation'])
@@ -69,25 +68,33 @@ def translate_protein_cytosolic(gene_info, mrna_transcript_c, mrna_deg_proxy):
 
     return translation_elongation, unfolded_protein_c
 
-def fold_protein_cytosolic(gene_info, unfolded_protein_c):
-    # extending proteostasis network in the future would be good
-    # will need to make sure inputs to each compartment-specific reactions are at the correct folding stage
-    # e.g., mitochondria currently takes unfolded protein, and in future we may want it to take a partially folded
-    
-    folded_protein_c = unfolded_protein_c.copy()
-    folded_protein_c.id = folded_protein_c.id.replace('unfolded', 'folded')
-    rxn = {unfolded_protein_c: -1, folded_protein_c: 1}
-    protein_folding = cobra.Reaction(gene_info.hgnc_id + '_CYTOSOLIC_PROTEIN_FOLDING')
-    protein_folding.subsytem = 'Protein_Expression'
-    
-    if gene_info.L_protein > 100: #chaperone assisted for larger proteins - https://www.nature.com/articles/nature10317
-        rxn = func.hydrolyze_atp(rxn, n_atp = gene_info.L_protein*params.proteolysis_translocation_atp_cost, compartment = 'c')
-        protein_folding.gene_reaction_rule = ' and '.join(mach.HSP40_c + mach.HSP70_c) # GPRs
-    
-    
-    protein_folding.add_metabolites(rxn)
 
-    
-    
-    return protein_folding, folded_protein_c
+# In[9]:
+
+
+# import random
+# import cobra
+# import pandas as pd
+# from utils import parameters as params
+# from utils import functions as func
+
+
+# psim_toy = pd.DataFrame(columns = ['HGNC_ID', 'PREMRNA_SEQ', 'MRNA_SEQ', 'PROTEIN_SEQ', 'POLYA_LENGTH', 'TMD', 
+#                                'SP', 'N_INTRONS', 'DSB', 'GPI', 'OG', 'LOCATION'])
+
+# hgnc_id, premrna_seq = 'HGNC:TOY', ''.join(random.choices(['U', 'C', 'G', 'A'], k = 100))
+# mrna_seq = premrna_seq[25:75]
+# # note that there is no check that the protein_sequence corresponds to the mrna_sequence beyond checking for the length
+# protein_seq = ''.join(random.choices(params.amino_acids, k = int(len(mrna_seq)/3)))
+# polyA_length, tmd, sp, n_introns, dsb, gpi, og  = None, 1, True, 0, 2, 2, 2
+# location = ['c'] # cytoplasm and golgi
+
+# psim_toy.loc[0,:] = [hgnc_id, premrna_seq, mrna_seq, protein_seq, polyA_length, tmd, sp, n_introns, dsb, gpi, og, location]
+# from expression.gene_information import gene_information
+# gene_info = gene_information(hgnc_id, premrna_seq, mrna_seq, protein_seq,
+#                  ptms = {'dsb': dsb, 'og': og, 'gpi': gpi}, tmd = tmd, sp = sp, polyA_length = polyA_length, 
+#                  n_introns = n_introns)
+# gene_info.get_final_locations(metabolic_model = cobra.Model(''), final_locations = location)
+# import expression.build_mrna_expression_reactions as build_mrna
+# mrna_reactions, mrna_transcript_c, mrna_deg_proxy = build_mrna.get_mrna_expression_reactions(gene_info)
 

@@ -35,8 +35,8 @@
  Columns       10459         803         375           4        9277
 
  No. of matrix elements               141858     Density       0.169
- Biggest                          1.7320E+07  (excluding fixed columns,
- Smallest                         5.2339E-19   free rows, and RHS)
+ Biggest                          1.7297E+07  (excluding fixed columns,
+ Smallest                         1.1369E-13   free rows, and RHS)
 
  No. of objective coefficients             0
 
@@ -53,57 +53,59 @@
  Scaling
  -------
              Min elem    Max elem       Max col ratio
- After  0    5.23E-19    1.73E+07     5.435674676E+21
- After  1    6.57E-19    1.00E+02     1.520980049E+20
- After  2    3.07E-18    1.00E+02     3.259720291E+19
- After  3    7.79E-18    1.00E+02     1.284295021E+19
- After  4    1.34E-17    1.00E+02     7.458161939E+18
- After  5    1.84E-17    1.00E+02     5.442047342E+18
- After  6    2.35E-17    1.00E+02     4.256722779E+18
- After  7    2.98E-17    1.00E+02     3.351799546E+18
- After  8    3.55E-17    1.00E+02     2.815911309E+18
- After  9    4.09E-17    1.00E+02     2.446915215E+18
- After 10    4.54E-17    1.00E+02     2.202535836E+18
+ After  0    1.14E-13    1.73E+07     7.249591966E+13
+ After  1    6.58E-17    1.00E+02     1.520493188E+18
+ After  2    6.58E-15    1.00E+02     1.520493188E+16
+ After  3    1.33E-14    1.00E+02     7.523469511E+15
+ After  4    1.33E-14    1.00E+02     7.523469511E+15
 
             Min scale                       Max scale      Between 0.5 and 2.0
- Col     18   1.0E-05            Col   4593   2.4E+03             1106    10.6
- Row   4529   1.1E-03            Row    710   4.1E+05              404     5.0
+ Col    631   1.9E-07            Col     48   2.4E+01             1264    12.1
+ Row    640   4.6E-04            Row   4503   6.5E+06              159     2.0
 
- Norm of fixed columns and slacks             8.9E+10
- (before and after row scaling)               7.6E+10
+ Norm of fixed columns and slacks             8.9E-08
+ (before and after row scaling)               1.3E-10
 
 
  Crash option  3
 
  Crash on linear E  rows:
- Slacks     0  Free cols   350  Preferred     0
- Unit     578  Double      780  Triangle   2850  Pad  3447
+ Slacks     0  Free cols   327  Preferred     0
+ Unit    1370  Double      547  Triangle   2359  Pad  3402
 1
  
  Iterations
  ----------
- Singular(m=n)  rank     7990  n-rank      16  nsing       16
+ Singular(m=n)  rank     7983  n-rank      23  nsing       23
 
       Itn     dj     ninf   sinf       objective       LU
-        1 -4.7E+02    177 1.240E+00 -1.00000000E+09    46644
- Itn     1012 --     105  nonbasics set on bound, basics recomputed
+        1 -9.2E+02     69 1.329E-09 -1.00000000E-09    51179
+ Itn     5359 --     339  nonbasics set on bound, basics recomputed
+ 
+ Itn     5359 -- linear E rows feasible.   Obj =  -1.000000000E-09
+
+ Crash on linear LG rows:
+ Slacks     1  Free cols     0  Preferred     0
+ Unit       0  Double        0  Triangle      0  Pad     0
+ 
+ Itn     5359 -- feasible solution.  Objective =   1.000000000E-09
+ 
 1
  
- EXIT -- the problem is infeasible
+ EXIT -- optimal solution found
 
- NEW BASIS file saved on file  11    itn =   1074
+ NEW BASIS file saved on file  11    itn =   5359
 
  Problem name                 lp      
- No. of iterations                1074   Objective value      1.0000000000E+09
- No. of infeasibilities             14   Sum of infeas        1.2314766553E+00
- No. of degenerate steps           853   Percentage                      79.42
- Max x       (scaled)     1000 2.5E-02   Max pi      (scaled)     4520 4.8E+03
- Max x                   10447 1.0E+09   Max pi                    740 3.4E-08
- Max Prim inf(scaled)    11643 1.0E+00   Max Dual inf(scaled)     7467 3.0E-17
- Max Primal infeas       11643 8.9E+10   Max Dual infeas          7467 1.9E-31
+ No. of iterations                5359   Objective value      1.0000000000E-09
+ No. of degenerate steps          4144   Percentage                      77.33
+ Max x       (scaled)      842 1.4E-07   Max pi      (scaled)     8006 1.0E+00
+ Max x                     525 1.4E-06   Max pi                   8006 1.0E+00
+ Max Prim inf(scaled)     6036 3.7E-21   Max Dual inf(scaled)        0 0.0E+00
+ Max Primal infeas       13194 2.4E-15   Max Dual infeas             0 0.0E+00
 
  Time for MPS input                           0.00 seconds
- Time for solving problem                     7.08 seconds
+ Time for solving problem                    82.10 seconds
  Time for solution output                     0.03 seconds
  Time for constraint functions                0.00 seconds
  Time for objective function                  0.00 seconds

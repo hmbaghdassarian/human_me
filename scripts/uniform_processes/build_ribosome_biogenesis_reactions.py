@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[1]:
+# In[25]:
 
 
 import cobra
@@ -23,18 +23,19 @@ from utils import utils_2
 
 from macromolecules.complex import Complex, get_complex_biomass_change
 from macromolecules.RNA import rRNA, RNA_fragment
+from macromolecules.protein import Protein
+
 
 from uniform_processes import biomass
 
-
 import expression.build_mrna_expression_reactions as build_mrna
-from expression.protein import cytosolic_translation as c_trln
-from expression.protein import build_protein_expression_reactions as build_protein
+from expression.protein_expression import cytosolic_translation as c_trln
+from expression.protein_expression import build_protein_expression_reactions as build_protein
 
 
 # # rRNA
 
-# In[2]:
+# In[19]:
 
 
 # rrna sequences
@@ -147,15 +148,14 @@ def build_ribosome_protein_expression_reactions(ub_args, compress_mrna = False):
     
     gene_info.final_locations = {'n': 'Cytosolic Tranport'}
 
-    processed_unfolded_protein_c = func.make_protein_metabolite(id_ = RPL40_HGNC + '_processed_unfolded',
-                                    amino_acid_counts = gene_info.amino_acid_counts, 
-                                                           L_protein = len(processed_seq), compartment = 'c')
+    processed_unfolded_protein_c = Protein(id_ = RPL40_HGNC + '_processed_unfolded',compartment = 'c',
+                                    amino_acid_counts = gene_info.amino_acid_counts)
     ub_cleavage = cobra.Reaction(gene_info.hgnc_id + '_UBIQUITIN_CLEAVAGEc')
     ub_cleavage.subsytem = 'Protein_Expression'
     
     
-    biomass_product = (processed_unfolded_protein_c.formula_weight - ub_args['ub_c'].formula_weight)/1000
-    biomass_reactant = unfolded_protein_c.formula_weight/1000 
+    biomass_product = (processed_unfolded_protein_c.mass - ub_args['ub_c'].mass)
+    biomass_reactant = unfolded_protein_c.mass 
     biomass_change = biomass_product - biomass_reactant
     ub_cleavage.add_metabolites({unfolded_protein_c:-1, metab.h2o_c: -1, 
                                  ub_args['ub_c']: 1, processed_unfolded_protein_c: 1, 

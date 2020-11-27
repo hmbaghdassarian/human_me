@@ -5,16 +5,13 @@
 
 
 import cobra
-# from cobra.core.gene import parse_gpr
 
 import pandas as pd
 import itertools
-# import ast
 
 import os
 import sys
 sys.path.insert(1, '../../scripts/') # comment out in python script
-# from utils.load_environmental_variables import *
 from utils import metabolites as metab
 from utils import parameters as params
 
@@ -56,24 +53,6 @@ def get_reaction_compartment(reaction):
         raise ValueError('Mapped reaction to a compartment that is not allowed in ME model')
     else:
         return compartments_[0]
-
-
-# def get_reaction_compartment(reaction):
-#     '''Input is a cobra.Reaction, output is a singular compartment. This function maps reactions to a particular 
-#     compartment according to some rules'''
-    
-#     compartments_ = list(reaction.compartments.copy())
-#     if len(compartments_) > 1: # for reactions that occur in more than one compartment
-#         if 'c' in compartments_ and len(compartments_) == 2: # remove cytoplasmic compartment between the two for machinery
-#             compartments_.remove('c')
-#         else: # choose most common compartment 
-#             compartments_ = [max(compartments_, key = compartments_.count)]
-#     if len(compartments_) > 1:
-#         raise ValueError('Failed to map reaction to a singular compartment')
-#     elif compartments_[0] not in params.compartments.keys():
-#         raise ValueError('Mapped reaction to a compartment that is not allowed in ME model')
-#     else:
-#         return compartments_[0]
 
 
 # In[4]:
@@ -156,42 +135,6 @@ def get_base_counts_and_elements(seq, triphosphate = True):
     return base_counts, elements
 
 
-# In[8]:
-
-
-def make_protein_metabolite(id_, amino_acid_counts, L_protein, compartment):
-    '''
-    ID is a string to name the protein metabolite. 
-    Amino acid counts is a dictionary with keys as the aa one letter code and counts as the number of occurences of that amino acid in the protein sequence
-    L_protein is the length of the protein
-    Compartment is the location of the protein (one letter string, corresponds to Recon2.2s compartments)
-    
-    Will return a cobra.Metabolite object with relevant charge and elements.
-    
-    '''
-    
-    protein_metabolite = cobra.Metabolite(id_ + '_protein_' + compartment)
-    protein_metabolite.compartment = compartment
-    
-    elements = {'C': 0, 'H': 0, 'N': 0, 'O': 0, 'S': 0}
-    if compartment in metab.seq_amino_acid_map_compartments.keys():
-        for aa_code, aa_count in amino_acid_counts.items():
-            aa_elements = metab.seq_amino_acid_map_compartments[compartment][aa_code].elements
-            for element in aa_elements:
-                elements[element] += aa_count*aa_elements[element]
-    else:
-        raise ValueError('Must add this compartment to make_protein_metabolite function')
-
-    # peptide bond formation
-    elements['H'] -= 2*(L_protein-1)
-    elements['O'] -= 1*(L_protein-1)
-
-    protein_metabolite.elements = elements
-    # assume charge of amino acid is the ssame regardless of metabolite
-    protein_metabolite.charge = sum([metab.seq_amino_acid_map_compartments[compartment][aa_code].charge*aa_count for aa_code, aa_count in amino_acid_counts.items()])
-    return protein_metabolite
-
-
 # In[12]:
 
 
@@ -200,105 +143,6 @@ def parse_me_reaction_id(x):
         return '_'.join(x.split('_')[1:])
     else:
         return x
-
-
-# In[13]:
-
-
-# def eval_complex_recur_full(expr):
-#     '''
-    
-#     Recursive parsing of gprs into lists of complexes. Input expr is a cobra.parse_gpr(gpr_string), 
-#     output is a list of lists, each entry of which is a complex joined by 'AND'; netsted lists are joined 
-#     with each other by 'OR'. 
-    
-#     Inspired by corda source code, should cite them.
-    
-#     '''
-    
-#     # corda: https://github.com/resendislab/corda/blob/master/corda/util.py
-#     if isinstance(expr, ast.Expression):
-#         return eval_complex_recur_full(expr.body) # Here!
-#     elif isinstance(expr, ast.Name):
-#         return cobra.core.gene.ast2str(expr)
-#     elif isinstance(expr, ast.BoolOp):
-#         op = expr.op
-#         if isinstance(op, ast.Or):
-#             return [eval_complex_recur_full(i) for i in expr.values] # Here!
-#         elif isinstance(op, ast.And):
-#             or_op = False
-#             names = []
-#             bool_ors = []
-#             bool_ands = []
-#             for e in expr.values:
-#                 if isinstance(e, ast.BoolOp):
-#                     if isinstance(e.op, ast.Or):
-#                         or_op = True
-#                         bool_ors.append(e)
-#                     else:
-#                         bool_ands.append(e)
-#                 elif isinstance(e, ast.Name):
-#                     names.append(eval_complex_recur_full(e))
-            
-#             if or_op:
-#                 product = []
-#                 if len(bool_ors) > 1:
-#                     product = list(itertools.product(*[eval_complex_recur_full(i) for i in bool_ors]))
-                    
-                    
-#                 ba_lists = []
-#                 for ba in bool_ands:
-#                     ba_list = [eval_complex_recur_full(j) for i in bool_ands for j in i.values]
-#                     ba_lists.append(ba_list)
-                
-#                 result = []    
-#                 if len(ba_lists) > 0:
-#                     bal_results = [eval_complex_recur_full(bal) for bal in ba_lists]
-#                     for br in bal_results:
-#                         if len(product) == 0:
-#                             result += [[eval_complex_recur_full(j)] + names + br for i in bool_ors for j in i.values] # Here!
-#                         else:
-#                             result += [list(p) + names + br for p in product]
-#                 else:
-#                     if len(product) == 0:
-#                         result += [[eval_complex_recur_full(j)] + names for i in bool_ors for j in i.values] # Here!
-#                     else:
-#                         result += [list(p) + names for p in product]
-#                 return result
-                    
-#             else:
-#                 return [eval_complex_recur_full(i) for i in expr.values] # Here!
-
-# def unnested_list(nested_list):
-#     lists = []
-#     non_lists = []
-#     for l in nested_list:
-#         if isinstance(l, list):
-#             lists.append(l)
-#         else:
-#             non_lists.append(l)
-#     size = len(lists)
-#     if size == len(nested_list):
-#         new_list = []
-#         for l in lists:
-#             new_list += unnested_list(l)
-#         return new_list
-#     elif size == 0:
-#         return [nested_list]
-#     else:
-#         return [item for sublist in [unnested_list(l) for l in lists] for item in sublist] + non_lists
-    
-# def eval_complex(expr):
-#     '''Input is a gene reaction rule, output is a list. If the length of the list is longer than 1, these are
-#     due to the presence of OR. If the entry itself is a list longer than one, this entry is a complex.'''
-    
-#     complexes = unnested_list(eval_complex_recur_full(parse_gpr(expr)[0]))
-    
-#     # make sure machinery is always output in the same order
-#     for i in range(len(complexes)):
-#         if isinstance(complexes[i],list):
-#             complexes[i] = sorted(complexes[i])
-#     return complexes
 
 
 # In[14]:
@@ -780,44 +624,4 @@ class ME_Model(cobra.Model):
         return solve_me.solve_lp(me_model = self, mu_val = mu_val, objective = objective, 
                                  close_biomass_dilution = close_biomass_dilution,
                                  solver_type = solver_type, precision = precision)
-
-
-# In[18]:
-
-
-# # test LP
-# test_model = ME_Model(cobra.io.load_json_model('/data2/hratch/Software/qminos_solver/solvemepy/examples/models/iJO1366.json'))
-# # test_model.constraints[0].lb = -5
-# # test_model.constraints[0].ub = 2
-
-# # test_model.constraints[20].ub = 50
-# # test_model.constraints[20].lb = 30
-# xq,statq,hsq = test_model.solve_lp(mu_val = 0.03, objective = {'BIOMASS_Ec_iJO1366_core_53p95M': 1}, 
-#                                   precision = 'quad')
-
-
-# In[19]:
-
-
-# test_model = cobra.io.load_json_model('/data2/hratch/Software/qminos_solver/solvemepy/examples/models/iJO1366.json')
-# test_model.objective = {test_model.reactions.BIOMASS_Ec_iJO1366_core_53p95M: 1}
-
-
-# In[20]:
-
-
-# test_reaction = ME_Reaction('test', type_ = ['catalysis'])
-
-
-# A, B, C = cobra.Metabolite('mA'), cobra.Metabolite('mB'), cobra.Metabolite('mC')
-# rxn_A, rxn_B = ME_Reaction('rA', type_ = ['translation']), ME_Reaction('rB', type_ = ['translation'])
-# rxn_C = ME_Reaction('rC', type_ = ['biomass'])
-# rxn_A.add_metabolites({A: -2*params.mu, B: 3*params.mu, C: 2})
-# rxn_B.add_metabolites({C: -5*params.mu, B: 10})
-# rxn_C._lower_bound, rxn_C._upper_bound = params.mu, params.mu
-
-# test_model = ME_Model('test')
-# test_model.add_reactions([rxn_A, rxn_B, rxn_C])
-
-# xq,statq,hsq = test_model.solve_lp(mu_val = 0.03, objective = {'rA': 1})
 
