@@ -354,10 +354,10 @@ class me_builder():
             compartment = unique_complexes.loc[i, 'compartment']
             machinery = unique_complexes.loc[i, 'machinery'].split(';')
 
-            if len(complex_id) > 256-8-4-(7*len(machinery)): # ids that are too long
-                new_complex_ids[complex_id] = str(counter)
-                complex_id = str(counter)
-                counter += 1
+#             if len(complex_id) > 256-8-4-(7*len(machinery)): # ids that are too long
+#                 new_complex_ids[complex_id] = str(counter)
+#                 complex_id = str(counter)
+#                 counter += 1
 
 
             machinery_metabolites = list()
@@ -370,10 +370,9 @@ class me_builder():
                     machinery_metabolites.append(self.ribosome_complex_c)
                     metabolite_types.append('complex')
 
-            complex_info = {'METABOLITES': machinery_metabolites, 'IDS': [m.id for m in machinery_metabolites], 
-                           'METABOLITE_TYPES': metabolite_types}
-            complex_metabolite = Complex(reaction_id = complex_id, complex_id = complex_id, **complex_info)
-            complex_reaction = complex_metabolite.form_complex()
+
+            complex_metabolite = Complex(metabolites = machinery_metabolites, complex_id = complex_id)
+            complex_reaction = complex_metabolite.form_complex(reaction_id = complex_id)
 
             complex_formation_reactions.append(complex_reaction)
             self.complex_id_metabolite_map[complex_id] = complex_metabolite
@@ -399,7 +398,7 @@ class me_builder():
             else:
                 enzyme_to_couple = self.complex_id_metabolite_map[self.complex_df.loc[i, 'complex_id']]
 
-            self.complex_df.loc[i, 'MW_kDa'] = enzyme_to_couple.formula_weight/1000 
+            self.complex_df.loc[i, 'MW_kDa'] = enzyme_to_couple.mass 
 
         self.complex_df['SASA'] = self.complex_df.MW_kDa.apply(lambda x: func.SASA(x))
         median_SASA = self.complex_df.SASA.median()

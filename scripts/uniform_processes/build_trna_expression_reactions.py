@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[1]:
+# In[28]:
 
 
 import warnings
@@ -27,7 +27,7 @@ from uniform_processes import biomass
 
 # # TRNA Information Class
 
-# In[2]:
+# In[29]:
 
 
 class trna_information():
@@ -101,7 +101,7 @@ class trna_information():
 
 # # Reactions
 
-# In[3]:
+# In[30]:
 
 
 # def update_trna_degradation(trna_degradation_reaction):
@@ -110,7 +110,7 @@ class trna_information():
 #     return trna_degradation_reaction
 
 
-# In[4]:
+# In[31]:
 
 
 class express_trna():
@@ -148,7 +148,7 @@ class express_trna():
                 five_leader = RNA_fragment(metabolite_name=self.trna_info.id, seq = self.trna_info.five_leader_seq, 
                     compartment = 'n', triphosphate = True, fragment_type = '5_leader')
 
-                other_trna_biomass += five_leader.formula_weight/1000
+                other_trna_biomass += five_leader.mass
 
                 rxn[five_leader] = 1
                 rxn[metab.h2o_n] -= 1 #endonuclolytic cleavage (RNAse P)
@@ -164,7 +164,7 @@ class express_trna():
 
         self.trna_n = tRNA(metabolite_name=self.trna_info.id, seq = self.trna_info.maturetrna_sequence, 
                           compartment = 'n', triphosphate = tp)
-        biomass_change = (self.trna_n.formula_weight - self.pretrna_n.formula_weight)/1000
+        biomass_change = (self.trna_n.mass - self.pretrna_n.mass)
         rxn[self.trna_n], rxn[biomass.trna_] = 1, biomass_change
 
         # 3' cleavage
@@ -172,7 +172,7 @@ class express_trna():
             three_trailer = RNA_fragment(metabolite_name = self.trna_info.id, seq = self.trna_info.three_trailer_seq, 
                                           fragment_type = '3_trailer',
                                          compartment = 'n',triphosphate = False)
-            other_trna_biomass += three_trailer.formula_weight/1000
+            other_trna_biomass += three_trailer.mass
             rxn[three_trailer] = 1
             rxn[metab.h2o_n] -= 1 #endonuclolytic cleavage (RNase Z)
             trna_processing_machinery += mach.RNASEZ
@@ -191,7 +191,7 @@ class express_trna():
                                             seq = self.trna_info.intron_sequences[i], fragment_type = 'trna_intron', 
                                             compartment = 'n', triphosphate = False)
 
-                other_trna_biomass += trna_intron_n.formula_weight/1000
+                other_trna_biomass += trna_intron_n.mass
                 rxn[trna_intron_n] = 1
 
                 intron_degradation = trna_intron_n.exonucleolytic_degradation(reaction_name = self.trna_info.id + "_intron_" + str(i) + '_tRNA', 
@@ -225,9 +225,7 @@ class express_trna():
             trna_modifications_nuclear = None
             self.modified_trna_n = self.trna_n # not copy, same object
     def primary_export_trna(self):
-        self.trna_c = self.modified_trna_n.copy()
-        self.trna_c.id = '_'.join(self.trna_c.id.split('_')[:-1]) + '_c'
-        self.trna_c.compartment = 'c'
+        self.trna_c = self.modified_trna_n.change_compartment('c')
 
         trna_primary_export = cobra.Reaction(self.trna_info.id + 'PRIMARY_EXPORTtn')
         trna_primary_export.subsytem = 'tRNA_Biogenesis'
@@ -281,16 +279,17 @@ class express_trna():
                     elements[element] += count
                 else:
                     elements[element] = count
-
-            charged_trna_c = cobra.Metabolite('charged_' + self.trna_info.id + '_' + code + '_trna_c')
-            charged_trna_c.compartment = 'c'
+            
+            charged_trna_c = tRNA(metabolite_name='charged_' + self.trna_info.id + '_' + code, 
+                                 seq = '', compartment = 'c', triphosphate = self.modified_trna_c.triphosphate)
             charged_trna_c.elements = elements
+            charged_trna_c.update_mass()
             # +1 for loss of negative charge on oxygen of amino acid
             charged_trna_c.charge = self.modified_trna_c.charge + aa.charge + 1 
 
             trna_charging = cobra.Reaction('CHARGING_TRNA_' + self.trna_info.id + '_' + code)
             trna_charging.subsytem = 'tRNA_Biogenesis'
-            biomass_change = (charged_trna_c.formula_weight - self.modified_trna_c.formula_weight)/1000
+            biomass_change = (charged_trna_c.mass - self.modified_trna_c.mass)
             rxn = {self.modified_trna_c: -1, aa: -1, charged_trna_c: 1, metab.atp_c: -1, metab.ppi_c: 1, 
                    metab.amp_c: 1, biomass.trna_: biomass_change}
             trna_charging.add_metabolites(rxn)
@@ -313,7 +312,7 @@ class express_trna():
         self.charged_trna_metabolites = charged_trna_metabolites
 
 
-# In[5]:
+# In[32]:
 
 
 def trna_biogenesis(trna_info):
@@ -333,7 +332,7 @@ def trna_biogenesis(trna_info):
 # 
 # positionally-independent (position won't effect .elements of cobra.Metabolite in cobra.Reaction)
 
-# In[6]:
+# In[33]:
 
 
 def get_base_frequency(seq_col, L):
@@ -390,7 +389,7 @@ mature_seq += 'CCA'
 
 # # Generate reactions
 
-# In[7]:
+# In[34]:
 
 
 trna_info = trna_information(maturetrna_sequence = mature_seq , id_ = 'generic', three_trailer_seq = trailer_seq, 

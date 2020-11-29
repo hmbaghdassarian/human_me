@@ -129,6 +129,7 @@ def protein_polyubiquitination(gene_info, protein_metabolite, compartment, ub_ar
         elements['H'] -= 2*(ub_args['L_monoub']*params.n_ub) # no -1 bc already accounted for in copying elements
         elements['O'] -= 1*(ub_args['L_monoub']*params.n_ub)
         polyub_protein_pm.elements = elements
+        polyub_protein_pm.update_mass()
         
         biomass_products = polyub_protein_pm.mass 
         biomass_substrates = protein_metabolite.mass + (params.n_ub*ub_args['ub_c'].mass)
@@ -581,6 +582,7 @@ def form_disulfide_bond(gene_info, folded_protein_r):
     elements = folded_protein_r.elements.copy()
     elements['H'] -= 2*number_DSB
     modified_protein_dsb_r.elements = elements
+    modified_protein_dsb_r.update_mass()
     # diagram https://www.google.com/url?sa=i&url=https%3A%2F%2Fen.wikipedia.org%2Fwiki%2FProtein_disulfide-isomerase&psig=AOvVaw0bGpff4XX1eYEF61H1RJKw&ust=1597273135069000&source=images&cd=vfe&ved=0CAIQjRxqFwoTCJi6l6GglOsCFQAAAAAdAAAAABAJ
     # incorporate exchange with PDI in future versions
     rxn = {folded_protein_r: -1, modified_protein_dsb_r: 1, metab.o2_r: -number_DSB, metab.h2o2_r: number_DSB, 
@@ -712,6 +714,7 @@ def glycosylate_o_linked(gene_info, protein_g):
         else:
             elements[e] = c
     modified_protein_og_g.elements = elements
+    modified_protein_og_g.update_mass()
 
     rxn = {protein_g: -1, modified_protein_og_g: 1, metab.udpacgal_g: -number_Oglycans, 
            metab.udpgal_g: -number_Oglycans, metab.uacgam_g: -number_Oglycans, metab.h_g: 3*number_Oglycans, 
@@ -881,6 +884,7 @@ def unfold_secretory_protein(gene_info, protein_metabolite):
     ###########
     
     unfolded_protein.elements = elements
+    unfolded_protein.update_mass()
     rxn[unfolded_protein] = 1
     
     biomass_change = (unfolded_protein.mass - protein_metabolite.mass)
