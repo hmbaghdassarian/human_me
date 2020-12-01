@@ -22,14 +22,12 @@ from utils import parameters as params
 from utils import metabolites as metab
 from utils import functions as func
 from utils.polyA_statistics import calculate_polyA_length
+from uniform_processes import biomass
 
 from macromolecules.RNA import RNA_fragment, pre_mRNA, mRNA
-from macromolecules.complex import add_biomass_change
-
-# from uniform_processes.biomass import Constraint
 
 
-# In[2]:
+# In[19]:
 
 
 class express_mrna():
@@ -59,7 +57,10 @@ class express_mrna():
         self.mrna_n.charge += 2#(-self.polyA_length + 2) 
 
         transcript_processing = cobra.Reaction(self.gene_info.hgnc_id + '_TRANSCRIPTION_PROCESSING')
-        rxn = {metab.atp_n: -self.polyA_length, metab.ppi_n: self.polyA_length}# polyA tail
+        transcript_processing.subsytem = 'mRNA_expression'
+        rxn = dict()
+        
+        rxn[metab.atp_n], rxn[metab.ppi_n] = -self.polyA_length, self.polyA_length # polyA tail 
 
         # 5' cap: https://sites.google.com/site/learnorganicchem/organic-molecules/biomolecules/rna/rna-processing?tmpl=%2Fsystem%2Fapp%2Ftemplates%2Fprint%2F&showPrintDialog=1
         rxn[metab.h2o_n], rxn[metab.pi_n] = -1, 1 #rtpase
@@ -82,10 +83,9 @@ class express_mrna():
         processed_elements['C'] += 2 # rxn 3-4: methyltransferase - cap0 and cap1 structure
         processed_elements['H'] += 5 # methyltransferase - cap0 and cap1 structure
         self.mrna_n.elements = processed_elements
-        self.mrna_n.update_mass()
 
-        rxn[self.premrna] = -1
-        rxn[self.mrna_n] = 1
+        rxn[self.premrna], rxn[biomass.premrna_] = -1, -self.premrna.formula_weight/1000
+        rxn[self.mrna_n], rxn[biomass.mrna_] = 1, self.mrna_n.formula_weight/1000
 
         # splicing
         if self.premrna.length > self.mrna_n.length - self.polyA_length: 
@@ -110,12 +110,13 @@ class express_mrna():
             else:
                 n_lariats = self.gene_info.n_introns  
 
-            rxn[self.lariat] = 1
+            rxn[self.lariat], rxn[biomass.other_rna_] = 1, self.lariat.formula_weight/1000
             rxn[metab.h2o_n] -= 1 # endonucleolytic cleavage
             # 10 ATP consumed per intron during splicing
             rxn = func.hydrolyze_atp(rxn, n_atp = 10*n_lariats, compartment = 'n')
             # lariat degradation - no linearization reaction (just one triphosphate consumption)
             lariat_degradation = self.lariat.exonucleolytic_degradation(reaction_name = self.gene_info.hgnc_id + '_lariats')
+            lariat_degradation.subsystem = 'mRNA_expression'
             lariat_degradation.gene_reaction_rule = mach.lm_rule  
             if list(lariat_degradation.compartments) != ['n']:
                 raise ValueError('Lariat degradation must be confined to nuclear compartment')
@@ -135,17 +136,17 @@ class express_mrna():
             self.reactions.append(transcript_processing)
     def export_mrna(self):
         # make the cytosolic mrna metabolite
-        self.mrna_c = self.mrna_n.change_compartment('c')
+        self.mrna_c = self.mrna_n.copy()
+            
+        self.mrna_c.id = '_'.join(self.mrna_c.id.split('_'))[:-1] + 'c'
+        self.mrna_c.compartment = 'c'
 
         # make the transport reaction
         mrna_export = cobra.Reaction(self.gene_info.hgnc_id + '_mRNA_EXPORTtn')
         mrna_export.name = 'mRNA nuclear export'
+        mrna_export.subsytem = 'mRNA_expression'
         rxn = dict()
         rxn[self.mrna_n], rxn[self.mrna_c] = -1, 1
-        
-#         # unecessary (could just use mrna_c directly, but makes Constraint objects consistent)
-#         self.mrna_form_proxy = Constraint(self.gene_info.hgnc_id + '_mrna_form_proxy')
-#         rxn[self.mrna_form_proxy] = 1 
         
         # 10 ATP consumer per transcript exported
         rxn = func.hydrolyze_atp(rxn, n_atp = 10, compartment = 'n')
@@ -160,7 +161,36 @@ class express_mrna():
         else:
             self.mrna_export = mrna_export
             self.reactions.append(mrna_export)
-
+    
+    def demand_mrna(self):
+        rxn = {self.premrna: -1, self.mrna_n: -1, self.mrna_c: -1, 
+               biomass.mrna_: -(self.mrna_c.formula_weight+ self.mrna_n.formula_weight)/1000,
+               biomass.premrna_: -self.premrna.formula_weight/1000}
+        if self.lariat is not None:
+            rxn[self.lariat] = -1
+            rxn[biomass.other_rna_] = -self.lariat.formula_weight/1000
+            
+        mrna_demand = cobra.Reaction('DM_mrna_' + self.gene_info.hgnc_id)
+        mrna_demand.add_metabolites(rxn)
+        
+        self.reactions.append(mrna_demand)
+        
+        # either of these two versions work
+#         mrna_c_demand = cobra.Reaction('DM_mrna[c]_' + self.gene_info.hgnc_id)
+#         mrna_n_demand = cobra.Reaction('DM_mrna[n]_' + self.gene_info.hgnc_id)
+#         premrna_demand = cobra.Reaction('DM_premrna_' + self.gene_info.hgnc_id)
+#         other_rna_demand = cobra.Reaction('DM_other_rna_' + self.gene_info.hgnc_id)
+        
+#         mrna_c_demand.add_metabolites({self.mrna_c: -1, biomass.mrna_: -self.mrna_c.formula_weight/1000})
+#         mrna_n_demand.add_metabolites({self.mrna_n: -1, biomass.mrna_: -self.mrna_n.formula_weight/1000})
+#         premrna_demand.add_metabolites({self.premrna: -1, biomass.premrna_: -self.premrna.formula_weight/1000})
+#         self.reactions += [mrna_c_demand, mrna_n_demand, premrna_demand]
+        
+#         if self.lariat is not None:
+#             other_rna_demand.add_metabolites({self.lariat: -1, biomass.other_rna_: -self.lariat.formula_weight/1000})
+#             self.reactions.append(other_rna_demand)
+                
+            
     def degrade_mrna(self, decapping = True, three_to_five = False):
         '''
 
@@ -185,6 +215,7 @@ class express_mrna():
 
         if three_to_five: 
             transcript_degradation_1 = cobra.Reaction(self.gene_info.hgnc_id + "_3'to5'_mRNA_DEGRADATIONc")
+            transcript_degradation_1.subsytem = 'mRNA_expression'
             rxn_1 = rxn.copy()
 
             rxn_1[metab.ndp_map_c[self.gene_info.mrna_seq[0]]] = 1
@@ -204,6 +235,7 @@ class express_mrna():
                 self.reactions.append(transcript_degradation_1)
         if decapping:
             transcript_degradation_2_decapping = cobra.Reaction(self.gene_info.hgnc_id + "_DECAPPING_mRNA_DEGRADATIONc")
+            transcript_degradation_2_decapping.subsytem = 'mRNA_expression'
 
             rxn_2 = rxn.copy()
             rxn_2[[m for m in rxn_2.keys() if m.id == metab.nmp_map_c[self.gene_info.mrna_seq[0]].id][0]] += 1
@@ -235,6 +267,7 @@ class express_mrna():
         rxn = {rxn_map[k]: v for k,v in rxn.items()}
 
         transcription = cobra.Reaction(self.gene_info.hgnc_id + "_TRANSCRIPTION")
+        transcription.subsytem = 'mRNA_expression'
         transcription.add_metabolites(rxn)
 
         transcription.gene_reaction_rule = ' and '.join(sorted(set([item.id for sublist in [list(r.genes) for r in rxns_to_remove] for item in sublist])))
@@ -245,13 +278,9 @@ class express_mrna():
         for r in rxns_to_remove:
             self.reactions.remove(r)
         self.reactions.append(transcription)
-    def add_biomass(self):
-        for r in self.reactions:
-            r.subsytem = 'mRNA expression'
-            add_biomass_change(r)
 
 
-# In[3]:
+# In[20]:
 
 
 def get_mrna_expression_reactions(gene_info, compress_mrna = False):
@@ -271,7 +300,6 @@ def get_mrna_expression_reactions(gene_info, compress_mrna = False):
     em.degrade_mrna()
     if compress_mrna:
         em.compress_mrna_module()
-    em.add_biomass()
 
     return em.reactions, em.mrna_c, em.mrna_deg_proxy 
 

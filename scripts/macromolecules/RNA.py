@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[34]:
+# In[11]:
 
 
 import cobra
@@ -9,14 +9,14 @@ import sys
 sys.path.insert(1, '../../scripts/')
 from utils import metabolites as metab
 from utils import machinery as mach
+from uniform_processes.biomass import biomass_rna_mapper
 from utils import functions as func
-from macromolecules.macromolecule import Macromolecule
 
 
-# In[33]:
+# In[10]:
 
 
-class RNA(Macromolecule):
+class RNA(cobra.Metabolite):
     def __init__(self, metabolite_name, seq, compartment = 'n', triphosphate = True):
         '''
         
@@ -30,12 +30,13 @@ class RNA(Macromolecule):
         self.sequence = seq
         self.triphosphate = triphosphate
         self.length = len(self.sequence)
-        self.get_base_counts_and_elements()
 
-        Macromolecule.__init__(self, id = rna_id, compartment = compartment, charge = -self.length, elements = self.elements)
+        cobra.Metabolite.__init__(self, id = rna_id, compartment = compartment, charge = -self.length)
         if triphosphate:
             self.charge -= 3
-            
+        
+        self.get_base_counts_and_elements()
+    
     def get_base_counts_and_elements(self):
         '''
         Updates RNA metabolite to have appropriate formula according to sequence
@@ -43,6 +44,30 @@ class RNA(Macromolecule):
         '''
         self.base_counts, self.elements = func.get_base_counts_and_elements(seq = self.sequence, 
                                                                   triphosphate = self.triphosphate)        
+#         base_counts = dict()
+#         for base_letter in metab.seq_element_map.keys():
+#             base_counts[base_letter] = self.sequence.count(base_letter)
+
+#         elements = {'C': 0, 'H': 0, 'N': 0, 'O': 0, 'P': 0}
+#         for base_letter in metab.seq_element_map.keys():
+#             for element in elements.keys():
+#                 elements[element] += base_counts[base_letter]* metab.seq_element_map[base_letter][element]   
+
+#         #3' OH end
+#         elements['H'] += 1 
+#         elements['O'] += 1
+
+#         # 5' end
+#         if self.triphosphate:
+#             elements['P'] += 2
+#             elements['O'] += 6
+#         else:
+#             elements['H'] += 1
+        
+#         self.base_counts = base_counts
+#         self.elements = elements
+        
+#         self.mw = self.formula_weight/1000
     def synthesize(self, id_):
         '''
         Generates a reaction for transcription of an RNA molecule (NTPs-->RNA).
@@ -60,6 +85,7 @@ class RNA(Macromolecule):
         # pyrophosphate released per base added, -1 for 3/5' ends
         rxn[metab.ppi_n] = self.length - 1
         rxn[self] = 1
+        rxn[biomass_rna_mapper[self.type]] = self.formula_weight/1000
         
         rna_synthesis.add_metabolites(rxn)
         
@@ -108,10 +134,16 @@ class RNA(Macromolecule):
         if self.triphosphate: # triphosphate on 5' end
             rxn[metab.nmp_map[self.compartment][self.sequence[0]]] -= 1
             rxn[metab.ntp_map[self.compartment][self.sequence[0]]]  = 1  
-            rxn[metab.h_compartments[self.compartment]] = self.length - 1 
+            rxn[metab.h_compartments[self.compartment]] = self.length - 1 #sum(self.base_counts.values())-1
         else:
-            rxn[metab.h_compartments[self.compartment]] = self.length  # extra H on 5' end <--unsure about this
+            rxn[metab.h_compartments[self.compartment]] = self.length #sum(self.base_counts.values()) # extra H on 5' end <--unsure about this
         
+        
+        
+        if self.type not in biomass_rna_mapper.keys():
+            raise ValueError('RNA type must be specified as one of ' + ', '.join(biomass_rna_mapper.keys()))
+        else:
+            rxn[biomass_rna_mapper[self.type]] = -self.formula_weight/1000 
         
         rna_degradation.add_metabolites(rxn)
         
@@ -166,7 +198,6 @@ class RNA(Macromolecule):
                 for element in new_elements.keys():
                     new_elements[element] += base_counts[base_letter]* metab.seq_element_map[base_letter][element]    
             self.elements = new_elements
-            self.update_mass()
             
         else:
             raise ValueError('Situation in which RNA sequence is removed or replaced has not been implemented yet')

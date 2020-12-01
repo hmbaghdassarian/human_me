@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[1]:
+# In[11]:
 
 
 import cobra
@@ -40,7 +40,7 @@ with warnings.catch_warnings():
 
 # # Generate Protein Expression Reactions for All Machinery
 
-# In[2]:
+# In[12]:
 
 
 def get_all_expression_reactions(hgnc_id, ub_args, psim = params.psim_me, machinery_list = mach.metabolic_machinery, 
@@ -77,7 +77,7 @@ def generate_expression_module(me_reactions):
     return expression_machinery_me, expression_module
 
 
-# In[3]:
+# In[13]:
 
 
 class me_builder():
@@ -346,31 +346,42 @@ class me_builder():
         unique_complexes.reset_index(inplace = True, drop = True)
 
         complex_formation_reactions = list() # store all complex formation reactions
-        #         new_complex_ids = dict()
+        new_complex_ids = dict()
 
+        counter = 0
         for i in unique_complexes.index:
             complex_id = unique_complexes.loc[i, 'complex_id']
             compartment = unique_complexes.loc[i, 'compartment']
             machinery = unique_complexes.loc[i, 'machinery'].split(';')
 
+            if len(complex_id) > 256-8-4-(7*len(machinery)): # ids that are too long
+                new_complex_ids[complex_id] = str(counter)
+                complex_id = str(counter)
+                counter += 1
+
+
             machinery_metabolites = list()
+            metabolite_types = list()
             for m in machinery:
                 if m != 'ribosome':
                     machinery_metabolites.append(self.id_protein_map[m][compartment])
+                    metabolite_types.append('protein')
                 else:
                     machinery_metabolites.append(self.ribosome_complex_c)
+                    metabolite_types.append('complex')
 
-            complex_metabolite = Complex(metabolites = machinery_metabolites, complex_id = complex_id)
-            if len(complex_id) > 247: # ids that are too long
-                complex_metabolite.udate_id()
-                new_id = complex_metabolite.id
-                self.complex_df.complex_id.replace(to_replace = complex_id, value = complex_metabolite.temp_id, 
-                                                   inplace = True)
+            complex_info = {'METABOLITES': machinery_metabolites, 'IDS': [m.id for m in machinery_metabolites], 
+                           'METABOLITE_TYPES': metabolite_types}
+            complex_metabolite = Complex(reaction_id = complex_id, complex_id = complex_id, **complex_info)
             complex_reaction = complex_metabolite.form_complex()
 
             complex_formation_reactions.append(complex_reaction)
-            self.complex_id_metabolite_map[complex_metabolite.temp_id] = complex_metabolite
-            self.complex_reactions_map[complex_metabolite.temp_id] = complex_reaction.id
+            self.complex_id_metabolite_map[complex_id] = complex_metabolite
+            self.complex_reactions_map[complex_id] = complex_reaction
+
+        # ids that were too long
+        for k,v in new_complex_ids.items():
+            self.complex_df.loc[self.complex_df[self.complex_df.complex_id == k].index, 'complex_id'] = v
         
         self.complex_formation_reactions = complex_formation_reactions
     def get_keff(self):
@@ -388,7 +399,7 @@ class me_builder():
             else:
                 enzyme_to_couple = self.complex_id_metabolite_map[self.complex_df.loc[i, 'complex_id']]
 
-            self.complex_df.loc[i, 'MW_kDa'] = enzyme_to_couple.mass 
+            self.complex_df.loc[i, 'MW_kDa'] = enzyme_to_couple.formula_weight/1000 
 
         self.complex_df['SASA'] = self.complex_df.MW_kDa.apply(lambda x: func.SASA(x))
         median_SASA = self.complex_df.SASA.median()
@@ -408,7 +419,7 @@ class me_builder():
             if df.shape[0] - len(to_drop) == 1:
                 drop_index += to_drop
             else:
-                raise ValueError('Something went wrong in selecting a complex by lowest molecular weight')
+                raise ValueError('Something went wrong in selecting a complex by lowerst molecular weight')
 
         self.complex_df.drop(index = drop_index, inplace = True)
 
@@ -416,7 +427,7 @@ class me_builder():
 
         # get rid of redundant complexes
         complexes_to_drop = sorted(set(c_og[c_og.is_complex].complex_id).difference(self.complex_df.complex_id))#sorted(set(self.complex_id_metabolite_map.keys()).difference(self.complex_df.complex_id))
-        complexes_to_drop_id = [self.complex_reactions_map[c_id] for c_id in complexes_to_drop]
+        complexes_to_drop_id = [self.complex_reactions_map[c_id].id for c_id in complexes_to_drop]
         self.complex_formation_reactions = [r for r in self.complex_formation_reactions if r.id not in complexes_to_drop_id]
         for c_id in complexes_to_drop:
             del self.complex_reactions_map[c_id]
@@ -601,7 +612,7 @@ class me_builder():
         return me_model
 
 
-# In[4]:
+# In[14]:
 
 
 def build_me(non_machinery = [], minimal_proteome = False, model_id = 'HUMAN_ME_MODEL', compress_mrna = False,
@@ -642,35 +653,29 @@ def build_me(non_machinery = [], minimal_proteome = False, model_id = 'HUMAN_ME_
     return me_model, builder
 
 
-# In[5]:
+# In[15]:
 
 
 # non_machinery = []
 # minimal_proteome = True
 # model_id = 'HUMAN_ME_MODEL'
-# compress_mrna = False
+# compress_mrna = False,
 # psim_me = params.psim_me
 # human_model = params.human_model
 
 
-# In[23]:
+# In[40]:
 
-
-# start = time.time()
 
 # builder = me_builder(non_machinery = non_machinery, psim_me = psim_me, human_model = human_model, 
 #                     compress_mrna = compress_mrna)
 # builder.express_metabolic_enzymes()
 # builder.express_expression_enzymes()
-# builder.express_dummy_protein()
 # builder.get_complex_info()
-# builder.generate_complex_reactions()
-# builder.get_keff()
-# if minimal_proteome:
-#     builder.minimize_proteome()
-# builder.add_metabolic_machinery()
-# builder.add_expression_machinery()
-# me_model = builder.build_me_model(model_id = model_id)
 
-# end = time.time()
+
+# In[ ]:
+
+
+
 

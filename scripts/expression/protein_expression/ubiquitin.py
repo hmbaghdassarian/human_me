@@ -14,12 +14,13 @@ from utils import metabolites as metab
 from utils import functions as func
 from utils import utils_2
 
+from uniform_processes import biomass
+
 from expression.gene_information import gene_information
 import expression.build_mrna_expression_reactions as build_mrna
 from expression.protein_expression import cytosolic_translation as c_trln
 
 from macromolecules.protein import Protein
-from macromolecules.complex import add_biomass_change
 
 
 # Ubiquitin expression
@@ -50,9 +51,12 @@ def express_ubiquitin(compress_mrna = False):
     ubc_translation_reaction_cytosolic, ubc_c = c_trln.translate_protein_cytosolic(ubc_info, ubc_transcript_c, ubc_deg_proxy)
 
     ubiquitin_monomerization_ubc = cobra.Reaction(ubc_info.hgnc_id + '_MONOMERIZATIONc')
+    ubiquitin_monomerization_ubc.subsytem = 'Protein_Expression'
 
+
+    biomass_change = n_ub_monomers*(ub_c.mass) - ubc_c.mass
     rxn = {ubc_c:-1, ub_c: n_ub_monomers, metab.seq_amino_acid_map_c[ubc_info.protein_seq[n_ub_monomers*76:]]: 1, 
-          metab.h2o_c: -n_ub_monomers}
+          metab.h2o_c: -n_ub_monomers, biomass.protein_: biomass_change}
     ubiquitin_monomerization_ubc.add_metabolites(rxn)
     ubiquitin_monomerization_ubc.gene_reaction_rule = mach.USP5[0]
 
@@ -72,9 +76,11 @@ def express_ubiquitin(compress_mrna = False):
     # monomerization from ubb polyub
     n_ub_monomers = ubb_info.protein_seq.count(single_ubiquitin_sequence)
     ubiquitin_monomerization_ubb = cobra.Reaction(ubb_info.hgnc_id + '_MONOMERIZATIONc')
+    ubiquitin_monomerization_ubb.subsytem = 'Protein_Expression'
 
+    biomass_change = n_ub_monomers*(ub_c.mass) - ubb_c.mass 
     rxn = {ubb_c:-1, ub_c: n_ub_monomers, metab. seq_amino_acid_map_c[ubb_info.protein_seq[n_ub_monomers*76:]]: 1, 
-          metab.h2o_c: -n_ub_monomers}
+          metab.h2o_c: -n_ub_monomers, biomass.protein_: biomass_change}
     ubiquitin_monomerization_ubb.add_metabolites(rxn)
     ubiquitin_monomerization_ubc.gene_reaction_rule = mach.USP5[0]
 
@@ -83,13 +89,17 @@ def express_ubiquitin(compress_mrna = False):
     polyub_c = Protein(id_ = 'cleaved_polyubiquitin_moiety', amino_acid_counts = polyub_aa_counts,
                         compartment = 'c')
     ubiquitin_monomerization_polyub = cobra.Reaction('POLYUBIQUITIN_MONOMERIZATIONc')
+    ubiquitin_monomerization_polyub.subsytem = 'Protein_Expression'
 
-    rxn = {polyub_c:-1, ub_c: params.n_ub, metab.h2o_c: -(params.n_ub-1)}
+
+    biomass_change = params.n_ub*(ub_c.mass) - polyub_c.mass 
+    rxn = {polyub_c:-1, ub_c: params.n_ub, metab.h2o_c: -(params.n_ub-1), biomass.protein_: biomass_change}
     ubiquitin_monomerization_polyub.add_metabolites(rxn)
     ubiquitin_monomerization_polyub.gene_reaction_rule = mach.USP5[0]
 
     # nuclear import of ubiquitin
     nuclear_import_ub_mono = cobra.Reaction('UBIQUITIN_MONOMER_IMPORTtn')
+    nuclear_import_ub_mono.subsytem = 'Protein_Expression'
     ub_n = ub_c.copy()
     ub_n.id, ub_n.compartment = '_'.join(ub_n.id.split('_')[:-1]) + '_n', 'n'
     nuclear_import_ub_mono.add_metabolites({ub_n: 1, ub_c: -1})
@@ -97,6 +107,7 @@ def express_ubiquitin(compress_mrna = False):
 
     # nuclear export of polyubiquitin moiety
     nuclear_export_ub_poly = cobra.Reaction('POLYUBIQUITIN_MOIETY_EXPORTtn')
+    nuclear_export_ub_poly.subsytem = 'Protein_Expression'
     polyub_n = polyub_c.copy()
     polyub_n.id, polyub_n.compartment = '_'.join(polyub_n.id.split('_')[:-1]) + '_n', 'n'
     nuclear_export_ub_poly.add_metabolites({polyub_n: -1, polyub_c: 1})
@@ -104,8 +115,9 @@ def express_ubiquitin(compress_mrna = False):
 
     # degradation
     degradation_ub = cobra.Reaction('UBIQUITIN_MONOMER_DEGRADATIONc')
+    degradation_ub.subsytem = 'Protein_Expression'
     rxn = {metab.seq_amino_acid_map_c[aa_code]: aa_counts for aa_code, aa_counts in monoub_aa_counts.items()}
-    rxn[ub_c]= -1
+    rxn[ub_c], rxn[biomass.protein_] = -1, -ub_c.mass 
     rxn[metab.h2o_c] =  -(L_monoub-1)
     # atp hydrolysis for translocation/unfolding by 26S - known 1 ATP per 2 residues - https://www.nature.com/articles/s41586-018-0736-4
     rxn = func.hydrolyze_atp(rxn, n_atp = L_monoub/2, compartment = 'c')
@@ -117,11 +129,6 @@ def express_ubiquitin(compress_mrna = False):
     ub_reactions += ubb_mrna_expression_reactions + [ubb_translation_reaction_cytosolic]
     ub_reactions += [ubiquitin_monomerization_ubc, ubiquitin_monomerization_ubb, ubiquitin_monomerization_polyub, degradation_ub]
     ub_reactions += [nuclear_import_ub_mono, nuclear_export_ub_poly]
-    
-    for r in ub_reactions:
-        r.subsystem = 'Protein Expression'
-        add_biomass_change(r)
-        
     
     ub_args = {'ub_reactions': ub_reactions, 'ub_c': ub_c, 'ub_n': ub_n, 'polyub_c': polyub_c, 
                'polyub_n': polyub_n, 'monoub_aa_counts': monoub_aa_counts, 'L_monoub': L_monoub, 
