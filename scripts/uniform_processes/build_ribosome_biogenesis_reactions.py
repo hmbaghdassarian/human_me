@@ -1,8 +1,3 @@
-#!/usr/bin/env python
-# coding: utf-8
-
-# In[1]:
-
 
 import cobra
 
@@ -21,21 +16,13 @@ from utils import metabolites as metab
 from utils import functions as func
 from utils import utils_2
 
-from macromolecules.complex import Complex#, get_complex_biomass_change
 from macromolecules.RNA import rRNA, RNA_fragment
 from macromolecules.protein import Protein
-
-from uniform_processes import biomass
+from macromolecules.complex import Complex, add_biomass_change
 
 import expression.build_mrna_expression_reactions as build_mrna
 from expression.protein_expression import cytosolic_translation as c_trln
 from expression.protein_expression import build_protein_expression_reactions as build_protein
-
-
-# # rRNA
-
-# In[2]:
-
 
 # rrna sequences
 # assume the ncbi 45s is actually 47s...see notes for details
@@ -86,17 +73,11 @@ six_s_index = 1 #https://www.nature.com/articles/s41594-019-0234-x?draft=collect
 
 
 
-# In[3]:
-
 
 psim_rib = params.psim_me.copy()
 def format_location(x):
     return ['n', 'c']
 psim_rib.LOCATION = psim_rib.LOCATION.apply(lambda x: format_location(x))
-
-
-# In[4]:
-
 
 def build_ribosome_protein_expression_reactions(ub_args, compress_mrna = False):
     '''Reactions associated with transcription and translation of ribosomal proteins'''
@@ -150,15 +131,8 @@ def build_ribosome_protein_expression_reactions(ub_args, compress_mrna = False):
     processed_unfolded_protein_c = Protein(id_ = RPL40_HGNC + '_processed_unfolded',compartment = 'c',
                                     amino_acid_counts = gene_info.amino_acid_counts)
     ub_cleavage = cobra.Reaction(gene_info.hgnc_id + '_UBIQUITIN_CLEAVAGEc')
-    ub_cleavage.subsytem = 'Protein_Expression'
-    
-    
-    biomass_product = (processed_unfolded_protein_c.mass - ub_args['ub_c'].mass)
-    biomass_reactant = unfolded_protein_c.mass 
-    biomass_change = biomass_product - biomass_reactant
-    ub_cleavage.add_metabolites({unfolded_protein_c:-1, metab.h2o_c: -1, 
-                                 ub_args['ub_c']: 1, processed_unfolded_protein_c: 1, 
-                                biomass.protein_: biomass_change})
+    ub_cleavage.add_metabolites({unfolded_protein_c:-1, metab.h2o_c: -1, ub_args['ub_c']: 1, 
+                                 processed_unfolded_protein_c: 1})
     ub_cleavage.gene_reaction_rule = mach.UCHL3[0]
     ub_cleavage.add_metabolites({unfolded_protein_c:-1, metab.h2o_c: -1, 
                                  ub_args['ub_c']: 1, processed_unfolded_protein_c: 1})
@@ -171,11 +145,10 @@ def build_ribosome_protein_expression_reactions(ub_args, compress_mrna = False):
     rl_expression_reactions += mrna_expression_reactions + [translation_elongation_c, ub_cleavage, protein_folding_cytosolic, nuclear_import] + build_protein.degrade_cytosolic_protein(gene_info, folded_protein_c, ub_args)
     rl_protein_metabolites += [folded_protein_c, folded_protein_n]
     
+    for r in rs_expression_reactions +  rl_expression_reactions:
+        r.subsystem = 'Ribosome Biogenesis'
+    
     return rs_expression_reactions, rs_protein_metabolites, rl_expression_reactions, rl_protein_metabolites
-
-
-# In[5]:
-
 
 def build_rrna5s_reactions(rpl5_n, rpl11_n):
     
@@ -186,7 +159,6 @@ def build_rrna5s_reactions(rpl5_n, rpl11_n):
 
     # PROCESSING - mature rrna (3->5' exonucleolytic cleave of last 24 bases) and complex formation with RPL5/RPL11
     rrna5s_processing = cobra.Reaction('PROCESSING_RRNA5s')
-    rrna5s_processing.subsytem = 'Ribosome_Biogenesis'
     rrna5s_n = rRNA(metabolite_name = '5s', seq = rrna_5s_seq, compartment = 'n')
     deg_base_counts = dict()
     for k,v in pre_rrna5s_n.base_counts.items():
@@ -200,10 +172,8 @@ def build_rrna5s_reactions(rpl5_n, rpl11_n):
 
     rrna5s_complex_n = Complex([rrna5s_n, rpl5_n, rpl11_n])
 
-    biomass_components = rrna5s_complex_n.get_complex_biomass()
-    biomass_change = biomass_components['rrna'] - pre_rrna5s_n.mass # no change in protein biomass
     rxn[pre_rrna5s_n], rxn[rpl5_n], rxn[rpl11_n]  = -1, -1, -1
-    rxn[rrna5s_complex_n], rxn[biomass.rrna_] = 1, biomass_change
+    rxn[rrna5s_complex_n] = 1
     rrna5s_processing.add_metabolites(rxn)
     rrna5s_processing.gene_reaction_rule = mach.REXO5
 
@@ -214,17 +184,12 @@ def build_rrna5s_reactions(rpl5_n, rpl11_n):
 
     # Degradation
     rrna5s_degradation = rrna5s_c.exonucleolytic_degradation(reaction_name = '5s_rRNA')
-    rrna5s_degradation.subsytem = 'Ribosome_Biogenesis'
     rrna5s_degradation.gene_reaction_rule = ' and '.join(mach.exosome['HGNC ID (gene)'].tolist())
 
     rrna5s_reactions = [rrna5s_transcription, rrna5s_processing, rrna5s_degradation]
     
     
     return rrna5s_reactions, rrna5s_complex_n, rrna5s_c
-
-
-# In[6]:
-
 
 # ets_5_frag1 is from 5' end of 47s to A' site
 # ets_5_frag2 is from A' to 18s
@@ -253,12 +218,10 @@ def build_other_rrna_reactions(rrna5s_complex_n, rs_protein_metabolites, rl_prot
     rrna_45s_n = rRNA('45s', seq = rrna_45s_seq, compartment = 'n', triphosphate = False)
 
     rrna_45s_formation = cobra.Reaction('FORMATION_RRNA_45s')
-    rrna_45s_formation.subsytem = 'Ribosome_Biogenesis'
 
     rxn = dict()
     rxn[metab.h2o_n] = -2 # 2 endonuclolytic cleavage events to go from 47s to 45s
     rxn[rrna_47s_n], rxn[rrna_45s_n], rxn[ets_3_n], rxn[ets_5_frag1_n] = -1, 1, 1, 1
-    rxn[biomass.rrna_], rxn[biomass.other_rna_] = (rrna_45s_n.mass - rrna_47s_n.mass),  (ets_3_n.mass+ets_5_frag1_n.mass)
     rrna_45s_formation.add_metabolites(rxn)
     rrna_45s_formation.gene_reaction_rule = ' and '.join(mach.UTP10 + mach.RNASEN)
 
@@ -274,11 +237,9 @@ def build_other_rrna_reactions(rrna5s_complex_n, rs_protein_metabolites, rl_prot
 
 
     rrna_30s_formation = cobra.Reaction('FORMATION_RRNA_30s_32_5s')
-    rrna_30s_formation.subsytem = 'Ribosome_Biogenesis'
     rxn = dict()
     rxn[metab.h2o_n] = -1 # endonuclolytic cleavage event at site 2
     rxn[rrna_45s_n], rxn[rrna_30s_n], rxn[rrna_32_5s_n] = -1, 1, 1
-    rxn[biomass.rrna_] = ((rrna_30s_n.mass + rrna_32_5s_n.mass) - rrna_45s_n.mass)
     rrna_30s_formation.add_metabolites(rxn)
     rrna_30s_formation.gene_reaction_rule = mach.RMRP[0]
 
@@ -290,12 +251,10 @@ def build_other_rrna_reactions(rrna5s_complex_n, rs_protein_metabolites, rl_prot
     ets_5_frag3_n = RNA_fragment('5_frag3', seq = ets_5_frag3_seq, compartment = 'n', triphosphate = False, fragment_type = 'ets')
 
     rrna_26s_formation = cobra.Reaction('FORMATION_RRNA_26s')
-    rrna_26s_formation.subsytem = 'Ribosome_Biogenesis'
 
     rxn = dict()
     rxn[metab.h2o_n] = -1 # endonuclolytic cleavage event at site 2
     rxn[rrna_30s_n], rxn[rrna_26s_n], rxn[ets_5_frag3_n] = -1, 1, 1
-    rxn[biomass.rrna_], rxn[biomass.other_rna_] = (rrna_26s_n.mass - rrna_30s_n.mass), ets_5_frag3_n.mass
     rrna_26s_formation.add_metabolites(rxn)
     rrna_26s_formation.gene_reaction_rule = mach.UTP23[0]
 
@@ -311,12 +270,10 @@ def build_other_rrna_reactions(rrna5s_complex_n, rs_protein_metabolites, rl_prot
                                                                  triphosphate=False)
 
     rrna_21s_formation = cobra.Reaction('FORMATION_RRNA_21s')
-    rrna_21s_formation.subsytem = 'Ribosome_Biogenesis'
     rxn = dict()
 
     rxn[metab.h2o_n] = -1 # endonuclolytic cleavage event at site 1
     rxn[rrna_26s_n], rxn[rrna_21s_n], rxn[ets_5_frag4_n] = -1, 1, 1
-    rxn[biomass.rrna_], rxn[biomass.other_rna_] = rrna_21s_n.mass - rrna_26s_n.mass, ets_5_frag4_n.mass
     rrna_21s_formation.add_metabolites(rxn)
     rrna_21s_formation.gene_reaction_rule = mach.UTP24[0]
 
@@ -330,9 +287,8 @@ def build_other_rrna_reactions(rrna5s_complex_n, rs_protein_metabolites, rl_prot
     base_counts_deg, elements_deg = func.get_base_counts_and_elements(deg_seq)
 
     rrna_21sc_formation = cobra.Reaction('FORMATION_RRNA_21sc')
-    rrna_21sc_formation.subsytem = 'Ribosome_Biogenesis'
     rxn = dict()
-    rxn[rrna_21s_n], rxn[rrna_21sc_n], rxn[biomass.rrna_] = -1, 1, (rrna_21sc_n.mass - rrna_21s_n.mass)
+    rxn[rrna_21s_n], rxn[rrna_21sc_n] = -1, 1
     # exonucleolytic cleavage
     for k,v in metab.nmp_map_n.items():
         rxn[v] = base_counts_deg[k]
@@ -348,11 +304,8 @@ def build_other_rrna_reactions(rrna5s_complex_n, rs_protein_metabolites, rl_prot
     its_1_frag1_n = RNA_fragment('1_frag1', seq = its_1_frag1_seq, fragment_type = 'its', compartment = 'n', triphosphate=False)
 
     rrna_18se_formation = cobra.Reaction('FORMATION_RRNA_18se')
-    rrna_18se_formation.subsytem = 'Ribosome_Biogenesis'
     # endonuclolytic cleavage event at site E
-    rrna_18se_formation.add_metabolites({metab.h2o_n: -1, rrna_21sc_n: -1, rrna_18se_n: 1, its_1_frag1_n: 1, 
-                                        biomass.rrna_: (rrna_18se_n.mass - rrna_21sc_n.mass), 
-                                        biomass.other_rna_: its_1_frag1_n.mass})
+    rrna_18se_formation.add_metabolites({metab.h2o_n: -1, rrna_21sc_n: -1, rrna_18se_n: 1, its_1_frag1_n: 1})
     rrna_18se_formation.gene_reaction_rule = mach.UTP24[0]
 
     its_1_frag1_degradation = its_1_frag1_n.exonucleolytic_degradation(reaction_name = 'its_1_frag1_rRNA', update = True)
@@ -366,9 +319,8 @@ def build_other_rrna_reactions(rrna5s_complex_n, rs_protein_metabolites, rl_prot
     base_counts_deg, elements_deg = func.get_base_counts_and_elements(deg_seq)
 
     rrna_18se_processing = cobra.Reaction('PROCESSING_RRNA_18se')
-    rrna_18se_processing.subsytem = 'Ribosome_Biogenesis'
     rxn = dict()
-    rxn[rrna_18se_n], rxn[rrna_18se_processed_n], rxn[biomass.rrna_] = -1,1, (rrna_18se_processed_n.mass-rrna_18se_n.mass)
+    rxn[rrna_18se_n], rxn[rrna_18se_processed_n] = -1,1
     # exonucleolytic cleavage
     for k,v in metab.nmp_map_n.items():
         rxn[v] = base_counts_deg[k]
@@ -391,7 +343,6 @@ def build_other_rrna_reactions(rrna5s_complex_n, rs_protein_metabolites, rl_prot
     pre40s_complex_c = pre40s_complex_n.change_compartment('c')
 
     pre40s_transport = cobra.Reaction('pre40s_NUCLEAR_EXPORTtn')
-    pre40s_transport.subsytem = 'Ribosome_Biogenesis'
     pre40s_transport.name = 'pre40s nuclear export'
     rxn = {pre40s_complex_n: -1, pre40s_complex_c: 1}
     # gtp hydrolysis
@@ -406,19 +357,15 @@ def build_other_rrna_reactions(rrna5s_complex_n, rs_protein_metabolites, rl_prot
                                                                  triphosphate=False)
 
     rrna_18s_formation = cobra.Reaction('40s_MATURATION')
-    rrna_18s_formation.subsytem = 'Ribosome_Biogenesis'
     # endonuclolytic cleavage event at site 3
     metabolites = [m for m in rs_protein_metabolites if m.compartment == 'c'] + [rrna_18s_c]
     forty_s_complex_c = Complex(metabolites = metabolites, complex_id = '40s')
 
-    rrna_18s_formation.add_metabolites({metab.h2o_n: -1, pre40s_complex_c: -1, forty_s_complex_c: 1, its_1_frag2_c: 1, 
-                                        biomass.other_rna_: its_1_frag2_c.mass})
-#     for bt, mwc in get_complex_biomass_change(complex_products=[forty_s_complex_c], 
-#                                     complex_reactants=[pre40s_complex_c]).items():
-#         rrna_18s_formation.add_metabolites({biomass.biomass_rna_mapper[bt]:mwc})
+    rrna_18s_formation.add_metabolites({metab.h2o_n: -1, pre40s_complex_c: -1, forty_s_complex_c: 1, 
+                                        its_1_frag2_c: 1})
     rrna_18s_formation.gene_reaction_rule = mach.NOB1[0]
 
-
+    
     its_1_frag2_degradation = its_1_frag2_c.exonucleolytic_degradation(reaction_name = 'its_1_frag2_rRNA', update = True)
 
     #18s degradation------------------------------------------------------------------------------------
@@ -432,10 +379,8 @@ def build_other_rrna_reactions(rrna5s_complex_n, rs_protein_metabolites, rl_prot
     base_counts_deg, elements_deg = func.get_base_counts_and_elements(deg_seq)
 
     rrna_32s_formation = cobra.Reaction('FORMATION_RRNA_32s')
-    rrna_32s_formation.subsytem = 'Ribosome_Biogenesis'
-
     rxn = dict()
-    rxn[rrna_32_5s_n], rxn[rrna_32s_n], rxn[biomass.rrna_] = -1,1, (rrna_32_5s_n.mass-rrna_32s_n.mass)
+    rxn[rrna_32_5s_n], rxn[rrna_32s_n] = -1,1
     # exonucleolytic cleavage
     for k,v in metab.nmp_map_n.items():
         rxn[v] = base_counts_deg[k]
@@ -453,11 +398,9 @@ def build_other_rrna_reactions(rrna5s_complex_n, rs_protein_metabolites, rl_prot
     rrna_28_5s_n = rRNA('28_5s', seq = rrna_28_5s_seq, compartment = 'n', triphosphate=False)
 
     rrna_12s_28_5s_formation = cobra.Reaction('FORMATION_RRNA_12s_28_5s')
-    rrna_12s_28_5s_formation.subsytem = 'Ribosome_Biogenesis'
     rxn = dict()
     rxn[metab.h2o_n] = -1 # endonuclolytic cleavage event at site 4
     rxn[rrna_32s_n], rxn[rrna_12s_n], rxn[rrna_28_5s_n] = -1,1,1
-    rxn[biomass.rrna_] = ((rrna_12s_n.mass + rrna_28_5s_n.mass) - rrna_32s_n.mass)
     rrna_12s_28_5s_formation.add_metabolites(rxn)
     rrna_12s_28_5s_formation.gene_reaction_rule = mach.LAS1[0]
 
@@ -468,10 +411,9 @@ def build_other_rrna_reactions(rrna5s_complex_n, rs_protein_metabolites, rl_prot
     base_counts_deg, elements_deg = func.get_base_counts_and_elements(deg_seq)
 
     rrna_28s_formation = cobra.Reaction('FORMATION_RRNA_28s')
-    rrna_28s_formation.subsytem = 'Ribosome_Biogenesis'
 
     rxn = dict()
-    rxn[rrna_28_5s_n], rxn[rrna_28s_n], rxn[biomass.rrna_] = -1,1, (rrna_28s_n.mass-rrna_28_5s_n.mass)
+    rxn[rrna_28_5s_n], rxn[rrna_28s_n] = -1,1
     # exonucleolytic cleavage
     for k,v in metab.nmp_map_n.items():
         rxn[v] = base_counts_deg[k]
@@ -488,10 +430,9 @@ def build_other_rrna_reactions(rrna5s_complex_n, rs_protein_metabolites, rl_prot
     base_counts_deg, elements_deg = func.get_base_counts_and_elements(deg_seq)
 
     rrna_7s_formation = cobra.Reaction('FORMATION_RRNA_7s')
-    rrna_7s_formation.subsytem = 'Ribosome_Biogenesis'
 
     rxn = dict()
-    rxn[rrna_12s_n], rxn[rrna_7s_n], rxn[biomass.rrna_] = -1,1, (rrna_7s_n.mass-rrna_12s_n.mass)
+    rxn[rrna_12s_n], rxn[rrna_7s_n] = -1,1
     # exonucleolytic cleavage
     for k,v in metab.nmp_map_n.items():
         rxn[v] = base_counts_deg[k]
@@ -508,10 +449,9 @@ def build_other_rrna_reactions(rrna5s_complex_n, rs_protein_metabolites, rl_prot
     base_counts_deg, elements_deg = func.get_base_counts_and_elements(deg_seq)
 
     rrna_5_8s_plus_40_formation = cobra.Reaction('FORMATION_RRNA_5_8s_plus_40')
-    rrna_5_8s_plus_40_formation.subsytem = 'Ribosome_Biogenesis'
 
     rxn = dict()
-    rxn[rrna_7s_n], rxn[rrna_5_8s_plus_40_n], rxn[biomass.rrna_] = -1,1, (rrna_5_8s_plus_40_n.mass-rrna_7s_n.mass)
+    rxn[rrna_7s_n], rxn[rrna_5_8s_plus_40_n] = -1,1
     # exonucleolytic cleavage
     for k,v in metab.nmp_map_n.items():
         rxn[v] = base_counts_deg[k]
@@ -529,10 +469,9 @@ def build_other_rrna_reactions(rrna5s_complex_n, rs_protein_metabolites, rl_prot
     base_counts_deg, elements_deg = func.get_base_counts_and_elements(deg_seq)
 
     rrna_6s_formation = cobra.Reaction('FORMATION_RRNA_6s')
-    rrna_6s_formation.subsytem = 'Ribosome_Biogenesis'
 
     rxn = dict()
-    rxn[rrna_5_8s_plus_40_n], rxn[rrna_6s_n], rxn[biomass.rrna_] = -1,1, (rrna_6s_n.mass-rrna_5_8s_plus_40_n.mass)
+    rxn[rrna_5_8s_plus_40_n], rxn[rrna_6s_n] = -1,1
     # exonucleolytic cleavage
     for k,v in metab.nmp_map_n.items():
         rxn[v] = base_counts_deg[k]
@@ -559,7 +498,6 @@ def build_other_rrna_reactions(rrna5s_complex_n, rs_protein_metabolites, rl_prot
     pre60s_complex_c = pre60s_complex_n.change_compartment('c')
 
     pre60s_transport = cobra.Reaction('pre60s_NUCLEAR_EXPORTtn')
-    pre60s_transport.subsytem = 'Ribosome_Biogenesis'
     pre60s_transport.name = 'pre60s nuclear export'
     rxn = {pre60s_complex_n: -1, pre60s_complex_c: 1}
     # gtp hydrolysis
@@ -578,7 +516,6 @@ def build_other_rrna_reactions(rrna5s_complex_n, rs_protein_metabolites, rl_prot
     metabolites = [m for m in rl_2 if m.compartment == 'c'] + [rrna_28s_c, rrna_5_8s_c, rrna5s_c]
     sixty_s_complex_c = Complex(metabolites = metabolites, complex_id = '60s')
     rrna_5_8s_formation = cobra.Reaction('60s_maturation')
-    rrna_5_8s_formation.subsytem = 'Ribosome_Biogenesis'
     rxn = dict()
 
     rxn[pre60s_complex_c], rxn[sixty_s_complex_c] = -1,1
@@ -588,10 +525,6 @@ def build_other_rrna_reactions(rrna5s_complex_n, rs_protein_metabolites, rl_prot
     rxn[metab.h2o_c] = -len(deg_seq)
     rxn[metab.h_c] = len(deg_seq)
     rrna_5_8s_formation.add_metabolites(rxn)
-
-#     for bt, mwc in get_complex_biomass_change(complex_products=[sixty_s_complex_c], 
-#                             complex_reactants=[pre60s_complex_c]).items():
-#         rrna_5_8s_formation.add_metabolites({biomass.biomass_mapper[bt]:mwc})
     rrna_5_8s_formation.gene_reaction_rule = mach.ERI1[0]
 
 
@@ -608,21 +541,12 @@ def build_other_rrna_reactions(rrna5s_complex_n, rs_protein_metabolites, rl_prot
                      rrna_32s_formation, rrna_12s_28_5s_formation, rrna_28s_formation, 
                     rrna_7s_formation, rrna_5_8s_plus_40_formation, rrna_6s_formation, pre60s_complex_formation, 
                      pre60s_transport, rrna_5_8s_formation, rrna_28s_degradation, rrna_5_8s_degradation]
-    
-    for i in range(len(all_reactions)): # because degradation reactions don't have proper subsystem assigned
-        r = all_reactions[i]
-        r.subsystem = 'Ribosome_Biogenesis'
-        all_reactions[i] = r
         
     mature_ribosomal_precomplexes = [forty_s_complex_c, sixty_s_complex_c]
     mature_rrna_metabolites = [rrna_5_8s_c, rrna_28s_c, rrna_18s_c]
     
 
     return all_reactions, mature_ribosomal_precomplexes, mature_rrna_metabolites
-
-
-# In[7]:
-
 
 def build_ribosome(ub_args, compress_mrna = False):
     with func.HiddenPrints():
@@ -634,7 +558,7 @@ def build_ribosome(ub_args, compress_mrna = False):
 
     # ribosome complex formation
     ribosome_complex_c = Complex(metabolites = mature_ribosomal_precomplexes, complex_id = 'mature_ribosome')
-    ribosome_complex_formation = ribosome_complex_c.form_complex(reaction_id = 'RIBOSOME')
+    ribosome_complex_formation = ribosome_complex_c.form_complex()
     # add a gtp hydrolysis to the complex formation: https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5861459/
     rxn = ribosome_complex_formation.metabolites.copy()
     rxn[metab.ntp_map_c['G']], rxn[metab.h2o_c], rxn[metab.ndp_map_c['G']], rxn[metab.pi_c], rxn[metab.h_c]  = -1, -1, 1, 1, 1
@@ -650,8 +574,14 @@ def build_ribosome(ub_args, compress_mrna = False):
     rxn = {m: -1 for m in (ind_mets) if m.compartment == 'c'}
     rxn[ribosome_complex_c] = 1
     ribosome_complex_dissociation.add_metabolites(rxn)
+    
+    
+    
+    all_reactions = rrna5s_reactions + other_rrna_reactions+ [ribosome_complex_formation, ribosome_complex_dissociation]
+    for r in all_reactions: 
+        r.subsystem = 'Ribosome Biogenesis'
+        add_biomass_change(r) 
+    
+    all_reactions += rs_expression_reactions +  rl_expression_reactions 
 
-    all_reactions = rrna5s_reactions + other_rrna_reactions + rs_expression_reactions +  rl_expression_reactions
-    all_reactions += [ribosome_complex_formation, ribosome_complex_dissociation]
     return  all_reactions, ribosome_complex_c
-

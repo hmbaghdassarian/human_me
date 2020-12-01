@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[140]:
+# In[235]:
 
 
 import cobra
@@ -21,7 +21,7 @@ from uniform_processes import biomass
 from expression.protein_expression import cytosolic_translation as c_trln
 
 
-# In[13]:
+# In[236]:
 
 
 def fold_protein_cytosolic(gene_info, unfolded_protein_c):
@@ -46,7 +46,7 @@ def fold_protein_cytosolic(gene_info, unfolded_protein_c):
 
 # # Degradation (Ubiquitin-Proteasome)
 
-# In[14]:
+# In[237]:
 
 
 def protein_polyubiquitination(gene_info, protein_metabolite, compartment, ub_args):
@@ -195,7 +195,7 @@ def proteasomal_degradation(gene_info, protein_metabolite, polyub_protein_metabo
 
 # # Cytosolic Degradation
 
-# In[15]:
+# In[238]:
 
 
 def degrade_cytosolic_protein(gene_info, folded_protein_c, ub_args):
@@ -212,7 +212,7 @@ def degrade_cytosolic_protein(gene_info, folded_protein_c, ub_args):
 
 # # Nuclear Reactions
 
-# In[16]:
+# In[239]:
 
 
 def transport_nuclear_protein(gene_info, folded_protein_c):
@@ -263,7 +263,7 @@ def get_nuclear_reactions(gene_info, folded_protein_c, ub_args):
 # # Mitochondrial Reactions
 # 
 
-# In[17]:
+# In[240]:
 
 
 # i is intermembrane space, but called inner in compartments BIGG
@@ -376,7 +376,7 @@ def get_mitochondrial_reactions(gene_info, unfolded_protein_c, compartments):
 
 # # Peroxisomal
 
-# In[18]:
+# In[241]:
 
 
 def transport_peroxisome(gene_info, folded_protein_c):
@@ -425,7 +425,7 @@ def get_peroxisomal_reactions(gene_info, folded_protein_c):
 
 # # ER transport
 
-# In[19]:
+# In[242]:
 
 
 def post_translational_translocation(gene_info, unfolded_protein_c):
@@ -530,7 +530,7 @@ def co_translational_translocation(gene_info, mrna_transcript_c, mrna_deg_proxy)
 
 # # ER Modifications
 
-# In[20]:
+# In[243]:
 
 
 def form_disulfide_bond(gene_info, folded_protein_r):
@@ -621,7 +621,7 @@ def modify_protein_er(gene_info, folded_protein_r):
 
 # # Golgi Reactions
 
-# In[21]:
+# In[244]:
 
 
 def import_golgi(gene_info, modified_protein_r):
@@ -714,7 +714,7 @@ def retrograde_er(gene_info, modified_protein_g):
 
 # # Lysosomal, Extracellular, and Plasma Membrane Transport
 
-# In[22]:
+# In[245]:
 
 
 def secrete_protein(gene_info, modified_protein_g):
@@ -750,7 +750,7 @@ def secrete_protein(gene_info, modified_protein_g):
 
 # # Secretory Pathway Protein Degradation
 
-# In[23]:
+# In[246]:
 
 
 def unfold_secretory_protein(gene_info, protein_metabolite):
@@ -890,7 +890,7 @@ def build_erad_reactions(gene_info, retro_protein_r, unfolded_protein_c = None):
     return erad_reactions, unfolded_protein_c
 
 
-# In[24]:
+# In[247]:
 
 
 def build_endocytosis_reactions(gene_info, protein_pm, ub_args, protein_l = None):
@@ -927,7 +927,7 @@ def build_endocytosis_reactions(gene_info, protein_pm, ub_args, protein_l = None
     return [polyubiquitinate_protein, endocytosis], protein_l
 
 
-# In[25]:
+# In[248]:
 
 
 def lysosomal_degradation(gene_info, protein_l):
@@ -957,7 +957,7 @@ def lysosomal_degradation(gene_info, protein_l):
     return lysosomal_degradation_reactions
 
 
-# In[26]:
+# In[249]:
 
 
 # # Jahir's NCBI GPRs to HGNC GPRs
@@ -983,7 +983,7 @@ def lysosomal_degradation(gene_info, protein_l):
 
 # # Protein Expression All
 
-# In[197]:
+# In[250]:
 
 
 def get_protein_expression_reactions(gene_info, mrna_transcript_c, mrna_deg_proxy, ub_args):
@@ -1154,7 +1154,7 @@ def get_protein_expression_reactions(gene_info, mrna_transcript_c, mrna_deg_prox
     return protein_expression_reactions, protein_metabolites
 
 
-# In[201]:
+# In[232]:
 
 
 # import random
@@ -1187,48 +1187,6 @@ def get_protein_expression_reactions(gene_info, mrna_transcript_c, mrna_deg_prox
 #                                                      mrna_transcript_c, mrna_deg_proxy, 
 #                                                     ub_args = ub_args)
 #     reactions += protein_expression_reactions
-
-
-
-
-# In[187]:
-
-
-# import random
-# import pandas as pd
-# from expression.gene_information import gene_information
-# import expression.build_mrna_expression_reactions as build_mrna
-# from expression.protein_expression import ubiquitin
-# import uuid
-# import itertools
-# reactions = list()
-# for l in list(itertools.combinations(params.compartments.keys(),2)):
-#     psim_toy = pd.DataFrame(columns = ['HGNC_ID', 'PREMRNA_SEQ', 'MRNA_SEQ', 'PROTEIN_SEQ', 'POLYA_LENGTH', 'TMD', 
-#                                'SP', 'N_INTRONS', 'DSB', 'GPI', 'OG', 'LOCATION'])
-
-#     hgnc_id, premrna_seq = 'HGNC:' + str(uuid.uuid4().fields[0]), ''.join(random.choices(['U', 'C', 'G', 'A'], k = 100))
-#     mrna_seq = premrna_seq[25:75]
-#     protein_seq = ''.join(random.choices(params.amino_acids, k = int(len(mrna_seq)/3)))
-#     polyA_length, tmd, sp, n_introns, dsb, gpi, og  = None, 1, True, 0, 2, 2, 2
-#     ub_args = ubiquitin.express_ubiquitin(compress_mrna = False)
-#     location = list(l)
-#     psim_toy.loc[0,:] = [hgnc_id, premrna_seq, mrna_seq, protein_seq, polyA_length, tmd, sp, n_introns, dsb, gpi, og, location]
-#     gene_info = gene_information(hgnc_id, premrna_seq, mrna_seq, protein_seq,
-#                      ptms = {}, tmd = tmd, sp = sp, polyA_length = polyA_length, 
-#                      n_introns = n_introns) 
-#     gene_info.get_final_locations(metabolic_model = cobra.Model(''), final_locations = location)
-
-#     transcription_reactions, mrna_transcript_c, mrna_deg_proxy = build_mrna.get_mrna_expression_reactions(gene_info)
-#     protein_expression_reactions, protein_metabolites = get_protein_expression_reactions(gene_info, 
-#                                                      mrna_transcript_c, mrna_deg_proxy, 
-#                                                     ub_args = ub_args)
-#     reactions += protein_expression_reactions
-
-# from macromolecules.macromolecule import Macromolecule
-# test = func.ME_Model('')
-# test.add_reactions(reactions)
-# test = [m for m in test.metabolites if isinstance(m, Macromolecule) and (m.mass != m.formula_weight/1000)]
-
 
 
 

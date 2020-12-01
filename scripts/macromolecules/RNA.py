@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[17]:
+# In[34]:
 
 
 import cobra
@@ -9,12 +9,11 @@ import sys
 sys.path.insert(1, '../../scripts/')
 from utils import metabolites as metab
 from utils import machinery as mach
-from uniform_processes.biomass import biomass_rna_mapper
 from utils import functions as func
 from macromolecules.macromolecule import Macromolecule
 
 
-# In[25]:
+# In[33]:
 
 
 class RNA(Macromolecule):
@@ -61,7 +60,6 @@ class RNA(Macromolecule):
         # pyrophosphate released per base added, -1 for 3/5' ends
         rxn[metab.ppi_n] = self.length - 1
         rxn[self] = 1
-        rxn[biomass_rna_mapper[self.type]] = self.formula_weight/1000
         
         rna_synthesis.add_metabolites(rxn)
         
@@ -110,16 +108,10 @@ class RNA(Macromolecule):
         if self.triphosphate: # triphosphate on 5' end
             rxn[metab.nmp_map[self.compartment][self.sequence[0]]] -= 1
             rxn[metab.ntp_map[self.compartment][self.sequence[0]]]  = 1  
-            rxn[metab.h_compartments[self.compartment]] = self.length - 1 #sum(self.base_counts.values())-1
+            rxn[metab.h_compartments[self.compartment]] = self.length - 1 
         else:
-            rxn[metab.h_compartments[self.compartment]] = self.length #sum(self.base_counts.values()) # extra H on 5' end <--unsure about this
+            rxn[metab.h_compartments[self.compartment]] = self.length  # extra H on 5' end <--unsure about this
         
-        
-        
-        if self.type not in biomass_rna_mapper.keys():
-            raise ValueError('RNA type must be specified as one of ' + ', '.join(biomass_rna_mapper.keys()))
-        else:
-            rxn[biomass_rna_mapper[self.type]] = -self.formula_weight/1000 
         
         rna_degradation.add_metabolites(rxn)
         
@@ -174,6 +166,7 @@ class RNA(Macromolecule):
                 for element in new_elements.keys():
                     new_elements[element] += base_counts[base_letter]* metab.seq_element_map[base_letter][element]    
             self.elements = new_elements
+            self.update_mass()
             
         else:
             raise ValueError('Situation in which RNA sequence is removed or replaced has not been implemented yet')

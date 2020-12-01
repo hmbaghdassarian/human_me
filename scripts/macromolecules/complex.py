@@ -1,17 +1,12 @@
-#!/usr/bin/env python
-# coding: utf-8
-
-# In[2]:
-
 
 import cobra
 import itertools
 import uuid
+
+import sys
+sys.path.insert(1, '../../scripts/')
 from macromolecules.macromolecule import Macromolecule
-
-
-# In[3]:
-
+from uniform_processes.biomass import biomass_mapper
 
 def flatten_list(list_):
     return [item for sublist in list_ for item in sublist]
@@ -36,20 +31,19 @@ class Complex(Macromolecule):
         self.type = 'complex'
         self.components = {m: metabolites.count(m) for m in metabolites}
         # parse compartment    
-        compartments = list(set([m.compartment for m in self.components.keys()]))
+        compartments = list(set([m.compartment for m in self.components]))
         if len(compartments) == 1:
             compartment = compartments[0]
-#         # exception of ribosome complex
-#         elif (len(compartments) == 2) and ('c' in compartments) and ('mature_ribosome_complex_c' in [m.id for m in self.components.keys()]):
-#             compartment = 'c'
+        # exception of ribosome complex
+        elif (sorted(compartments) == ['c', 'r']) and ('mature_ribosome_complex_c' in [m.id for m in self.components]):
+            compartment = 'c'
         else:
-            raise ValueError('Metabolites are not in the same compartment')
+            raise ValueError('Metabolites forming a complex must all be in the same compartment')
         
         
         # parse metabolite id
         if complex_id == None:
             self.temp_id = str(uuid.uuid4().fields[0])
-#             self.get_temp_id()        
         else: 
             self.temp_id = complex_id
         
@@ -65,7 +59,7 @@ class Complex(Macromolecule):
         Macromolecule.__init__(self, id = self.temp_id + '_complex_' + compartment, compartment = compartment,
                                   charge = sum([m.charge*count for m, count in self.components.items()]), 
                               elements = elements)
-#         self.mass = self.get_complex_biomass() # to avoid mastking with non-complex macromolecules
+#         self.mass = str(self.mass) # to avoid mitaking with non-complex macromolecules
     def form_complex(self, reaction_id = None):
 
         '''
@@ -73,7 +67,7 @@ class Complex(Macromolecule):
 
         '''
         
-        if reaction_id == None:
+        if reaction_id is None:
             reaction_id = self.temp_id + '_COMPLEX_FORMATION' + self.compartment
         else:
             reaction_id = reaction_id + '_COMPLEX_FORMATION' + self.compartment        
@@ -101,24 +95,10 @@ class Complex(Macromolecule):
             metabolites_ += flatten_list(flatten_list([[[m_]*count_ for m_, count_ in m.components.items()]*count for m, count in decomposed_complex.components.items() if m.type == 'complex']))
             return self.decompose_complex(decomposed_complex = Complex(metabolites = metabolites_, complex_id = 'ignore'))
 
-#     def get_temp_id(self):
-#         # to name complex -- does not currently name homodimers correctly (will give same name as dimer)
-#         temp_id = '_'.join(sorted(set([k.id.split('_')[0] if 'HGNC:' in k.id else '_'.join(k.id.split('_')[:-1]) for k in self.decompose_complex().keys()])))
-        
-#         # deal with homo-oligomers to have unique IDs - likely won't come up 
-#         all_metab = flatten_list([[m]*count for m,count in self.components.items()])
-#         cpx_only = flatten_list([[m]*count for m,count in self.components.items() if type(m) == Complex])
-#         if all_metab == cpx_only:
-#             print('woo')
-#             combs = itertools.combinations(test.components.keys(),2)
-#             counter = 0
-#             for comb in combs:
-#                 if comb[0] == comb[1]:
-#                     counter += 1
-#             if counter == len(list(combs)):
-#                 temp_id += '_' + str(uuid.uuid4().fields[-1])[:5] # add random id
-        
-#         self.temp_id = temp_id
+    def udate_id(self):
+        '''In cases where complex id is too long (see build_me_model generate_complex_reactions method)'''
+        self.temp_id = str(uuid.uuid4().fields[0])
+        self.id = self.temp_id + '_complex_' + self.compartment
 
     def get_complex_biomass(self):
         '''Returns a dictionary of the complex biomass by its individual component types'''
@@ -132,38 +112,27 @@ class Complex(Macromolecule):
 
         return biomass_by_type
 
-
-# In[ ]:
-
-
-# def get_complex_biomass_change(complex_products, complex_reactants):
-#     '''Input is two lists of type COMPLEX, one representing those on the product side, one representing those on the reactant side
-#     output is a dictionary of biomass change for each respective biomass type.'''
+def add_biomass_change(reaction):
+    '''
     
-#     product_biomass = dict()
-#     for cp in complex_products:
-#         if type(cp)!= Complex:
-#             raise TypeError('All complex products must be a COMPLEX object')
-#         for bt, mw in cp.get_complex_biomass().items():
-#             if bt in product_biomass.keys():
-#                 product_biomass[bt] += mw
-#             else:
-#                 product_biomass[bt] = mw
+    Input: list of cobra.Reactions
+    Output: dictionary delineating the change in biomass (products - substrates) for the different categories
+    of biomass.
     
-#     reactant_biomass = dict()
-#     for cr in complex_reactants:
-#         if type(cr)!= Complex:
-#             raise TypeError('All complex reactants must be a COMPLEX object')
-#         for bt, mw in cr.get_complex_biomass().items():
-#             if bt in reactant_biomass.keys():
-#                 reactant_biomass[bt] += mw
-#             else:
-#                 reactant_biomass[bt] = mw
-    
-#     for bt in set(product_biomass.keys()).difference(reactant_biomass.keys()):
-#         reactant_biomass[bt] = 0
-#     for bt in set(reactant_biomass.keys()).difference(product_biomass.keys()):
-#         product_biomass[bt] = 0    
-    
-#     return {bt: product_biomass[bt] - reactant_biomass[bt] for bt in product_biomass.keys() if product_biomass[bt] - reactant_biomass[bt] != 0}
-
+    '''
+    biomass_change = dict()
+    for m, count in reaction.metabolites.items():
+        if isinstance(m, Macromolecule):
+            if type(m) != Complex:
+                if m.type in biomass_change:
+                    biomass_change[m.type] += (count*m.mass)
+                else:
+                    biomass_change[m.type] = (count*m.mass)
+            else:
+                for type_, mass_ in m.get_complex_biomass().items():
+                    if type_ in biomass_change:
+                        biomass_change[type_] += (count*mass_)
+                    else:
+                        biomass_change[type_] = (count*mass_)
+    biomass_change = {biomass_mapper[k]:v for k,v in biomass_change.items()}
+    reaction.add_metabolites(biomass_change, combine = False)

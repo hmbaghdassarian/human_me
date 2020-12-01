@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[1]:
+# In[14]:
 
 
 import cobra
@@ -17,7 +17,7 @@ from utils import utils_2
 from macromolecules.protein import Protein
 
 
-# In[8]:
+# In[15]:
 
 
 def translate_protein_cytosolic(gene_info, mrna_transcript_c, mrna_deg_proxy):    
