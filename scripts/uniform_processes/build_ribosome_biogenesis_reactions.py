@@ -154,8 +154,8 @@ def build_ribosome_protein_expression_reactions(ub_args, compress_mrna = False):
     ub_cleavage.subsytem = 'Protein_Expression'
     
     
-    biomass_product = (processed_unfolded_protein_c.mass - ub_args['ub_c'].mass)
-    biomass_reactant = unfolded_protein_c.mass 
+    biomass_product = (processed_unfolded_protein_c.formula_weight/1000 - ub_args['ub_c'].formula_weight/1000)
+    biomass_reactant = unfolded_protein_c.formula_weight/1000 
     biomass_change = biomass_product - biomass_reactant
     ub_cleavage.add_metabolites({unfolded_protein_c:-1, metab.h2o_c: -1, 
                                  ub_args['ub_c']: 1, processed_unfolded_protein_c: 1, 

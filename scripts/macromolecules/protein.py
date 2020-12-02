@@ -57,8 +57,6 @@ class Protein(Macromolecule):
         
         Macromolecule.__init__(self, id = id_, compartment = compartment, charge = charge, elements = elements)
         self.type = 'protein'
-        self.mass = self.formula_weight/1000 #kDa
-        
 
 
 # In[61]:

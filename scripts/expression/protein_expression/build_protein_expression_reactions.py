@@ -69,9 +69,9 @@ def protein_polyubiquitination(gene_info, protein_metabolite, compartment, ub_ar
                            amino_acid_counts = polyu_protein_aa_counts) 
         
         
-        biomass_products = polyub_protein_c.mass
+        biomass_products = polyub_protein_c.formula_weight/1000
         # NOTE: ORIGINAL CODE SUBTRACTED UB_C FROM PROTEIN METABOLITE....I think this was an error
-        biomass_substrates = protein_metabolite.mass + (params.n_ub*ub_args['ub_c'].mass) 
+        biomass_substrates = protein_metabolite.formula_weight/1000 + (params.n_ub*ub_args['ub_c'].formula_weight/1000) 
         biomass_change = biomass_products - biomass_substrates
         
         
@@ -93,9 +93,9 @@ def protein_polyubiquitination(gene_info, protein_metabolite, compartment, ub_ar
         polyub_protein_n = Protein(id_ = protein_metabolite.id + '_polyub', compartment = 'n',
                            amino_acid_counts = polyu_protein_aa_counts) 
         
-        biomass_products = polyub_protein_n.mass 
+        biomass_products = polyub_protein_n.formula_weight/1000 
         # NOTE ORIGINAL CODE substracted ub_n weight, i think this was an error
-        biomass_substrates = (protein_metabolite.mass + (params.n_ub*ub_args['ub_n'].mass))        
+        biomass_substrates = (protein_metabolite.formula_weight/1000 + (params.n_ub*ub_args['ub_n'].formula_weight/1000))        
         biomass_change = biomass_products - biomass_substrates
         
     
@@ -129,8 +129,8 @@ def protein_polyubiquitination(gene_info, protein_metabolite, compartment, ub_ar
         elements['O'] -= 1*(ub_args['L_monoub']*params.n_ub)
         polyub_protein_pm.elements = elements
         
-        biomass_products = polyub_protein_pm.mass 
-        biomass_substrates = protein_metabolite.mass + (params.n_ub*ub_args['ub_c'].mass)
+        biomass_products = polyub_protein_pm.formula_weight/1000 
+        biomass_substrates = protein_metabolite.formula_weight/1000 + (params.n_ub*ub_args['ub_c'].formula_weight/1000)
         biomass_change = (biomass_products - biomass_substrates)
 
         rxn = {protein_metabolite: -1, ub_args['ub_c']: -params.n_ub, polyub_protein_pm: 1, metab.h2o_c: params.n_ub, 
@@ -156,8 +156,8 @@ def proteasomal_degradation(gene_info, protein_metabolite, polyub_protein_metabo
         deubiquitination = cobra.Reaction(protein_metabolite.id + '_DEUBIQUITINATIONc')
         deubiquitination.subsytem = 'Protein_Expression'
         
-        biomass_products = protein_metabolite.mass + ub_args['polyub_c'].mass
-        biomass_substrates = polyub_protein_metabolite.mass 
+        biomass_products = protein_metabolite.formula_weight/1000 + ub_args['polyub_c'].formula_weight/1000
+        biomass_substrates = polyub_protein_metabolite.formula_weight/1000 
         biomass_change = (biomass_products - biomass_substrates)
         
         deubiquitination.add_metabolites({polyub_protein_metabolite: -1, metab.h2o_c: -1, 
@@ -168,7 +168,7 @@ def proteasomal_degradation(gene_info, protein_metabolite, polyub_protein_metabo
         protein_degradation.subsytem = 'Protein_Expression'
         rxn = {metab.seq_amino_acid_map_c[aa_code]: aa_counts for aa_code, aa_counts in gene_info.amino_acid_counts.items()}
         rxn[polyub_protein_metabolite], rxn[metab.h2o_c], rxn[ub_args['polyub_c']] = -1, -gene_info.L_protein, 1
-        rxn[biomass.protein_] = (ub_args['polyub_c'].mass - polyub_protein_metabolite.mass)
+        rxn[biomass.protein_] = (ub_args['polyub_c'].formula_weight/1000 - polyub_protein_metabolite.formula_weight/1000)
         
         # atp hydrolysis for translocation/unfolding  - known 1 ATP per 2 residues - https://www.nature.com/articles/s41586-018-0736-4
         # L_polub_protein = (gene_info.L_protein + (ub_args['L_monoub']*params.n_ub)) 
@@ -189,8 +189,8 @@ def proteasomal_degradation(gene_info, protein_metabolite, polyub_protein_metabo
         deubiquitination = cobra.Reaction(protein_metabolite.id + '_DEUBIQUITINATIONn')
         deubiquitination.subsytem = 'Protein_Expression'
         
-        biomass_products = protein_metabolite.mass + ub_args['polyub_n'].mass
-        biomass_substrates = polyub_protein_metabolite.mass
+        biomass_products = protein_metabolite.formula_weight/1000 + ub_args['polyub_n'].formula_weight/1000
+        biomass_substrates = polyub_protein_metabolite.formula_weight/1000
         biomass_change = (biomass_products - biomass_substrates)
         
         
@@ -202,7 +202,7 @@ def proteasomal_degradation(gene_info, protein_metabolite, polyub_protein_metabo
         protein_degradation.subsytem = 'Protein_Expression'
         rxn = {metab.seq_amino_acid_map_n[aa_code]: aa_counts for aa_code, aa_counts in gene_info.amino_acid_counts.items()}
         rxn[polyub_protein_metabolite], rxn[metab.h2o_n], rxn[ub_args['polyub_n']] = -1, -gene_info.L_protein, 1
-        rxn[biomass.protein_] = (ub_args['polyub_n'].mass - polyub_protein_metabolite.mass)
+        rxn[biomass.protein_] = (ub_args['polyub_n'].formula_weight/1000 - polyub_protein_metabolite.formula_weight/1000)
 
         # atp hydrolysis for translocation/unfolding  - known 1 ATP per 2 residues - https://www.nature.com/articles/s41586-018-0736-4
 #         L_polub_protein = (gene_info.L_protein + (ub_args['L_monoub']*params.n_ub)) 
@@ -253,7 +253,7 @@ def transport_nuclear_protein(gene_info, folded_protein_c):
     import_rxn = {folded_protein_c: -1, folded_protein_n: 1}
 #     export_rxn = {folded_protein_c: 1, folded_protein_n: -1}
 
-    if folded_protein_c.mass > params.nuclear_diffusion_limit:
+    if folded_protein_c.formula_weight/1000 > params.nuclear_diffusion_limit:
         # gtp hydrolysis per import
         import_rxn[metab.gtp_n], import_rxn[metab.h2o_n], import_rxn[metab.gdp_n], import_rxn[metab.pi_n], import_rxn[metab.h_n]  = -1, -1, 1, 1, 1
         nuclear_import.add_metabolites(import_rxn)
@@ -327,7 +327,7 @@ def mitochondrial_matrix_protein_processing(gene_info, pre_protein_m):
 def degrade_mitochondrial_protein(gene_info, protein_metabolite, compartment, L_protein, amino_acid_counts):
     rxn = {metab.seq_amino_acid_map_m[aa_code]: aa_counts for aa_code, aa_counts in amino_acid_counts.items()}
     rxn[protein_metabolite], rxn[metab.h2o_m] = -1, -(L_protein-1)
-    rxn[biomass.protein_] = -protein_metabolite.mass
+    rxn[biomass.protein_] = -protein_metabolite.formula_weight/1000
     
     if compartment == 'm':
         mitochondrial_degradation = cobra.Reaction(gene_info.hgnc_id + '_DEGRADATIONm')
@@ -433,7 +433,7 @@ def degrade_peroxisomal_protein(gene_info, folded_protein_x):
 
     rxn = {metab.seq_amino_acid_map_x[aa_code]: aa_counts for aa_code, aa_counts in gene_info.amino_acid_counts.items()}
     rxn[folded_protein_x], rxn[metab.h2o_x] = -1, -(gene_info.L_protein-1)
-    rxn[biomass.protein_] = -folded_protein_x.mass
+    rxn[biomass.protein_] = -folded_protein_x.formula_weight/1000
     # ATP hydrolysis by LON: 2 ATP per residue - https://www.ncbi.nlm.nih.gov/pmc/articles/PMC2518814/
     rxn = func.hydrolyze_atp(rxn, n_atp = gene_info.L_protein*2, compartment = 'x')
     peroxisomal_degradation.add_metabolites(rxn)
@@ -523,7 +523,7 @@ def co_translational_translocation(gene_info, mrna_transcript_c, mrna_deg_proxy)
     rxn[metab.h_c] += gene_info.L_protein
     unprocessed_protein_r = Protein(compartment = 'r', id_ = 'unprocessed_folded', gene_info = gene_info)
     
-    mw_upr = unprocessed_protein_r.mass
+    mw_upr = unprocessed_protein_r.formula_weight/1000
     rxn[unprocessed_protein_r], rxn[biomass.protein_] = 1, mw_upr
     rxn = func.hydrolyze_atp(rxn, n_atp = number_BiP, compartment = 'r')
     
@@ -553,7 +553,7 @@ def co_translational_translocation(gene_info, mrna_transcript_c, mrna_deg_proxy)
     rxn = {metab.seq_amino_acid_map_r[aa]: count for aa, count in sp_aa_counts.items()}
     rxn[metab.h2o_r] = -params.L_sp
     rxn[unprocessed_protein_r],rxn[folded_protein_r] = -1, 1
-    rxn[biomass.protein_] = (folded_protein_r.mass) - mw_upr
+    rxn[biomass.protein_] = (folded_protein_r.formula_weight/1000) - mw_upr
     
     sp_degradation = cobra.Reaction(gene_info.hgnc_id + '_SP_degradationr')
     sp_degradation.subsystem = 'Protein Expression'
@@ -581,7 +581,7 @@ def form_disulfide_bond(gene_info, folded_protein_r):
     # diagram https://www.google.com/url?sa=i&url=https%3A%2F%2Fen.wikipedia.org%2Fwiki%2FProtein_disulfide-isomerase&psig=AOvVaw0bGpff4XX1eYEF61H1RJKw&ust=1597273135069000&source=images&cd=vfe&ved=0CAIQjRxqFwoTCJi6l6GglOsCFQAAAAAdAAAAABAJ
     # incorporate exchange with PDI in future versions
     rxn = {folded_protein_r: -1, modified_protein_dsb_r: 1, metab.o2_r: -number_DSB, metab.h2o2_r: number_DSB, 
-          biomass.protein_: (modified_protein_dsb_r.mass - folded_protein_r.mass)}
+          biomass.protein_: (modified_protein_dsb_r.formula_weight/1000 - folded_protein_r.formula_weight/1000)}
     disulfide_bond_formation.add_metabolites(rxn)
     disulfide_bond_formation.gene_reaction_rule = mach.P4HB[0]
     
@@ -665,7 +665,7 @@ def modify_protein_er(gene_info, folded_protein_r):
 
 
 def import_golgi(gene_info, modified_protein_r):
-    V = modified_protein_r.mass * 1.21 / 1000.0 # Protein Volume in nm^3
+    V = modified_protein_r.formula_weight/1000 * 1.21 / 1000.0 # Protein Volume in nm^3
     copii_coeff = int(round(268082.35 * params.Kv / V))
     
     protein_g = modified_protein_r.change_compartment('g')
@@ -711,7 +711,7 @@ def glycosylate_o_linked(gene_info, protein_g):
     rxn = {protein_g: -1, modified_protein_og_g: 1, metab.udpacgal_g: -number_Oglycans, 
            metab.udpgal_g: -number_Oglycans, metab.uacgam_g: -number_Oglycans, metab.h_g: 3*number_Oglycans, 
            metab.udp_g: 3* number_Oglycans,
-           biomass.protein_: (protein_g.mass - modified_protein_og_g.mass)}
+           biomass.protein_: (protein_g.formula_weight/1000 - modified_protein_og_g.formula_weight/1000)}
     
     
     o_glycosylation.add_metabolites(rxn)
@@ -737,7 +737,7 @@ def modify_protein_golgi(gene_info, protein_g):
 
 
 def retrograde_er(gene_info, modified_protein_g):
-    V = modified_protein_g.mass * 1.21 / 1000.0 # Protein Volume in nm^3
+    V = modified_protein_g.formula_weight/1000 * 1.21 / 1000.0 # Protein Volume in nm^3
     copi_coeff = int(round(143793.19 * params.Kv / V))
 
     retro_protein_r = modified_protein_g.change_compartment('r')
@@ -760,7 +760,7 @@ def retrograde_er(gene_info, modified_protein_g):
 
 
 def secrete_protein(gene_info, modified_protein_g):
-    V = modified_protein_g.mass * 1.21 / 1000.0 # Protein Volume in nm^3
+    V = modified_protein_g.formula_weight/1000 * 1.21 / 1000.0 # Protein Volume in nm^3
     clathrin_coeff = int(round(29880.01 * params.Kv / V)) # Number of proteins per clathrin vesicle  
 
     secreted_proteins = list()
@@ -785,7 +785,7 @@ def secrete_protein(gene_info, modified_protein_g):
         secrete_protein = cobra.Reaction(gene_info.hgnc_id + '_Clathrin_IMPORTt' + secreted_protein.compartment)
         secrete_protein.subsystem = 'Protein Expression'
         if secreted_protein.compartment == 'e':
-            rxn[biomass.protein_] = -clathrin_coeff*secreted_protein.mass
+            rxn[biomass.protein_] = -clathrin_coeff*secreted_protein.formula_weight/1000
         secrete_protein.add_metabolites(rxn)
         secrete_protein.gene_reaction_rule = ' and '.join(mach.clathrin_m)
         secreted_protein_reactions += [secrete_protein]
@@ -878,7 +878,7 @@ def unfold_secretory_protein(gene_info, protein_metabolite):
     unfolded_protein.elements = elements
     rxn[unfolded_protein] = 1
     
-    biomass_change = (unfolded_protein.mass - protein_metabolite.mass)
+    biomass_change = (unfolded_protein.formula_weight/1000 - protein_metabolite.formula_weight/1000)
     if biomass_change != 0:
         rxn[biomass.protein_] = biomass_change
         
@@ -963,7 +963,7 @@ def build_endocytosis_reactions(gene_info, protein_pm, ub_args, protein_l = None
     
     rxn = {polyub_protein_pm: -1, protein_l: 1, metab.h2o_c: -1, ub_args['polyub_c']: 1}
     
-    biomass_change = (protein_l.mass - polyub_protein_pm.mass)
+    biomass_change = (protein_l.formula_weight/1000 - polyub_protein_pm.formula_weight/1000)
     if biomass_change != 0:
         rxn[biomass.protein_] = biomass_change
     
@@ -1002,7 +1002,7 @@ def lysosomal_degradation(gene_info, protein_l):
     
     rxn = {metab.seq_amino_acid_map_l[aa_code]: aa_counts for aa_code, aa_counts in gene_info.amino_acid_counts.items()}
     rxn[unmodified_protein_l], rxn[metab.h2o_l] = -1, -(gene_info.L_protein-1)
-    rxn[biomass.protein_] = -unmodified_protein_l.mass
+    rxn[biomass.protein_] = -unmodified_protein_l.formula_weight/1000
     rxn = func.hydrolyze_atp(rxn, n_atp=gene_info.L_protein*params.proteolysis_translocation_atp_cost, compartment = 'l')
     
     degrade_lysosomal_protein.add_metabolites(rxn)
@@ -1056,7 +1056,7 @@ def get_protein_expression_reactions(gene_info, mrna_transcript_c, mrna_deg_prox
                 protein_expression_reactions += [protein_folding_cytosolic]
 
 
-                if 'c' in gene_info.final_locations.keys() or 'x' in gene_info.final_locations.keys() or ('n' in gene_info.final_locations.keys() and folded_protein_c.mass <= params.nuclear_diffusion_limit):
+                if 'c' in gene_info.final_locations.keys() or 'x' in gene_info.final_locations.keys() or ('n' in gene_info.final_locations.keys() and folded_protein_c.formula_weight/1000 <= params.nuclear_diffusion_limit):
                    # cytoplasmic degradation of folded proteins: cytoplasmic proteins, peroxisomal proteins, or nuclear proteins undergoing passive diffusion
                     protein_expression_reactions += degrade_cytosolic_protein(gene_info, folded_protein_c, 
                                                                               ub_args = ub_args)

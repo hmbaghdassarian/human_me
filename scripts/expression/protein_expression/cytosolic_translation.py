@@ -57,7 +57,7 @@ def translate_protein_cytosolic(gene_info, mrna_transcript_c, mrna_deg_proxy):
     rxn_c[mrna_transcript_c] = -gene_info.coupling['c1'] # couple mrna dilution to protein synthesis
     
     # biomas
-    rxn_c[biomass.protein_] = unfolded_protein_c.mass
+    rxn_c[biomass.protein_] = unfolded_protein_c.formula_weight/1000
     
     translation_elongation = func.ME_Reaction(gene_info.hgnc_id + '_TRANSLATION_ELONGATIONc', 
                                              type_ = ['translation'])
