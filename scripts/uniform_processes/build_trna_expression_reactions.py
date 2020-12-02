@@ -17,8 +17,7 @@ from utils import parameters as params
 from utils import metabolites as metab
 # from utils import functions as func
 from macromolecules.RNA import tRNA, RNA_fragment
-
-from uniform_processes import biomass
+from macromolecules.complex import add_biomass_change
 
 
 # -To change to individual tRNA molecules rather than a generic one, start with the charge_trna function and also change the trna_biogenesis function
@@ -142,13 +141,10 @@ class express_trna():
         reactions = list()
         rxn[metab.h2o_n] = 0 
 
-        other_trna_biomass = 0 # initialize
-
         if self.trna_info.five_leader_seq != None: # if there is a 5' leader sequence
                 five_leader = RNA_fragment(metabolite_name=self.trna_info.id, seq = self.trna_info.five_leader_seq, 
                     compartment = 'n', triphosphate = True, fragment_type = '5_leader')
 
-                other_trna_biomass += five_leader.formula_weight/1000
 
                 rxn[five_leader] = 1
                 rxn[metab.h2o_n] -= 1 #endonuclolytic cleavage (RNAse P)
@@ -164,15 +160,13 @@ class express_trna():
 
         self.trna_n = tRNA(metabolite_name=self.trna_info.id, seq = self.trna_info.maturetrna_sequence, 
                           compartment = 'n', triphosphate = tp)
-        biomass_change = (self.trna_n.formula_weight - self.pretrna_n.formula_weight)/1000
-        rxn[self.trna_n], rxn[biomass.trna_] = 1, biomass_change
+        rxn[self.trna_n] = 1
 
         # 3' cleavage
         if self.trna_info.three_trailer_seq != None:
             three_trailer = RNA_fragment(metabolite_name = self.trna_info.id, seq = self.trna_info.three_trailer_seq, 
                                           fragment_type = '3_trailer',
                                          compartment = 'n',triphosphate = False)
-            other_trna_biomass += three_trailer.formula_weight/1000
             rxn[three_trailer] = 1
             rxn[metab.h2o_n] -= 1 #endonuclolytic cleavage (RNase Z)
             trna_processing_machinery += mach.RNASEZ
@@ -191,7 +185,6 @@ class express_trna():
                                             seq = self.trna_info.intron_sequences[i], fragment_type = 'trna_intron', 
                                             compartment = 'n', triphosphate = False)
 
-                other_trna_biomass += trna_intron_n.formula_weight/1000
                 rxn[trna_intron_n] = 1
 
                 intron_degradation = trna_intron_n.exonucleolytic_degradation(reaction_name = self.trna_info.id + "_intron_" + str(i) + '_tRNA', 
@@ -200,8 +193,6 @@ class express_trna():
 
             rxn[h2o_n] -= n_introns
 
-        if other_trna_biomass > 0:
-            rxn[biomass.other_rna_] = other_trna_biomass
         trna_processing = cobra.Reaction('PROCESSING_TRNA_' + self.trna_info.id)
         trna_processing.subsytem = 'tRNA_Biogenesis'
         trna_processing.add_metabolites(rxn)
@@ -288,10 +279,8 @@ class express_trna():
             charged_trna_c.charge = self.modified_trna_c.charge + aa.charge + 1 
 
             trna_charging = cobra.Reaction('CHARGING_TRNA_' + self.trna_info.id + '_' + code)
-            trna_charging.subsytem = 'tRNA_Biogenesis'
-            biomass_change = (charged_trna_c.formula_weight - self.modified_trna_c.formula_weight)/1000
             rxn = {self.modified_trna_c: -1, aa: -1, charged_trna_c: 1, metab.atp_c: -1, metab.ppi_c: 1, 
-                   metab.amp_c: 1, biomass.trna_: biomass_change}
+                   metab.amp_c: 1}
             trna_charging.add_metabolites(rxn)
             # add gprs
             genes = mach.seq_synthetase_map[code]
@@ -310,6 +299,10 @@ class express_trna():
         
         self.reactions += trna_charging_reactions
         self.charged_trna_metabolites = charged_trna_metabolites
+    def add_biomass(self):
+        for r in self.reactions:
+            r.subsystem = 'tRNA_Biogenesis'
+            add_biomass_change(r)
 
 
 # In[5]:
@@ -324,6 +317,7 @@ def trna_biogenesis(trna_info):
     tb.modify_trna_cytosolic()
     tb.degrade_trna()
     tb.charge_trna()
+    tb.add_biomass()
     
     return tb.reactions, tb.charged_trna_metabolites, tb.modified_trna_c
 
