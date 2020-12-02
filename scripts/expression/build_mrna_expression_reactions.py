@@ -50,6 +50,7 @@ class express_mrna():
         # make mrna_n metabolite
         self.mrna_n = mRNA(self.gene_info, compartment = 'n')
         self.polyA_length = int(calculate_polyA_length(self.gene_info.polyA_length))
+        self.polyA_length = 100 # GET RID OF THIS
         self.mrna_n.update_metabolite(seq = ''.join(['A']*self.polyA_length), 
                                      append = True, append_to = '3_primed')
         

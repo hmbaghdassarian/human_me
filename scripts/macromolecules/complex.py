@@ -48,7 +48,7 @@ class Complex(cobra.Metabolite):
             raise ValueError('metabolites are not in the same compartment')
 
         # parse metabolite id
-        mt_type = '_'.join(list(set(self.component_types)))
+        mt_type = '_'.join(sorted(set(self.component_types)))
         ids_ = '_'.join(ids)
         if complex_id == None:
             id_ = ids_ + '_' + mt_type
@@ -137,7 +137,7 @@ class Complex(cobra.Metabolite):
 # In[ ]:
 
 
-def get_complex_biomass_change(complex_products, complex_reactants):
+def get_complex_biomass_change(complex_products, complex_reactants, precision_limit = 1e-12):
     '''Input is two lists of type COMPLEX, one representing those on the product side, one representing those on the reactant side
     output is a dictionary of biomass change for each respective biomass type.'''
     
@@ -166,5 +166,11 @@ def get_complex_biomass_change(complex_products, complex_reactants):
     for bt in set(reactant_biomass.keys()).difference(product_biomass.keys()):
         product_biomass[bt] = 0    
     
-    return {bt: product_biomass[bt] - reactant_biomass[bt] for bt in product_biomass.keys() if product_biomass[bt] - reactant_biomass[bt] != 0}
+    change = dict()
+    for bt in product_biomass.keys():
+        if abs(product_biomass[bt] - reactant_biomass[bt]) > precision_limit:
+            change[bt] = product_biomass[bt] - reactant_biomass[bt]
+    return change
+    
+#     return {bt: product_biomass[bt] - reactant_biomass[bt] for bt in product_biomass.keys() if product_biomass[bt] - reactant_biomass[bt] != 0}
 

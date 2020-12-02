@@ -101,10 +101,10 @@ class gene_information():
             raise ValueError(self.hgnc_id + ': All of the sequence types (premrna, mrna, protein) must be provided')
         if 'N' in mrna_seq:
             warnings.warn(self.hgnc_id + ': The letter N is in the mrna sequence. Replacing with a random nucleotide')
-            mrna_seq = mrna_seq.replace('N', random.choice(['A', 'U', 'G', 'C']))
+            mrna_seq = mrna_seq.replace('N', 'U')#mrna_seq.replace('N', random.choice(['A', 'U', 'G', 'C']))
         if 'N' in premrna_seq:
             warnings.warn(self.hgnc_id + ': The letter N is in the premrna sequence. Replacing with a random nucleotide')
-            premrna_seq = premrna_seq.replace('N', random.choice(['A', 'U', 'G', 'C']))
+            premrna_seq = premrna_seq.replace('N', 'C')#('N', random.choice(['A', 'U', 'G', 'C']))
         if len(set(premrna_seq).difference(['A', 'U', 'G', 'C'])) > 0:
             raise ValueError(self.hgnc_id + ': The premrna sequence contains bases which are not allowed')
         if len(set(mrna_seq).difference(['A', 'U', 'G', 'C'])) > 0:
@@ -112,7 +112,7 @@ class gene_information():
         
         if 'X' in protein_seq:
             warnings.warn(self.hgnc_id + ': The letter X is in the protein sequence. Replacing with a random amino acid')
-            protein_seq = protein_seq.replace('X', random.choice(params.amino_acids))
+            protein_seq = protein_seq.replace('X', 'A')#('X', random.choice(params.amino_acids))
         if 'U' in protein_seq:
             warnings.warn(self.hgnc_id + ': Selenocysteine not currently considered by model, replacing with cysteine')
             protein_seq = protein_seq.replace('U', 'C')
