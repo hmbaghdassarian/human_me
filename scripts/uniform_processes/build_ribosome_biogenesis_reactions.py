@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[25]:
+# In[23]:
 
 
 import cobra
@@ -35,7 +35,7 @@ from expression.protein_expression import build_protein_expression_reactions as 
 
 # # rRNA
 
-# In[19]:
+# In[24]:
 
 
 # rrna sequences
@@ -87,7 +87,7 @@ six_s_index = 1 #https://www.nature.com/articles/s41594-019-0234-x?draft=collect
 
 
 
-# In[3]:
+# In[25]:
 
 
 psim_rib = params.psim_me.copy()
@@ -96,7 +96,7 @@ def format_location(x):
 psim_rib.LOCATION = psim_rib.LOCATION.apply(lambda x: format_location(x))
 
 
-# In[4]:
+# In[26]:
 
 
 def build_ribosome_protein_expression_reactions(ub_args, compress_mrna = False):
@@ -175,7 +175,7 @@ def build_ribosome_protein_expression_reactions(ub_args, compress_mrna = False):
     return rs_expression_reactions, rs_protein_metabolites, rl_expression_reactions, rl_protein_metabolites
 
 
-# In[5]:
+# In[27]:
 
 
 # def update_rrna_degradation(rrna_degradation_reaction, nucleus = True):
@@ -223,9 +223,7 @@ def build_rrna5s_reactions(rpl5_n, rpl11_n):
     # TRANSPORT - will be transported as pre60s later, but make an rrna5s cytoplasmic for degradation, as
     # ribosome dissociates in cytoplasm
     # must add nucleocytoplasmic export via ran gtp: https://www.sciencedirect.com/science/article/pii/S0171933504702575?via%3Dihub
-    rrna5s_c = rrna5s_n.copy()
-    rrna5s_c.id = '_'.join(rrna5s_c.id.split('_')[:-1]) + '_c'
-    rrna5s_c.compartment = 'c'
+    rrna5s_c = rrna5s_n.change_compartment('c')
 
     # Degradation
     rrna5s_degradation = rrna5s_c.exonucleolytic_degradation(reaction_name = '5s_rRNA')
@@ -238,7 +236,7 @@ def build_rrna5s_reactions(rpl5_n, rpl11_n):
     return rrna5s_reactions, rrna5s_complex_n, rrna5s_c
 
 
-# In[6]:
+# In[28]:
 
 
 # ets_5_frag1 is from 5' end of 47s to A' site
@@ -405,9 +403,7 @@ def build_other_rrna_reactions(rrna5s_complex_n, rs_protein_metabolites, rl_prot
     pre40s_complex_formation.gene_reaction_rule = ' and '.join(mach.pre40s_rbfs)
 
     # pre40s nucleocytoplasmic export-----------------------------------------------------------------------
-    pre40s_complex_c = pre40s_complex_n.copy()
-    pre40s_complex_c.id = '_'.join(pre40s_complex_c.id.split('_')[:-1]) + '_c'
-    pre40s_complex_c.compartment = 'c'
+    pre40s_complex_c = pre40s_complex_n.change_compartment('c')
 
     pre40s_transport = cobra.Reaction('pre40s_NUCLEAR_EXPORTtn')
     pre40s_transport.subsytem = 'Ribosome_Biogenesis'
@@ -581,9 +577,7 @@ def build_other_rrna_reactions(rrna5s_complex_n, rs_protein_metabolites, rl_prot
     pre60s_complex_formation.gene_reaction_rule = ' and '.join(mach.pre60s_rbfs)
 
     # pre60s nucleocytoplasmic export-----------------------------------------------------------------------
-    pre60s_complex_c = pre60s_complex_n.copy()
-    pre60s_complex_c.id = '_'.join(pre60s_complex_c.id.split('_')[:-1]) + '_c'
-    pre60s_complex_c.compartment = 'c'
+    pre60s_complex_c = pre60s_complex_n.change_compartment('c')
 
     pre60s_transport = cobra.Reaction('pre60s_NUCLEAR_EXPORTtn')
     pre60s_transport.subsytem = 'Ribosome_Biogenesis'
@@ -600,9 +594,7 @@ def build_other_rrna_reactions(rrna5s_complex_n, rs_protein_metabolites, rl_prot
     rrna_5_8s_c = rRNA('5_8s', seq = rrna_5_8s_seq, compartment = 'c', triphosphate=False)
     base_counts_deg, elements_deg = func.get_base_counts_and_elements(deg_seq)
 
-    rrna_28s_c = rrna_28s_n.copy()
-    rrna_28s_c.id = '_'.join(rrna_28s_c.id.split('_')[:-1]) + '_c'
-    rrna_28s_c.compartment = 'c'
+    rrna_28s_c = rrna_28s_n.change_compartment('c')
 
     metabolites = [m for m in rl_2 if m.compartment == 'c'] + [rrna_28s_c, rrna_5_8s_c, rrna5s_c]
     complex_info = {'METABOLITES': metabolites, 'IDS': [m.id.split('_')[0] for m in metabolites], 
@@ -653,7 +645,7 @@ def build_other_rrna_reactions(rrna5s_complex_n, rs_protein_metabolites, rl_prot
     return all_reactions, mature_ribosomal_precomplexes, mature_rrna_metabolites
 
 
-# In[8]:
+# In[29]:
 
 
 def build_ribosome(ub_args, compress_mrna = False):

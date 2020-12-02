@@ -7,32 +7,24 @@
 import cobra
 import sys
 sys.path.insert(1, '../../scripts/')
-from utils import parameters as params
 from utils import metabolites as metab
-# from utils import machinery as mach
-# from uniform_processes.biomass import biomass_rna_mapper
-# from utils import functions as func
+from macromolecules.macromolecule import Macromolecule
 
 
-# In[55]:
+# In[ ]:
 
 
-class Protein(cobra.Metabolite):
+class Protein(Macromolecule):
     def __init__(self, compartment, id_, gene_info = None, amino_acid_counts = None):
         '''
         
-        Generates a cobra.Metabolite in the compartment for a protein with either 1) gene_info (gene_information object) or all of 
+        Generates a Macromolecule in the compartment for a protein with either 1) gene_info (gene_information object) or all of 
         2) id (string)and amino_acid_counts (dictionary, keys as 1-letter amino acide code values as number of 
         occurences in the protein).
         
         If gene_info and id_ are both not None, will concatenate the two strings.
         
         '''
-        
-        if compartment not in params.compartments.keys():
-            err = 'Specified compartment is not considered in the ME Model. Please input one of the following: ' 
-            err += ', '.join(list(params.compartments.keys()))
-            raise ValueError(err)
         if gene_info is not None and (amino_acid_counts is not None):
             raise ValueError('Please specify either gene_info only or amino_acid_counts only')
         elif gene_info is None and ((id_ is None) or (amino_acid_counts is None)):
@@ -63,23 +55,10 @@ class Protein(cobra.Metabolite):
         elements['H'] -= 2*(L_protein-1)
         elements['O'] -= 1*(L_protein-1)
         
-        cobra.Metabolite.__init__(self, id = id_, compartment = compartment, charge = charge)
-        self.elements = elements
-        self.mass = self.formula_weight/1000
-    def change_compartment(self, new_compartment):
-        '''Returns a copy of the protein metabolite, but in new compartment'''
+        Macromolecule.__init__(self, id = id_, compartment = compartment, charge = charge, elements = elements)
+        self.type = 'protein'
+        self.mass = self.formula_weight/1000 #kDa
         
-        if new_compartment == self.compartment:
-            raise ValueError('The protein is already in this compartment')
-        if new_compartment not in params.compartments.keys():
-            err = 'Specified compartment is not considered in the ME Model. Please input one of the following: ' 
-            err += ', '.join(list(params.compartments.keys()))
-        
-        new_protein = self.copy()
-        new_protein.id = '_'.join(self.id.split('_')[:-1]) + '_' + new_compartment
-        new_protein.compartment = new_compartment
-        
-        return new_protein
 
 
 # In[61]:

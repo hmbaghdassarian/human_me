@@ -116,8 +116,7 @@ def protein_polyubiquitination(gene_info, protein_metabolite, compartment, ub_ar
         polyubiquitinate_protein = cobra.Reaction(protein_metabolite.id + '_POLYUBIQUITINATIONpm')
         polyubiquitinate_protein.subsytem = 'Protein_Expression'
         
-        polyub_protein_pm = protein_metabolite.copy()
-        polyub_protein_pm.id = polyub_protein_pm.id.replace('_protein_pm', '_polyub_protein_pm')
+        polyub_protein_pm = protein_metabolite.change_compartment('pm')
         
         elements = polyub_protein_pm.elements.copy()
         for aa_code, aa_count in ub_args['monoub_aa_counts'].items():
@@ -360,9 +359,7 @@ def transport_mitochondrial_inter(gene_info, processed_protein_m):
     
     mitochondrial_inter_transport = cobra.Reaction(gene_info.hgnc_id + '_IMPORTti')
     mitochondrial_inter_transport.subsytem = 'Protein_Expression'
-    pre_protein_i = processed_protein_m.copy()
-    pre_protein_i.id = '_'.join(pre_protein_i.id.split('_')[:-1]) + '_i'
-    pre_protein_i.compartment = 'i'
+    pre_protein_i = processed_protein_m.change_compartment('i')
     
     rxn = {processed_protein_m: -1, pre_protein_i: 1}
     
@@ -671,9 +668,7 @@ def import_golgi(gene_info, modified_protein_r):
     V = modified_protein_r.mass * 1.21 / 1000.0 # Protein Volume in nm^3
     copii_coeff = int(round(268082.35 * params.Kv / V))
     
-    protein_g = modified_protein_r.copy()
-    protein_g.id = '_'.join(protein_g.id.split('_')[:-1]) + '_g'
-    protein_g.compartment = 'g'
+    protein_g = modified_protein_r.change_compartment('g')
     
     rxn = {modified_protein_r: -copii_coeff, protein_g: copii_coeff}
     # gtp hydrolysis

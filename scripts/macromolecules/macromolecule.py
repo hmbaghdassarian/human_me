@@ -30,17 +30,17 @@ class Macromolecule(cobra.Metabolite):
             raise ValueError('Macromolecules must syntactically have compartment as part of id')
     
     def change_compartment(self, new_compartment):
-        '''Returns a copy of the protein metabolite, but in new compartment'''
+        '''Returns a copy of the macromolecule metabolite, but in new compartment'''
         
         if new_compartment == self.compartment:
-            raise ValueError('The protein is already in this compartment')
+            raise ValueError('The macromolecule is already in this compartment')
         if new_compartment not in params.compartments.keys():
             err = 'Specified compartment is not considered in the ME Model. Please input one of the following: ' 
             err += ', '.join(list(params.compartments.keys()))
         
-        new_protein = self.copy()
-        new_protein.id = '_'.join(self.id.split('_')[:-1]) + '_' + new_compartment
-        new_protein.compartment = new_compartment
+        new_macromolecule = self.copy()
+        new_macromolecule.id = '_'.join(self.id.split('_')[:-1]) + '_' + new_compartment
+        new_macromolecule.compartment = new_compartment
         
-        return new_protein    
+        return new_macromolecule    
 

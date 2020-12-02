@@ -5,6 +5,9 @@
 
 
 import cobra
+import sys
+sys.path.insert(1, '../../scripts/')
+from utils import parameters as params
 
 
 # In[ ]:
@@ -131,7 +134,21 @@ class Complex(cobra.Metabolite):
             new_complex_info = {'METABOLITES': metabolites_, 'IDS': ids, 'METABOLITE_TYPES': metabolite_types}
 
             return self.get_complex_biomass(decomposed_complex = Complex(complex_id = 'foo', reaction_id = 'foo', 
-                                                                         **new_complex_info))  
+                                                                         **new_complex_info)) 
+    def change_compartment(self, new_compartment):
+        '''Returns a copy of the macromolecule metabolite, but in new compartment'''
+        
+        if new_compartment == self.compartment:
+            raise ValueError('The macromolecule is already in this compartment')
+        if new_compartment not in params.compartments.keys():
+            err = 'Specified compartment is not considered in the ME Model. Please input one of the following: ' 
+            err += ', '.join(list(params.compartments.keys()))
+        
+        new_macromolecule = self.copy()
+        new_macromolecule.id = '_'.join(self.id.split('_')[:-1]) + '_' + new_compartment
+        new_macromolecule.compartment = new_compartment
+        
+        return new_macromolecule 
 
 
 # In[ ]:
