@@ -208,9 +208,9 @@ def add_biomass_change(reaction):
         if isinstance(m, Macromolecule): # and not isinstance(c, sympy.Expr):
             if not isinstance(m, Complex):
                 if m.type in biomass_change:
-                    biomass_change[m.type] += (count*m.mass)
+                    biomass_change[m.type] += (count*m.formula_weight/1000)
                 else:
-                    biomass_change[m.type] = (count*m.mass)
+                    biomass_change[m.type] = (count*m.formula_weight/1000)
             else:
                 for type_, mass_ in m.get_complex_biomass().items():
                     if type_ in biomass_change:
