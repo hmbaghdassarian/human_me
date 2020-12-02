@@ -9,14 +9,15 @@ import sys
 sys.path.insert(1, '../../scripts/')
 from utils import metabolites as metab
 from utils import machinery as mach
-from uniform_processes.biomass import biomass_rna_mapper
 from utils import functions as func
+from uniform_processes.biomass import biomass_rna_mapper
+from macromolecules.macromolecule import Macromolecule
 
 
 # In[10]:
 
 
-class RNA(cobra.Metabolite):
+class RNA(Macromolecule):
     def __init__(self, metabolite_name, seq, compartment = 'n', triphosphate = True):
         '''
         
@@ -30,12 +31,11 @@ class RNA(cobra.Metabolite):
         self.sequence = seq
         self.triphosphate = triphosphate
         self.length = len(self.sequence)
+        self.get_base_counts_and_elements()
 
-        cobra.Metabolite.__init__(self, id = rna_id, compartment = compartment, charge = -self.length)
+        Macromolecule.__init__(self, id = rna_id, compartment = compartment, charge = -self.length, elements = self.elements)
         if triphosphate:
             self.charge -= 3
-        
-        self.get_base_counts_and_elements()
     
     def get_base_counts_and_elements(self):
         '''
@@ -44,30 +44,7 @@ class RNA(cobra.Metabolite):
         '''
         self.base_counts, self.elements = func.get_base_counts_and_elements(seq = self.sequence, 
                                                                   triphosphate = self.triphosphate)        
-#         base_counts = dict()
-#         for base_letter in metab.seq_element_map.keys():
-#             base_counts[base_letter] = self.sequence.count(base_letter)
 
-#         elements = {'C': 0, 'H': 0, 'N': 0, 'O': 0, 'P': 0}
-#         for base_letter in metab.seq_element_map.keys():
-#             for element in elements.keys():
-#                 elements[element] += base_counts[base_letter]* metab.seq_element_map[base_letter][element]   
-
-#         #3' OH end
-#         elements['H'] += 1 
-#         elements['O'] += 1
-
-#         # 5' end
-#         if self.triphosphate:
-#             elements['P'] += 2
-#             elements['O'] += 6
-#         else:
-#             elements['H'] += 1
-        
-#         self.base_counts = base_counts
-#         self.elements = elements
-        
-#         self.mw = self.formula_weight/1000
     def synthesize(self, id_):
         '''
         Generates a reaction for transcription of an RNA molecule (NTPs-->RNA).

@@ -137,10 +137,7 @@ class express_mrna():
             self.reactions.append(transcript_processing)
     def export_mrna(self):
         # make the cytosolic mrna metabolite
-        self.mrna_c = self.mrna_n.copy()
-            
-        self.mrna_c.id = '_'.join(self.mrna_c.id.split('_'))[:-1] + 'c'
-        self.mrna_c.compartment = 'c'
+        self.mrna_c = self.mrna_n.change_compartment('c')
 
         # make the transport reaction
         mrna_export = cobra.Reaction(self.gene_info.hgnc_id + '_mRNA_EXPORTtn')
