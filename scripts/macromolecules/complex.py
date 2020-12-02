@@ -8,6 +8,8 @@ import cobra
 import sys
 sys.path.insert(1, '../../scripts/')
 from utils import parameters as params
+from macromolecules.macromolecule import Macromolecule
+from uniform_processes.biomass import biomass_mapper
 
 
 # In[ ]:
@@ -188,6 +190,33 @@ def get_complex_biomass_change(complex_products, complex_reactants, precision_li
         if abs(product_biomass[bt] - reactant_biomass[bt]) > precision_limit:
             change[bt] = product_biomass[bt] - reactant_biomass[bt]
     return change
+
+
+# In[ ]:
+
+
+def add_biomass_change(reaction):
+    '''
     
-#     return {bt: product_biomass[bt] - reactant_biomass[bt] for bt in product_biomass.keys() if product_biomass[bt] - reactant_biomass[bt] != 0}
+    Input: list of cobra.Reactions
+    Output: dictionary delineating the change in biomass (products - substrates) for the different categories
+    of biomass.
+    
+    '''
+    biomass_change = dict()
+    for m, count in reaction.metabolites.items():
+        if isinstance(m, Macromolecule): # and not isinstance(c, sympy.Expr):
+            if not isinstance(m, Complex):
+                if m.type in biomass_change:
+                    biomass_change[m.type] += (count*m.mass)
+                else:
+                    biomass_change[m.type] = (count*m.mass)
+            else:
+                for type_, mass_ in m.get_complex_biomass().items():
+                    if type_ in biomass_change:
+                        biomass_change[type_] += (count*mass_)
+                    else:
+                        biomass_change[type_] = (count*mass_)
+    biomass_change = {biomass_mapper[k]:v for k,v in biomass_change.items()}
+    reaction.add_metabolites(biomass_change, combine = False)
 
