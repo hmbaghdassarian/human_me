@@ -63,7 +63,7 @@
 
             Min scale                       Max scale      Between 0.5 and 2.0
  Col    657   1.7E-08            Col     50   2.5E+01              958     7.7
- Row    642   4.1E-04            Row   1497   2.3E+07              203     2.0
+ Row    642   4.1E-04            Row   1497   2.3E+07              202     2.0
 
  Norm of fixed columns and slacks             8.9E-08
  (before and after row scaling)               2.2E-11
@@ -81,36 +81,26 @@
  Singular(m=n)  rank    10051  n-rank       5  nsing        5
 
       Itn     dj     ninf   sinf       objective       LU
-        1 -1.6E+09     52 2.093E-11 -1.00000000E-09    57562
- 
- Itn     7650 -- linear E rows feasible.   Obj =  -1.000000000E-09
-
- Crash on linear LG rows:
- Slacks     1  Free cols     0  Preferred     0
- Unit       0  Double        0  Triangle      0  Pad     0
- 
- Itn     7650 -- feasible solution.  Objective =   1.000000000E-09
- 
- Itn     7686 --     737  nonbasics set on bound, basics recomputed
- 
- Itn     7698 -- feasible solution.  Objective =   1.000000000E-09
- 
+        1 -2.2E+08     49 2.088E-11 -1.00000000E-09    57556
+ Itn     9331 --     891  nonbasics set on bound, basics recomputed
+ Itn     9386 --       1  nonbasics set on bound, basics recomputed
 1
  
- EXIT -- optimal solution found
+ EXIT -- the problem is infeasible
 
- NEW BASIS file saved on file  11    itn =   7698
+ NEW BASIS file saved on file  11    itn =   9386
 
  Problem name                 lp      
- No. of iterations                7698   Objective value      1.0000000000E-09
- No. of degenerate steps          5291   Percentage                      68.73
- Max x       (scaled)      858 4.6E-08   Max pi      (scaled)    10056 1.0E+00
- Max x                     527 1.3E-06   Max pi                  10056 1.0E+00
- Max Prim inf(scaled)     6423 4.9E-21   Max Dual inf(scaled)        0 0.0E+00
- Max Primal infeas       17044 4.8E-15   Max Dual infeas             0 0.0E+00
+ No. of iterations                9386   Objective value      1.0000000000E-09
+ No. of infeasibilities              1   Sum of infeas        2.9854225017E-13
+ No. of degenerate steps          5868   Percentage                      62.52
+ Max x       (scaled)      858 4.6E-08   Max pi      (scaled)     3636 1.2E+05
+ Max x                     527 6.5E-07   Max pi                   4840 4.2E+02
+ Max Prim inf(scaled)    18197 3.0E-13   Max Dual inf(scaled)      510 1.6E-22
+ Max Primal infeas       18197 5.3E-12   Max Dual infeas         12375 3.5E-24
 
  Time for MPS input                           0.00 seconds
- Time for solving problem                   126.03 seconds
+ Time for solving problem                   172.36 seconds
  Time for solution output                     0.03 seconds
  Time for constraint functions                0.00 seconds
  Time for objective function                  0.00 seconds

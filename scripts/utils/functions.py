@@ -429,15 +429,12 @@ from cobra.core.dictlist import DictList
 from cobra.util.context import get_context
 from sympy import lambdify
 import warnings
-# import scipy
+import copy
 import numpy as np
 import sys
 sys.path.insert(1, '../../scripts/')
 from me_solver import solve_me
 
-
-
-# from sympy.parsing.sympy_parser import parse_expr
 class ME_Model(cobra.Model):
     def __init__(self,  id_or_model, name = None):
         '''
@@ -606,7 +603,7 @@ class ME_Model(cobra.Model):
         Solver is a string, options of [qminos] - must have solveME and qMINOS installed
         
         Returns same outputs as qminospy.solver.solvelp:
-        x: optimal solution
+        sln: optimal solution
         stat: status
         hs: optimal basis
         
@@ -620,8 +617,34 @@ class ME_Model(cobra.Model):
               for a large number of iterations (e.g. 1000).
         
         '''
-        
-        return solve_me.solve_lp(me_model = self, mu_val = mu_val, objective = objective, 
+        sln, stat, hs = solve_me.solve_lp(me_model = self, mu_val = mu_val, objective = objective, 
                                  close_biomass_dilution = close_biomass_dilution,
                                  solver_type = solver_type, precision = precision)
+        
+        return sln, stat, hs
+    def infeasible_reactions(self, mu_val, sln):
+        '''
+        Should only use for infeasible models to identify reactions that cause infeasibility.
+
+        Inputs:
+        sln: A solution output from ME_Model.solve_lp
+        mu_val: The mu_value that was used in ME_Model.solve_lp
+
+        Returns: a dictionary with keys as reaction ids and values as fluxes for reactions that caused infeasibility    
+        '''
+
+        ir = dict()
+        for r in self.reactions:
+            flux = sln[self.reactions.index(r.id)]
+
+            ub = copy.copy(r.upper_bound)
+            lb = copy.copy(r.lower_bound)
+
+            if isinstance(ub, sympy.Expr):
+                ub = float(ub.subs(params.mu, mu_val))
+            if isinstance(lb, sympy.Expr):
+                lb = float(lb.subs(params.mu, mu_val))
+            if (flux > ub) or (flux < lb):
+                ir[r.id] = flux
+        return ir
 
