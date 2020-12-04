@@ -14,7 +14,6 @@ from utils import metabolites as metab
 from utils import functions as func
 from utils import utils_2
 
-from uniform_processes import biomass
 from macromolecules.protein import Protein
 
 
@@ -26,15 +25,11 @@ def translate_protein_cytosolic(gene_info, mrna_transcript_c, mrna_deg_proxy):
     # peptide bond formation: https://d1j63owfs0b5j3.cloudfront.net/pop-quiz/answerImage/Amino-Acid-1-popquiz.png
     # tRNA amino acide release: https://rnajournal.cshlp.org/content/14/8/1526/F1.expansion.html
 
-    tb_reactant_bm = 0
     rxn = dict()
     for aa_code, aa_count in gene_info.amino_acid_counts.items():
         rxn[utils_2.charged_trna_map[aa_code]] = -aa_count # tRNA consumption
-        tb_reactant_bm += utils_2.charged_trna_map_mw[aa_code]*aa_count # trna biomass consumed kDa
     
     rxn[utils_2.modified_trna_transcript_c]  = gene_info.L_protein 
-    biomass_change = (gene_info.L_protein*utils_2.modified_trna_transcript_c_mw)-tb_reactant_bm
-    rxn[biomass.trna_] = biomass_change
     
     rxn[metab.h2o_c] = -gene_info.L_protein # release of peptide from tRNA, addition of -OH to uncharged tRNA
     rxn[metab.h_c] = gene_info.L_protein # release of peptide from tRNA, addition of -OH to uncharged tRNA
@@ -56,9 +51,7 @@ def translate_protein_cytosolic(gene_info, mrna_transcript_c, mrna_deg_proxy):
     rxn_c[mrna_deg_proxy] = -gene_info.coupling['c2']# couple mrna degradation to protein synthesis 
     rxn_c[mrna_transcript_c] = -gene_info.coupling['c1'] # couple mrna dilution to protein synthesis
     
-    # biomas
-    rxn_c[biomass.protein_] = unfolded_protein_c.formula_weight/1000
-    
+    # biomas    
     translation_elongation = func.ME_Reaction(gene_info.hgnc_id + '_TRANSLATION_ELONGATIONc', 
                                              type_ = ['translation'])
     translation_elongation.subsytem = 'Protein_Expression'

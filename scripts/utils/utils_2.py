@@ -19,8 +19,6 @@ from expression.gene_information import gene_information
 
 
 charged_trna_map = {v.id.split('_')[2]: v for v in charged_trna_metabolites}
-charged_trna_map_mw = {aa_code: aa_metab.formula_weight/1000 for aa_code, aa_metab in charged_trna_map.items()}
-modified_trna_transcript_c_mw = modified_trna_transcript_c.formula_weight/1000
 
 
 # In[23]:

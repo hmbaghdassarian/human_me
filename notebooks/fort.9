@@ -20,29 +20,29 @@
       Optimality tol  1.00000000E-20
       Unbounded step size  1.00000000E+30
 
- Nonzeros allowed for in LU factors 66576187
+ Nonzeros allowed for in LU factors 66575842
 
  Scale option  2,      Partial price      10
- Partial price section size (A)         1250
- Partial price section size (I)         1005
+ Partial price section size (A)         1261
+ Partial price section size (I)         1009
 
 
 
  Matrix Statistics
  -----------------
                Total      Normal        Free       Fixed     Bounded
- Rows          10056           0           1       10055           0
- Columns       12509         803         375           4       11327
+ Rows          10090           0           1       10089           0
+ Columns       12611         803         375           4       11429
 
- No. of matrix elements               158244     Density       0.126
+ No. of matrix elements               159714     Density       0.126
  Biggest                          1.7297E+07  (excluding fixed columns,
  Smallest                         2.6170E-08   free rows, and RHS)
 
  No. of objective coefficients             0
 
 
- Nonlinear constraints       0     Linear constraints   10056
- Nonlinear variables         0     Linear variables     12509
+ Nonlinear constraints       0     Linear constraints   10090
+ Nonlinear variables         0     Linear variables     12611
  Jacobian  variables         0     Objective variables      0
 
  Initial basis
@@ -62,8 +62,8 @@
  After  6    1.57E-07    1.00E+02        637677967.04
 
             Min scale                       Max scale      Between 0.5 and 2.0
- Col    657   1.7E-08            Col     50   2.5E+01              958     7.7
- Row    642   4.1E-04            Row   1497   2.3E+07              202     2.0
+ Col    657   1.7E-08            Col     52   2.5E+01              958     7.6
+ Row    668   4.1E-04            Row   1497   2.3E+07              202     2.0
 
  Norm of fixed columns and slacks             8.9E-08
  (before and after row scaling)               2.2E-11
@@ -73,41 +73,33 @@
 
  Crash on linear E  rows:
  Slacks     0  Free cols   312  Preferred     0
- Unit    1885  Double      541  Triangle   2572  Pad  4745
+ Unit    1886  Double      569  Triangle   2572  Pad  4750
 1
  
  Iterations
  ----------
- Singular(m=n)  rank    10051  n-rank       5  nsing        5
+ Singular(m=n)  rank    10085  n-rank       5  nsing        5
 
       Itn     dj     ninf   sinf       objective       LU
-        1 -1.3E+08     49 2.088E-11 -1.00000000E-09    57575
- Itn     8366 --     827  nonbasics set on bound, basics recomputed
- 
- Itn     8375 -- linear E rows feasible.   Obj =  -1.000000000E-09
-
- Crash on linear LG rows:
- Slacks     1  Free cols     0  Preferred     0
- Unit       0  Double        0  Triangle      0  Pad     0
- 
- Itn     8375 -- feasible solution.  Objective =   1.000000000E-09
- 
+        1 -1.6E+09     59 2.099E-11 -1.00000000E-09    57741
+ Itn     8302 --     772  nonbasics set on bound, basics recomputed
 1
  
- EXIT -- optimal solution found
+ EXIT -- the problem is infeasible
 
- NEW BASIS file saved on file  11    itn =   8375
+ NEW BASIS file saved on file  11    itn =   8354
 
  Problem name                 lp      
- No. of iterations                8375   Objective value      1.0000000000E-09
- No. of degenerate steps          5322   Percentage                      63.55
- Max x       (scaled)      858 4.6E-08   Max pi      (scaled)    10056 1.0E+00
- Max x                     527 8.0E-07   Max pi                  10056 1.0E+00
- Max Prim inf(scaled)    17648 4.1E-21   Max Dual inf(scaled)        0 0.0E+00
- Max Primal infeas       15495 5.5E-15   Max Dual infeas             0 0.0E+00
+ No. of iterations                8354   Objective value      1.0000000000E-09
+ No. of infeasibilities              1   Sum of infeas        1.5420475837E-13
+ No. of degenerate steps          5479   Percentage                      65.59
+ Max x       (scaled)      858 4.6E-08   Max pi      (scaled)     3672 6.2E+04
+ Max x                     527 6.5E-07   Max pi                   4354 1.0E+02
+ Max Prim inf(scaled)    16188 1.5E-13   Max Dual inf(scaled)      742 1.9E-21
+ Max Primal infeas       16188 8.3E-12   Max Dual infeas          5712 1.1E-24
 
  Time for MPS input                           0.00 seconds
- Time for solving problem                   217.89 seconds
+ Time for solving problem                   154.82 seconds
  Time for solution output                     0.04 seconds
  Time for constraint functions                0.00 seconds
  Time for objective function                  0.00 seconds
