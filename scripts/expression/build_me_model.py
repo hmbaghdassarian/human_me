@@ -236,7 +236,7 @@ class me_builder():
         self.dummy_protein = dm[0]
         
     def get_complex_info(self):
-        print('Get metabolic model complex information')
+        print('Get metabolic module complex information')
         complex_df = pd.DataFrame(columns = ['reaction_id', 'compartment', 'machinery', 'is_complex', 'creates_multiple_reactions'])
 
         for r in tqdm(self.human_model.reactions):
@@ -264,7 +264,7 @@ class me_builder():
 
 
         ######------------------------------------------------
-        print('Get me reaction complex information')
+        print('Get expression module complex information')
         me_complex_df = pd.DataFrame(columns = ['reaction_id', 'compartment', 'machinery', 'is_complex', 'creates_multiple_reactions'])
 
         for r in tqdm(self.me_reactions):
@@ -346,7 +346,6 @@ class me_builder():
         unique_complexes.reset_index(inplace = True, drop = True)
 
         complex_formation_reactions = list() # store all complex formation reactions
-        new_complex_ids = dict()
 
         counter = 0
         for i in unique_complexes.index:
@@ -354,36 +353,30 @@ class me_builder():
             compartment = unique_complexes.loc[i, 'compartment']
             machinery = unique_complexes.loc[i, 'machinery'].split(';')
 
-            if len(complex_id) > 256-8-4-(7*len(machinery)): # ids that are too long
-                new_complex_ids[complex_id] = str(counter)
-                complex_id = str(counter)
-                counter += 1
-
-
             machinery_metabolites = list()
-            metabolite_types = list()
             for m in machinery:
                 if m != 'ribosome':
                     machinery_metabolites.append(self.id_protein_map[m][compartment])
-                    metabolite_types.append('protein')
                 else:
                     machinery_metabolites.append(self.ribosome_complex_c)
-                    metabolite_types.append('complex')
 
-            complex_info = {'METABOLITES': machinery_metabolites, 'IDS': [m.id for m in machinery_metabolites], 
-                           'METABOLITE_TYPES': metabolite_types}
-            complex_metabolite = Complex(reaction_id = complex_id, complex_id = complex_id, **complex_info)
+            complex_metabolite = Complex(metabolites = machinery_metabolites, complex_id = complex_id)
+            if len(complex_id) > 247: # ids that are too long
+                complex_metabolite.update_id(new_id = str(counter)) # complex_metabolite.udate_id()
+                counter += 1
+
+                new_id = complex_metabolite.id
+                self.complex_df.complex_id.replace(to_replace = complex_id, value = complex_metabolite.temp_id, 
+                                                   inplace = True)
+
             complex_reaction = complex_metabolite.form_complex()
 
             complex_formation_reactions.append(complex_reaction)
-            self.complex_id_metabolite_map[complex_id] = complex_metabolite
-            self.complex_reactions_map[complex_id] = complex_reaction
+            self.complex_id_metabolite_map[complex_metabolite.temp_id] = complex_metabolite
+            self.complex_reactions_map[complex_metabolite.temp_id] = complex_reaction.id
 
-        # ids that were too long
-        for k,v in new_complex_ids.items():
-            self.complex_df.loc[self.complex_df[self.complex_df.complex_id == k].index, 'complex_id'] = v
-        
         self.complex_formation_reactions = complex_formation_reactions
+        
     def get_keff(self):
         # for reactions that show up more than once
         reactions_to_track = self.human_model.reactions + self.me_reactions
@@ -419,7 +412,7 @@ class me_builder():
             if df.shape[0] - len(to_drop) == 1:
                 drop_index += to_drop
             else:
-                raise ValueError('Something went wrong in selecting a complex by lowerst molecular weight')
+                raise ValueError('Something went wrong in selecting a complex by lowest molecular weight')
 
         self.complex_df.drop(index = drop_index, inplace = True)
 
@@ -427,7 +420,7 @@ class me_builder():
 
         # get rid of redundant complexes
         complexes_to_drop = sorted(set(c_og[c_og.is_complex].complex_id).difference(self.complex_df.complex_id))#sorted(set(self.complex_id_metabolite_map.keys()).difference(self.complex_df.complex_id))
-        complexes_to_drop_id = [self.complex_reactions_map[c_id].id for c_id in complexes_to_drop]
+        complexes_to_drop_id = [self.complex_reactions_map[c_id] for c_id in complexes_to_drop]
         self.complex_formation_reactions = [r for r in self.complex_formation_reactions if r.id not in complexes_to_drop_id]
         for c_id in complexes_to_drop:
             del self.complex_reactions_map[c_id]
@@ -459,6 +452,7 @@ class me_builder():
         n_reactions = len(self.me_reactions) + len(self.complex_formation_reactions)
 
         print('A total of {} reactions were dropped when forming a minimal proteome'.format(n_reactions_og - n_reactions))
+
     def add_metabolic_machinery(self):
         print('Add machinery to metabolic module reactions')
         metabolic_reactions = [r.id for r in params.human_model.reactions]
