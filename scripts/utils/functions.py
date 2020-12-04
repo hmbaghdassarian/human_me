@@ -248,7 +248,7 @@ class ME_Reaction(cobra.Reaction):
                 
             for i in range(len(values)):
                 if isinstance(values[i], sympy.Expr): # assumes the sympy expression always containts mu
-                    values[i] = values[i].subs(params.mu, mu_val)
+                    values[i] = float(values[i].subs(params.mu, mu_val))
             if not inplace:
                 return lb, ub, values
             else:
@@ -433,6 +433,7 @@ import copy
 import numpy as np
 import sys
 sys.path.insert(1, '../../scripts/')
+from utils import parameters as params
 from me_solver import solve_me
 
 class ME_Model(cobra.Model):
@@ -575,7 +576,7 @@ class ME_Model(cobra.Model):
                 reaction_type = isinstance(reaction, ME_Reaction) and reaction.type != ['biomass']
                 for metabolite, stoich in iteritems(reaction.metabolites):
                     if reaction_type and isinstance(stoich, sympy.Expr):
-                        array[m_ind(metabolite), r_ind(reaction)] = stoich.subs(params.mu, mu_val)
+                        array[m_ind(metabolite), r_ind(reaction)] = float(stoich.subs(params.mu, mu_val))
                     else:
                         array[m_ind(metabolite), r_ind(reaction)] = stoich
 
@@ -622,7 +623,7 @@ class ME_Model(cobra.Model):
                                  solver_type = solver_type, precision = precision)
         
         return sln, stat, hs
-    def infeasible_reactions(self, mu_val, sln):
+    def infeasible_reactions(self, mu_val, sln, stat):
         '''
         Should only use for infeasible models to identify reactions that cause infeasibility.
 
@@ -646,5 +647,8 @@ class ME_Model(cobra.Model):
                 lb = float(lb.subs(params.mu, mu_val))
             if (flux > ub) or (flux < lb):
                 ir[r.id] = flux
+                
+        if (len(ir)>0 and stat == 0) or (len(ir)==0 and stat != 0):
+            warnings.warn('There is a discrepancy between the solver status and reactions that violate bound constraints')
         return ir
 

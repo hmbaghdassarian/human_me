@@ -168,11 +168,6 @@ def build_ribosome_protein_expression_reactions(ub_args, compress_mrna = False):
         add_biomass_change(r)
         if r.id == 'HGNC:12458_TRANSLATION_ELONGATIONc':
             r.add_metabolites({biomass.mrna_: 0}, combine = False)
-        
-        # REMOVE THIS LATER, FOR FEASIBILITY !!!!!!
-        if r.id == 'HGNC:12458_UBIQUITIN_CLEAVAGEc':
-            r.add_metabolites({biomass.protein_: -17.111457840000003}, combine = False)
-        #!!!!!!!!
 
     rl_expression_reactions += mrna_expression_reactions + to_add
     rl_protein_metabolites += [folded_protein_c, folded_protein_n] 

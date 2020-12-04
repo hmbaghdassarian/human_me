@@ -63,10 +63,10 @@ biomass_reactions.append(reaction_)
 # protein biomass with unmodeled protein 
 upc=(params.unmodeled_protein_frac)/(1-params.unmodeled_protein_frac)
 reaction_ = cobra.Reaction('protein_biomass_to_biomass')
-reaction_.add_metabolites({protein_: -1, 
-                         unmodeled_protein_: -upc, 
-                         biomass_: 1 + upc})
-# reaction_.add_metabolites({protein_: -1, biomass_: 1})
+# reaction_.add_metabolites({protein_: -1, 
+#                          unmodeled_protein_: -upc, 
+#                          biomass_: 1 + upc})
+reaction_.add_metabolites({protein_: -1, biomass_: 1})
 biomass_reactions.append(reaction_)
 
 
