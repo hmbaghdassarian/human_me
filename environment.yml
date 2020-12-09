@@ -13,9 +13,7 @@ dependencies:
   - h5py=2.10.0
   - hdf5=1.10.5
   - ipykernel=5.3.1
-  - jupyter=1.0.0
-  - json=2.0.9
-  - logging=0.5.1.2  
+  - jupyter=1.0.0 
   - more-itertools=8.4.0
   - nb_conda=2.2.1
   - numpy=1.18.5
@@ -28,6 +26,9 @@ dependencies:
   - statsmodels=0.10.2
   - sympy=1.6.1
   - tqdm=4.47.0
+  - gfortran_linux-64=7.5.0
+      #  - json=2.0.9
+      #  - logging=0.5.1.2
   - pip:
     - cobra==0.18.1
     - seaborn==0.11.0
