@@ -46,7 +46,7 @@ make
 git clone https://github.com/SBRG/solvemepy.git #@0d0ebca585c61ed0f4a559a11ef38706620d7c22
 cd solvemepy
 cp path/to/qminos/minos56/lib/libminos.a ./
-cp path/to/qminos/minos56/lib/libqminos.a ./
+cp path/to/qminos/qminos56/lib/libqminos.a ./
 python setup.py develop
 ```
 

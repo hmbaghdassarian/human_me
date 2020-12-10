@@ -14,12 +14,20 @@ from utils import metabolites as metab
 from utils import functions as func
 
 
-# In[2]:
+# In[ ]:
+
+
+class Biomass(cobra.Metabolite):
+    def __init__(self, id=None, formula=None, name="",charge=None, compartment=None, elements = None):
+        cobra.Metabolite.__init__(self, id = id, charge = charge, compartment = compartment)
+
+
+# In[ ]:
 
 
 # make the metabolites
 
-biomass_ = cobra.Metabolite('biomass')
+biomass_ = Biomass('biomass')
 biomass_dilution = func.ME_Reaction('biomass_dilution', type_ = ['biomass'])
 biomass_dilution.add_metabolites({biomass_: -1})
 biomass_dilution._lower_bound, biomass_dilution._upper_bound = params.mu, params.mu 
@@ -27,25 +35,25 @@ biomass_dilution._lower_bound, biomass_dilution._upper_bound = params.mu, params
 biomass_reactions = [biomass_dilution]
 
 # constant
-dna_ = cobra.Metabolite('biomass_DNA')
-carb_ = cobra.Metabolite('biomass_carbohydrate')
-lipid_ = cobra.Metabolite('biomass_lipid')
-# other_ = cobra.Metabolite('biomass_other')
+dna_ = Biomass('biomass_DNA')
+carb_ = Biomass('biomass_carbohydrate')
+lipid_ = Biomass('biomass_lipid')
+# other_ = Biomass('biomass_other')
 
 # variable
-protein_, unmodeled_protein_ = cobra.Metabolite('biomass_protein'),  cobra.Metabolite('biomass_unmodeled_protein')
-trna_ = cobra.Metabolite('biomass_tRNA')
-rrna_ = cobra.Metabolite('biomass_rRNA')
-mrna_ = cobra.Metabolite('biomass_mRNA')
-premrna_ = cobra.Metabolite('biomass_premRNA')
-other_rna_ = cobra.Metabolite('biomass_other_RNA')
+protein_, unmodeled_protein_ = Biomass('biomass_protein'),  Biomass('biomass_unmodeled_protein')
+trna_ = Biomass('biomass_tRNA')
+rrna_ = Biomass('biomass_rRNA')
+mrna_ = Biomass('biomass_mRNA')
+premrna_ = Biomass('biomass_premRNA')
+other_rna_ = Biomass('biomass_other_RNA')
 
 biomass_mapper = {'rrna': rrna_, 'protein': protein_, 'mrna': mrna_, 'trna': trna_, 'fragment_rna': other_rna_, 
                      'premrna': premrna_}
 biomass_rna_mapper = {k:v for k,v in biomass_mapper.items() if 'rna' in k}
 
 
-# In[3]:
+# In[ ]:
 
 
 # biomass formation reactions
@@ -72,7 +80,7 @@ biomass_reactions.append(reaction_)
 
 # The following reactions convert the biomass components which are a constant proportion from the metabolic model formulation to the ME model formulation. Briefly, the coefficients of the precursor reactions must be scaled by their molecular weight, and the product must be equal to the constant proportion of that class of biomass, bounded by growth (flux through reaction = growth rate). 
 
-# In[4]:
+# In[ ]:
 
 
 # constant biomass reactions
