@@ -1,0 +1,21 @@
+biopython==1.77
+cmake==3.18.2
+cython==0.29.20
+google-api-python-client==1.6.3
+ipykernel==5.3.1
+jupyter==1.0.0 
+more-itertools==8.4.0
+numpy==1.18.5
+pandas==1.0.5
+python-dotenv==0.14.0
+scipy==1.4.1
+six==1.15.0
+statsmodels==0.10.2
+sympy==1.6.1
+tqdm==4.47.0
+cobra==0.18.1
+xlrd==1.2.0
+requests==2.25.0
+#make==4.1 # didn't need this on mine, but those that don't have make may need it
+
+
