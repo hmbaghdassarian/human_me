@@ -2,12 +2,14 @@
 *.env
 .env_template
 *.json
-*fort.11
-*fort.8
+**/fort.11
+**/fort.8
+**/fort.9
 project_files/
 data/
 notebooks/.pybiomart.sqlite
-__pycache__/
+**/__pycache__/
+me_env/
 MammalianSecretoryRecon/
 
 requirements.txt
