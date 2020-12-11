@@ -15,7 +15,6 @@ from utils.load_environmental_variables import raw_data_path
 from utils import machinery as mach
 from utils import parameters as params
 from utils import metabolites as metab
-# from utils import functions as func
 from macromolecules.RNA import tRNA, RNA_fragment
 from macromolecules.complex import add_biomass_change
 
@@ -390,4 +389,5 @@ trna_info = trna_information(maturetrna_sequence = mature_seq , id_ = 'generic',
                              five_leader_seq = leader_seq, modifications = {},
                              intron_sequences = None)
 trna_biogenesis_reactions, charged_trna_metabolites, modified_trna_transcript_c  = trna_biogenesis(trna_info)
+charged_trna_map = {v.id.split('_')[2]: v for v in charged_trna_metabolites}
 

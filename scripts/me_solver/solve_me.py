@@ -10,7 +10,7 @@ from qminospy.solver import QMINOS # need solveME installed and working
 
 import sys
 sys.path.insert(1, '../../scripts/')
-from utils.functions import ME_Reaction
+from core.reaction import ME_Reaction
 
 
 # In[8]:
@@ -153,12 +153,12 @@ def binary_search(me_model, min_mu=0, max_mu=0.05, mu_accuracy=1e-4, increment =
         
         xq,status,hsq = me_model.solve_lp(mu_val, objective = objective, solver_type = solver_type, precision = precision)
        
-        if status.var() == 0:#"optimal":
+        if status.max() == 0:#"optimal":
             if verbose:
                 print('The problem has an optimal solution at mu = ' + num_format.format(mu_val) + ' (hrs)')
             feasible_mu.append(mu)
             return True, xq, status, hsq 
-        elif status.var() == 1:
+        elif status.max() == 1:
             infeasible_mu.append(mu)
             if verbose:
                 print('The problem is infeasible at mu = ' + num_format.format(mu_val) + ' (hrs)')
@@ -241,4 +241,10 @@ def binary_search(me_model, min_mu=0, max_mu=0.05, mu_accuracy=1e-4, increment =
 
 
 # test_model.solve_lp(mu_val = 1e10, objective = {'rA': 1})
+
+
+# In[ ]:
+
+
+
 

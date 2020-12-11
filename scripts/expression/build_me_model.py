@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[11]:
+# In[1]:
 
 
 import cobra
@@ -25,11 +25,14 @@ with warnings.catch_warnings():
     from utils import functions as func  
     from preprocess import parse_complex
     
+    from core.reaction import ME_Reaction
+    from core.model import ME_Model
+    
     with func.HiddenPrints():
         from macromolecules.complex import Complex
-        from utils import utils_2
 
         import expression.build_mrna_expression_reactions as build_mrna
+        from expression import gene_information
         from expression.protein_expression import ubiquitin
         from expression.protein_expression import build_protein_expression_reactions as build_protein
         
@@ -49,7 +52,7 @@ def get_all_expression_reactions(hgnc_id, ub_args, psim = params.psim_me, machin
     with warnings.catch_warnings():
         warnings.simplefilter('ignore')
         with func.HiddenPrints():
-            gene_info = utils_2.generate_geneinfo_object(hgnc_id, psim, machinery_list, metabolic_model)
+            gene_info = gene_information.generate(hgnc_id, psim, machinery_list, metabolic_model)
             mrna_reactions, mrna_transcript_c, mrna_deg_proxy  = build_mrna.get_mrna_expression_reactions(gene_info, compress_mrna = compress_mrna)
             protein_reactions, protein_metabolites = build_protein.get_protein_expression_reactions(gene_info, mrna_transcript_c, mrna_deg_proxy, 
                                                                                                     ub_args = ub_args)
@@ -62,7 +65,7 @@ def generate_expression_module(me_reactions):
 
     # 2) replace mu values
     me_reactions_copy = copy.deepcopy(me_reactions) # this step is slow - can be faster with an inplace argument in .replace_coefficient_mu
-    idx = [i for i in range(len(me_reactions_copy)) if isinstance(me_reactions_copy[i], func.ME_Reaction)]
+    idx = [i for i in range(len(me_reactions_copy)) if isinstance(me_reactions_copy[i], ME_Reaction)]
     for i in idx:
          me_reactions_copy[i].replace_coefficient_mu(1)
 
@@ -81,8 +84,9 @@ def generate_expression_module(me_reactions):
 
 
 class me_builder():
-    def __init__(self, non_machinery = [], psim_me = params.psim_me, human_model = params.human_model, 
-                 compress_mrna = False):
+    def __init__(self, non_machinery = [], compress_mrna = False, unmodeled_protein_frac = 'default', 
+                psim_me = params.psim_me, human_model = params.human_model):
+        
         self.non_machinery = non_machinery
         self.psim_me = psim_me
         self.human_model = human_model
@@ -93,6 +97,16 @@ class me_builder():
         self.ub_args = ubiquitin.express_ubiquitin(compress_mrna = self.compress_mrna)
         print('Generate ribosome')
         ribosomal_reactions, self.ribosome_complex_c = build_ribosome(self.ub_args, self.compress_mrna )
+        
+        if unmodeled_protein_frac is 'default':
+            self.unmodeled_protein_frac = params.unmodeled_protein_frac # default value
+        else:
+            if unmodeled_protein_frac is None:
+                self.unmodeled_protein_frac = 0
+            elif not (unmodeled_protein_frac >= 1 or unmodeled_protein_frac < 0):
+                self.unmodeled_protein_frac = unmodeled_protein_frac
+            else:
+                raise ValueError('Unmodeled protein fraction must be a value in the range [0,1)')
         
         self.me_reactions = ribosomal_reactions + trna_biogenesis_reactions + self.ub_args['ub_reactions']
         # map HGNC ID to a dictionary of compartments and cobra.Metabolite proteins
@@ -217,23 +231,31 @@ class me_builder():
             raise ValueError('There are excess expression machinery reactions')
     
     def express_dummy_protein(self):
-        ups = pd.read_csv(build_files_path + 'dummy_protein_features.tab', sep = '\t', header = None, index_col = 0)
-        ups_ = pd.DataFrame(columns = params.psim_me.columns)
-        ups_.loc[0, 'PREMRNA_SEQ'], ups_.loc[0,'MRNA_SEQ'], ups_.loc[0,'PROTEIN_SEQ'] = ups.loc['premrna_seq', 1], ups.loc['mrna_seq', 1], ups.loc['protein_seq', 1]
-        dummy_id = 'HGNC:DUMMY'
-        ups_['HGNC_ID'], ups_['LOCATION'] = dummy_id, '[c]'
-        dummy_reactions, dm = get_all_expression_reactions(hgnc_id = dummy_id, psim = ups_, machinery_list = [], 
-                                                            metabolic_model = cobra.Model(''), compress_mrna = self.compress_mrna, 
-                                                          ub_args = self.ub_args) 
+        if self.unmodeled_protein_frac > 0:
+            upc=(self.unmodeled_protein_frac)/(1-self.unmodeled_protein_frac)
+            biomass.pb_reaction.add_metabolites({biomass.unmodeled_protein_: -upc, 
+                                                 biomass.biomass_: upc}, combine = True)
 
-        for r in dummy_reactions:
-            if biomass.protein_ in r.metabolites.keys():
-                rxn = r.metabolites.copy()
-                rxn[biomass.unmodeled_protein_] = rxn[biomass.protein_]
-                rxn[biomass.protein_] = 0
-                r.add_metabolites(rxn, combine = False)
-        self.me_reactions += dummy_reactions
-        self.dummy_protein = dm[0]
+            ups = pd.read_csv(build_files_path + 'dummy_protein_features.tab', sep = '\t', header = None, index_col = 0)
+            ups_ = pd.DataFrame(columns = params.psim_me.columns)
+            ups_.loc[0, 'PREMRNA_SEQ'], ups_.loc[0,'MRNA_SEQ'], ups_.loc[0,'PROTEIN_SEQ'] = ups.loc['premrna_seq', 1], ups.loc['mrna_seq', 1], ups.loc['protein_seq', 1]
+            dummy_id = 'HGNC:DUMMY'
+            ups_['HGNC_ID'], ups_['LOCATION'] = dummy_id, '[c]'
+            dummy_reactions, dm = get_all_expression_reactions(hgnc_id = dummy_id, psim = ups_, machinery_list = [], 
+                                                                metabolic_model = cobra.Model(''), compress_mrna = self.compress_mrna, 
+                                                              ub_args = self.ub_args) 
+
+            for r in dummy_reactions:
+                if biomass.protein_ in r.metabolites.keys():
+                    rxn = r.metabolites.copy()
+                    rxn[biomass.unmodeled_protein_] = rxn[biomass.protein_]
+                    rxn[biomass.protein_] = 0
+                    r.add_metabolites(rxn, combine = False)
+            self.me_reactions += dummy_reactions
+            self.dummy_protein = dm[0]
+        else:
+            self.dummy_protein = None
+            
         
     def get_complex_info(self):
         print('Get metabolic module complex information')
@@ -463,7 +485,7 @@ class me_builder():
             reaction_id = self.complex_df.loc[i, 'reaction_id'] # original reaction id
             r_ = params.human_model.reactions.get_by_id(reaction_id).copy() # original reaction
 
-            r = func.ME_Reaction(type_ = ['catalysis'], 
+            r = ME_Reaction(type_ = ['catalysis'], 
                             id = r_.id, name = r_.name, subsystem = r_.subsystem, lower_bound = r_.lower_bound, 
                             upper_bound = r_.upper_bound, 
                                 cobra_id = r_.id)
@@ -524,14 +546,14 @@ class me_builder():
             reaction_id = rxn.id # original reaction id
             idx = self.complex_df[self.complex_df.reaction_id == reaction_id_short].index.tolist()
 
-            if not isinstance(rxn, func.ME_Reaction):
-                rxn_me = func.ME_Reaction(type_ = ['catalysis'], 
+            if not isinstance(rxn, ME_Reaction):
+                rxn_me = ME_Reaction(type_ = ['catalysis'], 
                                 id = rxn.id, name = rxn.name, subsystem = rxn.subsystem, lower_bound = rxn.lower_bound, 
                                 upper_bound = rxn.upper_bound)
                 rxn_me.add_metabolites(rxn.metabolites)
                 rxn_me.gene_reaction_rule = rxn.gene_reaction_rule
             else: # translation reactions
-                rxn_me = func.ME_Reaction(type_ = rxn.type + ['catalysis'], 
+                rxn_me = ME_Reaction(type_ = rxn.type + ['catalysis'], 
                                 id = rxn.id, name = rxn.name, subsystem = rxn.subsystem, lower_bound = rxn.lower_bound, 
                                 upper_bound = rxn.upper_bound)
                 rxn_me.add_metabolites(rxn.metabolites)
@@ -577,7 +599,7 @@ class me_builder():
 #         metabolic_reactions = [r.id for r in self.human_model.reactions]
 #         err = False
 #         for r in tqdm(self.final_reactions):
-#             if isinstance(r, func.ME_Reaction):
+#             if isinstance(r, ME_Reaction):
 #                 if r.cobra_id is None and len(r.check_mass_balance())>0 and r.type != ['biomass']:
 #                     err = True
 #                     break
@@ -596,11 +618,13 @@ class me_builder():
 #         if err:
 #             raise ValueError('Not all expression module reactions are mass balanced') 
     def build_me_model(self, model_id = 'HUMAN_ME_MODEL'):
+        # here instead of in biomass script in case of dummy_protein
+        biomass.biomass_reactions.append(biomass.pb_reaction) 
         self.final_reactions += biomass.biomass_reactions
 #         self.check_me_mass_balance()
 
         print('Generate ME-Model')
-        me_model = func.ME_Model(model_id)
+        me_model = ME_Model(model_id)
         me_model.add_reactions(self.final_reactions)
 
         return me_model
@@ -609,25 +633,30 @@ class me_builder():
 # In[14]:
 
 
-def build_me(non_machinery = [], minimal_proteome = False, model_id = 'HUMAN_ME_MODEL', compress_mrna = False,
-                  psim_me = params.psim_me, human_model = params.human_model):
+def build_me(non_machinery = [], minimal_proteome = False, compress_mrna = False, dummy_protein = False, 
+             unmodeled_protein_frac = 'default', model_id = 'HUMAN_ME_MODEL', psim_me = params.psim_me, 
+             human_model = params.human_model):
     '''
     Returns a human ME_model. 
     
     Inputs:
-        non_machinery: a list of HGNC_IDs of non_machinery proteins
-        minimal_proteome: bool; For reactions with OR in the GPR, the builder by default (False) generates a 
+        1) non_machinery: a list of HGNC_IDs of non_machinery proteins
+        2) minimal_proteome: bool; For reactions with OR in the GPR, the builder by default (False) generates a 
         separate reaction for each protein complex (False). If True, builder instead will create one reaction, 
         choosing the protein complex with the lowest molecular weight to catalyze the reaction.
-        model_id: string; id for the me model
-        compress_mrna: boolean, whether to merge the 3 transcription, mrna processing, and mrna export to cytosol 
+        3) compress_mrna: boolean, whether to merge the 3 transcription, mrna processing, and mrna export to cytosol 
         reactions into one single reaction
+        4) unmodeled_protein_frac: string = float (0<=val<1); represents the proportion of the protein biomass not 
+        explicitly modeled by the model. If 0 or None, no dummy protein expressed. If string 'default' instead of float, will use default value of 0.88.  
+        5) model_id: string; id for the me model
+
     
     '''
     start = time.time()
     
-    builder = me_builder(non_machinery = non_machinery, psim_me = psim_me, human_model = human_model, 
-                        compress_mrna = compress_mrna)
+    builder = me_builder(non_machinery = non_machinery, compress_mrna = compress_mrna, 
+                         unmodeled_protein_frac = unmodeled_protein_frac, psim_me = psim_me, 
+                         human_model = human_model)
     builder.express_metabolic_enzymes()
     builder.express_expression_enzymes()
     builder.express_dummy_protein()

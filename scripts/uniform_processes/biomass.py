@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[1]:
+# In[2]:
 
 
 import cobra
@@ -11,10 +11,10 @@ import sys
 sys.path.insert(1, '../../scripts/') # comment out in python script
 from utils import parameters as params
 from utils import metabolites as metab
-from utils import functions as func
+from core.reaction import ME_Reaction
 
 
-# In[ ]:
+# In[3]:
 
 
 class Biomass(cobra.Metabolite):
@@ -22,13 +22,12 @@ class Biomass(cobra.Metabolite):
         cobra.Metabolite.__init__(self, id = id, charge = charge, compartment = compartment)
 
 
-# In[ ]:
+# In[4]:
 
 
-# make the metabolites
-
+# make the biomass metabolites
 biomass_ = Biomass('biomass')
-biomass_dilution = func.ME_Reaction('biomass_dilution', type_ = ['biomass'])
+biomass_dilution = ME_Reaction('biomass_dilution', type_ = ['biomass'])
 biomass_dilution.add_metabolites({biomass_: -1})
 biomass_dilution._lower_bound, biomass_dilution._upper_bound = params.mu, params.mu 
 
@@ -53,7 +52,7 @@ biomass_mapper = {'rrna': rrna_, 'protein': protein_, 'mrna': mrna_, 'trna': trn
 biomass_rna_mapper = {k:v for k,v in biomass_mapper.items() if 'rna' in k}
 
 
-# In[ ]:
+# In[5]:
 
 
 # biomass formation reactions
@@ -69,13 +68,9 @@ reaction_.add_metabolites({other_rna_: -1, biomass_: 1})
 biomass_reactions.append(reaction_)
 
 # protein biomass with unmodeled protein 
-upc=(params.unmodeled_protein_frac)/(1-params.unmodeled_protein_frac)
-reaction_ = cobra.Reaction('protein_biomass_to_biomass')
-# reaction_.add_metabolites({protein_: -1, 
-#                          unmodeled_protein_: -upc, 
-#                          biomass_: 1 + upc})
-reaction_.add_metabolites({protein_: -1, biomass_: 1})
-biomass_reactions.append(reaction_)
+pb_reaction = cobra.Reaction('protein_biomass_to_biomass')
+pb_reaction.add_metabolites({protein_: -1, biomass_: 1})
+# biomass_reactions.append(reaction_)
 
 
 # The following reactions convert the biomass components which are a constant proportion from the metabolic model formulation to the ME model formulation. Briefly, the coefficients of the precursor reactions must be scaled by their molecular weight, and the product must be equal to the constant proportion of that class of biomass, bounded by growth (flux through reaction = growth rate). 
@@ -87,7 +82,7 @@ biomass_reactions.append(reaction_)
 
 
 #DNA------------------------------------------------------
-dna_reaction = func.ME_Reaction('DNA_biomass_formation', type_ = ['biomass'])
+dna_reaction = ME_Reaction('DNA_biomass_formation', type_ = ['biomass'])
 
 # coefs from original RECON2.2
 datp_coef = 0.941642857142857
@@ -106,7 +101,7 @@ dna_reaction._lower_bound, dna_reaction._upper_bound = params.mu, params.mu
 
 # CARBOHYDRATE------------------------------------------------------
 g6p_coef = 3.87591549295775
-carbohydrate_reaction = func.ME_Reaction('carbohydrate_biomass_formation', type_ = ['biomass'])
+carbohydrate_reaction = ME_Reaction('carbohydrate_biomass_formation', type_ = ['biomass'])
 rxn = {metab.g6p_c: -g6p_coef*metab.g6p_c.formula_weight/1000, 
       carb_: params.carb_frac}
 carbohydrate_reaction.add_metabolites(rxn)
@@ -132,7 +127,7 @@ ps_hs_c_mw = 312.14740/1000 #ChEBI 58436
 sphmyln_hs_c_mw = 492.630 #ChEBI 62490
 
 
-lipid_reaction = func.ME_Reaction('lipid_biomass_formation', type_ = ['biomass'])
+lipid_reaction = ME_Reaction('lipid_biomass_formation', type_ = ['biomass'])
 rxn = {metab.chsterol_c: -chsterol_coef*metab.chsterol_c.formula_weight/1000,
        metab.clpn_hs_c: -clpn_hs_coef*clpn_hs_c_mw,
        metab.pail_hs_c: -pail_hs_coef*pail_hs_c_mw,

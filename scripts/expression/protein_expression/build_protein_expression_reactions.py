@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[208]:
+# In[1]:
 
 
 import cobra
@@ -12,12 +12,13 @@ from utils import machinery as mach
 from utils import parameters as params
 from utils import metabolites as metab
 from utils import functions as func
-from utils import utils_2
+from core.reaction import ME_Reaction
 
 from macromolecules.protein import Protein
 from expression.protein_expression import cytosolic_translation as c_trln
 from macromolecules.complex import add_biomass_change
 from uniform_processes import biomass
+from uniform_processes.build_trna_expression_reactions import modified_trna_transcript_c, charged_trna_map
 
 
 # In[209]:
@@ -468,9 +469,9 @@ def co_translational_translocation(gene_info, mrna_transcript_c, mrna_deg_proxy)
     
     rxn = dict()
     for aa_code, aa_count in gene_info.amino_acid_counts.items():
-        rxn[utils_2.charged_trna_map[aa_code]] = -aa_count # tRNA consumption
+        rxn[charged_trna_map[aa_code]] = -aa_count # tRNA consumption
     
-    rxn[utils_2.modified_trna_transcript_c]  = gene_info.L_protein 
+    rxn[modified_trna_transcript_c]  = gene_info.L_protein 
     
     rxn[metab.h2o_c] = -gene_info.L_protein # release of peptide from tRNA, addition of -OH to uncharged tRNA
     rxn[metab.h_c] = gene_info.L_protein # release of peptide from tRNA, addition of -OH to uncharged tRNA
@@ -494,7 +495,7 @@ def co_translational_translocation(gene_info, mrna_transcript_c, mrna_deg_proxy)
 
     #------------------------------------------------------------------------------------
 
-    co_translational_translocation_r = func.ME_Reaction(gene_info.hgnc_id + '_co_TRANSLOC_IMPORTtr', 
+    co_translational_translocation_r = ME_Reaction(gene_info.hgnc_id + '_co_TRANSLOC_IMPORTtr', 
                                                        type_ = ['translation'])
     co_translational_translocation_r.subsytem = 'Protein_Expression'
     co_translational_translocation_r.add_metabolites(rxn)
@@ -1126,7 +1127,7 @@ def get_protein_expression_reactions(gene_info, mrna_transcript_c, mrna_deg_prox
     for r in protein_expression_reactions:
         r.subsystem = 'Protein_Expression'
         add_biomass_change(r)
-        if isinstance(r, func.ME_Reaction): 
+        if isinstance(r, ME_Reaction): 
             r.add_metabolites({biomass.mrna_: 0}, combine = False) # no biomass consumptions from coupling
 
     if 'e' in gene_info.final_locations: # secreted proteins - get rid of biomass

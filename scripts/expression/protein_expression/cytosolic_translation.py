@@ -12,7 +12,8 @@ from utils import machinery as mach
 from utils import parameters as params
 from utils import metabolites as metab
 from utils import functions as func
-from utils import utils_2
+from core.reaction import ME_Reaction
+from uniform_processes.build_trna_expression_reactions import modified_trna_transcript_c, charged_trna_map
 
 from macromolecules.protein import Protein
 
@@ -27,9 +28,9 @@ def translate_protein_cytosolic(gene_info, mrna_transcript_c, mrna_deg_proxy):
 
     rxn = dict()
     for aa_code, aa_count in gene_info.amino_acid_counts.items():
-        rxn[utils_2.charged_trna_map[aa_code]] = -aa_count # tRNA consumption
+        rxn[charged_trna_map[aa_code]] = -aa_count # tRNA consumption
     
-    rxn[utils_2.modified_trna_transcript_c]  = gene_info.L_protein 
+    rxn[modified_trna_transcript_c]  = gene_info.L_protein 
     
     rxn[metab.h2o_c] = -gene_info.L_protein # release of peptide from tRNA, addition of -OH to uncharged tRNA
     rxn[metab.h_c] = gene_info.L_protein # release of peptide from tRNA, addition of -OH to uncharged tRNA
@@ -52,7 +53,7 @@ def translate_protein_cytosolic(gene_info, mrna_transcript_c, mrna_deg_proxy):
     rxn_c[mrna_transcript_c] = -gene_info.coupling['c1'] # couple mrna dilution to protein synthesis
     
     # biomas    
-    translation_elongation = func.ME_Reaction(gene_info.hgnc_id + '_TRANSLATION_ELONGATIONc', 
+    translation_elongation = ME_Reaction(gene_info.hgnc_id + '_TRANSLATION_ELONGATIONc', 
                                              type_ = ['translation'])
     translation_elongation.subsytem = 'Protein_Expression'
     translation_elongation.add_metabolites(rxn_c)

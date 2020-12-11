@@ -12,7 +12,7 @@ from utils import machinery as mach
 from utils import parameters as params
 from utils import metabolites as metab
 from utils import functions as func
-from utils import utils_2
+from core.reaction import ME_Reaction
 
 from expression.gene_information import gene_information
 import expression.build_mrna_expression_reactions as build_mrna
@@ -128,7 +128,7 @@ def express_ubiquitin(compress_mrna = False):
     
     for r in ub_reactions:
         add_biomass_change(r)
-        if isinstance(r, func.ME_Reaction): 
+        if isinstance(r, ME_Reaction): 
             r.add_metabolites({biomass.mrna_: 0}, combine = False) # no biomass consumptions from coupling
     
     ub_args = {'ub_reactions': ub_reactions, 'ub_c': ub_c, 'ub_n': ub_n, 'polyub_c': polyub_c, 

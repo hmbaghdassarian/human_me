@@ -19,7 +19,6 @@ from utils import machinery as mach
 from utils import parameters as params
 from utils import metabolites as metab
 from utils import functions as func
-from utils import utils_2
 
 from macromolecules.complex import Complex, add_biomass_change
 from macromolecules.RNA import rRNA, RNA_fragment
@@ -29,6 +28,7 @@ from macromolecules.protein import Protein
 from uniform_processes import biomass
 
 import expression.build_mrna_expression_reactions as build_mrna
+from expression import gene_information
 from expression.protein_expression import cytosolic_translation as c_trln
 from expression.protein_expression import build_protein_expression_reactions as build_protein
 
@@ -107,7 +107,7 @@ def build_ribosome_protein_expression_reactions(ub_args, compress_mrna = False):
     rs_ids = mach.rs['HGNC ID (gene)'].tolist()
     rs_expression_reactions, rs_protein_metabolites = list(), list()
     for i in rs_ids:
-        gene_info = utils_2.generate_geneinfo_object(hgnc_id = i, psim = psim_rib, 
+        gene_info = gene_information.generate(hgnc_id = i, psim = psim_rib, 
                     machinery_list = list(), metabolic_model = cobra.Model())
         gene_info.final_locations = {'c': 'Cytosolic Tranport', 'n': 'Cytosolic Tranport'}
         gene_info.module = 'Machinery'
@@ -123,7 +123,7 @@ def build_ribosome_protein_expression_reactions(ub_args, compress_mrna = False):
     rl_ids.remove(RPL40_HGNC) # RPL40 contains a ubiquitin monomer
     rl_expression_reactions, rl_protein_metabolites = list(), list()
     for i in rl_ids:
-        gene_info = utils_2.generate_geneinfo_object(hgnc_id = i, psim = psim_rib, 
+        gene_info = gene_information.generate(hgnc_id = i, psim = psim_rib, 
                     machinery_list = list(), metabolic_model = cobra.Model())
         gene_info.final_locations = {'c': 'Cytosolic Tranport', 'n': 'Cytosolic Tranport'}
         gene_info.module = 'Machinery'
@@ -135,7 +135,7 @@ def build_ribosome_protein_expression_reactions(ub_args, compress_mrna = False):
 
 #     #RPS27A ubiquitin-fusion in the future
     # RPL40-UB FUSION----------------------------------------------------------------------
-    gene_info = utils_2.generate_geneinfo_object(hgnc_id = RPL40_HGNC, psim = psim_rib, 
+    gene_info = gene_information.generate(hgnc_id = RPL40_HGNC, psim = psim_rib, 
                     machinery_list = list(), metabolic_model = cobra.Model())
     gene_info.final_locations = {'n': 'Cytosolic Tranport'}
     gene_info.module = 'Machinery'
@@ -146,7 +146,7 @@ def build_ribosome_protein_expression_reactions(ub_args, compress_mrna = False):
     processed_seq = gene_info.protein_seq[:gene_info.protein_seq.index(ub_args['single_ubiquitin_sequence'])] + gene_info.protein_seq[gene_info.protein_seq.index(ub_args['single_ubiquitin_sequence']) + len(ub_args['single_ubiquitin_sequence']):]
     psim_temp = psim_rib.copy()
     psim_temp.loc[psim_temp[psim_temp.HGNC_ID == RPL40_HGNC].index, 'PROTEIN_SEQ'] = processed_seq
-    gene_info = utils_2.generate_geneinfo_object(hgnc_id = RPL40_HGNC, psim = psim_temp, 
+    gene_info = gene_information.generate(hgnc_id = RPL40_HGNC, psim = psim_temp, 
                     machinery_list = list(), metabolic_model = cobra.Model())
     gene_info.final_locations = {'n': 'Cytosolic Tranport'}
     gene_info.module = 'Machinery'
@@ -175,7 +175,7 @@ def build_ribosome_protein_expression_reactions(ub_args, compress_mrna = False):
 # # RPL40-UB FUSION same result different code----------------------------------------------------------------------
 
 #     # full protein
-#     fp_info = utils_2.generate_geneinfo_object(hgnc_id = RPL40_HGNC, psim = psim_rib, 
+#     fp_info = gene_information.generate(hgnc_id = RPL40_HGNC, psim = psim_rib, 
 #                     machinery_list = list(), metabolic_model = cobra.Model())
 #     fp_info.final_locations = {'c': 'Cytosolic Tranport'}
 #     fp_info.module = 'Machinery'
@@ -188,7 +188,7 @@ def build_ribosome_protein_expression_reactions(ub_args, compress_mrna = False):
 #     psim_temp = psim_rib.copy()
 #     psim_temp.loc[psim_temp[psim_temp.HGNC_ID == RPL40_HGNC].index, 'PROTEIN_SEQ'] = processed_seq
 #     psim_temp.HGNC_ID.replace(to_replace = RPL40_HGNC, value = RPL40_HGNC + '_processed', inplace = True)
-#     cp_info = utils_2.generate_geneinfo_object(hgnc_id = RPL40_HGNC + '_processed', psim = psim_temp, 
+#     cp_info = gene_information.generate(hgnc_id = RPL40_HGNC + '_processed', psim = psim_temp, 
 #                     machinery_list = list(), metabolic_model = cobra.Model())
 #     cp_info.final_locations = {'n': 'Cytosolic Tranport'}
 #     cp_info.module = 'Machinery'

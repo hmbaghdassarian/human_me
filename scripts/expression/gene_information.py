@@ -11,7 +11,6 @@ import random
 import cobra
 from Bio.Seq import Seq
 from Bio.Alphabet import generic_dna, generic_rna
-# from Bio.SeqUtils import molecular_weight as calculate_molecular_weight
 
 import requests, sys, json, re, warnings
 
@@ -309,22 +308,7 @@ class gene_information():
                 self.coupling['c1'] = 0.5*self.coupling['c1']
             else:
                 raise ValueError('Have not yet accounted for Non-Canonical Secretion or other synthesis forms in coupling of mrna degradataion to protein synthesis')
-#         #NEW 1
-#         if len(set(self.final_locations.values())) > 1:
-#             if len(set(self.final_locations.values())) == 2:
-#                 self.coupling_c1 = 0.5*self.coupling_c1
-#             else:
-#                 raise ValueError('Have not yet accounted for Non-Canonical Secretion or other synthesis forms in coupling of mrna degradataion to protein synthesis')
 
-
-        # new 2
-                # OLD
-#         # in the case that protein synthesis flux spread across multiple reactions due to multi-localization
-#         if len(set(self.final_locations.values())) > 1:
-#             if len(set(self.final_locations.values())) == 2:
-#                 self.coupling_c1B = 0.5*self.coupling_c1B
-#             else:
-#                 raise ValueError('Have not yet accounted for Non-Canonical Secretion or other synthesis forms in coupling of mrna degradataion to protein synthesis')
     def check_gene_information(self):
         if self.final_locations == None:
             raise ValueError(self.hgnc_id + ': Must specify a final location for the gene. Use the get_final_locations() method')
@@ -342,4 +326,41 @@ class gene_information():
 
 
         print('No errors raised')
+
+
+# In[ ]:
+
+
+ptm_cols = ['DSB', 'GPI', 'NG', 'OG']
+ptm_keys = list(params.allowed_ptms.keys())
+cp_keys = ['mrna_half_life', 'alpha_p', 'ptr', 'ptr_tissue', 'constant_ptr']
+
+def generate(hgnc_id, psim = params.psim_me, machinery_list = mach.metabolic_machinery, 
+                             metabolic_model = params.human_model):
+    '''Generates gene information object from PSIM'''
+    
+    idx = psim[psim.HGNC_ID == hgnc_id].index.tolist()
+    if len(idx) == 0:
+        raise ValueError(hgnc_id + ' is not in the PSIM')
+    if len(idx) > 1:
+        warnings.warn('More than one entry of this gene by HGNC ID in PSIM, taking the first')
+
+    entries = psim.loc[idx[0],:]
+    if type(entries['LOCATION']) == str:
+        entries['LOCATION'] = list(entries['LOCATION'].split(']')[0].split('[')[1].split(','))
+    
+    cp_values = entries['MRNA_HALF_LIFE'], entries['ALPHA_P'], entries['PTR'], entries['PTR_TISSUE'], entries['CONSTANT_PTR']
+
+    gene_info = gene_information(hgnc_id = entries['HGNC_ID'], 
+                    premrna_seq = entries['PREMRNA_SEQ'], mrna_seq = entries['MRNA_SEQ'], 
+                    protein_seq = entries['PROTEIN_SEQ'], 
+                    machinery_list = machinery_list,
+                    ptms = dict(zip(['dsb', 'og', 'gpi'],[entries['DSB'], entries['OG'], entries['GPI']])),
+                    tmd = entries['TMD'], sp = entries['SP'], polyA_length = entries['POLYA_LENGTH'], 
+                    n_introns = entries['N_INTRONS'], 
+                    coupling_params = dict(zip(cp_keys, cp_values)))
+    gene_info.get_final_locations(metabolic_model = metabolic_model, 
+                                  final_locations = entries['LOCATION'])
+    gene_info.check_gene_information()
+    return gene_info
 
