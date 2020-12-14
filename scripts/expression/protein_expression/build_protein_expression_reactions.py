@@ -488,21 +488,19 @@ def co_translational_translocation(gene_info, mrna_transcript_c, mrna_deg_proxy)
     rxn[unprocessed_protein_r] = 1
     rxn = func.hydrolyze_atp(rxn, n_atp = number_BiP, compartment = 'r')
     
-    # coupling
-    mrna_deg_proxy.couple(type = 'mrna_degradation', value = -gene_info.coupling['mrna_degradation'])
-    mrna_transcript_c.couple(type = 'mrna_formation', value = -gene_info.coupling['mrna_formation'])
-    
-    rxn[mrna_deg_proxy] = mrna_deg_proxy.coupling_coefficient['mrna_degradation'] # couple mrna degradation to protein synthesis 
-    rxn[mrna_transcript_c] = mrna_transcript_c.coupling_coefficient['mrna_formation'] # couple mrna formation to protein synthesis
-
-
     #------------------------------------------------------------------------------------
 
     co_translational_translocation_r = ME_Reaction(gene_info.hgnc_id + '_co_TRANSLOC_IMPORTtr', 
                                                        type_ = ['translation'])
     co_translational_translocation_r.subsytem = 'Protein_Expression'
-    co_translational_translocation_r.add_metabolites(rxn)
     co_translational_translocation_r.gene_reaction_rule = ' and '.join(mach.ctnm + mach.translation_efs + ['ribosome'])
+    
+    co_translational_translocation_r.add_metabolites(rxn)
+    #coupling
+    mrna_deg_proxy.couple(type = 'mrna_degradation', value = -gene_info.coupling['mrna_degradation'])
+    mrna_transcript_c.couple(type = 'mrna_formation', value = -gene_info.coupling['mrna_formation'])
+    co_translational_translocation_r.couple(metabolites = [mrna_deg_proxy, mrna_transcript_c], 
+                                 types = ['mrna_degradation', 'mrna_formation'])
     ctt_reactions += [co_translational_translocation_r]
     
     # sp degradation

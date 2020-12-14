@@ -169,27 +169,26 @@ class ME_Reaction(cobra.Reaction):
         reaction_string += ' + '.join(product_bits)
         return reaction_string 
 
-    def check_mass_balance(self):
+    def check_mass_balance(self, tol = 0):
         """Compute mass and charge balance for the reaction
 
         returns a dict of {element: amount} for unbalanced elements.
         "charge" is treated as an element in this dict
         This should be empty for balanced reactions.
         """
-        return {}
         
-#         reaction_element_dict = defaultdict(int)
-#         md = self._metabolites.copy()
-#         if self.coupling_metabolites is not None:
-#             for metabolite, type in self.coupling_metabolites.items():
-#                 md[metabolite] -= metabolite.coupling_coefficients[type] # coupling not part of mass balance
-#         for metabolite, coefficient in iteritems(self._metabolites):    
-#             if metabolite.charge is not None:
-#                 reaction_element_dict["charge"] += coefficient * metabolite.charge
-#             for element, amount in iteritems(metabolite.elements):
-#                 reaction_element_dict[element] += coefficient * amount
+        reaction_element_dict = defaultdict(int)
+        md = self._metabolites.copy()
+        if self.coupled_metabolites is not None:
+            for metabolite, type in self.coupled_metabolites.items():
+                md[metabolite] -= metabolite.coupling_coefficient[type] # coupling not part of mass balance
+        for metabolite, coefficient in iteritems(md):    
+            if metabolite.charge is not None:
+                reaction_element_dict["charge"] += coefficient * metabolite.charge
+            for element, amount in iteritems(metabolite.elements):
+                reaction_element_dict[element] += coefficient * amount
 
-#         return {k: v for k, v in iteritems(reaction_element_dict) if v != 0}
+        return {k: v for k, v in iteritems(reaction_element_dict) if abs(v) > tol}
 
 
     

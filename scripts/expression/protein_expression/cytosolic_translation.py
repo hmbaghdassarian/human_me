@@ -46,22 +46,19 @@ def translate_protein_cytosolic(gene_info, mrna_transcript_c, mrna_deg_proxy):
     unfolded_protein_c = Protein(compartment = 'c', id_ = 'unfolded', gene_info = gene_info)
     rxn[unfolded_protein_c] = 1
     
-    # coupling
-    mrna_deg_proxy.couple(type = 'mrna_degradation', value = -gene_info.coupling['mrna_degradation'])
-    mrna_transcript_c.couple(type = 'mrna_formation', value = -gene_info.coupling['mrna_formation'])
-    
-    rxn[mrna_deg_proxy] = mrna_deg_proxy.coupling_coefficient['mrna_degradation'] # couple mrna degradation to protein synthesis 
-    rxn[mrna_transcript_c] = mrna_transcript_c.coupling_coefficient['mrna_formation'] # couple mrna formation to protein synthesis
-    
-    
-    
-    # biomas    
     translation_elongation = ME_Reaction(gene_info.hgnc_id + '_TRANSLATION_ELONGATIONc', 
                                              type_ = ['translation'])
     translation_elongation.subsytem = 'Protein_Expression'
-    translation_elongation.add_metabolites(rxn)
-
     translation_elongation.gene_reaction_rule = ' and '.join(mach.translation_efs + ['ribosome']) # GPRs
+
+
+    translation_elongation.add_metabolites(rxn)
+    #coupling
+    mrna_deg_proxy.couple(type = 'mrna_degradation', value = -gene_info.coupling['mrna_degradation'])
+    mrna_transcript_c.couple(type = 'mrna_formation', value = -gene_info.coupling['mrna_formation'])
+    translation_elongation.couple(metabolites = [mrna_deg_proxy, mrna_transcript_c], 
+                                 types = ['mrna_degradation', 'mrna_formation'])
+
 
     return translation_elongation, unfolded_protein_c
 
