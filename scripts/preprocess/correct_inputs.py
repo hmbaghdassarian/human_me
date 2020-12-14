@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[1]:
+# In[18]:
 
 
 import cobra
@@ -13,10 +13,6 @@ import json
 import itertools
 import more_itertools as mit
 import copy
-
-
-
-
 
 import logging
 logging.basicConfig()
@@ -34,7 +30,7 @@ compartments_me = {'c': 'cytosol',  'l': 'lysosome', 'm': 'mitochondria', 'r': '
                 'i': 'inner mitochondrial compartment', 'pm': 'plasma membrane', 'b': 'boundary'}
 
 
-# In[2]:
+# In[19]:
 
 
 required_metabolites = json.load(open(build_files_path + "required_metabolic_model_metabolites.json"))
@@ -55,6 +51,7 @@ def bool_metabolite(m_id, compartment, m_model):
 def correct_model(model_file = root_path + 'recon2_2.xml', 
                  psim_file = root_path + 'psim_recon2_2.csv'):
     '''
+    
     Makes some necessary changes to cobrapy model, largely based on issues encountered with Recon2.2.
     model_file is path/to/cobra_smbl_model
     psim_file is path/to/psim_csv
@@ -108,8 +105,7 @@ def correct_model(model_file = root_path + 'recon2_2.xml',
     all_metabolites = [m.id for m in human_model.metabolites]
     missing_metabolites = sorted(set(all_required_metabolites).difference(all_metabolites))
     
-    comp_ = ['c', 'n', 'r', 'g', 'm', 'l', 'x', 'i', 'pm']
-#     reactions_to_add = list()
+    comp_ = ['c', 'n', 'r', 'g', 'm', 'l', 'x', 'i', 'e', 'b', 'pm']
 
     for m_id in missing_metabolites:
         nc = m_id.split('_')[-1]
@@ -121,7 +117,7 @@ def correct_model(model_file = root_path + 'recon2_2.xml',
             found, m_t = bool_metabolite(m_id, cp_, human_model) 
             counter_ += 1
 
-        if m_t is not None: # metabolite was found in another compartment of the model, add a transport
+        if found: # metabolite was found in another compartment of the model, add a transport
             new_metab = m_t.copy()
             new_metab.compartment = nc
             new_metab.id = m_id
@@ -129,13 +125,13 @@ def correct_model(model_file = root_path + 'recon2_2.xml',
             transport_rxn = cobra.Reaction('_'.join(m_t.id.split('_')[:-1]) + 't' + nc)
             transport_rxn.add_metabolites({m_t: -1, new_metab: 1})
             transport_rxn.lower_bound = -1000
-            
-            human_model.add_reactions([transport_rxn])#reactions_to_add.append(transport_rxn)
-        else: # metabolite does not exist anywhere in model, add an exchange and transport from [e] to compartment
+
+            human_model.add_reactions([transport_rxn])
+        else: 
             core_id = '_'.join(m_id.split('_')[:-1])
 
-            wrn = core_id + ' does not exist in model. Adding to compartment ' + nc + ' via exchange and '
-            wrn += ' transport reactions. This allows ' + core_id + ' to be in the model at no cost.'
+            wrn = core_id + ' does not exist in model. Adding to compartment ' + nc + ' via sink '
+            wrn += 'This allows ' + core_id + ' to be in the model at no cost.'
             warnings.warn(wrn)
 
             new_metab = cobra.Metabolite(m_id)
@@ -147,37 +143,10 @@ def correct_model(model_file = root_path + 'recon2_2.xml',
             new_metab.elements = eval(info['elements'])
             new_metab.formula = info['formula']
 
-            exchange_rxn_1 = cobra.Reaction('EX_' + core_id + '_b')
-            exchange_rxn_1.name = exchange_rxn_1.id
-            exchange_rxn_1.lower_bound = -1000
-
-            if new_metab.compartment != 'b':
-                m_t_1, m_t_2 = new_metab.copy(), new_metab.copy()
-                m_t_1.compartment, m_t_2.compartment = 'b', 'e'
-                m_t_1.id, m_t_2.id = core_id + '_b', core_id + '_e'
-
-                # boundary exchange
-                exchange_rxn_1.add_metabolites({m_t_1: -1})
-
-                # extracellular exchange
-                exchange_rxn_2 = cobra.Reaction('EX_' + core_id + '_LPAREN_e_RPAREN_')
-                exchange_rxn_2.lower_bound,exchange_rxn_2.upper_bound  = -float('inf'), float('inf')
-                exchange_rxn_2.name = 'exchange reaction for ' + core_id
-                exchange_rxn_2.add_metabolites({m_t_2: -1, m_t_1: 1})
-
-                # exchange to compartment
-                transport_rxn = cobra.Reaction(core_id + 't' + nc)
-                transport_rxn.add_metabolites({m_t_2: -1, new_metab: 1})
-                transport_rxn.lower_bound = -1000
-                
-                human_model.add_reactions([exchange_rxn_1, exchange_rxn_2, transport_rxn])#reactions_to_add += [exchange_rxn_1, exchange_rxn_2, transport_rxn]
-
+            if new_metab.compartment != 'e':
+                human_model.add_boundary(metabolite = new_metab, type = 'sink')
             else:
-                
-                exchange_rxn_1.add_metabolites({new_metab: -1})
-                human_model.add_reactions([exchange_rxn_1])#reactions_to_add.append(exchange_rxn_1)
-
-#     human_model.add_reactions(reactions_to_add)
+                human_model.add_boundary(metabolite = new_metab, type = 'exchange')
 
     print('Check for the recon2.2 HGNC:HGNC error')
     # correct genes with HGNC:HGNC:, recon2.2 has this

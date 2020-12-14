@@ -11,9 +11,10 @@ from six import iteritems
 
 import sympy
 from sympy import lambdify
+import numpy as np
+import pandas as pd
 import warnings
 import copy
-import numpy as np
 
 import sys
 sys.path.insert(1, '../../scripts/')
