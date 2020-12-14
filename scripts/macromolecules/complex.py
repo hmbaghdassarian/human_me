@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[ ]:
+# In[1]:
 
 
 import cobra
@@ -14,7 +14,7 @@ from macromolecules.macromolecule import Macromolecule
 from uniform_processes.biomass import biomass_mapper
 
 
-# In[ ]:
+# In[2]:
 
 
 def flatten_list(list_):
@@ -131,20 +131,20 @@ class Complex(Macromolecule):
         return biomass_by_type
 
 
-# In[ ]:
+# In[4]:
 
 
+#import sympy
 def add_biomass_change(reaction):
     '''
     
-    Input: list of cobra.Reactions
-    Output: dictionary delineating the change in biomass (products - substrates) for the different categories
-    of biomass.
+    Input: cobra.Reaction
+    Output: nothing, but adds the change in biomass for each macromolecule type to the reaction
     
     '''
     biomass_change = dict()
     for m, count in reaction.metabolites.items():
-        if isinstance(m, Macromolecule): # and not isinstance(c, sympy.Expr):
+        if isinstance(m, Macromolecule):# and not isinstance(count, sympy.Expr):
             if not isinstance(m, Complex):
                 if m.type in biomass_change:
                     biomass_change[m.type] += (count*m.formula_weight/1000)
@@ -156,6 +156,9 @@ def add_biomass_change(reaction):
                         biomass_change[type_] += (count*mass_)
                     else:
                         biomass_change[type_] = (count*mass_)
+    if 'proxy' in biomass_change:
+        del biomass_change['proxy']
+    
     biomass_change = {biomass_mapper[k]:v for k,v in biomass_change.items()}
     reaction.add_metabolites(biomass_change, combine = False)
 

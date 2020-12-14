@@ -43,7 +43,7 @@ with warnings.catch_warnings():
 
 # # Generate Protein Expression Reactions for All Machinery
 
-# In[12]:
+# In[2]:
 
 
 def get_all_expression_reactions(hgnc_id, ub_args, psim = params.psim_me, machinery_list = mach.metabolic_machinery, 
@@ -80,7 +80,7 @@ def generate_expression_module(me_reactions):
     return expression_machinery_me, expression_module
 
 
-# In[13]:
+# In[3]:
 
 
 class me_builder():
@@ -93,7 +93,7 @@ class me_builder():
         
         # get pre-generated reactions - the compress_mrna arg requires that they be run with that input
         self.compress_mrna = compress_mrna
-        print('Generate ubiquitin reactions for proteasomal degrdation')
+        print('Generate ubiquitin reactions for proteasomal degradation')
         self.ub_args = ubiquitin.express_ubiquitin(compress_mrna = self.compress_mrna)
         print('Generate ribosome')
         ribosomal_reactions, self.ribosome_complex_c = build_ribosome(self.ub_args, self.compress_mrna )
@@ -501,17 +501,21 @@ class me_builder():
 
             # add machinery to substrate side
             c3 = (params.mu + params.alpha_p)/self.complex_df.loc[i, 'keff']
+            enzyme_to_couple.couple(type = 'catalysis', value = -c3)
 
             if not r_.reversibility:
-                r.add_metabolites({enzyme_to_couple: -c3}, combine = True) # combine true in case machinery and substrate are same (e.g., ribosome translating its own proetin - but only for non-complex proteins)
+                r.add_metabolites({enzyme_to_couple: enzyme_to_couple.coupling_coefficient['catalysis']}, 
+                                  combine = True) # combine true in case machinery and substrate are same (e.g., ribosome translating its own proetin - but only for non-complex proteins)
                 reactions = [r]
             else: # add a forward and reverse reaction for reversible reactions
                 r_f,r_r = r.copy(), r.copy()
                 r_f.lower_bound, r_r.lower_bound, r_r.upper_bound = 0,0, abs(r.lower_bound)
                 r_r.add_metabolites({metab: -coeff for metab, coeff in r_r.metabolites.items()}, combine = False)
 
-                r_f.add_metabolites({enzyme_to_couple: -c3}, combine = True) # combine true in case machinery and substrate are same (e.g., ribosome translating its own proetin - but only for non-complex proteins)
-                r_r.add_metabolites({enzyme_to_couple: -c3}, combine = True)
+                r_f.add_metabolites({enzyme_to_couple: enzyme_to_couple.coupling_coefficient['catalysis']}, 
+                                    combine = True) # combine true in case machinery and substrate are same (e.g., ribosome translating its own proetin - but only for non-complex proteins)
+                r_r.add_metabolites({enzyme_to_couple: enzyme_to_couple.coupling_coefficient['catalysis']}, 
+                                    combine = True)
 
                 r_f.id, r_r.id = r_f.id + '_F', r_r.id + '_R'
                 reactions = [r_f, r_r]
@@ -570,17 +574,19 @@ class me_builder():
 
                 # add machinery to substrate side
                 c3 = (params.mu + params.alpha_p)/self.complex_df.loc[i, 'keff']
+                metabolite_to_add.couple(type = 'catalysis', value = -c3)
 
                 if not rxn.reversibility:
-                    r.add_metabolites({metabolite_to_add: -c3}, combine = True) # combine true in case machinery and substrate are same (e.g., ribosome translating its own proetin - but only for non-complex proteins)
+                    r.add_metabolites({metabolite_to_add: metabolite_to_add.coupling_coefficient['catalysis']}, 
+                                      combine = True) # combine true in case machinery and substrate are same (e.g., ribosome translating its own proetin - but only for non-complex proteins)
                     reactions = [r]
                 else: # add a forward and reverse reaction for reversible reactions
                     r_f,r_r = r.copy(), r.copy()
                     r_f.lower_bound, r_r.lower_bound, r_r.upper_bound = 0,0, abs(r.lower_bound)
                     r_r.add_metabolites({metab: -coeff for metab, coeff in r_r.metabolites.items()}, combine = False)
 
-                    r_f.add_metabolites({metabolite_to_add: -c3}, combine = True) # combine true in case machinery and substrate are same (e.g., ribosome translating its own proetin - but only for non-complex proteins)
-                    r_r.add_metabolites({metabolite_to_add: -c3}, combine = True)
+                    r_f.add_metabolites({metabolite_to_add.coupling_coefficient['catalysis']}, combine = True) # combine true in case machinery and substrate are same (e.g., ribosome translating its own proetin - but only for non-complex proteins)
+                    r_r.add_metabolites({metabolite_to_add.coupling_coefficient['catalysis']}, combine = True)
 
                     r_f.id, r_r.id = r_f.id + '_F', r_r.id + '_R'
                     reactions = [r_f, r_r]
@@ -630,7 +636,7 @@ class me_builder():
         return me_model
 
 
-# In[14]:
+# In[4]:
 
 
 def build_me(non_machinery = [], minimal_proteome = False, compress_mrna = False, dummy_protein = False, 
@@ -676,7 +682,7 @@ def build_me(non_machinery = [], minimal_proteome = False, compress_mrna = False
     return me_model, builder
 
 
-# In[15]:
+# In[42]:
 
 
 # non_machinery = []
@@ -685,20 +691,23 @@ def build_me(non_machinery = [], minimal_proteome = False, compress_mrna = False
 # compress_mrna = False,
 # psim_me = params.psim_me
 # human_model = params.human_model
+# unmodeled_protein_frac = 0
 
 
-# In[40]:
+# In[43]:
 
 
-# builder = me_builder(non_machinery = non_machinery, psim_me = psim_me, human_model = human_model, 
-#                     compress_mrna = compress_mrna)
+# builder = me_builder(non_machinery = non_machinery, compress_mrna = compress_mrna, 
+#                      unmodeled_protein_frac = unmodeled_protein_frac, psim_me = psim_me, 
+#                      human_model = human_model)
 # builder.express_metabolic_enzymes()
 # builder.express_expression_enzymes()
+# builder.express_dummy_protein()
 # builder.get_complex_info()
-
-
-# In[ ]:
-
-
-
+# builder.generate_complex_reactions()
+# builder.get_keff()
+# if minimal_proteome:
+#     builder.minimize_proteome()
+# builder.add_metabolic_machinery()
+# builder.add_expression_machinery()
 

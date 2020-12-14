@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[1]:
+# In[5]:
 
 
 import cobra
@@ -25,9 +25,10 @@ from utils.polyA_statistics import calculate_polyA_length
 
 from macromolecules.RNA import RNA_fragment, pre_mRNA, mRNA
 from macromolecules.complex import add_biomass_change
+from macromolecules.macromolecule import Macromolecule
 
 
-# In[19]:
+# In[11]:
 
 
 class express_mrna():
@@ -174,7 +175,7 @@ class express_mrna():
         rxn[metab.amet_c], rxn[metab.ahcys_c] = 2, -2 # reverse methyltransferase - cap0 and cap1 structure
 
 #         proxy metabolite for coupling mRNA degradation to protein synthesis flux
-        self.mrna_deg_proxy = cobra.Metabolite(self.gene_info.hgnc_id + '_mrna_deg_proxy')
+        self.mrna_deg_proxy = Macromolecule(self.gene_info.hgnc_id + '_mrna_deg_proxy', proxy = True)
         rxn[self.mrna_deg_proxy] = 1 
 
         h2o_c = [m for m in rxn.keys() if m.id == 'h2o_c'][0] # won't load directly from metab for some reason
@@ -249,7 +250,7 @@ class express_mrna():
             add_biomass_change(r)
 
 
-# In[20]:
+# In[7]:
 
 
 def get_mrna_expression_reactions(gene_info, compress_mrna = False):

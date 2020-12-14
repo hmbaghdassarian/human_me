@@ -233,11 +233,8 @@ class gene_information():
                 warnings.warn('You have indicated using a constant PTR, ignoring user input PTR tissue')
         
         self.coupling = dict()
-        self.coupling['c2'] = (np.log(2)/coupling_params['mrna_half_life'])/((coupling_params['alpha_p'] + params.mu)*self.ptr)
-        # c1c
-#         self.coupling['c1'] = params.mu/((coupling_params['alpha_p'] + params.mu)*self.ptr)
-        # c1b
-        self.coupling['c1'] = ((np.log(2)/coupling_params['mrna_half_life']) + params.mu)/((coupling_params['alpha_p'] + params.mu)*self.ptr)
+        self.coupling['mrna_degradation'] = (np.log(2)/coupling_params['mrna_half_life'])/((coupling_params['alpha_p'] + params.mu)*self.ptr)
+        self.coupling['mrna_formation'] = ((np.log(2)/coupling_params['mrna_half_life']) + params.mu)/((coupling_params['alpha_p'] + params.mu)*self.ptr)
 
        
     def get_final_locations(self, metabolic_model = params.human_model, final_locations = None):
@@ -304,8 +301,8 @@ class gene_information():
         # in the case that protein synthesis flux spread across multiple reactions due to multi-localization
         if len(set(self.final_locations.values())) > 1:
             if len(set(self.final_locations.values())) == 2:
-                self.coupling['c2'] = 0.5*self.coupling['c2']
-                self.coupling['c1'] = 0.5*self.coupling['c1']
+                self.coupling['mrna_degradation'] = 0.5*self.coupling['mrna_degradation']
+                self.coupling['mrna_formation'] = 0.5*self.coupling['mrna_formation']
             else:
                 raise ValueError('Have not yet accounted for Non-Canonical Secretion or other synthesis forms in coupling of mrna degradataion to protein synthesis')
 

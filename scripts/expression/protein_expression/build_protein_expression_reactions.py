@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[1]:
+# In[2]:
 
 
 import cobra
@@ -489,8 +489,11 @@ def co_translational_translocation(gene_info, mrna_transcript_c, mrna_deg_proxy)
     rxn = func.hydrolyze_atp(rxn, n_atp = number_BiP, compartment = 'r')
     
     # coupling
-    rxn[mrna_deg_proxy] = -gene_info.coupling['c2']# couple mrna degradation to protein synthesis 
-    rxn[mrna_transcript_c] = -gene_info.coupling['c1'] # couple mrna dilution to protein synthesis
+    mrna_deg_proxy.couple(type = 'mrna_degradation', value = -gene_info.coupling['mrna_degradation'])
+    mrna_transcript_c.couple(type = 'mrna_formation', value = -gene_info.coupling['mrna_formation'])
+    
+    rxn[mrna_deg_proxy] = mrna_deg_proxy.coupling_coefficient['mrna_degradation'] # couple mrna degradation to protein synthesis 
+    rxn[mrna_transcript_c] = mrna_transcript_c.coupling_coefficient['mrna_formation'] # couple mrna formation to protein synthesis
 
 
     #------------------------------------------------------------------------------------
