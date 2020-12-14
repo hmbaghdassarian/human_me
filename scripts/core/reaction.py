@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[1]:
+# In[3]:
 
 
 import cobra
@@ -16,6 +16,7 @@ from six import iteritems
 import sys
 sys.path.insert(1, '../../scripts/')
 from utils import parameters as params
+from macromolecules.macromolecule import Macromolecule
 
 
 # In[ ]:
@@ -31,6 +32,7 @@ class ME_Reaction(cobra.Reaction):
 
     def __init__(self,  id, type_, name='', subsystem='', lower_bound=0.0, upper_bound=None, 
                 cobra_id = None):
+        
         '''Helps distinguish between these reactions, which have mu in bounds, and coupling reactions, which 
         have mu in stochiometric coefficient.
         
@@ -44,7 +46,31 @@ class ME_Reaction(cobra.Reaction):
         super().__init__(id, name, subsystem, lower_bound, upper_bound)
         self.type = type_
         self.cobra_id = cobra_id
+        self.coupled_metabolites = None
     
+    def _couple(self, metabolite, type):
+        '''Add coupling coefficient and associated metadata to reaction for a coupled metabolite'''
+        
+        if metabolite.coupling_coefficient is None:
+            raise ValueError('Cannot add coupling metadata to reaction for a metabolite without coupling coefficient metadata')
+        if type not in metabolite.coupling_coefficient:
+            raise ValueError('Incorrect coupling coefficient type specified for this metabolite')
+
+        if self.coupled_metabolites is None:
+            self.coupled_metabolites = {metabolite: type}
+        else:
+            self.coupled_metabolites[metabolite] = type
+
+        self.add_metabolites({metabolite: metabolite.coupling_coefficient[type]}, combine = True)
+    
+    def couple(self, metabolites, types):
+        '''Add coupling coefficient and associated metadata to reaction for a coupled metabolite or list of coupled metabolites'''
+        if isinstance(metabolites, list):
+            for metabolite, type in dict(zip(metabolites,types)).items():
+                self._couple(metabolite,type)
+        else:
+            self._couple(metabolites,types)
+            
     def check_me_bounds(self, lb, ub):
         if self.type == ['biomass']:
             if isinstance(lb, sympy.Expr) or isinstance(ub, sympy.Expr):
@@ -150,30 +176,22 @@ class ME_Reaction(cobra.Reaction):
         "charge" is treated as an element in this dict
         This should be empty for balanced reactions.
         """
-        reaction_element_dict = defaultdict(int)
-        for metabolite, coefficient in iteritems(self._metabolites):
-            if not isinstance(coefficient, sympy.Expr): # don't include coupled metabolites
-                if metabolite.charge is not None:
-                    reaction_element_dict["charge"] +=                         coefficient * metabolite.charge
-                if metabolite.elements is None:
-                    raise ValueError("No elements found in metabolite %s"
-                                     % metabolite.id)
-                for element, amount in iteritems(metabolite.elements):
-                    reaction_element_dict[element] += coefficient * amount
-            else:
-                if len(set(self.type).difference(['translation', 'catalysis'])) > 0:
-                    raise ValueError('Mu can only be a coefficient in translation and catalysis reactions')
-                else:
-                    # for the exceptional situaiton in which a machinery is catalyzing its own expression reaction
-                    # assume it is a reactant with coefficient -1...not robust
-                    
-                    # should only happen with peroxisomal protein degradation and 
-                    if len(self.genes) == 1 and self.genes == metabolite.id.split('_')[0]:
-                        for element, amount in iteritems(metabolite.elements):
-                            reaction_element_dict[element] = -1*amount
-                    
-        # filter out 0 values
-        return {k: v for k, v in iteritems(reaction_element_dict) if v != 0}
+        return {}
+        
+#         reaction_element_dict = defaultdict(int)
+#         md = self._metabolites.copy()
+#         if self.coupling_metabolites is not None:
+#             for metabolite, type in self.coupling_metabolites.items():
+#                 md[metabolite] -= metabolite.coupling_coefficients[type] # coupling not part of mass balance
+#         for metabolite, coefficient in iteritems(self._metabolites):    
+#             if metabolite.charge is not None:
+#                 reaction_element_dict["charge"] += coefficient * metabolite.charge
+#             for element, amount in iteritems(metabolite.elements):
+#                 reaction_element_dict[element] += coefficient * amount
+
+#         return {k: v for k, v in iteritems(reaction_element_dict) if v != 0}
+
+
     
     def replace_coefficient_mu(self, mu_val):
         if len(set(self.type).difference(['translation', 'catalysis'])) > 0:

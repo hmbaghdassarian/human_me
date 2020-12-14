@@ -5,14 +5,18 @@
 
 
 import cobra
-from tqdm import tqdm
-import warnings
-import ast
+
 import os
-import pandas as pd
-import numpy as np
+import warnings
+from tqdm import tqdm
+import ast
 import copy
 import time
+
+import pandas as pd
+pd.options.mode.chained_assignment = None
+import numpy as np
+
 
 import sys
 sys.path.insert(1, '../../scripts/') # comment out in python script
@@ -141,7 +145,7 @@ class me_builder():
         #list of ALL expression machinery in all possible reactions). This takes 0 iterations for recon2.2
         
         # get protein expression reactions for all expression module reactions
-        print('Generate protein expression reactions for expression module enzymes')
+        print('Generate protein expression reactions for expression module enzymes, this step may take a few minutes')
 
         # to generate the cobra.Model, must remove the mu values; need the cobra.Model to get reaction compartments from gene_info
         # this code can be modified in the future to be faster by modifying gene info to take a reaction list rather than a cobra.Model
@@ -504,18 +508,16 @@ class me_builder():
             enzyme_to_couple.couple(type = 'catalysis', value = -c3)
 
             if not r_.reversibility:
-                r.add_metabolites({enzyme_to_couple: enzyme_to_couple.coupling_coefficient['catalysis']}, 
-                                  combine = True) # combine true in case machinery and substrate are same (e.g., ribosome translating its own proetin - but only for non-complex proteins)
+                r.couple(metabolites = enzyme_to_couple, types = 'catalysis')
                 reactions = [r]
             else: # add a forward and reverse reaction for reversible reactions
                 r_f,r_r = r.copy(), r.copy()
                 r_f.lower_bound, r_r.lower_bound, r_r.upper_bound = 0,0, abs(r.lower_bound)
                 r_r.add_metabolites({metab: -coeff for metab, coeff in r_r.metabolites.items()}, combine = False)
-
-                r_f.add_metabolites({enzyme_to_couple: enzyme_to_couple.coupling_coefficient['catalysis']}, 
-                                    combine = True) # combine true in case machinery and substrate are same (e.g., ribosome translating its own proetin - but only for non-complex proteins)
-                r_r.add_metabolites({enzyme_to_couple: enzyme_to_couple.coupling_coefficient['catalysis']}, 
-                                    combine = True)
+                
+                r_f.couple(metabolites = enzyme_to_couple, types = 'catalysis')
+                r_r.couple(metabolites = enzyme_to_couple, types = 'catalysis')
+                
 
                 r_f.id, r_r.id = r_f.id + '_F', r_r.id + '_R'
                 reactions = [r_f, r_r]
@@ -577,17 +579,16 @@ class me_builder():
                 metabolite_to_add.couple(type = 'catalysis', value = -c3)
 
                 if not rxn.reversibility:
-                    r.add_metabolites({metabolite_to_add: metabolite_to_add.coupling_coefficient['catalysis']}, 
-                                      combine = True) # combine true in case machinery and substrate are same (e.g., ribosome translating its own proetin - but only for non-complex proteins)
+                    r.couple(metabolites = metabolite_to_add, types = 'catalysis')
                     reactions = [r]
                 else: # add a forward and reverse reaction for reversible reactions
                     r_f,r_r = r.copy(), r.copy()
                     r_f.lower_bound, r_r.lower_bound, r_r.upper_bound = 0,0, abs(r.lower_bound)
                     r_r.add_metabolites({metab: -coeff for metab, coeff in r_r.metabolites.items()}, combine = False)
 
-                    r_f.add_metabolites({metabolite_to_add.coupling_coefficient['catalysis']}, combine = True) # combine true in case machinery and substrate are same (e.g., ribosome translating its own proetin - but only for non-complex proteins)
-                    r_r.add_metabolites({metabolite_to_add.coupling_coefficient['catalysis']}, combine = True)
-
+                    r_f.couple(metabolites = metabolite_to_add, types = 'catalysis')
+                    r_r.couple(metabolites = metabolite_to_add, types = 'catalysis')
+                    
                     r_f.id, r_r.id = r_f.id + '_F', r_r.id + '_R'
                     reactions = [r_f, r_r]
 
@@ -601,28 +602,28 @@ class me_builder():
                 self.final_reactions += reactions
 
         self.final_reactions += [r__ for r__ in self.me_reactions if len(r__.genes) == 0]
-#     def check_me_mass_balance(self):
-#         metabolic_reactions = [r.id for r in self.human_model.reactions]
-#         err = False
-#         for r in tqdm(self.final_reactions):
-#             if isinstance(r, ME_Reaction):
-#                 if r.cobra_id is None and len(r.check_mass_balance())>0 and r.type != ['biomass']:
-#                     err = True
-#                     break
-#                 elif r.cobra_id is not None:
-#                     ogr = self.human_model.reactions.get_by_id(r.cobra_id).copy()
-#                     if (len([k for k in ogr.metabolites.keys() if k.elements is None]) == 0) and (r.check_mass_balance() != ogr.check_mass_balance()):
-#                         err = True
-#                         break
-#             else:
-#                 if r.id in metabolic_reactions:
-#                     ogr = self.human_model.reactions.get_by_id(r.id).copy()
-#                     if (len([k for k in ogr.metabolites.keys() if k.elements is None]) == 0) and (r.check_mass_balance() != ogr.check_mass_balance()):
-#                         err = True
-#                 elif len(r.check_mass_balance())>0:
-#                     err = True
-#         if err:
-#             raise ValueError('Not all expression module reactions are mass balanced') 
+    def check_me_mass_balance(self):
+        metabolic_reactions = [r.id for r in self.human_model.reactions]
+        err = False
+        for r in tqdm(self.final_reactions):
+            if isinstance(r, ME_Reaction):
+                if r.cobra_id is None and len(r.check_mass_balance())>0 and r.type != ['biomass']:
+                    err = True
+                    break
+                elif r.cobra_id is not None:
+                    ogr = self.human_model.reactions.get_by_id(r.cobra_id).copy()
+                    if (len([k for k in ogr.metabolites.keys() if k.elements is None]) == 0) and (r.check_mass_balance() != ogr.check_mass_balance()):
+                        err = True
+                        break
+            else:
+                if r.id in metabolic_reactions:
+                    ogr = self.human_model.reactions.get_by_id(r.id).copy()
+                    if (len([k for k in ogr.metabolites.keys() if k.elements is None]) == 0) and (r.check_mass_balance() != ogr.check_mass_balance()):
+                        err = True
+                elif len(r.check_mass_balance())>0:
+                    err = True
+        if err:
+            raise ValueError('Not all expression module reactions are mass balanced') 
     def build_me_model(self, model_id = 'HUMAN_ME_MODEL'):
         # here instead of in biomass script in case of dummy_protein
         biomass.biomass_reactions.append(biomass.pb_reaction) 
@@ -673,6 +674,7 @@ def build_me(non_machinery = [], minimal_proteome = False, compress_mrna = False
         builder.minimize_proteome()
     builder.add_metabolic_machinery()
     builder.add_expression_machinery()
+    builder.check_me_mass_balance()
     me_model = builder.build_me_model(model_id = model_id)
 
     end = time.time()
@@ -682,32 +684,6 @@ def build_me(non_machinery = [], minimal_proteome = False, compress_mrna = False
     return me_model, builder
 
 
-# In[42]:
 
 
-# non_machinery = []
-# minimal_proteome = True
-# model_id = 'HUMAN_ME_MODEL'
-# compress_mrna = False,
-# psim_me = params.psim_me
-# human_model = params.human_model
-# unmodeled_protein_frac = 0
-
-
-# In[43]:
-
-
-# builder = me_builder(non_machinery = non_machinery, compress_mrna = compress_mrna, 
-#                      unmodeled_protein_frac = unmodeled_protein_frac, psim_me = psim_me, 
-#                      human_model = human_model)
-# builder.express_metabolic_enzymes()
-# builder.express_expression_enzymes()
-# builder.express_dummy_protein()
-# builder.get_complex_info()
-# builder.generate_complex_reactions()
-# builder.get_keff()
-# if minimal_proteome:
-#     builder.minimize_proteome()
-# builder.add_metabolic_machinery()
-# builder.add_expression_machinery()
 

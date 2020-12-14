@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[5]:
+# In[7]:
 
 
 import cobra
@@ -48,7 +48,7 @@ class Macromolecule(cobra.Metabolite):
         
         return new_macromolecule    
     
-    def couple(self, type, value, combine = False):
+    def couple(self, type, value):
         '''
         Input:
             type: a string, one of ['catalysis', 'mrna_degradation', 'mrna_formation']
@@ -65,10 +65,5 @@ class Macromolecule(cobra.Metabolite):
             if self.coupling_coefficient is None:
                 self.coupling_coefficient = {type: value}
             else:
-                if not combine or id not in self.coupling_coefficient.keys():
-                    self.coupling_coefficient[type] = value
-                else:
-                    self.coupling_coefficient[type] += value
-                    
-                    
+                self.coupling_coefficient[type] = value
 
