@@ -18,7 +18,7 @@ from expression.gene_information import gene_information
 import expression.build_mrna_expression_reactions as build_mrna
 from expression.protein_expression import cytosolic_translation as c_trln
 
-from macromolecules.complex import add_biomass_change
+# from macromolecules.complex import add_biomass_change
 from macromolecules.protein import Protein
 from uniform_processes import biomass
 
@@ -127,9 +127,10 @@ def express_ubiquitin(compress_mrna = False):
     ub_reactions += [nuclear_import_ub_mono, nuclear_export_ub_poly]
     
     for r in ub_reactions:
-        add_biomass_change(r)
-        if isinstance(r, ME_Reaction): 
-            r.add_metabolites({biomass.mrna_: 0}, combine = False) # no biomass consumptions from coupling
+        r.subsystem = 'Protein_Expression'
+#         add_biomass_change(r)
+#         if isinstance(r, ME_Reaction): 
+#             r.add_metabolites({biomass.mrna_: 0}, combine = False) # no biomass consumptions from coupling
     
     ub_args = {'ub_reactions': ub_reactions, 'ub_c': ub_c, 'ub_n': ub_n, 'polyub_c': polyub_c, 
                'polyub_n': polyub_n, 'monoub_aa_counts': monoub_aa_counts, 'L_monoub': L_monoub, 

@@ -24,7 +24,7 @@ from utils import functions as func
 from utils.polyA_statistics import calculate_polyA_length
 
 from macromolecules.RNA import RNA_fragment, pre_mRNA, mRNA
-from macromolecules.complex import add_biomass_change
+# from macromolecules.complex import add_biomass_change
 from macromolecules.macromolecule import Macromolecule
 
 
@@ -244,10 +244,10 @@ class express_mrna():
             self.reactions.remove(r)
         self.reactions.append(transcription)
     
-    def add_biomass(self):
+    def add_subsystem(self):
         for r in self.reactions:
             r.subsytem = 'mRNA_expression'
-            add_biomass_change(r)
+#             add_biomass_change(r)
 
 
 # In[7]:
@@ -269,7 +269,7 @@ def get_mrna_expression_reactions(gene_info, compress_mrna = False):
     em.degrade_mrna()
     if compress_mrna:
         em.compress_mrna_module()
-    em.add_biomass()
+    em.add_subsystem()
 
     return em.reactions, em.mrna_c, em.mrna_deg_proxy 
 

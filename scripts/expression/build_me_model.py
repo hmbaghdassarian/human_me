@@ -609,6 +609,7 @@ class me_builder():
 
         self.final_reactions += [r__ for r__ in self.me_reactions if len(r__.genes) == 0]
     def check_me_mass_balance(self):
+        print('Check reaction mass balances')
         metabolic_reactions = [r.id for r in self.human_model.reactions]
 
         # strange exception ------
@@ -641,10 +642,12 @@ class me_builder():
         if err:
             raise ValueError('Not all expression module reactions are mass balanced') 
     def build_me_model(self, model_id = 'HUMAN_ME_MODEL'):
-        # here instead of in biomass script in case of dummy_protein
+        print('Add biomass component to reactions')
+        for r in self.final_reactions:
+            biomass.add_biomass_change(r)
+
         biomass.biomass_reactions.append(biomass.pb_reaction) 
-        self.final_reactions += biomass.biomass_reactions
-#         self.check_me_mass_balance()
+        self.final_reactions += biomass.biomass_reactions  # here instead of in biomass script in case of dummy_protein
 
         print('Generate ME-Model')
         me_model = ME_Model(model_id)
@@ -712,7 +715,7 @@ def build_me(non_machinery = [], minimal_proteome = False, compress_mrna = False
 # unmodeled_protein_frac = 0
 
 
-# In[11]:
+# In[70]:
 
 
 # builder = me_builder(non_machinery = non_machinery, compress_mrna = compress_mrna, 
@@ -728,4 +731,5 @@ def build_me(non_machinery = [], minimal_proteome = False, compress_mrna = False
 #     builder.minimize_proteome()
 # builder.add_metabolic_machinery()
 # builder.add_expression_machinery()
+# builder.check_me_mass_balance()
 

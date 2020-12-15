@@ -16,7 +16,7 @@ from utils import machinery as mach
 from utils import parameters as params
 from utils import metabolites as metab
 from macromolecules.RNA import tRNA, RNA_fragment
-from macromolecules.complex import add_biomass_change
+# from macromolecules.complex import add_biomass_change
 
 
 # -To change to individual tRNA molecules rather than a generic one, start with the charge_trna function and also change the trna_biogenesis function
@@ -298,10 +298,10 @@ class express_trna():
         
         self.reactions += trna_charging_reactions
         self.charged_trna_metabolites = charged_trna_metabolites
-    def add_biomass(self):
+    def add_subsystem(self):
         for r in self.reactions:
             r.subsystem = 'tRNA_Biogenesis'
-            add_biomass_change(r)
+#             add_biomass_change(r)
 
 
 # In[5]:
@@ -316,7 +316,7 @@ def trna_biogenesis(trna_info):
     tb.modify_trna_cytosolic()
     tb.degrade_trna()
     tb.charge_trna()
-    tb.add_biomass()
+    tb.add_subsystem()
     
     return tb.reactions, tb.charged_trna_metabolites, tb.modified_trna_c
 

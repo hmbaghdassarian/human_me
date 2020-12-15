@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[2]:
+# In[4]:
 
 
 import cobra
@@ -12,6 +12,8 @@ sys.path.insert(1, '../../scripts/') # comment out in python script
 from utils import parameters as params
 from utils import metabolites as metab
 from core.reaction import ME_Reaction
+from macromolecules.complex import Complex
+from macromolecules.macromolecule import Macromolecule
 
 
 # In[3]:
@@ -49,7 +51,7 @@ other_rna_ = Biomass('biomass_other_RNA')
 
 biomass_mapper = {'rrna': rrna_, 'protein': protein_, 'mrna': mrna_, 'trna': trna_, 'fragment_rna': other_rna_, 
                      'premrna': premrna_}
-biomass_rna_mapper = {k:v for k,v in biomass_mapper.items() if 'rna' in k}
+# biomass_rna_mapper = {k:v for k,v in biomass_mapper.items() if 'rna' in k}
 
 
 # In[5]:
@@ -141,4 +143,47 @@ lipid_reaction.add_metabolites(rxn)
 lipid_reaction._lower_bound, lipid_reaction._upper_bound = params.mu, params.mu 
 
 biomass_reactions += [dna_reaction, carbohydrate_reaction, lipid_reaction]
+
+
+# In[ ]:
+
+
+def add_biomass_change(reaction):
+    '''
+    
+    Input: cobra.Reaction
+    Output: nothing, but adds the change in biomass for each macromolecule type to the reaction
+    
+    '''
+    biomass_change = dict()
+    md = reaction._metabolites.copy()
+    
+    # coupling does not contribute to biomass change
+    if isinstance(reaction, ME_Reaction) and reaction.coupled_metabolites is not None:
+        for metabolite, type in reaction.coupled_metabolites.items():
+                md[metabolite] -= metabolite.coupling_coefficient[type] # coupling not part of mass balance
+    
+    # extracellular proteins do not contribute to biomass
+    md = {m:count for m,count in md.items() if m.compartment != 'e'}
+    
+    for m, count in md.items():
+        if isinstance(m, Macromolecule):# and not isinstance(count, sympy.Expr):
+            if not isinstance(m, Complex):
+                if m.type in biomass_change:
+                    biomass_change[m.type] += (count*m.formula_weight/1000)
+                else:
+                    biomass_change[m.type] = (count*m.formula_weight/1000)
+            else:
+                for type_, mass_ in m.get_complex_biomass().items():
+                    if type_ in biomass_change:
+                        biomass_change[type_] += (count*mass_)
+                    else:
+                        biomass_change[type_] = (count*mass_)
+    
+    # proxy metabolites do not contribute to bimoass
+    if 'proxy' in biomass_change:
+        del biomass_change['proxy']
+    
+    biomass_change = {biomass_mapper[k]:v for k,v in biomass_change.items()}
+    reaction.add_metabolites(biomass_change, combine = False)
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[11]:
+# In[2]:
 
 
 import cobra
@@ -10,7 +10,7 @@ sys.path.insert(1, '../../scripts/')
 from utils import metabolites as metab
 from utils import machinery as mach
 from utils import functions as func
-from uniform_processes.biomass import biomass_rna_mapper
+# from uniform_processes.biomass import biomass_rna_mapper
 from macromolecules.macromolecule import Macromolecule
 
 
@@ -62,7 +62,7 @@ class RNA(Macromolecule):
         # pyrophosphate released per base added, -1 for 3/5' ends
         rxn[metab.ppi_n] = self.length - 1
         rxn[self] = 1
-        rxn[biomass_rna_mapper[self.type]] = self.formula_weight/1000
+#         rxn[biomass_rna_mapper[self.type]] = self.formula_weight/1000
         
         rna_synthesis.add_metabolites(rxn)
         
@@ -117,10 +117,10 @@ class RNA(Macromolecule):
         
         
         
-        if self.type not in biomass_rna_mapper.keys():
-            raise ValueError('RNA type must be specified as one of ' + ', '.join(biomass_rna_mapper.keys()))
-        else:
-            rxn[biomass_rna_mapper[self.type]] = -self.formula_weight/1000 
+#         if self.type not in biomass_rna_mapper.keys():
+#             raise ValueError('RNA type must be specified as one of ' + ', '.join(biomass_rna_mapper.keys()))
+#         else:
+#             rxn[biomass_rna_mapper[self.type]] = -self.formula_weight/1000 
         
         rna_degradation.add_metabolites(rxn)
         

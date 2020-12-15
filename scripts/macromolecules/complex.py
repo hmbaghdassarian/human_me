@@ -11,7 +11,13 @@ import uuid
 import sys
 sys.path.insert(1, '../../scripts/')
 from macromolecules.macromolecule import Macromolecule
-from uniform_processes.biomass import biomass_mapper
+from utils import machinery as mach
+
+
+# In[12]:
+
+
+cotransloc_ids = set([mid + '_folded_protein_r' for mid in mach.ctnm + mach.translation_efs]) 
 
 
 # In[2]:
@@ -21,11 +27,12 @@ def flatten_list(list_):
     return [item for sublist in list_ for item in sublist]
     
 class Complex(Macromolecule):
-    def __init__(self, metabolites, complex_id = None):
+    def __init__(self, metabolites, complex_id = None, ignore_compartment = False):
         '''
         Inputs:
         metabolites is a list of Macromolecule objects (protein or RNA or complex, not generic metabolites)
         complex_id is a string for the id of the complex metabolite, otherwise will form a random id
+        ignore_compartment is a boolean whether ot ignore the metabolite compartments, mainly for internal use
         Output:
         A Macromolecule object representing the complex formed between macromolecules
         
@@ -41,10 +48,14 @@ class Complex(Macromolecule):
         self.components = {m: metabolites.count(m) for m in metabolites}
         # parse compartment    
         compartments = list(set([m.compartment for m in self.components]))
+        
+        # test compartment consistency - exception of ribosome complexes
+        comp_ids = [m.id for m in self.components]
+        cotransloc_cond = (len(cotransloc_ids.difference(comp_ids))==0) or ('mature_ribosome_complex_c' in comp_ids)
+        
         if len(compartments) == 1:
             compartment = compartments[0]
-        # exception of ribosome complex
-        elif (sorted(compartments) == ['c', 'r']) and ('mature_ribosome_complex_c' in [m.id for m in self.components]):
+        elif (sorted(compartments) == ['c', 'r']) and cotransloc_cond:
             compartment = 'c'
         else:
             raise ValueError('Metabolites forming a complex must all be in the same compartment')
@@ -106,7 +117,6 @@ class Complex(Macromolecule):
     
     def decompose_complex(self, decomposed_complex = None):
         '''Recursive method to get the complex by its individual components, including nested complexes'''
-        
         if decomposed_complex == None:
             all_metab = flatten_list([[m]*count for m, count in self.components.items()])
             decomposed_complex = Complex(metabolites = all_metab, complex_id = 'ignore')
@@ -129,36 +139,4 @@ class Complex(Macromolecule):
                 biomass_by_type[m.type] = count*(m.formula_weight/1000)
 
         return biomass_by_type
-
-
-# In[4]:
-
-
-#import sympy
-def add_biomass_change(reaction):
-    '''
-    
-    Input: cobra.Reaction
-    Output: nothing, but adds the change in biomass for each macromolecule type to the reaction
-    
-    '''
-    biomass_change = dict()
-    for m, count in reaction.metabolites.items():
-        if isinstance(m, Macromolecule):# and not isinstance(count, sympy.Expr):
-            if not isinstance(m, Complex):
-                if m.type in biomass_change:
-                    biomass_change[m.type] += (count*m.formula_weight/1000)
-                else:
-                    biomass_change[m.type] = (count*m.formula_weight/1000)
-            else:
-                for type_, mass_ in m.get_complex_biomass().items():
-                    if type_ in biomass_change:
-                        biomass_change[type_] += (count*mass_)
-                    else:
-                        biomass_change[type_] = (count*mass_)
-    if 'proxy' in biomass_change:
-        del biomass_change['proxy']
-    
-    biomass_change = {biomass_mapper[k]:v for k,v in biomass_change.items()}
-    reaction.add_metabolites(biomass_change, combine = False)
 

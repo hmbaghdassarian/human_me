@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[3]:
+# In[2]:
 
 
 import cobra
@@ -16,10 +16,9 @@ from six import iteritems
 import sys
 sys.path.insert(1, '../../scripts/')
 from utils import parameters as params
-from macromolecules.macromolecule import Macromolecule
 
 
-# In[ ]:
+# In[2]:
 
 
 class ME_Reaction(cobra.Reaction):
