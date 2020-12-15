@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[2]:
+# In[1]:
 
 
 import cobra
@@ -16,12 +16,12 @@ from core.reaction import ME_Reaction
 
 from macromolecules.protein import Protein
 from expression.protein_expression import cytosolic_translation as c_trln
-from macromolecules.complex import add_biomass_change
+# from macromolecules.complex import add_biomass_change
 from uniform_processes import biomass
 from uniform_processes.build_trna_expression_reactions import modified_trna_transcript_c, charged_trna_map
 
 
-# In[209]:
+# In[2]:
 
 
 def fold_protein_cytosolic(gene_info, unfolded_protein_c):
@@ -46,7 +46,7 @@ def fold_protein_cytosolic(gene_info, unfolded_protein_c):
 
 # # Degradation (Ubiquitin-Proteasome)
 
-# In[210]:
+# In[3]:
 
 
 def protein_polyubiquitination(gene_info, protein_metabolite, compartment, ub_args):
@@ -192,7 +192,7 @@ def proteasomal_degradation(gene_info, protein_metabolite, polyub_protein_metabo
 
 # # Cytosolic Degradation
 
-# In[211]:
+# In[4]:
 
 
 def degrade_cytosolic_protein(gene_info, folded_protein_c, ub_args):
@@ -209,7 +209,7 @@ def degrade_cytosolic_protein(gene_info, folded_protein_c, ub_args):
 
 # # Nuclear Reactions
 
-# In[212]:
+# In[5]:
 
 
 def transport_nuclear_protein(gene_info, folded_protein_c):
@@ -260,7 +260,7 @@ def get_nuclear_reactions(gene_info, folded_protein_c, ub_args):
 # # Mitochondrial Reactions
 # 
 
-# In[213]:
+# In[6]:
 
 
 # i is intermembrane space, but called inner in compartments BIGG
@@ -371,7 +371,7 @@ def get_mitochondrial_reactions(gene_info, unfolded_protein_c, compartments):
 
 # # Peroxisomal
 
-# In[214]:
+# In[7]:
 
 
 def transport_peroxisome(gene_info, folded_protein_c):
@@ -420,7 +420,7 @@ def get_peroxisomal_reactions(gene_info, folded_protein_c):
 
 # # ER transport
 
-# In[215]:
+# In[8]:
 
 
 def post_translational_translocation(gene_info, unfolded_protein_c):
@@ -440,7 +440,7 @@ def post_translational_translocation(gene_info, unfolded_protein_c):
     if gene_info.tmd > 0 or 'pm' in gene_info.final_locations.keys(): # membrane secreted protein
         post_translational_translocation_r = cobra.Reaction(gene_info.hgnc_id + '_post_TRANSLOC_3A_IMPORTtr')
         post_translational_translocation_r.subsytem = 'Protein_Expression'
-        post_translational_translocation_r.gene_reaction_rule = ' and '.join(mach.ASNA1 + mach.WRB + mach.translation_efs + ['ribosome'])
+        post_translational_translocation_r.gene_reaction_rule = ' and '.join(mach.ASNA1 + mach.WRB)
         
         # complex cleavage from jahir's (+h2o_c, +h_c, + pi_c) not included 
         post_translational_translocation_r.add_metabolites(rxn)
@@ -450,7 +450,7 @@ def post_translational_translocation(gene_info, unfolded_protein_c):
         number_BiP = gene_info.L_protein/40
         post_translational_translocation_r = cobra.Reaction(gene_info.hgnc_id + '_post_TRANSLOC_3B_IMPORTtr')
         post_translational_translocation_r.subsytem = 'Protein_Expression'
-        post_translational_translocation_r.gene_reaction_rule = ' and '.join(mach.ptnm+mach.translation_efs + ['ribosome'])
+        post_translational_translocation_r.gene_reaction_rule = ' and '.join(mach.ptnm)
         
         rxn = func.hydrolyze_atp(rxn, n_atp = number_BiP, compartment = 'r')
         post_translational_translocation_r.add_metabolites(rxn)
@@ -526,7 +526,7 @@ def co_translational_translocation(gene_info, mrna_transcript_c, mrna_deg_proxy)
 
 # # ER Modifications
 
-# In[239]:
+# In[9]:
 
 
 def form_disulfide_bond(gene_info, folded_protein_r):
@@ -616,7 +616,7 @@ def modify_protein_er(gene_info, folded_protein_r):
 
 # # Golgi Reactions
 
-# In[217]:
+# In[10]:
 
 
 def import_golgi(gene_info, modified_protein_r):
@@ -707,7 +707,7 @@ def retrograde_er(gene_info, modified_protein_g):
 
 # # Lysosomal, Extracellular, and Plasma Membrane Transport
 
-# In[218]:
+# In[11]:
 
 
 def secrete_protein(gene_info, modified_protein_g):
@@ -743,7 +743,7 @@ def secrete_protein(gene_info, modified_protein_g):
 
 # # Secretory Pathway Protein Degradation
 
-# In[219]:
+# In[12]:
 
 
 def unfold_secretory_protein(gene_info, protein_metabolite):
@@ -882,7 +882,7 @@ def build_erad_reactions(gene_info, retro_protein_r, unfolded_protein_c = None):
     return erad_reactions, unfolded_protein_c
 
 
-# In[220]:
+# In[13]:
 
 
 def build_endocytosis_reactions(gene_info, protein_pm, ub_args, protein_l = None):
@@ -917,7 +917,7 @@ def build_endocytosis_reactions(gene_info, protein_pm, ub_args, protein_l = None
     return [polyubiquitinate_protein, endocytosis], protein_l
 
 
-# In[221]:
+# In[14]:
 
 
 def lysosomal_degradation(gene_info, protein_l):
@@ -946,7 +946,7 @@ def lysosomal_degradation(gene_info, protein_l):
     return lysosomal_degradation_reactions
 
 
-# In[222]:
+# In[15]:
 
 
 # # Jahir's NCBI GPRs to HGNC GPRs
@@ -972,7 +972,7 @@ def lysosomal_degradation(gene_info, protein_l):
 
 # # Protein Expression All
 
-# In[223]:
+# In[17]:
 
 
 def get_protein_expression_reactions(gene_info, mrna_transcript_c, mrna_deg_proxy, ub_args):
@@ -1123,24 +1123,23 @@ def get_protein_expression_reactions(gene_info, mrna_transcript_c, mrna_deg_prox
             
             # lysosomal degradation
             protein_expression_reactions += lysosomal_degradation(gene_info, protein_l)
-    
-    # biomass---------------------------------
-    for r in protein_expression_reactions:
-        r.subsystem = 'Protein_Expression'
-        add_biomass_change(r)
-        if isinstance(r, ME_Reaction): 
-            r.add_metabolites({biomass.mrna_: 0}, combine = False) # no biomass consumptions from coupling
-
-    if 'e' in gene_info.final_locations: # secreted proteins - get rid of biomass
-        r = [r for r in protein_expression_reactions if r.id == gene_info.hgnc_id + '_Clathrin_IMPORTte'][0]
-        emw = sum([(m.formula_weight/1000)*c for m,c in r.metabolites.items() if isinstance(m, Protein) and (c > 0) and (m.compartment == 'e')])
-        r.add_metabolites({biomass.protein_: -emw}, combine = True)
-    #---------------------------------------------------------------------------------------------
 
     elif 'Non-Canonical Secretion' in gene_info.final_locations.values():
         raise ValueError('Model does not currently account for non-canonical secretion')
     
-        
+        # biomass---------------------------------
+    for r in protein_expression_reactions:
+        r.subsystem = 'Protein_Expression'
+#         add_biomass_change(r)
+#         if isinstance(r, ME_Reaction): 
+#             r.add_metabolites({biomass.mrna_: 0}, combine = False) # no biomass consumptions from coupling
+
+#     if 'e' in gene_info.final_locations: # secreted proteins - get rid of biomass
+#         r = [r for r in protein_expression_reactions if r.id == gene_info.hgnc_id + '_Clathrin_IMPORTte'][0]
+#         emw = sum([(m.formula_weight/1000)*c for m,c in r.metabolites.items() if isinstance(m, Protein) and (c > 0) and (m.compartment == 'e')])
+#         r.add_metabolites({biomass.protein_: -emw}, combine = True)
+    #---------------------------------------------------------------------------------------------
+
     return protein_expression_reactions, protein_metabolites
 
 
