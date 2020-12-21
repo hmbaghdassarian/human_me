@@ -151,3 +151,92 @@ def SASA(mw):
     '''Estimate the protein solvent-accessible surface area from the molecular weight'''
     return mw**(0.75)
 
+
+# In[ ]:
+
+
+def average_protein_features(psim_me, protein_ids, context_specific = True):
+    '''Function to get the average protein features from the proteins used in a specific ME model being generated.
+    This is explicitly written to help generate the dummy protein. 
+    
+    Parameters
+    ----------
+    psim_me: pd.DataFrame
+        protein specific information matrix, same as corrected input file (see preprocessing output)
+    protein_ids: list
+        each entry is a string protein HGNC ID, the list should include all proteins included in the ME Model
+
+
+    Returns
+    ----------
+    dummy_psim: pd.DataFrame
+        same as PSIM but with one row, representing the average features of all proteins in the model
+    '''
+    if context_specific:
+        psim = psim_me.copy()
+    else:
+        psim = pd.read_csv(build_files_path + 'psim_recon2_2.csv')
+    
+    res = pd.DataFrame()
+    res['premrna_counts'] = psim.PREMRNA_SEQ.dropna().apply(lambda x: {ntp: x.count(ntp)for ntp in set(x)})
+    res['premrna_length'] = psim.PREMRNA_SEQ.dropna().apply(lambda x: len(x))
+    res['premrna_prop'] = res.apply(lambda x: {k: v/x.premrna_length for k,v in x.premrna_counts.items()}, axis = 1)
+
+    premrna_L = res['premrna_length'].median()
+    premrna_avg_prop = {ntp: res['premrna_prop'].apply(lambda x: x[ntp]).median() for ntp in ['A', 'U', 'C', 'G']}
+
+    premrna_seq = ''
+    for ntp in ['A', 'U', 'C', 'G']:
+        premrna_seq += ntp*int(round(premrna_avg_prop[ntp]*premrna_L))
+
+
+    res = pd.DataFrame()
+    res['mrna_counts'] = psim.MRNA_SEQ.dropna().apply(lambda x: {ntp: x.count(ntp)for ntp in set(x)})
+    res['mrna_length'] = psim.MRNA_SEQ.dropna().apply(lambda x: len(x))
+    res['mrna_prop'] = res.apply(lambda x: {k: v/x.mrna_length for k,v in x.mrna_counts.items()}, axis = 1)
+
+    mrna_L = res['mrna_length'].median()
+    mrna_avg_prop = {ntp: res['mrna_prop'].apply(lambda x: x[ntp]).median() for ntp in ['A', 'U', 'C', 'G']}
+
+    mrna_seq = ''
+    for ntp in ['A', 'U', 'C', 'G']:
+        mrna_seq += ntp*int(round(mrna_avg_prop[ntp]*mrna_L))
+
+    res = pd.DataFrame()
+    res['protein_counts'] = psim.PROTEIN_SEQ.dropna().apply(lambda x: {ntp: x.count(ntp)for ntp in set(x)})
+    res['protein_length'] = psim.PROTEIN_SEQ.dropna().apply(lambda x: len(x))
+    res['protein_prop'] = res.apply(lambda x: {k: v/x.protein_length for k,v in x.protein_counts.items()}, axis = 1)
+
+    protein_L = int(round(mrna_L)/3)
+
+    def get_prop(x, aa):
+        if aa in x.keys():
+            return x[aa]
+        else:
+            return 0
+
+    protein_avg_prop = {aa: res['protein_prop'].apply(lambda x: get_prop(x, aa)).median() for aa in params.amino_acids}
+
+    protein_seq = ''
+    for aa in params.amino_acids:
+        protein_seq += aa*int(round(protein_avg_prop[aa]*protein_L))
+
+    median_vals = ['POLYA_LENGTH', 'N_INTRONS', 'MRNA_HALF_LIFE', 'ALPHA_P', 'PTR']
+    max_arg = ['PTR_TISSUE', 'CONSTANT_PTR']
+
+    dummy_psim = pd.DataFrame(columns = psim.columns)
+    dummy_psim.loc[0,:] = ['HGNC:DUMMY', premrna_seq, mrna_seq, protein_seq] + [float('nan')]*(dummy_psim.shape[1] - 4)
+    dummy_psim.LOCATION = ['[c]']
+
+    for col in median_vals:
+        dummy_psim[col] = psim[col].median()
+
+    for col in max_arg:
+        vc = pd.value_counts(psim[col].fillna('nan').values.flatten())
+        replace_val = vc[vc == vc.max()].index[0]
+        if replace_val == 'nan':
+            dummy_psim[col] = float('nan')
+        else:
+            dummy_psim[col] = replace_val
+    return dummy_psim
+

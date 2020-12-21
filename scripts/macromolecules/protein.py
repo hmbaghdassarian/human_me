@@ -15,15 +15,33 @@ from macromolecules.macromolecule import Macromolecule
 
 
 class Protein(Macromolecule):
-    def __init__(self, compartment, id_, gene_info = None, amino_acid_counts = None):
+    def __init__(self, compartment, id_, gene_info = None, amino_acid_counts = None, dummy = False):
         '''
         
         Generates a Macromolecule in the compartment for a protein with either 1) gene_info (gene_information object) or all of 
         2) id (string)and amino_acid_counts (dictionary, keys as 1-letter amino acide code values as number of 
         occurences in the protein).
         
+        
+        
         If gene_info and id_ are both not None, will concatenate the two strings.
         
+        '''
+        
+        '''Inheritcs from Macromolecule. Class for Protein objects in ME-Model
+
+        Parameters
+        ----------
+        compartment: str
+            same as cobra.Metabolite.__init__
+        id_: str
+            same as cobra.Metabolite.__init__ (id)
+        gene_info: gene_information object
+        amino_acid_counts: dict
+            keys are amino acids, values are the number of occurences in the protein sequence
+        dummy: bool, default False
+            whether the protein is a dummy protein for the unmodeled protein fraction of the ME-Model
+
         '''
         if gene_info is not None and (amino_acid_counts is not None):
             raise ValueError('Please specify either gene_info only or amino_acid_counts only')
@@ -56,7 +74,10 @@ class Protein(Macromolecule):
         elements['O'] -= 1*(L_protein-1)
         
         Macromolecule.__init__(self, id = id_, compartment = compartment, charge = charge, elements = elements)
-        self.type = 'protein'
+        if not dummy:
+            self.type = 'protein'
+        else:
+            self.type = 'dummy_protein'
 
 
 # In[61]:

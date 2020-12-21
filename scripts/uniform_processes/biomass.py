@@ -49,9 +49,9 @@ mrna_ = Biomass('biomass_mRNA')
 premrna_ = Biomass('biomass_premRNA')
 other_rna_ = Biomass('biomass_other_RNA')
 
-biomass_mapper = {'rrna': rrna_, 'protein': protein_, 'mrna': mrna_, 'trna': trna_, 'fragment_rna': other_rna_, 
+biomass_mapper = {'rrna': rrna_, 'protein': protein_, 'dummy_protein': unmodeled_protein_, 
+                  'mrna': mrna_, 'trna': trna_, 'fragment_rna': other_rna_, 
                      'premrna': premrna_}
-# biomass_rna_mapper = {k:v for k,v in biomass_mapper.items() if 'rna' in k}
 
 
 # In[5]:
