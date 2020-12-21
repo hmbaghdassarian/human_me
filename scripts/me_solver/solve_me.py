@@ -108,7 +108,15 @@ def solve_lp(me_model, mu_val, objective = {'biomass_dilution': 1}, close_biomas
 
         if solver_type == 'qminos':
             qminos_solver = QMINOS()
-            return qminos_solver.solvelp(A,b,c,xl,xu,csense,precision=precision) # xq,statq,hsq =   
+            
+            sln, stat, hsq = qminos_solver.solvelp(A,b,c,xl,xu,csense,precision=precision) 
+            
+            # remove unwanted output files
+            abspath = os.path.abspath(os.getcwd())
+            for fn in [os.path.join(abspath, 'fort.9'), os.path.join(abspath, 'fort.11')]:
+                if os.path.isfile(fn):
+                    os.remove(fn)
+            return sln, stat, hsq   
         else:
             raise ValueError('Only qminos solver is implemented for now')
 
