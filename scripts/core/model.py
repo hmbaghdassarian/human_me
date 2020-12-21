@@ -15,6 +15,7 @@ import numpy as np
 import pandas as pd
 import warnings
 import copy
+import math
 
 import sys
 sys.path.insert(1, '../../scripts/')
@@ -235,7 +236,7 @@ class ME_Model(cobra.Model):
                 ub = float(ub.subs(params.mu, mu_val))
             if isinstance(lb, sympy.Expr):
                 lb = float(lb.subs(params.mu, mu_val))
-            if (flux > ub) or (flux < lb):
+            if (flux > ub) or (flux < lb) or math.isnan(flux):
                 ir[r.id] = flux
                 
         if (len(ir)>0 and stat == 0) or (len(ir)==0 and stat != 0):
