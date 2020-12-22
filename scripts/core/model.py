@@ -5,6 +5,7 @@
 
 
 import pickle
+import os
 
 import cobra
 from cobra.core.dictlist import DictList
@@ -24,6 +25,7 @@ import sys
 sys.path.insert(1, '../../scripts/')
 from utils import parameters as params
 from macromolecules.complex import Complex
+from macromolecules.protein import Protein
 
 from core.reaction import ME_Reaction
 from me_solver import solve_me
@@ -43,6 +45,20 @@ class ME_Model(cobra.Model):
             The cobrapy model object that the ME_Model was built from. Only needed for checking model (.check_model) 
         id_or_model: None or a string
             the identifier to associate with the object
+        
+        Returns
+        -------
+        Nothing, but initializes the following variables for use later:
+        self.m_model: cobra.Model
+            the metabolic model from which the ME Model was built (added by builder class)
+        self.S:
+            model stoichiometric matrix
+        self.solver_:
+            the LP solver for the model
+        self.orphan: list
+            a list of reactions that remain orphaned when dummy is being incorporated (added by builder class)
+        self.deorphaned: list
+            a list of reactions that are deoprhaned whend dummy protein is being incorporated (added by builder class)
             
         '''
         
@@ -50,6 +66,8 @@ class ME_Model(cobra.Model):
         self.m_model = m_model.copy()
         self.S = None
         self.solver_ = None
+        self.orphan = None
+        self.deorphaned = None
         
 
     def add_reactions(self, reaction_list):
@@ -238,7 +256,7 @@ class ME_Model(cobra.Model):
             optimal basis (see qminospy.solver.QMINOS)
         '''
         if self.solver_ is None:
-            warnings.warn('Solver is not initializes with ME_Model.intialize_solver, intializing with default parameters')
+            warnings.warn('Solver is not initialized with ME_Model.intialize_solver, intializing with default parameters')
             self.initialize_solver()
             
         sln, stat, hs = self.solver_.solve_lp(me_model = self, mu_val = mu_val, objective = objective)
@@ -349,62 +367,68 @@ class ME_Model(cobra.Model):
     def check_coupling(self):
         '''Checks that all reactions in ME Model received appropriate machinery. Use after self.add_reactions'''
         print('Check correct coupling of metabolic machinery')
-        mismatch = dict()
-        unchecked = list()
-        for r in self.reactions:
+        dummy = 'HGNC:DUMMY_folded_protein_c' in [m.id for m in self.metabolites]
+
+        for r in tqdm(self.reactions):
             if isinstance(r, ME_Reaction):
-                if r.cobra_id is not None: 
-                    r_ = self.m_model.reactions.get_by_id(r.cobra_id)
-            else:
-                r_ = None
+                if r.type != ['biomass']:
+                    if r.cobra_id is not None: 
+                        r_ = self.m_model.reactions.get_by_id(r.cobra_id) # metabolic reactions
+                    else:
+                        r_ = r # non-metabolic reactions
 
-            if r_ is None:
-                unchecked.append(r.id)#pass
-            else:
-                machinery = [m for m,v in r.coupled_metabolites.items() if v == 'catalysis']
-                if len(machinery) > 1:
-                    raise ValueError('Unexpected coupling of multiple machinery')
+                    machinery = [m for m,v in r.coupled_metabolites.items() if v == 'catalysis']
+                    if len(machinery) > 1:
+                        raise ValueError('Unexpected coupling of multiple machinery: ' + r.id)
+                    if not dummy:
+                        if (len(r.genes) == 0 and len(machinery) > 0) or (len(r.genes) > 0 and len(machinery) == 0):
+                            raise ValueError('Unexpected addition/lack of machinery: ' + r.id)
+                    else:
+                        if len(machinery) != 1:
+                            raise ValueError('Unexpected number of machinery coupled: ' + r.id)
+                        machinery = machinery[0]
+                        if ((len(r_.genes) == 0) and (machinery.id != 'HGNC:DUMMY_folded_protein_c')) or ((len(r_.genes) > 0) and (machinery.id == 'HGNC:DUMMY_folded_protein_c')):
+                            raise ValueError('(A) Incorrect machinery coupled: ' + r.id)
+
+                    if len(r.genes)>0:
+                        if type(machinery) == list:
+                            if len(machinery) != 1:
+                                raise ValueError('Unexpected number of machinery coupled: ' + r.id)
+                            else:
+                                machinery = machinery[0]
+
+                        mach_me = [p for p in machinery.decompose_complex() if p.type == 'protein' or p.type == 'dummy_protein'] if isinstance(machinery, Complex) else [machinery]
+                        mach_me = [m.id.split('_')[0] for m in mach_me]
+                        mach_m = [g.id for g in list(r_.genes)]
+                        if 'ribosome' in mach_m:
+                            mach_m.remove('ribosome')
+                            mach_m += [p.id.split('_')[0] for p in self.metabolites.get_by_id('mature_ribosome_complex_c').decompose_complex() if isinstance(p, Protein)]
+
+                        if (len(set(mach_me).difference(mach_m)) > 0) or (len(set(mach_me).intersection(mach_m)) == 0):
+                            raise ValueError('(B) Incorrect machinery coupled: ' + r.id)
                 else:
-                    machinery = machinery[0]
-
-                if ((len(r_.genes) == 0) and (machinery.id != 'HGNC:DUMMY_folded_protein_c')) or ((len(r_.genes) > 0) and (machinery.id == 'HGNC:DUMMY_folded_protein_c')):
-                    mismatch[r.id] = machinery.id
-                elif len(r.genes)>0:
-                    mach = machinery.decompose_complex() if isinstance(machinery, Complex) else [machinery]
-                    mach_me = [m.id.split('_')[0] for m in mach]
-                    mach_m = [g.id for g in list(r_.genes)]
-                    if len(set(mach_me).difference(mach_m))> 0:
-                        mismatch[r.id] = machinery.id
-
-        dummy = 'HGNC:DUMMY_folded_protein_c' in [m.id for m in self.m_model.metabolites]
-        if dummy: 
-            exclude = [r.id for r in self.m_model.exchanges + self.m_model.demands]
-        else:
-            exclude = [r.id for r in self.m_model.reactions if len(r.genes) == 0]
-
-        mrid = [r.id for r in self.m_model.reactions]
-        unchecked = [r for r in unchecked if r in mrid and r not in exclude]
-
-        if len(unchecked)>0:
-            raise ValueError('Unexpected reactions were missed in checking for appropriate coupling')
-
-        return mismatch
+                    pass
+            else:
+                if len(r.genes) > 0:
+                    raise ValueError('Uncoupled reaction: ' + r.id)
+                else:
+                    if dummy and r.id not in self.orphan:
+                        raise ValueError('Dummy protein did not couple: ' + r.id)
+                    else:
+                        pass
 
     def check(self):
         '''Check reaction coupling and mass balance'''
         self.check_me_mass_balance()
-        mismatch = self.check_coupling()
-        if len(mismatch)>0:
-            warnings.warn('Incorrect machinery coupling')
-        return mismatch
-    
-    def pickle(self, file):
+        self.check_coupling()
+
+    def pickle(self, file = os.path.join(os.path.abspath(os.getcwd()), 'me_model.pickle')):
         '''Save ME_Model as a pickled object
         
         Parameters
         ----------
-        file: str
-            "full/path/to/filename.pickle"
+        file: str, default saves to current directory
+            will save to file = "full/path/to/filename.pickle"
         
         '''
         with open(file, 'wb') as handle:

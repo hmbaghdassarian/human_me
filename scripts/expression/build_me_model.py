@@ -113,6 +113,8 @@ class me_builder():
                 self.unmodeled_protein_frac = unmodeled_protein_frac
             else:
                 raise ValueError('Unmodeled protein fraction must be a value in the range [0,1)')
+        self.deorphaned = None
+        self.orphan = None
         
         self.me_reactions = [copy.deepcopy(r) for r in trna_biogenesis_reactions] + ribosomal_reactions + self.ub_args['ub_reactions']
         # map HGNC ID to a dictionary of compartments and cobra.Metabolite proteins
@@ -255,6 +257,7 @@ class me_builder():
                         m.type = 'dummy_protein'
                         
             self.dummy_protein = {'protein_metabolite': dm[0], 'dummy_expression_reactions': dummy_reactions}
+            self.dummy_protein['alpha_p'] = dummy_psim['ALPHA_P'][0] if not pd.isna(dummy_psim['ALPHA_P'][0]) else params.alpha_p
             self.me_reactions += self.dummy_protein['dummy_expression_reactions']
             
         else:
@@ -484,13 +487,13 @@ class me_builder():
 
     def add_metabolic_machinery(self):
         print('Add machinery to metabolic module reactions')
-        metabolic_reactions = [r.id for r in params.human_model.reactions]
+        metabolic_reactions = [r.id for r in self.m_model.reactions]
         final_reactions = self.complex_formation_reactions # ALL reactions list, to create the ME model
 
         # deal with metabolic reactions first
         for i in tqdm(self.complex_df[self.complex_df.category == 'metabolic_reaction'].index):
             reaction_id = self.complex_df.loc[i, 'reaction_id'] # original reaction id
-            r_ = params.human_model.reactions.get_by_id(reaction_id).copy() # original reaction
+            r_ = self.m_model.reactions.get_by_id(reaction_id).copy() # original reaction
 
             r = ME_Reaction(type_ = ['catalysis'], 
                             id = r_.id, name = r_.name, subsystem = r_.subsystem, lower_bound = r_.lower_bound, 
@@ -538,49 +541,14 @@ class me_builder():
                 metabolic_reactions.remove(reaction_id) # tracking that all metabolic reactions are added
             final_reactions += reactions
 
-        # dummy protein for orphan reactions
-        if sorted(metabolic_reactions) != sorted([r.id for r in params.human_model.reactions if len(r.genes) == 0]):
+        # dummy protein for orphan reactions (see deorphan)
+        if sorted(metabolic_reactions) != sorted([r.id for r in self.m_model.reactions if len(r.genes) == 0]):
             raise ValueError('Not all metabolic reactions that require machinery have been accounted for')
-        else: 
-            if self.dummy_protein is None:
-                final_reactions += [r.copy() for r in params.human_model.reactions if len(r.genes) == 0]
-            else: # couple dummy protein to orphan reactions (that aren't exchange or demand reactions)
-                exclude = [r.id for r in self.m_model.exchanges + self.m_model.demands]
-                self.orphan_reactions = [r_id for r_id in metabolic_reactions if r_id not in exclude]        
-                final_reactions += [self.m_model.reactions.get_by_id(r_id).copy() for r_id in metabolic_reactions if r_id in exclude]
-
-                # add machinery to substrate side
-                if len(self.orphan_reactions) > 0:
-                    print('Add machinery to orphan reactions')
-                    c3 = (params.mu + params.alpha_p)/self.dummy_protein['keff']
-                    self.dummy_protein['protein_metabolite'].couple(type = 'catalysis', value = -c3)
-                    for r_id in self.orphan_reactions:
-                        r_ = params.human_model.reactions.get_by_id(r_id).copy()
-                        r = ME_Reaction(type_ = ['catalysis'], 
-                                        id = r_.id, name = r_.name, subsystem = r_.subsystem, lower_bound = r_.lower_bound, 
-                                        upper_bound = r_.upper_bound, 
-                                            cobra_id = r_.id)
-                        r.add_metabolites(r_.metabolites)
-                        r.gene_reaction_rule = r_.gene_reaction_rule
-                        metabolites = r.metabolites.copy() # original reaction metabolites
-
-                        if not r_.reversibility:
-                            r.couple(metabolites = self.dummy_protein['protein_metabolite'], types = 'catalysis')
-                            reactions = [r]
-                        else: # add a forward and reverse reaction for reversible reactions
-                            r_f,r_r = r.copy(), r.copy()
-                            r_f.lower_bound, r_r.lower_bound, r_r.upper_bound = 0,0, abs(r.lower_bound)
-                            r_r.add_metabolites({metab: -coeff for metab, coeff in r_r.metabolites.items()}, combine = False)
-
-                            r_f.couple(metabolites = enzyme_to_couple, types = 'catalysis')
-                            r_r.couple(metabolites = enzyme_to_couple, types = 'catalysis')
-                            r_f.id, r_r.id = r_f.id + '_F', r_r.id + '_R'
-                            reactions = [r_f, r_r]
-
-                        final_reactions += reactions
-                else:
-                    self.dummy_protein = None
+        if self.dummy_protein is None:
+            final_reactions += [r.copy() for r in self.m_model.reactions if len(r.genes) == 0]
         self.final_reactions = final_reactions
+
+        
     def add_expression_machinery(self):
         # filter out metabolic reactions
         backup = self.complex_df.copy()
@@ -647,11 +615,84 @@ class me_builder():
                         reactions[j] = r_
                     self.reaction_counter[reaction_id] += 1
                 self.final_reactions += reactions
-
-        self.final_reactions += [r__ for r__ in self.me_reactions if len(r__.genes) == 0]
+        
+        if self.dummy_protein is None:
+            self.final_reactions += [r for r in self.me_reactions if len(r.genes) == 0]
+            
         self.complex_df = backup.copy()
         del backup
-        
+    
+    def deorphan(self, exclude = None):
+        '''Couples dummy protein to reactions that don't have specified genes ("de-orphaning")
+
+        Parameters
+        ----------
+        exclude: list, default None
+            a list of ME_Model reaction ids to exclude from coupling to dummy protein (if None, defaults to 
+            non-exchange/demand metabolic model reactions and a few expression module reactions; recommended default)
+
+        Returns
+        ----------
+        deorphaned: list
+            a list of ME_Model reaction IDs for reactions that were de-orphaned
+        self.orphan: list
+            a list of ME_Model reaction IDs for reactions there were not de-orphaned despite having 0 specified genes 
+
+        '''
+
+        if self.dummy_protein is not None:
+            print('Deoprhan enzymeless reactions')
+            enzymeless_reactions = [r for r in self.m_model.reactions if len(r.genes) == 0]
+            enzymeless_reactions += [r for r in self.me_reactions if len(r.genes) == 0]
+            if exclude is None:
+                # metabolic module enzymes to exclude
+                self.orphan = [r.id for r in self.m_model.exchanges + self.m_model.demands]
+                # expression module enzymes to exclude
+                expression_rids = ['CYTOSOLIC_PROTEIN_FOLDING', 'IMPORTtn', 'COMPLEX_FORMATION', 
+                              'RIBOSOME_COMPLEX_DISSOCIATIONc', 'UNFOLDr', 'biomass_to_biomass', 
+                              'POLYUBIQUITIN_MOIETY_EXPORTtn'] 
+                rc = biomass.biomass_reactions + [biomass.pb_reaction] + self.me_reactions + self.final_reactions 
+                for er in expression_rids:
+                    self.orphan += [r.id for r in rc if er in r.id]
+            else:
+                self.orphan = exclude 
+            
+            self.orphan = sorted(set(self.orphan))
+            deorphan = [r for r in enzymeless_reactions if r.id not in self.orphan]
+            self.deorphaned = list()
+
+            if len(deorphan) > 0:
+                c3 = (params.mu + self.dummy_protein['alpha_p'])/self.dummy_protein['keff']
+                self.dummy_protein['protein_metabolite'].couple(type = 'catalysis', value = -c3)
+
+                for r_ in deorphan:
+                    r = ME_Reaction(type_ = ['catalysis'], 
+                                    id = r_.id, name = r_.name, subsystem = r_.subsystem, lower_bound = r_.lower_bound, 
+                                    upper_bound = r_.upper_bound, 
+                                        cobra_id = r_.id)
+                    r.add_metabolites(r_.metabolites)
+                    r.gene_reaction_rule = r_.gene_reaction_rule
+                    metabolites = r.metabolites.copy() # original reaction metabolites
+
+                    if not r_.reversibility:
+                        r.couple(metabolites = self.dummy_protein['protein_metabolite'], types = 'catalysis')
+                        reactions = [r]
+                    else: # add a forward and reverse reaction for reversible reactions
+                        r_f,r_r = r.copy(), r.copy()
+                        r_f.lower_bound, r_r.lower_bound, r_r.upper_bound = 0,0, abs(r.lower_bound)
+                        r_r.add_metabolites({metab: -coeff for metab, coeff in r_r.metabolites.items()}, combine = False)
+
+                        r_f.couple(metabolites = self.dummy_protein['protein_metabolite'], types = 'catalysis')
+                        r_r.couple(metabolites = self.dummy_protein['protein_metabolite'], types = 'catalysis')
+                        r_f.id, r_r.id = r_f.id + '_F', r_r.id + '_R'
+                        reactions = [r_f, r_r]
+
+                    self.deorphaned += [r.id for r in reactions]
+                    self.final_reactions += reactions
+
+
+            self.final_reactions += [r for r in self.m_model.reactions if r.id in self.orphan]
+
     def build_me_model(self, model_id = 'HUMAN_ME_MODEL'):
         print('Add biomass component to reactions')
         for r in self.final_reactions:
@@ -664,9 +705,9 @@ class me_builder():
         print('Generate ME-Model')
         me_model = ME_Model(m_model = self.m_model, id_or_model = model_id)
         me_model.add_reactions(self.final_reactions)
-        mismatch = me_model.check()
-#         if len(mismatch)>0:
-#             raise ValueError('Incorrect machinery coupling')
+        me_model.orphan = self.orphan
+        me_model.deorphaned = self.deorphaned
+        me_model.check()
         
         del self.pb_reaction
         del self.ub_args
@@ -674,6 +715,8 @@ class me_builder():
         del self.final_reactions
         del self.complex_formation_reactions
         del self.m_model
+        del self.orphan
+        del self.deorphaned
 
         return me_model
 
@@ -715,6 +758,7 @@ def build_me(non_machinery = [], minimal_proteome = False, compress_mrna = False
         builder.minimize_proteome()
     builder.add_metabolic_machinery()
     builder.add_expression_machinery()
+    builder.deorphan()
     me_model = builder.build_me_model(model_id = model_id)
 
     end = time.time()
@@ -724,7 +768,7 @@ def build_me(non_machinery = [], minimal_proteome = False, compress_mrna = False
     return me_model, builder
 
 
-# In[52]:
+# In[16]:
 
 
 # non_machinery = []
@@ -733,15 +777,15 @@ def build_me(non_machinery = [], minimal_proteome = False, compress_mrna = False
 # compress_mrna = False
 # psim_me = params.psim_me
 # m_model = params.human_model
-# unmodeled_protein_frac = None #0.2
+# unmodeled_protein_frac = 0.2
 
 
-# In[51]:
+# In[19]:
 
 
 # builder = me_builder(non_machinery = non_machinery, compress_mrna = compress_mrna, 
 #                      unmodeled_protein_frac = unmodeled_protein_frac, psim_me = psim_me, 
-#                      m_model = human_model)
+#                      m_model = m_model)
 # builder.express_metabolic_enzymes()
 # builder.express_expression_enzymes()
 # builder.express_dummy_protein()
@@ -752,4 +796,6 @@ def build_me(non_machinery = [], minimal_proteome = False, compress_mrna = False
 #     builder.minimize_proteome()
 # builder.add_metabolic_machinery()
 # builder.add_expression_machinery()
+# builder.deorphan()
+# me_model = builder.build_me_model(model_id = model_id)
 
