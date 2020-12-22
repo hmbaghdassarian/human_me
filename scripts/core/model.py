@@ -238,8 +238,9 @@ class ME_Model(cobra.Model):
             optimal basis (see qminospy.solver.QMINOS)
         '''
         if self.solver_ is None:
-            raise ValueError('Must first initialize the solver (see self.intitialize_solver())')
-        
+            warnings.warn('Solver is not initializes with ME_Model.intialize_solver, intializing with default parameters')
+            self.initialize_solver()
+            
         sln, stat, hs = self.solver_.solve_lp(me_model = self, mu_val = mu_val, objective = objective)
         return sln, stat, hs
     
@@ -274,15 +275,22 @@ class ME_Model(cobra.Model):
         return mu_max, res
 
     
-    def infeasible_reactions(self, mu_val, sln, stat):
-        '''
-        Should only use for infeasible models to identify reactions that cause infeasibility.
+    def infeasible_reactions(self, mu_val, sln, stat, tolerance = 1e-19):
+        '''Binary search to find the maximum feasible growth rate
 
-        Inputs:
-        sln: A solution output from ME_Model.solve_lp
-        mu_val: The mu_value that was used in ME_Model.solve_lp
+        Parameters
+        ----------
+        mu_val: float
+            input growth value to ME_Model.solve_lp
+        sln, stat: outputs of ME_Model.solve_lp
+            Expected minimum feasible growth rate (~0)
+        tolerance: float
+            Threshold below which expected sensitivity of solver is too low to detect infeasibility
 
-        Returns: a dictionary with keys as reaction ids and values as fluxes for reactions that caused infeasibility    
+        Returns
+        ----------
+        ir: dict
+            for reactions that cause feasibility, keys are reaction ids for infeasible reactions and values are optimizes reaction fluxes
         '''
 
         ir = dict()
@@ -296,7 +304,7 @@ class ME_Model(cobra.Model):
                 ub = float(ub.subs(params.mu, mu_val))
             if isinstance(lb, sympy.Expr):
                 lb = float(lb.subs(params.mu, mu_val))
-            if (flux > ub) or (flux < lb) or math.isnan(flux):
+            if math.isnan(flux) or ((flux > ub + tolerance) or (flux < lb - tolerance)):
                 ir[r.id] = flux
                 
         if (len(ir)>0 and stat == 0) or (len(ir)==0 and stat != 0):
