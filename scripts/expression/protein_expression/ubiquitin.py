@@ -80,7 +80,7 @@ def express_ubiquitin(compress_mrna = False):
     rxn = {ubb_c:-1, ub_c: n_ub_monomers, metab. seq_amino_acid_map_c[ubb_info.protein_seq[n_ub_monomers*76:]]: 1, 
           metab.h2o_c: -n_ub_monomers}
     ubiquitin_monomerization_ubb.add_metabolites(rxn)
-    ubiquitin_monomerization_ubc.gene_reaction_rule = mach.USP5[0]
+    ubiquitin_monomerization_ubb.gene_reaction_rule = mach.USP5[0]
 
     # breakdown of the polyubiquitin cleaved from proteins in ubiquitin-proteasome pathway
     polyub_aa_counts = {aa_code: aa_count*params.n_ub for aa_code, aa_count in monoub_aa_counts.items()}
