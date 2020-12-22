@@ -90,11 +90,11 @@ def generate_expression_module(me_reactions):
 
 class me_builder():
     def __init__(self, non_machinery = [], compress_mrna = False, unmodeled_protein_frac = 'default', 
-                psim_me = params.psim_me, human_model = params.human_model):
+                psim_me = params.psim_me, m_model = params.human_model):
         
         self.non_machinery = non_machinery
         self.psim_me = psim_me
-        self.human_model = human_model
+        self.m_model = m_model
         
         # get pre-generated reactions - the compress_mrna arg requires that they be run with that input
         self.compress_mrna = compress_mrna
@@ -264,7 +264,7 @@ class me_builder():
         print('Get metabolic module complex information')
         complex_df = pd.DataFrame(columns = ['reaction_id', 'compartment', 'machinery', 'is_complex', 'creates_multiple_reactions'])
 
-        for r in tqdm(self.human_model.reactions):
+        for r in tqdm(self.m_model.reactions):
             compartment_ = func.get_reaction_compartment(r)
             if len(r.genes) == 1: 
                 complex_df.loc[complex_df.shape[0], :] = [r.id, compartment_, list(r.genes)[0].id, False, False]
@@ -404,7 +404,7 @@ class me_builder():
         
     def get_keff(self):
         # for reactions that show up more than once
-        reactions_to_track = self.human_model.reactions + self.me_reactions
+        reactions_to_track = self.m_model.reactions + self.me_reactions
         self.reaction_counter = dict(zip(sorted(set([r.id for r in reactions_to_track])), [0]*len(reactions_to_track))) 
 
         # get SASA and keff values for coupling
@@ -545,9 +545,9 @@ class me_builder():
             if self.dummy_protein is None:
                 final_reactions += [r.copy() for r in params.human_model.reactions if len(r.genes) == 0]
             else: # couple dummy protein to orphan reactions (that aren't exchange or demand reactions)
-                exclude = [r.id for r in self.human_model.exchanges + self.human_model.demands]
+                exclude = [r.id for r in self.m_model.exchanges + self.m_model.demands]
                 self.orphan_reactions = [r_id for r_id in metabolic_reactions if r_id not in exclude]        
-                final_reactions += [self.human_model.reactions.get_by_id(r_id).copy() for r_id in metabolic_reactions if r_id in exclude]
+                final_reactions += [self.m_model.reactions.get_by_id(r_id).copy() for r_id in metabolic_reactions if r_id in exclude]
 
                 # add machinery to substrate side
                 if len(self.orphan_reactions) > 0:
@@ -652,57 +652,28 @@ class me_builder():
         self.complex_df = backup.copy()
         del backup
         
-    def check_me_mass_balance(self):
-        print('Check reaction mass balances')
-        metabolic_reactions = [r.id for r in self.human_model.reactions]
-
-        # strange exception ------
-        exception = 'HGNC:9479_DEGRADATIONm' 
-        check = [r for r in self.final_reactions if r.id != exception]
-        if len([r for r in self.final_reactions if r.id == exception][0].check_mass_balance(tol = 1e-14))>0:
-            err = True
-        #---------------
-
-        err = False
-        for r in tqdm(check):
-            if r.subsystem != 'Ribosome_Biogenesis' and r.subsystem != '':
-                if isinstance(r, ME_Reaction):
-                    if r.cobra_id is None and len(r.check_mass_balance())>0 and r.type != ['biomass']:
-                        err = True
-                        break
-                    elif r.cobra_id is not None:
-                        ogr = self.human_model.reactions.get_by_id(r.cobra_id).copy()
-                        if (len([k for k in ogr.metabolites.keys() if k.elements is None]) == 0) and (r.check_mass_balance() != ogr.check_mass_balance()):
-                            err = True
-                            break
-                else:
-                    if r.id in metabolic_reactions:
-                        ogr = self.human_model.reactions.get_by_id(r.id).copy()
-                        if (len([k for k in ogr.metabolites.keys() if k.elements is None]) == 0) and (r.check_mass_balance() != ogr.check_mass_balance()):
-                            err = True
-                    elif len(r.check_mass_balance())>0:
-                        err = True
-
-        if err:
-            raise ValueError('Not all expression module reactions are mass balanced') 
     def build_me_model(self, model_id = 'HUMAN_ME_MODEL'):
         print('Add biomass component to reactions')
         for r in self.final_reactions:
             biomass.add_biomass_change(r)
-        
+
         br = [copy.deepcopy(r) for r in biomass.biomass_reactions]
         br.append(self.pb_reaction) 
         self.final_reactions += br
 
         print('Generate ME-Model')
-        me_model = ME_Model(model_id)
+        me_model = ME_Model(m_model = self.m_model, id_or_model = model_id)
         me_model.add_reactions(self.final_reactions)
+        mismatch = me_model.check()
+#         if len(mismatch)>0:
+#             raise ValueError('Incorrect machinery coupling')
         
         del self.pb_reaction
         del self.ub_args
         del self.me_reactions
         del self.final_reactions
         del self.complex_formation_reactions
+        del self.m_model
 
         return me_model
 
@@ -712,7 +683,7 @@ class me_builder():
 
 def build_me(non_machinery = [], minimal_proteome = False, compress_mrna = False, dummy_protein = False, 
              unmodeled_protein_frac = 'default', model_id = 'HUMAN_ME_MODEL', psim_me = params.psim_me, 
-             human_model = params.human_model):
+             m_model = params.human_model):
     '''
     Returns a human ME_model. 
     
@@ -733,7 +704,7 @@ def build_me(non_machinery = [], minimal_proteome = False, compress_mrna = False
     
     builder = me_builder(non_machinery = non_machinery, compress_mrna = compress_mrna, 
                          unmodeled_protein_frac = unmodeled_protein_frac, psim_me = psim_me, 
-                         human_model = human_model)
+                         m_model = m_model)
     builder.express_metabolic_enzymes()
     builder.express_expression_enzymes()
     builder.express_dummy_protein()
@@ -744,7 +715,6 @@ def build_me(non_machinery = [], minimal_proteome = False, compress_mrna = False
         builder.minimize_proteome()
     builder.add_metabolic_machinery()
     builder.add_expression_machinery()
-    builder.check_me_mass_balance()
     me_model = builder.build_me_model(model_id = model_id)
 
     end = time.time()
@@ -754,7 +724,7 @@ def build_me(non_machinery = [], minimal_proteome = False, compress_mrna = False
     return me_model, builder
 
 
-# In[5]:
+# In[52]:
 
 
 # non_machinery = []
@@ -762,12 +732,24 @@ def build_me(non_machinery = [], minimal_proteome = False, compress_mrna = False
 # model_id = 'HUMAN_ME_MODEL'
 # compress_mrna = False
 # psim_me = params.psim_me
-# human_model = params.human_model
-# unmodeled_protein_frac = 0.1
+# m_model = params.human_model
+# unmodeled_protein_frac = None #0.2
 
 
-# In[7]:
+# In[51]:
 
 
-
+# builder = me_builder(non_machinery = non_machinery, compress_mrna = compress_mrna, 
+#                      unmodeled_protein_frac = unmodeled_protein_frac, psim_me = psim_me, 
+#                      m_model = human_model)
+# builder.express_metabolic_enzymes()
+# builder.express_expression_enzymes()
+# builder.express_dummy_protein()
+# builder.get_complex_info()
+# builder.generate_complex_reactions()
+# builder.get_keff()
+# if minimal_proteome:
+#     builder.minimize_proteome()
+# builder.add_metabolic_machinery()
+# builder.add_expression_machinery()
 

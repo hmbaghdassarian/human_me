@@ -4,6 +4,8 @@
 # In[2]:
 
 
+import pickle
+
 import cobra
 from cobra.core.dictlist import DictList
 from cobra.util.context import get_context
@@ -16,6 +18,7 @@ import pandas as pd
 import warnings
 import copy
 import math
+from tqdm import tqdm
 
 import sys
 sys.path.insert(1, '../../scripts/')
@@ -46,7 +49,7 @@ class ME_Model(cobra.Model):
         super().__init__(id_or_model, name)
         self.m_model = m_model.copy()
         self.S = None
-        self.solver = None
+        self.solver_ = None
         
 
     def add_reactions(self, reaction_list):
@@ -202,7 +205,7 @@ class ME_Model(cobra.Model):
         '''
         
         if solver_type == 'qminos':
-            self.solver = solve_me.qminos_solver(me_model = self, precision = precision)
+            self.solver_ = solve_me.qminos_solver(precision = precision)
         else:
             raise ValueError('Only the qMINOS solver is currently implemented')
     
@@ -234,10 +237,10 @@ class ME_Model(cobra.Model):
         hsq: 
             optimal basis (see qminospy.solver.QMINOS)
         '''
-        if self.solver is None:
+        if self.solver_ is None:
             raise ValueError('Must first initialize the solver (see self.intitialize_solver())')
         
-        sln, stat, hs = self.solver.solve_lp(me_model = self, mu_val = mu_val, objective = objective)
+        sln, stat, hs = self.solver_.solve_lp(me_model = self, mu_val = mu_val, objective = objective)
         return sln, stat, hs
     
     def maximize_growth(self, min_mu=0, max_mu=0.05, mu_accuracy=1e-4, increment = 1, verbose=True):
@@ -259,28 +262,16 @@ class ME_Model(cobra.Model):
 
         Returns
         ----------
-        sln: 1D np.array
-            the vector of fluxes in the optimal solution
-        stat: 
-            the solver status 
-                0     Optimal solution found.
-                1     The problem is infeasible.
-                2     The problem is unbounded (or badly scaled).
-                3     Too many iterations.
-                4     Apparent stall.  The solution has not changed
-                      for a large number of iterations (e.g. 1000).
-        hsq: 
-            optimal basis (see qminospy.solver.QMINOS)
-        feasible_mu: list
-            all tested values for growth that were feasible
-        infeasible_mu: list
-            all tested values for growth that were infeasible
+        mu_max: int
+            the maximum feasible growth value (in hours)
+        res: dict
+            keys are all attempted growth values, values are dictionaries with keys as output from self.solve_lp
         '''
-        sln, stat, hsq, feasible_mu, infeasible_mu = self.solver.maximize_growth(me_model = self, 
+        mu_max,res = self.solver_.maximize_growth(me_model = self, 
                                                      min_mu=min_mu, max_mu=max_mu, 
                                                      mu_accuracy=mu_accuracy, increment = increment, 
                                                      verbose=verbose)
-        return sln, stat, hsq, feasible_mu, infeasible_mu
+        return mu_max, res
 
     
     def infeasible_reactions(self, mu_val, sln, stat):
@@ -391,12 +382,25 @@ class ME_Model(cobra.Model):
 
         return mismatch
 
-    def check_model(self):
-        self.check_me_mass_balanace()
-        mismatch = self.check_mismatch()
+    def check(self):
+        '''Check reaction coupling and mass balance'''
+        self.check_me_mass_balance()
+        mismatch = self.check_coupling()
         if len(mismatch)>0:
-            warnings.warn('Incorrect metabolite coupling')
+            warnings.warn('Incorrect machinery coupling')
         return mismatch
+    
+    def pickle(self, file):
+        '''Save ME_Model as a pickled object
+        
+        Parameters
+        ----------
+        file: str
+            "full/path/to/filename.pickle"
+        
+        '''
+        with open(file, 'wb') as handle:
+            pickle.dump(me_model, handle)
         
   
 

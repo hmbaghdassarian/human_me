@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[1]:
+# In[37]:
 
 
 import os
@@ -16,9 +16,10 @@ import time
 import sys
 sys.path.insert(1, '../../scripts/')
 from core.reaction import ME_Reaction
+from utils import functions as func
 
 
-# In[10]:
+# In[30]:
 
 
 class qminos_solver():
@@ -164,65 +165,68 @@ class qminos_solver():
 
         Returns
         ----------
-        sln: 1D np.array
-            the vector of fluxes in the optimal solution
-        stat: 
-            the solver status 
-                0     Optimal solution found.
-                1     The problem is infeasible.
-                2     The problem is unbounded (or badly scaled).
-                3     Too many iterations.
-                4     Apparent stall.  The solution has not changed
-                      for a large number of iterations (e.g. 1000).
-        hsq: 
-            optimal basis (see qminospy.solver.QMINOS)
-        feasible_mu: list
-            all tested values for growth that were feasible
-        infeasible_mu: list
-            all tested values for growth that were infeasible
+        mu_max: int
+            the maximum feasible growth value (in hours)
+        res: dict
+            keys are all attempted growth values, values are dictionaries with keys as output from self.solve_lp
         '''
 
         objective = {'biomass_dilution': 1} # maximizing for growth
         feasible_mu = []
         infeasible_mu = []
+        res = dict()
 
 
         def try_mu(mu_val):
-            sln,stat,hsq = self.solve_lp(me_model, mu_val, objective = objective)
+            with func.HiddenPrints():
+                sln,stat,hsq = self.solve_lp(me_model, mu_val, objective = objective)
             if stat.max() == 1 and mu_val < 1e-9:
                 warnings.warn('Model is infeasible at mu = 0. Trying mu = 1e-9 instead')
                 mu_val = 1e-9
-                sln,stat,hsq = self.solve_lp(me_model, mu_val, objective = objective)
+                with func.HiddenPrints():
+                    sln,stat,hsq = self.solve_lp(me_model, mu_val, objective = objective)
+                if stat.max() == 1:
+                    raise ValueError('Provided minimum mu is infeasible')
+                    
+            res[mu_val] = {'solution': sln, 'status': stat.max(), 'basis': hsq}
 
             if stat.max() == 0:#"optimal":
                 if verbose:
-                    print('The problem has an optimal solution at mu = '.format(mu_val) + ' (hrs)')
-                feasible_mu.append(mu)
+                    print('The problem has an optimal solution at mu = {} (hrs)'.format(mu_val))
+                feasible_mu.append(mu_val)
                 return True, sln, stat, hsq 
             elif stat.max() == 1:
-                infeasible_mu.append(mu)
+                infeasible_mu.append(mu_val)
                 if verbose:
-                    print('The problem is infeasible at mu = '.format(mu_val) + ' (hrs)')
+                    print('The problem is infeasible at mu = {} (hrs)'.format(mu_val))
                 return False, None, None, None
             else:
                 raise valueError('The problem returned with stat: {}'.format(stat.max()))
 
         start = time.time()
-
+        
+        
+        if verbose:
+            print('Trying mu: {}'.format(min_mu))
+        bool_, sln,stat, hsq = try_mu(min_mu) # start with minimal
         while try_mu(max_mu)[0]:  # If max_mu was feasible, keep increasing
             max_mu += increment
+            if verbose:
+                print('Trying mu: {}'.format(max_mu))
         while (infeasible_mu[-1] - feasible_mu[-1]) > mu_accuracy:
+            if verbose:
+                print('Trying mu: {}'.format((infeasible_mu[-1] - feasible_mu[-1])*0.5))
             bool_, sln,stat, hsq = try_mu((infeasible_mu[-1] + feasible_mu[-1]) * 0.5)
 
         if verbose:
             tot = ((time.time() - start)/3600)
             print("completed in {:.2f} hours and {} iterations".format(tot, len(feasible_mu+ infeasible_mu)))
       
+        mu_max = np.max(feasible_mu)
+        return mu_max, res
 
-        return sln, stat, hsq, feasible_mu, infeasible_mu
 
-
-# In[ ]:
+# In[4]:
 
 
 # import pickle
@@ -236,7 +240,7 @@ class qminos_solver():
 # from utils import functions as func
 
 
-# In[49]:
+# In[5]:
 
 
 # # test LP
@@ -250,7 +254,7 @@ class qminos_solver():
 #                                   precision = 'quad')
 
 
-# In[1]:
+# In[6]:
 
 
 # import cobra
@@ -273,7 +277,7 @@ class qminos_solver():
 # xq,statq,hsq = test_model.solve_lp(mu_val = 0.03, objective = {'rA': 1})
 
 
-# In[2]:
+# In[7]:
 
 
 # test_model.solve_lp(mu_val = 1e10, objective = {'rA': 1})
