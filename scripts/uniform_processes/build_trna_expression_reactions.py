@@ -170,7 +170,8 @@ class express_trna():
             rxn[metab.h2o_n] -= 1 #endonuclolytic cleavage (RNase Z)
             trna_processing_machinery += mach.RNASEZ
 
-            three_trailer_degradation = three_trailer.exonucleolytic_degradation(reaction_name = self.trna_info.id + "_3'_trailer_fragment_tRNA")
+            three_trailer_degradation = three_trailer.exonucleolytic_degradation(reaction_name = self.trna_info.id + "_3'_trailer_fragment_tRNA", 
+                                                                                update = True)
             self.reactions.append(three_trailer_degradation)
 
         # splicing of intron
@@ -185,7 +186,6 @@ class express_trna():
                                             compartment = 'n', triphosphate = False)
 
                 rxn[trna_intron_n] = 1
-
                 intron_degradation = trna_intron_n.exonucleolytic_degradation(reaction_name = self.trna_info.id + "_intron_" + str(i) + '_tRNA', 
                                                                              update = True)
                 self.reactions.append(intron_degradation)
