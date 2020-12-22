@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[1]:
+# In[2]:
 
 
 import cobra
@@ -20,6 +20,8 @@ import math
 import sys
 sys.path.insert(1, '../../scripts/')
 from utils import parameters as params
+from macromolecules.complex import Complex
+
 from core.reaction import ME_Reaction
 from me_solver import solve_me
 
@@ -28,19 +30,24 @@ from me_solver import solve_me
 
 
 class ME_Model(cobra.Model):
-    def __init__(self,  id_or_model, name = None):
+    def __init__(self,  m_model, id_or_model, name = None):
         '''
         A simple object with an identifier
     
         Parameters
         ----------
-        id: None or a string
+        m_model: cobra.Model
+            The cobrapy model object that the ME_Model was built from. Only needed for checking model (.check_model) 
+        id_or_model: None or a string
             the identifier to associate with the object
             
         '''
         
         super().__init__(id_or_model, name)
+        self.m_model = m_model.copy()
         self.S = None
+        self.solver = None
+        
 
     def add_reactions(self, reaction_list):
         """Add reactions to the model.
@@ -183,37 +190,99 @@ class ME_Model(cobra.Model):
             self.S = array
         else:
             return array
+
+    def initialize_solver(self, solver_type = 'qminos', precision = 'quad'):
+        '''Initialize the ME Model solver
         
+        solver_type: string, default "qminos"
+            The solver to use for the linear programs (no other options currently )
+        precision: string, default "quad"
+            The precision for the qminos solver (options ['double', 'quad', 'dq', 'dqq'])
+        
+        '''
+        
+        if solver_type == 'qminos':
+            self.solver = solve_me.qminos_solver(me_model = self, precision = precision)
+        else:
+            raise ValueError('Only the qMINOS solver is currently implemented')
     
-    def solve_lp(self, mu_val, close_biomass_dilution = True, 
-                 objective = {'biomass_dilution': 1}, solver_type = 'qminos', precision = 'quad'):
-        
+    def solve_lp(self, mu_val, objective = {'biomass_dilution': 1}):
+        '''Solves the linear program for a specified objective at a specified growth rate
+
+        Parameters
+        ----------
+        mu_val: float
+            The growth value for which to solve the linear program
+        objective: dict, default {'bimoass_dilution': 1}
+            The objective function to optimize. Dictionary represent a linear combination of reactions to optimize,
+            with reaction ids as keys and the coefficient of the lin. comb. as the values. 
+
+            Example: simplest case, to maximize reaction with id 'A', objective = {'A': 1}
+
+        Returns
+        ----------
+        sln: 1D np.array
+            the vector of fluxes in the optimal solution
+        stat: 
+            the solver status 
+                0     Optimal solution found.
+                1     The problem is infeasible.
+                2     The problem is unbounded (or badly scaled).
+                3     Too many iterations.
+                4     Apparent stall.  The solution has not changed
+                      for a large number of iterations (e.g. 1000).
+        hsq: 
+            optimal basis (see qminospy.solver.QMINOS)
         '''
+        if self.solver is None:
+            raise ValueError('Must first initialize the solver (see self.intitialize_solver())')
         
-        mu_val is the growth value at which to optimize. 
-        objective is a dictionary with keys as reaction ids to maximize as some linear combination and values as the coefficient for the linear objective
-        Solver is a string, options of [qminos] - must have solveME and qMINOS installed
-        
-        Returns same outputs as qminospy.solver.solvelp:
-        sln: optimal solution (reactions, metabolites, +1)
-        stat: status
-        hs: optimal basis
-        
-        
-        stat:
-        0     Optimal solution found.
-        1     The problem is infeasible.
-        2     The problem is unbounded (or badly scaled).
-        3     Too many iterations.
-        4     Apparent stall.  The solution has not changed
-              for a large number of iterations (e.g. 1000).
-        
-        '''
-        sln, stat, hs = solve_me.solve_lp(me_model = self, mu_val = mu_val, objective = objective, 
-                                 close_biomass_dilution = close_biomass_dilution,
-                                 solver_type = solver_type, precision = precision)
-        
+        sln, stat, hs = self.solver.solve_lp(me_model = self, mu_val = mu_val, objective = objective)
         return sln, stat, hs
+    
+    def maximize_growth(self, min_mu=0, max_mu=0.05, mu_accuracy=1e-4, increment = 1, verbose=True):
+    
+        '''Binary search to find the maximum feasible growth rate
+
+        Parameters
+        ----------
+        min_mu: float, default 0
+            Expected minimum feasible growth rate (~0)
+        max_mu: float, default 0.05
+            Expected minimum infeasible growth rate (i.e., just above expected maximum feasible growth rate)
+        mu_accuracy: float, default 1e-4
+            The maximum error in mu after the binary search
+        increment: float, default 1
+            The amount to increase growth by when searching for maximum infeasible growth rate from max_mu
+        verbose: bool, default True
+            Prints information about each linear program iteration
+
+        Returns
+        ----------
+        sln: 1D np.array
+            the vector of fluxes in the optimal solution
+        stat: 
+            the solver status 
+                0     Optimal solution found.
+                1     The problem is infeasible.
+                2     The problem is unbounded (or badly scaled).
+                3     Too many iterations.
+                4     Apparent stall.  The solution has not changed
+                      for a large number of iterations (e.g. 1000).
+        hsq: 
+            optimal basis (see qminospy.solver.QMINOS)
+        feasible_mu: list
+            all tested values for growth that were feasible
+        infeasible_mu: list
+            all tested values for growth that were infeasible
+        '''
+        sln, stat, hsq, feasible_mu, infeasible_mu = self.solver.maximize_growth(me_model = self, 
+                                                     min_mu=min_mu, max_mu=max_mu, 
+                                                     mu_accuracy=mu_accuracy, increment = increment, 
+                                                     verbose=verbose)
+        return sln, stat, hsq, feasible_mu, infeasible_mu
+
+    
     def infeasible_reactions(self, mu_val, sln, stat):
         '''
         Should only use for infeasible models to identify reactions that cause infeasibility.
@@ -242,4 +311,92 @@ class ME_Model(cobra.Model):
         if (len(ir)>0 and stat == 0) or (len(ir)==0 and stat != 0):
             warnings.warn('There is a discrepancy between the solver status and reactions that violate bound constraints')
         return ir
+    
+    
+    def check_me_mass_balance(self):
+        '''Checks that all reactions in ME Model are mass balance. Use after self.add_reactions'''
+        print('Check reaction mass balances')
+        metabolic_reactions = [r.id for r in self.m_model.reactions]
+
+        # strange exception ------
+        exception = 'HGNC:9479_DEGRADATIONm' 
+        check = [r for r in self.reactions if r.id != exception]
+        if len([r for r in self.reactions if r.id == exception][0].check_mass_balance(tol = 1e-14))>0:
+            err = True
+        #---------------
+
+        err = False
+        for r in tqdm(check):
+            if r.subsystem != 'Ribosome_Biogenesis' and r.subsystem != '':
+                if isinstance(r, ME_Reaction):
+                    if r.cobra_id is None and len(r.check_mass_balance())>0 and r.type != ['biomass']:
+                        err = True
+                        break
+                    elif r.cobra_id is not None:
+                        ogr = self.m_model.reactions.get_by_id(r.cobra_id).copy()
+                        if (len([k for k in ogr.metabolites.keys() if k.elements is None]) == 0) and (r.check_mass_balance() != ogr.check_mass_balance()):
+                            err = True
+                            break
+                else:
+                    if r.id in metabolic_reactions:
+                        ogr = self.m_model.reactions.get_by_id(r.id).copy()
+                        if (len([k for k in ogr.metabolites.keys() if k.elements is None]) == 0) and (r.check_mass_balance() != ogr.check_mass_balance()):
+                            err = True
+                    elif len(r.check_mass_balance())>0:
+                        err = True
+            if err:
+                raise ValueError('Not all expression module reactions are mass balanced') 
+            
+    def check_coupling(self):
+        '''Checks that all reactions in ME Model received appropriate machinery. Use after self.add_reactions'''
+        print('Check correct coupling of metabolic machinery')
+        mismatch = dict()
+        unchecked = list()
+        for r in self.reactions:
+            if isinstance(r, ME_Reaction):
+                if r.cobra_id is not None: 
+                    r_ = self.m_model.reactions.get_by_id(r.cobra_id)
+            else:
+                r_ = None
+
+            if r_ is None:
+                unchecked.append(r.id)#pass
+            else:
+                machinery = [m for m,v in r.coupled_metabolites.items() if v == 'catalysis']
+                if len(machinery) > 1:
+                    raise ValueError('Unexpected coupling of multiple machinery')
+                else:
+                    machinery = machinery[0]
+
+                if ((len(r_.genes) == 0) and (machinery.id != 'HGNC:DUMMY_folded_protein_c')) or ((len(r_.genes) > 0) and (machinery.id == 'HGNC:DUMMY_folded_protein_c')):
+                    mismatch[r.id] = machinery.id
+                elif len(r.genes)>0:
+                    mach = machinery.decompose_complex() if isinstance(machinery, Complex) else [machinery]
+                    mach_me = [m.id.split('_')[0] for m in mach]
+                    mach_m = [g.id for g in list(r_.genes)]
+                    if len(set(mach_me).difference(mach_m))> 0:
+                        mismatch[r.id] = machinery.id
+
+        dummy = 'HGNC:DUMMY_folded_protein_c' in [m.id for m in self.m_model.metabolites]
+        if dummy: 
+            exclude = [r.id for r in self.m_model.exchanges + self.m_model.demands]
+        else:
+            exclude = [r.id for r in self.m_model.reactions if len(r.genes) == 0]
+
+        mrid = [r.id for r in self.m_model.reactions]
+        unchecked = [r for r in unchecked if r in mrid and r not in exclude]
+
+        if len(unchecked)>0:
+            raise ValueError('Unexpected reactions were missed in checking for appropriate coupling')
+
+        return mismatch
+
+    def check_model(self):
+        self.check_me_mass_balanace()
+        mismatch = self.check_mismatch()
+        if len(mismatch)>0:
+            warnings.warn('Incorrect metabolite coupling')
+        return mismatch
+        
+  
 

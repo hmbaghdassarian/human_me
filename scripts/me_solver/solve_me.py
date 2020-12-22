@@ -1,51 +1,77 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[7]:
+# In[1]:
 
 
+import os
 import numpy as np
 import scipy
 from qminospy.solver import QMINOS # need solveME installed and working
+
+from math import log
+import warnings
+import time
 
 import sys
 sys.path.insert(1, '../../scripts/')
 from core.reaction import ME_Reaction
 
 
-# In[8]:
+# In[10]:
 
 
-def solve_lp(me_model, mu_val, objective = {'biomass_dilution': 1}, close_biomass_dilution = True,
-             solver_type = 'qminos', precision = 'quad'):
+class qminos_solver():
+    def __init__(self, precision = 'quad'):
+        '''Initializer for solving with qMINOS
+        
+        Parameters
+        ----------  
+        precision: string, default "quad"
+            The precision for the qminos solver (options ['double', 'quad', 'dq', 'dqq'])
         
         '''
         
-        mu_val is the growth value at which to optimize. 
-        objective is a dictionary with keys as reaction ids to maximize as some linear combination and values as the coefficient for the linear objective
-        close_biomass_dilution is a boolean indicating whether to bound biomass_dilution by mu (True) or by [0,1000] (False)
-        solver_type is a string, options of [qminos] - must have solveME and qMINOS installed
-        precision options for solver_type as in solveME
-        
-        Returns same outputs as qminospy.solver.solvelp:
-        x: optimal solution
-        stat: status
-        hs: optimal basis
-        
-        
-        stat:
-        0     Optimal solution found.
-        1     The problem is infeasible.
-        2     The problem is unbounded (or badly scaled).
-        3     Too many iterations.
-        4     Apparent stall.  The solution has not changed
-              for a large number of iterations (e.g. 1000).
-        
+        self.precision = 'quad'
+
+    def solve_lp(self, me_model, mu_val, objective = {'biomass_dilution': 1}, close_biomass_dilution = True):   
+        '''Solves the linear program for a specified objective at a specified growth rate
+
+        Parameters
+        ----------
+        me_model: human_me.core.model.ME_Model
+            ME Model to solve
+        mu_val: float
+            The growth value for which to solve the linear program
+        objective: dict, default {'bimoass_dilution': 1}
+            The objective function to optimize. Dictionary represent a linear combination of reactions to optimize,
+            with reaction ids as keys and the coefficient of the lin. comb. as the values. 
+
+            Example: simplest case, to maximize reaction with id 'A', objective = {'A': 1}
+        close_biomass_dilution: bool, default True
+            Internal use only, whether to constrain the biomass_dilution reaction bounds by mu
+
+        Returns
+        ----------
+        sln: 1D np.array
+            the vector of fluxes in the optimal solution
+        stat: 
+            the solver status 
+                0     Optimal solution found.
+                1     The problem is infeasible.
+                2     The problem is unbounded (or badly scaled).
+                3     Too many iterations.
+                4     Apparent stall.  The solution has not changed
+                      for a large number of iterations (e.g. 1000).
+        hsq: 
+            optimal basis (see qminospy.solver.QMINOS)
         '''
-            
+
+
+
         # get stoichiometric matrix at mu_val
         S = me_model.create_stoichiometric_matrix(mu_val = mu_val, array_type = 'numpy', inplace = False)
-        
+
         # get equality and inequality matrices to format (Ev=b; lb <= Iv <= ub; A = concat[E,I])
         zero_tol=1e-6
         inequality_index = []
@@ -53,7 +79,7 @@ def solve_lp(me_model, mu_val, objective = {'biomass_dilution': 1}, close_biomas
         b_equal = []
         b_less = []
         b_greater = []
-    
+
         counter = 0
         for metab in me_model.metabolites:
             lb = -np.inf if metab.constraint.lb is None else metab.constraint.lb
@@ -78,7 +104,7 @@ def solve_lp(me_model, mu_val, objective = {'biomass_dilution': 1}, close_biomas
         del b_greater
         del b_equal
         del S
-        
+
         # reaction bounds at mu
         xl, xu = np.zeros(len(me_model.reactions)), np.zeros(len(me_model.reactions))
         xl[:], xu[:] = np.nan, np.nan
@@ -96,7 +122,7 @@ def solve_lp(me_model, mu_val, objective = {'biomass_dilution': 1}, close_biomas
                     xl[counter] = 0
                     xu[counter] = 1000
             counter +=1
-        
+
         # objective vector (max c.T*v)
         c = np.zeros(len(me_model.reactions))
         for r_id, coeff in objective.items():
@@ -106,92 +132,94 @@ def solve_lp(me_model, mu_val, objective = {'biomass_dilution': 1}, close_biomas
                 raise ValueError('Specified reaction id(s) not in model')
             c[r_index] = coeff
 
-        if solver_type == 'qminos':
-            qminos_solver = QMINOS()
-            
-            sln, stat, hsq = qminos_solver.solvelp(A,b,c,xl,xu,csense,precision=precision) 
-            
-            # remove unwanted output files
-            abspath = os.path.abspath(os.getcwd())
-            for fn in [os.path.join(abspath, 'fort.9'), os.path.join(abspath, 'fort.11')]:
-                if os.path.isfile(fn):
-                    os.remove(fn)
-            return sln, stat, hsq   
-        else:
-            raise ValueError('Only qminos solver is implemented for now')
+
+        qminos_solver = QMINOS()
+
+        sln, stat, hsq = qminos_solver.solvelp(A,b,c,xl,xu,csense,precision=self.precision) 
+
+        # remove unwanted output files
+        abspath = os.path.abspath(os.getcwd())
+        for fn in [os.path.join(abspath, 'fort.9'), os.path.join(abspath, 'fort.11')]:
+            if os.path.isfile(fn):
+                os.remove(fn)
+                
+        return sln, stat, hsq   
+    def maximize_growth(self, me_model, min_mu=0, max_mu=0.05, mu_accuracy=1e-4, increment = 1, verbose=True):
+        '''Binary search to find the maximum feasible growth rate
+
+        Parameters
+        ----------
+        me_model: human_me.core.model.ME_Model
+            ME Model to solve
+        min_mu: float, default 0
+            Expected minimum feasible growth rate (~0)
+        max_mu: float, default 0.05
+            Expected minimum infeasible growth rate (i.e., just above expected maximum feasible growth rate)
+        mu_accuracy: float, default 1e-4
+            The maximum error in mu after the binary search
+        increment: float, default 1
+            The amount to increase growth by when searching for maximum infeasible growth rate from max_mu
+        verbose: bool, default True
+            Prints information about each linear program iteration
+
+        Returns
+        ----------
+        sln: 1D np.array
+            the vector of fluxes in the optimal solution
+        stat: 
+            the solver status 
+                0     Optimal solution found.
+                1     The problem is infeasible.
+                2     The problem is unbounded (or badly scaled).
+                3     Too many iterations.
+                4     Apparent stall.  The solution has not changed
+                      for a large number of iterations (e.g. 1000).
+        hsq: 
+            optimal basis (see qminospy.solver.QMINOS)
+        feasible_mu: list
+            all tested values for growth that were feasible
+        infeasible_mu: list
+            all tested values for growth that were infeasible
+        '''
+
+        objective = {'biomass_dilution': 1} # maximizing for growth
+        feasible_mu = []
+        infeasible_mu = []
 
 
-# In[9]:
+        def try_mu(mu_val):
+            sln,stat,hsq = self.solve_lp(me_model, mu_val, objective = objective)
+            if stat.max() == 1 and mu_val < 1e-9:
+                warnings.warn('Model is infeasible at mu = 0. Trying mu = 1e-9 instead')
+                mu_val = 1e-9
+                sln,stat,hsq = self.solve_lp(me_model, mu_val, objective = objective)
 
+            if stat.max() == 0:#"optimal":
+                if verbose:
+                    print('The problem has an optimal solution at mu = '.format(mu_val) + ' (hrs)')
+                feasible_mu.append(mu)
+                return True, sln, stat, hsq 
+            elif stat.max() == 1:
+                infeasible_mu.append(mu)
+                if verbose:
+                    print('The problem is infeasible at mu = '.format(mu_val) + ' (hrs)')
+                return False, None, None, None
+            else:
+                raise valueError('The problem returned with stat: {}'.format(stat.max()))
 
-# adapted from: https://github.com/SBRG/cobrame/blob/master/cobrame/solve/algorithms.py
-from math import log
-# from tempfile import mkdtemp
-# from os.path import join
-import warnings
-import time
+        start = time.time()
 
-def binary_search(me_model, min_mu=0, max_mu=0.05, mu_accuracy=1e-4, increment = 0.02,
-                  solver_type='qminos', precision = 'quad', objective = {'biomass_dilution': 1}, # solver args
-                  verbose=True):
-    """Computes maximum feasible growth rate (mu) through a binary search
-    The objective function of the model should be set to a dummy
-    reaction which forces translation of a dummy protein.
-    :param float max_mu: A guess for a growth rate which will be infeasible
-    :param float min_mu: A guess for a growth rate which will be feasible
-    :param float mu_accuracy: The final error in mu after the binary search
-    :param boolean verbose: will print out each mu in the binary search
-    """
-    if solve not in ['qminos']:
-        raise ValueError('Only qMINOS solver is available')
-    
-    feasible_mu = []
-    infeasible_mu = []
+        while try_mu(max_mu)[0]:  # If max_mu was feasible, keep increasing
+            max_mu += increment
+        while (infeasible_mu[-1] - feasible_mu[-1]) > mu_accuracy:
+            bool_, sln,stat, hsq = try_mu((infeasible_mu[-1] + feasible_mu[-1]) * 0.5)
 
-    # String formatting for display
-    str_places = int(abs(round(log(mu_accuracy)/log(10)))) + 1
-    num_format = "%." + str(str_places) + "f"
-    mu_str = "mu".ljust(str_places + 2)
+        if verbose:
+            tot = ((time.time() - start)/3600)
+            print("completed in {:.2f} hours and {} iterations".format(tot, len(feasible_mu+ infeasible_mu)))
+      
 
-    
-    def try_mu(mu_val):
-        if mu_val == 0:
-            warnings.warn('model is infeasible at mu = 0. Using mu = 1e-9 instead.')
-            mu = 1e-9
-        
-        xq,status,hsq = me_model.solve_lp(mu_val, objective = objective, solver_type = solver_type, precision = precision)
-       
-        if status.max() == 0:#"optimal":
-            if verbose:
-                print('The problem has an optimal solution at mu = ' + num_format.format(mu_val) + ' (hrs)')
-            feasible_mu.append(mu)
-            return True, xq, status, hsq 
-        elif status.max() == 1:
-            infeasible_mu.append(mu)
-            if verbose:
-                print('The problem is infeasible at mu = ' + num_format.format(mu_val) + ' (hrs)')
-            return False
-        else:
-            raise valueError('The problem returned with status: {}'.format(status.var()))
-
-    start = time.time()
-    # find highest possible value of mu try the edges of binary search
-    if not try_mu(min_mu)[0]:
-        # Try 0 if min_mu failed
-        if min_mu <= 1e-9 or not try_mu(0):
-            raise ValueError("0 needs to be feasible")
-    while try_mu(max_mu)[0]:  # If max_mu was feasible, keep increasing
-        max_mu += increment
-    while (infeasible_mu[-1] - feasible_mu[-1]) > mu_accuracy:
-        bool_, xq,status, hsq = try_mu((infeasible_mu[-1] + feasible_mu[-1]) * 0.5)
-
-    if verbose:
-        tot = ((time.time() - start)/3600)
-        print("completed in {:.2f} seconds and {} iterations".format(tot, len(feasible_mu) + len(infeasible_mu)))
-              
-    return xq, status, hsq, feasible_mu, infeasible_mu
-
-            
+        return sln, stat, hsq, feasible_mu, infeasible_mu
 
 
 # In[ ]:
