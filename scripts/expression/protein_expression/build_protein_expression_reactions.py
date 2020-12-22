@@ -282,7 +282,7 @@ def transport_mitochondrial_matrix(gene_info, unfolded_protein_c):
     
     
     mitochondrial_matrix_transport.add_metabolites(rxn)
-    mitochondrial_matrix_transportgene_reaction_rule = ' and '.join(mach.TOM + mach.TIM23_PAM + mach.HSP70_m)
+    mitochondrial_matrix_transport.gene_reaction_rule = ' and '.join(mach.TOM + mach.TIM23_PAM + mach.HSP70_m)
     
     return mitochondrial_matrix_transport, pre_protein_m
 
