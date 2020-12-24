@@ -55,9 +55,9 @@ def translate_protein_cytosolic(gene_info, mrna_transcript_c, mrna_deg_proxy):
     translation_elongation.add_metabolites(rxn)
     #coupling
     mrna_deg_proxy.couple(type = 'mrna_degradation', value = -gene_info.coupling['mrna_degradation'])
-    mrna_transcript_c.couple(type = 'mrna_formation', value = -gene_info.coupling['mrna_formation'])
+    mrna_transcript_c.couple(type = 'mrna_dilution', value = -gene_info.coupling['mrna_dilution'])
     translation_elongation.couple(metabolites = [mrna_deg_proxy, mrna_transcript_c], 
-                                 types = ['mrna_degradation', 'mrna_formation'])
+                                 types = ['mrna_degradation', 'mrna_dilution'])
 
 
     return translation_elongation, unfolded_protein_c

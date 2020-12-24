@@ -161,7 +161,7 @@ def add_biomass_change(reaction):
     # coupling does not contribute to biomass change
     if isinstance(reaction, ME_Reaction) and reaction.coupled_metabolites is not None:
         for metabolite, type in reaction.coupled_metabolites.items():
-                md[metabolite] -= metabolite.coupling_coefficient[type] # coupling not part of mass balance
+            md[metabolite] -= metabolite.coupling_coefficient[type] # coupling not part of mass balance
     
     # extracellular proteins do not contribute to biomass
     md = {m:count for m,count in md.items() if m.compartment != 'e'}

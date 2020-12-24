@@ -51,7 +51,7 @@ class Macromolecule(cobra.Metabolite):
     def couple(self, type, value):
         '''
         Input:
-            type: a string, one of ['catalysis', 'mrna_degradation', 'mrna_formation']
+            type: a string, one of ['catalysis', 'mrna_degradation', 'mrna_dilution']
             value: The coupling coefficient value (sympy.Expr or float)
             combine: boolean, whether to 
         
@@ -59,8 +59,8 @@ class Macromolecule(cobra.Metabolite):
         
         '''
         
-        if type not in ['catalysis', 'mrna_degradation', 'mrna_formation']:
-            raise ValueError('The couple id must be one of catalysis, mrna_degradation, or mrna_formation')
+        if type not in ['catalysis', 'mrna_degradation', 'mrna_dilution']:
+            raise ValueError('The couple id must be one of catalysis, mrna_degradation, or mrna_dilution')
         else:
             if self.coupling_coefficient is None:
                 self.coupling_coefficient = {type: value}

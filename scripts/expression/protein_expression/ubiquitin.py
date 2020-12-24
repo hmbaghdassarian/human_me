@@ -105,6 +105,10 @@ def express_ubiquitin(compress_mrna = False):
     nuclear_export_ub_poly = cobra.Reaction('POLYUBIQUITIN_MOIETY_EXPORTtn')
     nuclear_export_ub_poly.subsytem = 'Protein_Expression'
     polyub_n = polyub_c.change_compartment('n')
+    
+    if polyub_n.formula_weight/1000 > params.nuclear_diffusion_limit:
+        raise ValueError('Unaccounted for non-passive nuclear export mechanism')
+    
     polyub_n.id, polyub_n.compartment = '_'.join(polyub_n.id.split('_')[:-1]) + '_n', 'n'
     nuclear_export_ub_poly.add_metabolites({polyub_n: -1, polyub_c: 1})
     nuclear_export_ub_poly.lower_bound = -1000

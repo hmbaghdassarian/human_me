@@ -25,73 +25,72 @@ from utils import functions as func
 
 
 class gene_information():
-    '''This class compiles all the necessary information for a given protein to be expressed in the 
+    '''This class compiles all the necessary information for a given transcript/protein to be expressed in the 
     ME model. 
     
     Notes: 
     
-    1) As of right now, machinery PTMs are not considered. Proteins processed through the secretory pathway includes 
-    those with a final location in the following compartments: ['l', 'r', 'e', 'x', 'g', 'pm']. See get_final_locations() method
-    for details.
-    
-    2) Expression machinery is checked from the utils expression model; there is no input for this. Further, 
-    the expression model may include expression machinery that the final specific ME model does not include.'''
+    1) As of right now, machinery PTMs are not considered. Only non-machinery proteins processed via the 
+    secretory pathway can have PTMs. 
+    '''
     
     
     def __init__(self, hgnc_id, premrna_seq, mrna_seq, protein_seq,
                  machinery_list = mach.metabolic_machinery,
                  ptms = {}, tmd = 0, sp = False, polyA_length = None, n_introns = None, 
                 coupling_params = None):
-        '''
+        '''Initialize object
         
-        1) HGNC ID is a string in the format HGNC:#### - required.
-        
-        2-4) Relevant string representing sequence - required
-        
-        5) Metabolic machinery is a list of HGNC IDs of metabolic enzymes in the metabolic model. 
-        The default is a list generated from the input CobraPy model in utils.
-        
-        6) PTMs is a dictionary with keys as a string representing the ptm and values as an integer
-        representing the number of that ptms of that kind for that gene. The exception here is gpi, which is binary 
-        with 0 for no GPI Anchor and 1 indicating GPI Anchor presence. The keys of the dictionary utils.allowed_ptms 
-        show all possible key values here. PTMs are not currently considered for machinery.  - optional
-        
-        7) TMD is an integer indicating the number of transmembrane domains the protein has. This is only relevant
-        for proteins processed into secretory pathway. - optional
-        
-        8) SP is a boolean indicating whether a protein has a signal peptide. 
-        Not used in current format (automatically defaults to True for secretory pathway proteins) - unimplemented
-                
-        9) polyA_length is an floating point representing the length of the polyA tail. This information will be 
-        estimated by a statistical model if not provided. - optional
-        
-        10) n_introns is an integer representing the length of the polyA tail. This information will be estimated
-        if not provided. Should be specific to the transcript isoform. - optional
-        
-        11) coupling_params is a dictionary with required parameters for coupling constraints. The key-value pairs are as follows:
-            a) 'mrna_half_life': The half life for the mrna in units of hours. If not provided, defaults to 10.
-            b) 'alpha_p': The protein first-order degradation constant in units of hours^-1. If not provided, defaults to 0.02. 
-            c) 'ptr': A value for the protein-to-RNA ratio
-            d) 'ptr_tissue': A tissue from which to get or estimate the PTR, if a ptr value is not provided. Options include:
-            ['Median', Adrenal', 'Appendices', 'Brain', 'Colon', 'Duodenum', 'Endometrium', 'Esophagus', 'Fallopiantube', 'Fat', 'Gallbladder', 'Heart', 
-            'Kidney', 'Liver', 'Lung', 'Lymphnode', 'Ovary', 'Pancreas', 'Placenta', 'Prostate', 'Rectum', 'Salivarygland', 'Smallintestine', 'Smoothmuscle', 
-            'Spleen', 'Stomach', 'Testis', 'Thyroid', 'Tonsil', 'Urinarybladder']
-            e) 'constant_ptr': bool - whether to estimate the same PTR for all genes (True). Not recommended. Will override provided ptr/ptr_tissue
+        Parameters
+        ----------
+        hgnc_id: str
+            gene HGNC ID in the format HGNC: #### 
+        premrna_seq: str
+            the premrna sequence
+        mrna_seq: str
+            the mrna sequence (length must be <= premrna_seq)
+        protein_seq: str
+            the protein sequence (length must be <= mrna_seq/3)
+        machinery_list: list, default to input M_model genes, optional 
+            each entry is the HGNC ID of a protein that should be considered as catalyzing an M_modle reaction
+        ptms: dict, default {}, optional
+            keys (str) representing the ptm and values (int) representing the number of that ptms of that kind for 
+            that gene. The exception here is gpi, which is binary with 0 for no GPI Anchor and 1 indicating GPI 
+            Anchor presence. Key options include ['dsb', 'gpi', 'og'] for 
+            ['disulfide bond formation', 'GPI Anchor','O-linked glycosylation'] respectively. PTMs are not currently considered for machinery.  - optional
+        tmd: int, default 0, optional
+            the number of transmembrane domains the protein has. This is only relevant for proteins processed into 
+            the secretory pathway.
+        sp: bool, default False, optional
+            whether a protein has a signal peptide for the secretory pathway.
+            Current format disregards this input, automatically defaulting to True for secretory pathway proteins. 
+            Will be used in future for non-canonical secretion. 
+        polyA_length: float, default estimated from statistical model
+            length of mrna polyA tail
+        n_introns: int, default estimated from premrna_seq length
+            the number of introns in the premrna
+        coupling_params: dict
+            keys (str) specify the parameter, values the value for the parameter. Used to calculate the coupling 
+            coefficients. The key-value pairs are as follows:
+                a) 'mrna_half_life': The half life for the mrna (hrs). If not provided, defaults to 10.
+                b) 'alpha_p': The protein first-order degradation constant (hrs^-1). If not provided, defaults to 0.02. 
+                c) 'ptr': the protein-to-RNA ratio. If not provided, defaults to
+                d) 'ptr_tissue': A tissue from which to get or estimate the PTR, if a ptr value is not provided. Options include: 
+                    ['Median', Adrenal', 'Appendices', 'Brain', 'Colon', 'Duodenum', 'Endometrium', 'Esophagus', 'Fallopiantube', 'Fat', 'Gallbladder', 'Heart', 
+                    'Kidney', 'Liver', 'Lung', 'Lymphnode', 'Ovary', 'Pancreas', 'Placenta', 'Prostate', 'Rectum', 'Salivarygland', 'Smallintestine', 'Smoothmuscle', 
+                    'Spleen', 'Stomach', 'Testis', 'Thyroid', 'Tonsil', 'Urinarybladder']
+                    Defaults to 'Median'
+                e) 'constant_ptr': bool 
+                    whether to estimate the same PTR for all genes (True). Not recommended. Will override provided ptr/ptr_tissue
         '''
         
         self.hgnc_id = hgnc_id
         
         # current structure assumes that a protein is either machinery (catalyzing a reaction) or
         # a secreted protein (processed through secretory pathway, does not catalyze reaction) but not both
-        
             
-        #self.module = list()
-        if hgnc_id in machinery_list: #or hgnc_id in expression_machinery:
+        if hgnc_id in machinery_list: 
             self.module = 'Machinery'
-#             if hgnc_id in machinery_list:
-#                 self.module += ['Metabolic Machinery']
-#             else:
-#                 self.module += ['Expression Machinery']
         else:
             self.module = 'Non-Machinery'
         
@@ -128,19 +127,7 @@ class gene_information():
                 warning_ = 'Premrna and mrna sequences are the same length, but you have indicated this is' 
                 warning_ += 'not an intronless gene. Setting n_introns to None'
                 warnings.warn(warning_)
-                n_introns = None
-#         else:
-#             premrna_base_counts, mrna_base_counts = dict(), dict()
-#             for base_letter in seq_element_map.keys():
-#                 premrna_base_counts[base_letter] = premrna_seq.count(base_letter)
-#                 mrna_base_counts[base_letter] = mrna_seq.count(base_letter)
-#             for k,v in mrna_base_counts.items():
-#                 if v > premrna_base_counts[k]:
-#                     raise ValueError(self.hgnc_id + ': Number of ' + k + ' bases in premrna sequence less than that of mrna sequence')
-            
-#             self.premrna_base_counts = premrna_base_counts
-#             self.mrna_base_counts = mrna_base_counts
-            
+                n_introns = None           
             
         if len(mrna_seq) < len(protein_seq)*3:
             warnings.warn(self.hgnc_id + ': The mrna and protein sequence lengths are inconsistent')
@@ -234,8 +221,19 @@ class gene_information():
         
         self.coupling = dict()
         self.coupling['mrna_degradation'] = (np.log(2)/coupling_params['mrna_half_life'])/((coupling_params['alpha_p'] + params.mu)*self.ptr)
+        
+        # term for mrna_formation (called dilution to change to dilution in future)
+        # can't use correct term currently bc a minimal demand is needed on mrna flux
+        # otherwise model tries to compensate by generating biomass via rrna reactions, which causes infeasability
         self.coupling['mrna_formation'] = ((np.log(2)/coupling_params['mrna_half_life']) + params.mu)/((coupling_params['alpha_p'] + params.mu)*self.ptr)
+        self.coupling['mrna_dilution'] = self.coupling.pop('mrna_formation')
+        # kept all these lines to make it clear (is really a one liner)
+        
+        # correct term for dilution:
+#         self.coupling['mrna_dilution'] = params.mu/((coupling_params['alpha_p'] + params.mu)*self.ptr)
 
+
+   
        
     def get_final_locations(self, metabolic_model = params.human_model, final_locations = None):
         '''Assigns a set of final compartments for the protein. For machinery, extracts this from the inputer
@@ -302,7 +300,7 @@ class gene_information():
         if len(set(self.final_locations.values())) > 1:
             if len(set(self.final_locations.values())) == 2:
                 self.coupling['mrna_degradation'] = 0.5*self.coupling['mrna_degradation']
-                self.coupling['mrna_formation'] = 0.5*self.coupling['mrna_formation']
+                self.coupling['mrna_dilution'] = 0.5*self.coupling['mrna_dilution']
             else:
                 raise ValueError('Have not yet accounted for Non-Canonical Secretion or other synthesis forms in coupling of mrna degradataion to protein synthesis')
 
