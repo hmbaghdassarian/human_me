@@ -54,6 +54,7 @@ Downloadable Files
 ------
 Download the following two directories: 
 
+0. prebuild: not needed to run; these are file inputs/outputs from analyses that helped generate the build files
 1. build: all files used in pipeline to building the ME Model; can be downloaded here
 2. input: the three files used as inputs to the ME Model building (detailed descriptions below); we have provided our recommended input files here
 
