@@ -4,15 +4,7 @@
 Installation
 ------
 
-
-1v1. DEPRECATED - Create conda environment using environment.yml file
-
-```console
-conda create --name <env_name> --file=environment.yml
-conda activate <env_name>
-```
-
-1v2. Create a [python virtual environment](https://packaging.python.org/guides/) using the requirements.txt file:
+1. Create a [python virtual environment](https://packaging.python.org/guides/) using the requirements.txt file:
 ```console
 python3.6.9 -m venv <env_name>
 source [env_name]/bin/activate
@@ -57,4 +49,14 @@ If jupyter notebook does not load the virtual environment kernel, outside of the
 ```console
 python3 -m ipykernel install --user --name=<env_name>
 ```
+
+Downloadable Files
+------
+Download the following two directories: 
+
+1. build: all files used in pipeline to building the ME Model; can be downloaded here
+2. input: the three files used as inputs to the ME Model building (detailed descriptions below); we have provided our recommended input files here
+
+Input File Descriptions
+------
 
