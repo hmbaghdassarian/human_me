@@ -5,6 +5,7 @@
 
 
 import cobra
+import cobra.manipulation.delete as c_del
 
 import pandas as pd
 import warnings
@@ -56,8 +57,7 @@ def correct_model(model_file = root_path + 'recon2_2.xml',
     model_file is path/to/cobra_smbl_model
     psim_file is path/to/psim_csv
     
-    '''
-    
+    '''  
     human_model = cobra.io.read_sbml_model(model_file)
     
     psim_me = pd.read_csv(psim_file)
@@ -99,6 +99,11 @@ def correct_model(model_file = root_path + 'recon2_2.xml',
                 new_gpr = new_gpr[:-4]
 
                 human_model.reactions.get_by_id(r.id).gene_reaction_rule = new_gpr
+    
+    # remove psuedogene w/ no sequences
+    g = [g for g in m_model.genes if g.id == 'HGNC:4686'] 
+    if len(g) > 0:
+        c_del.remove_genes(cobra_model = m_model, gene_list = g, remove_reactions = True)
             
     # check for minimum required metabolites
     all_required_metabolites = [item for sublist in list(required_metabolites.values()) for item in sublist]

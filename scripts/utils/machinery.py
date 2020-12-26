@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[1]:
+# In[2]:
 
 
 import pandas as pd
@@ -9,31 +9,31 @@ import cobra
 
 import sys
 sys.path.insert(1, '../../scripts/') # comment out in python script
-from utils.load_environmental_variables import raw_data_path, build_files_path
+from utils.load_environmental_variables import build_files_path
 from utils.parameters import human_model
 
 
-# In[2]:
+# In[7]:
 
 
 # define necessary variables 
-rs = pd.read_csv(raw_data_path + '/small_ribosomal_protein.csv', index_col = None, skiprows = [0])
-rl = pd.read_csv(raw_data_path + '/large_ribosomal_protein.csv', index_col = None, skiprows = [0])
+rs = pd.read_csv(build_files_path + 'machinery/small_ribosomal_protein.csv', index_col = None, skiprows = [0])
+rl = pd.read_csv(build_files_path + 'machinery/large_ribosomal_protein.csv', index_col = None, skiprows = [0])
 
 
-# In[3]:
+# In[9]:
 
 
 # mrna expression
 
 # elongation machinery------------------------------------------------------------
-rnap = pd.read_csv(raw_data_path + 'RNAP_HUGO.csv', index_col = None, skiprows = [0])
+rnap = pd.read_csv(build_files_path + 'machinery/RNAP_HUGO.csv', index_col = None, skiprows = [0])
 rnap2 = rnap[rnap['Approved name'].isin([i for i in rnap['Approved name'] if ' II ' in i])]
 
 tfiis, tfiif, ell = ['HGNC:11612', 'HGNC:11614'], ['HGNC:4652', 'HGNC:4653'], ['HGNC:23114', 'HGNC:17064', 'HGNC:23113']
-elongin = pd.read_csv(raw_data_path + 'elongin.csv', index_col = None, skiprows = [0])
+elongin = pd.read_csv(build_files_path + 'machinery/elongin.csv', index_col = None, skiprows = [0])
 elongin.drop(index = elongin[elongin['HGNC ID (gene)'] == 'HGNC:24617'].index, inplace = True)
-elongator = pd.read_csv(raw_data_path + 'elongator.csv', index_col = None, skiprows = [0])
+elongator = pd.read_csv(build_files_path + 'machinery/elongator.csv', index_col = None, skiprows = [0])
 fact = ['HGNC:11327', 'HGNC:11465']
 ec = rnap2['HGNC ID (gene)'].tolist() + elongin['HGNC ID (gene)'].tolist() + elongator['HGNC ID (gene)'].tolist()
 ec += tfiis + tfiif + ell + fact
@@ -49,13 +49,13 @@ capping = nelf + ['HGNC:10073', 'HGNC:10075', 'HGNC:21077', 'HGNC:7658', 'HGNC:7
                  'HGNC:29200', 'HGNC:17970']
 
 # ignore snRNA for now, can change in the future
-spliceosome = pd.read_csv(raw_data_path + 'spliceosome.txt', index_col = None, sep = '\t')
+spliceosome = pd.read_csv(build_files_path + 'machinery/spliceosome.txt', index_col = None, sep = '\t')
 spliceosome = spliceosome[spliceosome['Locus type'] != 'RNA, small nuclear']
 spliceosome = sorted(set(spliceosome['HGNC ID'].tolist()))
 
 
 # lariat degradataion------------------------------------------------------------
-exosome = pd.read_csv(raw_data_path + 'exosome.csv', index_col = None, skiprows = [0])
+exosome = pd.read_csv(build_files_path + 'machinery/exosome.csv', index_col = None, skiprows = [0])
 lariat_machinery = {'Linearization': ['HGNC:15594'] ,
                     "5' Degradation": ['HGNC:12836'], 
                "Exosome": exosome.loc[:, 'HGNC ID (gene)'].tolist() + ['HGNC:29911'], 
@@ -65,13 +65,13 @@ lm2 = ' and '.join(lariat_machinery['Linearization'] + lariat_machinery["Exosome
 lm_rule = '({})'.format(lm1) + ' or ' + '({})'.format(lm2)
 
 # mrna export------------------------------------------------------------
-tho = pd.read_csv(raw_data_path + 'tho.csv', index_col = None, skiprows = [0])
+tho = pd.read_csv(build_files_path + 'machinery/tho.csv', index_col = None, skiprows = [0])
 trex = tho.loc[:, 'HGNC ID (gene)'].tolist() + ['HGNC:17821', 'HGNC:25407', 'HGNC:24971', 'HGNC:24511', 'HGNC:24432',
                                                'HGNC:23782', 'HGNC:29093', 'HGNC:3447', 'HGNC:8071', 'HGNC:15913',
                                                'HGNC:25091', 'HGNC:24101', 'HGNC:7658']
 
 # mrna degradation------------------------------------------------------------
-ccr4_not = pd.read_csv(raw_data_path + 'CCR4_NOT.csv', index_col = None, skiprows = [0])
+ccr4_not = pd.read_csv(build_files_path + 'machinery/CCR4_NOT.csv', index_col = None, skiprows = [0])
 # pabp3 isoform not included
 deadenylation_machinery = {'CCR4_NOT Deadenylation': ccr4_not.loc[:, 'HGNC ID (gene)'].tolist(), 
                 'PARN Deadenylation': ['HGNC:8609'], 
@@ -92,7 +92,7 @@ degradation_rule1 = ' and '.join(deadenylation_machinery + mrna_degradation_mach
 decapping_rule = ' and '.join(deadenylation_machinery + decapping_degradation_machinery)
 
 
-# In[4]:
+# In[10]:
 
 
 #rrna expression
@@ -125,7 +125,7 @@ RAN = ['HGNC:9846']
 XPO1 = ['HGNC:12825']
 
 
-# In[5]:
+# In[11]:
 
 
 # trna expression
@@ -136,9 +136,9 @@ RNASEZ = ['HGNC:14198']
 trna_splicing_machinery = ['HGNC:28422', 'HGNC:16791', 'HGNC:15506', 'HGNC:27561']
 XPOT = ['HGNC:12826'] # nuclear export of trna
 
-classI_synthetase = pd.read_csv(raw_data_path + 'classI_aa_trna_synthetases.csv', index_col = None, 
+classI_synthetase = pd.read_csv(build_files_path + 'machinery/classI_aa_trna_synthetases.csv', index_col = None, 
                                 skiprows = [0])
-classII_synthetase = pd.read_csv(raw_data_path + 'classII_aa_trna_synthetases.csv', index_col = None, 
+classII_synthetase = pd.read_csv(build_files_path + 'machinery/classII_aa_trna_synthetases.csv', index_col = None, 
                                  skiprows = [0])
 trna_synthetase = pd.concat([classI_synthetase, classII_synthetase], axis = 0)
 trna_synthetase.reset_index(inplace = True, drop = True)
@@ -171,7 +171,7 @@ seq_synthetase_map = {
 }
 
 
-# In[7]:
+# In[12]:
 
 
 # cytoplasmic transport
@@ -180,7 +180,7 @@ translation_efs = ['HGNC:3189', 'HGNC:3214', 'HGNC:3208', 'HGNC:3300']
 
 # # DON'T DELETE------------------------------------------------
 # import pandas as pd
-# e3_ligase = pd.read_csv(raw_data_path + 'E3_HPA.tsv', sep = '\t')
+# e3_ligase = pd.read_csv(build_files_path + 'machinery/E3_HPA.tsv', sep = '\t')
 # e3_ligase = e3_ligase[e3_ligase['RNA cell line specificity'] == 'Low cell line specificity']
 # e3_ligase = e3_ligase.loc[e3_ligase[e3_ligase['Subcellular main location'].notna()].index,:]
 # e3_ligase = e3_ligase.loc[[i for i in e3_ligase.index if ('Cytosol' in e3_ligase.loc[i, 'Subcellular main location'])], :]
@@ -188,7 +188,7 @@ translation_efs = ['HGNC:3189', 'HGNC:3214', 'HGNC:3208', 'HGNC:3300']
 # top_gene_idx = e3_ligase.iloc[:, e3_ligase.columns.tolist().index('Tissue RNA - adipose tissue [NX]'):].mean(axis = 1).sort_values(ascending = False).index.tolist()[3]
 # e3_uniprot_id = e3_ligase.loc[top_gene_idx, 'Uniprot']
 
-# e2_ligase = pd.read_csv(raw_data_path + 'E2_HPA.tsv', sep = '\t')
+# e2_ligase = pd.read_csv(build_files_path + 'machinery/E2_HPA.tsv', sep = '\t')
 # e2_ligase = e2_ligase[e2_ligase['RNA cell line specificity'] == 'Low cell line specificity']
 # e2_ligase = e2_ligase.loc[e2_ligase[e2_ligase['Subcellular main location'].notna()].index,:]
 # e2_ligase = e2_ligase.loc[[i for i in e2_ligase.index if ('Cytosol' in e2_ligase.loc[i, 'Subcellular main location'])], :]
@@ -196,14 +196,14 @@ translation_efs = ['HGNC:3189', 'HGNC:3214', 'HGNC:3208', 'HGNC:3300']
 # top_gene_idx = e2_ligase.iloc[:, e2_ligase.columns.tolist().index('Tissue RNA - adipose tissue [NX]'):].mean(axis = 1).sort_values(ascending = False).index.tolist()[0]
 # e2_uniprot_id = e2_ligase.loc[top_gene_idx, 'Uniprot']
 
-# e3_ligase = pd.read_csv(raw_data_path + 'E3_HPA.tsv', sep = '\t')
+# e3_ligase = pd.read_csv(build_files_path + 'machinery/E3_HPA.tsv', sep = '\t')
 # e3_ligase = e3_ligase[e3_ligase['RNA cell line specificity'] == 'Low cell line specificity']
 # e3_ligase = e3_ligase.loc[e3_ligase[e3_ligase['Subcellular main location'].notna()].index,:]
 # e3_ligase = e3_ligase.loc[[i for i in e3_ligase.index if ('Nucleoplasm' in e3_ligase.loc[i, 'Subcellular main location'])], :]
 # # e3_ligase = e3_ligase[e3_ligase['Subcellular main location'] == 'Cytosol']
 # top_gene_idx = e3_ligase.iloc[:, e3_ligase.columns.tolist().index('Tissue RNA - adipose tissue [NX]'):].mean(axis = 1).sort_values(ascending = False).index.tolist()[0]
 # e3_uniprot_id = e3_ligase.loc[top_gene_idx, 'Uniprot']
-# e2_ligase = pd.read_csv(raw_data_path + 'E2_HPA.tsv', sep = '\t')
+# e2_ligase = pd.read_csv(build_files_path + 'machinery/E2_HPA.tsv', sep = '\t')
 # e2_ligase = e2_ligase[e2_ligase['RNA cell line specificity'] == 'Low cell line specificity']
 # e2_ligase = e2_ligase.loc[e2_ligase[e2_ligase['Subcellular main location'].notna()].index,:]
 # e2_ligase = e2_ligase.loc[[i for i in e2_ligase.index if ('Nucleoplasm' in e2_ligase.loc[i, 'Subcellular main location'])], :]
@@ -229,7 +229,7 @@ proteasome_machinery = proteasome_structural + proteasome_ubiquitin + proteasome
 
 TOM = ['HGNC:31369', 'HGNC:34528', 'HGNC:21648', 'HGNC:20947', 'HGNC:18002', 'HGNC:18001', 'HGNC:11985']
 # HGNC's tim23 already contains PAM
-TIM23_PAM = pd.read_csv(raw_data_path + 'tim23_complex.csv',  index_col = None, skiprows = [0])['HGNC ID (gene)'].tolist()
+TIM23_PAM = pd.read_csv(build_files_path + 'machinery/tim23_complex.csv',  index_col = None, skiprows = [0])['HGNC ID (gene)'].tolist()
 HSP70_m = ['HGNC:5244'] # mitocondrial version
 OXA = ['HGNC:8526'] # inner membrane transport
 
@@ -249,7 +249,7 @@ LONP2 = ['HGNC:20598']
 importins = ['HGNC:6400', 'HGNC:6394']
 
 
-# In[9]:
+# In[13]:
 
 
 # ribosome biogenesis
@@ -258,13 +258,13 @@ pre40s_rbfs = ['HGNC:25542', 'HGNC:21173', 'HGNC:32790', 'HGNC:29100']
 pre60s_rbfs = ['HGNC:18477', 'HGNC:25789', 'HGNC:19440', 'HGNC:20870', 'HGNC:17083', 'HGNC:4333']
 
 eif1, eif2 = ['HGNC:3249', 'HGNC:3250'], ['HGNC:3265', 'HGNC:3266', 'HGNC:3267']
-eif3 = pd.read_csv(raw_data_path + 'eif3.csv', index_col = None, skiprows = [0])['HGNC ID (gene)'].tolist()
+eif3 = pd.read_csv(build_files_path + 'machinery/eif3.csv', index_col = None, skiprows = [0])['HGNC ID (gene)'].tolist()
 eif4f = ['HGNC:3282', 'HGNC:3284', 'HGNC:3287', 'HGNC:3296']
 eif5 = ['HGNC:3299', 'HGNC:30793']
 eifs = eif1 + eif2 + eif3 + eif4f + eif5 + ['HGNC:8554']
 
 
-# In[11]:
+# In[14]:
 
 
 # secretory pathway
@@ -311,11 +311,19 @@ retro_mach_glyco = ['HGNC:16695', 'HGNC:28454', 'HGNC:14236', 'HGNC:18261', 'HGN
 ERDJ5 = ['HGNC:24637']
 
 HSP90AB1 = ['HGNC:5258']
-escrt = pd.read_csv(raw_data_path + 'escrt_complexes.txt', sep = '\t')['HGNC ID'].tolist()
+escrt = pd.read_csv(build_files_path + 'machinery/escrt_complexes.txt', sep = '\t')['HGNC ID'].tolist()
 eps = ['HGNC:3419', 'HGNC:21604']
 endocytic_machinery = sorted(set(proteasome_ubiquitin + escrt + eps + clathrin_m))
 
 cathepsins = ['HGNC:2527', 'HGNC:2529', 'HGNC:9251']
+
+
+# In[ ]:
+
+
+metabolic_machinery = sorted([g.id for g in human_model.genes]) # not efficient to do this each time
+expression_machinery = sorted(open(build_files_path + 'expression_machinery.txt').read().splitlines())
+all_machinery = sorted(set(metabolic_machinery + expression_machinery))
 
 
 # # List all expression machinery
@@ -350,7 +358,7 @@ cathepsins = ['HGNC:2527', 'HGNC:2529', 'HGNC:9251']
 # expression_machinery = sorted(set(expression_machinery))
 # expression_machinery = [m for m in expression_machinery if 'HGNC:' in m]
 
-# with open(root_path + 'project_files/expression_machinery.txt', 'w') as f:
+# with open(build_files_path + 'expression_machinery.txt', 'w') as f:
 #     for m in expression_machinery:
 #         f.write(m + '\n')
 
@@ -362,15 +370,7 @@ cathepsins = ['HGNC:2527', 'HGNC:2529', 'HGNC:9251']
 #     r.gene_reaction_rule = r.gene_reaction_rule.replace('ribosome', ' and '.join(rs['HGNC ID (gene)'].tolist() + rl['HGNC ID (gene)'].tolist()))
 
 
-# expression_psim = pd.read_csv(root_path + 'expression_module_psim.csv', index_col = 0)
+# expression_psim = pd.read_csv(build_files_path + 'expression_module_psim.csv', index_col = 0)
 # expression_machinery_2 = expression_psim.HGNC_ID.tolist()
 # set(expression_machinery_2).difference(expression_machinery)
-
-
-# In[12]:
-
-
-metabolic_machinery = sorted([g.id for g in human_model.genes]) # not efficient to do this each time
-expression_machinery = sorted(open(build_files_path + 'expression_machinery.txt').read().splitlines())
-all_machinery = sorted(set(metabolic_machinery + expression_machinery))
 
