@@ -103,18 +103,18 @@ class express_mrna():
             self.lariat = RNA_fragment(metabolite_name = self.gene_info.hgnc_id, fragment_type='lariat', 
                                        seq = lariat_seq, triphosphate = False)
 
-            if self.gene_info.n_introns == None:
-                n_lariats = self.premrna.length * params.rate_intron # removed ROUND()
-                if n_lariats < 1: # atleast one intron must be generated
-                    n_lariats = 1
-            #             n_splices = n_lariats * 2 # because on average, one more exon than intron
-            else:
-                n_lariats = self.gene_info.n_introns  
+#             if self.gene_info.n_introns == None:
+#                 n_lariats = self.premrna.length * params.rate_intron # removed ROUND()
+#                 if n_lariats < 1: # atleast one intron must be generated
+#                     n_lariats = 1
+#             #             n_splices = n_lariats * 2 # because on average, one more exon than intron
+#             else:
+#                 n_lariats = self.gene_info.n_introns  
 
             rxn[self.lariat] = 1
             rxn[metab.h2o_n] -= 1 # endonucleolytic cleavage
             # 10 ATP consumed per intron during splicing
-            rxn = func.hydrolyze_atp(rxn, n_atp = 10*n_lariats, compartment = 'n')
+            rxn = func.hydrolyze_atp(rxn, n_atp = 10*self.gene_info.n_introns, compartment = 'n')
             # lariat degradation - no linearization reaction (just one triphosphate consumption)
             lariat_degradation = self.lariat.exonucleolytic_degradation(reaction_name = self.gene_info.hgnc_id + '_lariats')
             lariat_degradation.gene_reaction_rule = mach.lm_rule  

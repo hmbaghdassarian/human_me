@@ -37,7 +37,7 @@ class gene_information():
     
     def __init__(self, hgnc_id, premrna_seq, mrna_seq, protein_seq,
                  machinery_list = mach.metabolic_machinery,
-                 ptms = {}, tmd = 0, sp = False, polyA_length = None, n_introns = None, 
+                 ptms = {}, tmd = 0, sp = False, polyA_length = None, n_exons = None, 
                 coupling_params = None):
         '''Initialize object
         
@@ -67,8 +67,8 @@ class gene_information():
             Will be used in future for non-canonical secretion. 
         polyA_length: float, default estimated from statistical model
             length of mrna polyA tail
-        n_introns: int, default estimated from premrna_seq length
-            the number of introns in the premrna
+        n_exons: int, default estimated from premrna_seq length
+            the number of exons in the mrna isoform. Used to estimate the number of introns (n_exons -1) in the premrna
         coupling_params: dict
             keys (str) specify the parameter, values the value for the parameter. Used to calculate the coupling 
             coefficients. The key-value pairs are as follows:
@@ -123,11 +123,13 @@ class gene_information():
         elif len(premrna_seq) == len(mrna_seq):
             if premrna_seq != mrna_seq:
                 raise ValueError(self.hgnc_id + ': Premrna and mrna sequences are the same length, but not the same sequence')
-            if n_introns != None and n_introns > 0:
-                warning_ = 'Premrna and mrna sequences are the same length, but you have indicated this is' 
-                warning_ += 'not an intronless gene. Setting n_introns to None'
+        else:
+            if n_exons != None and n_exons > 1:
+                warning_ = 'Premrna and mrna sequences are the same length, but you have indicated this gene' 
+                warning_ += 'has atleast 1 intron (n_exons > 1, n_introns = n_exons - 1).' 
+                warning_ += 'Setting n_exons to default.'
                 warnings.warn(warning_)
-                n_introns = None           
+                n_exons = None           
             
         if len(mrna_seq) < len(protein_seq)*3:
             warnings.warn(self.hgnc_id + ': The mrna and protein sequence lengths are inconsistent')
@@ -169,12 +171,12 @@ class gene_information():
         else:
             raise ValueError(self.hgnc_id + ': polyA_length must either be an integer >= 0 or None/nan')
         
-        if n_introns == None or pd.isna(n_introns): # or round(n_introns) == n_introns):
-            self.n_introns = None
-        elif n_introns >= 0:
-            self.n_introns = round(n_introns) # must be an integer
+        if n_exons == None or pd.isna(n_exons): 
+            self.n_introns = len(self.premrna_seq) * params.rate_intron
+        elif n_exonss >= 1:
+            self.n_introns = n_exons - 1
         else:
-            raise TypeError(self.hgnc_id + ': n_introns must either be an integer >= 0 or None/nan')
+            raise TypeError(self.hgnc_id + ': n_exons must either be an integer >= 1 or None/nan')
         
 #         self.keff = keff
 #         if self.keff == None and self.module == 'Machinery':
@@ -352,7 +354,7 @@ def generate(hgnc_id, psim = params.psim_me, machinery_list = mach.metabolic_mac
                     machinery_list = machinery_list,
                     ptms = dict(zip(['dsb', 'og', 'gpi'],[entries['DSB'], entries['OG'], entries['GPI']])),
                     tmd = entries['TMD'], sp = entries['SP'], polyA_length = entries['POLYA_LENGTH'], 
-                    n_introns = entries['N_INTRONS'], 
+                    n_introns = (entries['N_EXONS'] - 1), 
                     coupling_params = dict(zip(cp_keys, cp_values)))
     gene_info.get_final_locations(metabolic_model = metabolic_model, 
                                   final_locations = entries['LOCATION'])
