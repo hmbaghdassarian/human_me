@@ -123,24 +123,20 @@ class gene_information():
         elif len(premrna_seq) == len(mrna_seq):
             if premrna_seq != mrna_seq:
                 raise ValueError(self.hgnc_id + ': Premrna and mrna sequences are the same length, but not the same sequence')
-        else:
             if n_exons != None and n_exons > 1:
                 warning_ = 'Premrna and mrna sequences are the same length, but you have indicated this gene' 
                 warning_ += 'has atleast 1 intron (n_exons > 1, n_introns = n_exons - 1).' 
-                warning_ += 'Setting n_exons to default.'
+                warning_ += 'Setting n_exons to 1 for premrna and mrna of the same length.'
                 warnings.warn(warning_)
-                n_exons = None           
+            n_exons = 1  # n_introns is 0 when the sequence lengths are equal         
             
         if len(mrna_seq) < len(protein_seq)*3:
             warnings.warn(self.hgnc_id + ': The mrna and protein sequence lengths are inconsistent')
-
+        
+        # complete checks, assign attributes
         self.premrna_seq = Seq(premrna_seq, generic_rna)
-#         self.premrna_mass = calculate_molecular_weight(seq = self.premrna_seq)/1000 #kDa
         self.mrna_seq = Seq(mrna_seq, generic_rna)
         self.protein_seq = protein_seq
-        
-#         self.protein_mass = calculate_molecular_weight(seq=self.protein_seq, seq_type='protein')/1000 #kDa
-        self.L_protein = len(self.protein_seq)
         self.amino_acid_counts = {k: self.protein_seq.count(k) for k in params.amino_acids}
         
         remove_ptms = list()
@@ -173,7 +169,7 @@ class gene_information():
         
         if n_exons == None or pd.isna(n_exons): 
             self.n_introns = len(self.premrna_seq) * params.rate_intron
-        elif n_exonss >= 1:
+        elif n_exons >= 1:
             self.n_introns = n_exons - 1
         else:
             raise TypeError(self.hgnc_id + ': n_exons must either be an integer >= 1 or None/nan')

@@ -89,7 +89,7 @@ class express_mrna():
         rxn[self.mrna_n] = 1
 
         # splicing
-        if self.premrna.length > self.mrna_n.length - self.polyA_length: 
+        if self.gene_info.n_introns > 0: #self.premrna.length > self.mrna_n.length - self.polyA_length: 
             lariat_seq = ''
             for nt in ['A', 'U', 'G', 'C']:
 
@@ -102,14 +102,6 @@ class express_mrna():
             
             self.lariat = RNA_fragment(metabolite_name = self.gene_info.hgnc_id, fragment_type='lariat', 
                                        seq = lariat_seq, triphosphate = False)
-
-#             if self.gene_info.n_introns == None:
-#                 n_lariats = self.premrna.length * params.rate_intron # removed ROUND()
-#                 if n_lariats < 1: # atleast one intron must be generated
-#                     n_lariats = 1
-#             #             n_splices = n_lariats * 2 # because on average, one more exon than intron
-#             else:
-#                 n_lariats = self.gene_info.n_introns  
 
             rxn[self.lariat] = 1
             rxn[metab.h2o_n] -= 1 # endonucleolytic cleavage

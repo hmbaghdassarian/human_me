@@ -5,12 +5,11 @@
 
 
 import pandas as pd
-import cobra
+import utils_machinery_extract 
 
 import sys
 sys.path.insert(1, '../../scripts/') # comment out in python script
 from utils.load_environmental_variables import build_files_path
-from utils.parameters import human_model
 
 
 # In[2]:
@@ -317,12 +316,4 @@ eps = ['HGNC:3419', 'HGNC:21604']
 endocytic_machinery = sorted(set(proteasome_ubiquitin + escrt + eps + clathrin_m))
 
 cathepsins = ['HGNC:2527', 'HGNC:2529', 'HGNC:9251']
-
-
-# In[ ]:
-
-
-metabolic_machinery = sorted([g.id for g in human_model.genes]) # not efficient to do this each time
-expression_machinery = sorted(open(build_files_path + 'expression_machinery.txt').read().splitlines())
-all_machinery = sorted(set(metabolic_machinery + expression_machinery))
 
