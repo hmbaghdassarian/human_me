@@ -17,7 +17,7 @@ dotenv_path = find_dotenv()
 load_dotenv(dotenv_path)
 
 root_path = os.path.join(os.environ.get("ROOT_PATH"),'')
-raw_data_path = os.path.join(os.environ.get("INPUT_PATH"),'')
+input_data_path = os.path.join(os.environ.get("INPUT_PATH"),'')
 build_files_path = os.path.join(os.environ.get("BUILD_PATH"),'')
 processed_data_path = os.path.join(os.environ.get("PROCESSED_PATH"),'')
 
