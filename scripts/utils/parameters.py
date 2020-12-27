@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[1]:
+# In[3]:
 
 
 import pandas as pd 
@@ -51,7 +51,7 @@ allowed_trna_modifications = {}
 
 # universal variables and inputs
 
-rate_intron = 10/67000 # 10 introns / 67 kbp
+rate_intron = 10/67000 # 10 introns / 67 kbp (https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5199132/)
 # L_polyA_n = 250 # https://www.nature.com/articles/s41592-019-0503-y
 n_ub = 4 # see this - no. of ubiquitins to add to protein
 
@@ -67,24 +67,29 @@ Kv = 0.7 # secretory pathway vesicle coat coefficients
 # In[11]:
 
 
-# kinetic parameters
+# coupling parameters
 
 # enzyme
 keff_median = 3.983*3600 # units: hr^-1 (3.983 in s^-1)
 
-
 # central dogma
-mrna_half_life = 10 #units: hours
-alpha_p = 0.02 # units: hours ^-1
-
-coupling_params = {'mrna_half_life': mrna_half_life, 
-                  'alpha_p': alpha_p, 
-                  'ptr': None,
-                  'ptr_tissue': 'Median',
-                  'constant_ptr': False}
+alpha_m_median =  0.06108233261605428 # units: hours (Gregersen et al ) median value
+alpha_p_median = 0.018342530808268292 # units: hours ^-1 (Cambridge et al 2011) median value
+ptr_median = 65162.83940608428 # (Eraslan et al 2019) median value
 
 ptr = pd.read_csv(build_files_path + 'PTR_Gagneur_processed.tsv', sep = '\t', index_col = 0)
-constant_ptr = ptr.Median.median()
+# don't groupby hgnc ID median, because if tissue option is used, can include unmapped ids in calculation
+ptr.drop(columns = ['ENSG_ID'], inplace = True)
+ptr.columns = pd.Series(ptr.columns).apply(lambda x: x.split('_')[0] if '_PTR' in x else x).tolist()
+
+alpha_p = pd.read_csv(build_files_path + 'protein_turnover.csv', index_col = 0)
+alpha_p = alpha_p.groupby(alpha_p.HGNC_ID).median().kdeg # have true median stored above
+
+alpha_m = pd.read_csv(build_files_path + 'Gregersen_mrna_turnover_processed.tsv', sep = '\t', index_col = 0)
+alpha_m = alpha_m.groupby(alpha_m.HGNC_ID).median().median_turnover # have true median stored above
+
+turnover = {'alpha_m': alpha_m, 'alpha_p', alpha_p, 
+           'alpha_m_median': alpha_m_median, 'alpha_p_median': alpha_p_median}
 
 
 # In[7]:

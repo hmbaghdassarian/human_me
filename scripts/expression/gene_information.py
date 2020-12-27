@@ -72,16 +72,19 @@ class gene_information():
         coupling_params: dict
             keys (str) specify the parameter, values the value for the parameter. Used to calculate the coupling 
             coefficients. The key-value pairs are as follows:
-                a) 'mrna_half_life': The half life for the mrna (hrs). If not provided, defaults to 10.
-                b) 'alpha_p': The protein first-order degradation constant (hrs^-1). If not provided, defaults to 0.02. 
-                c) 'ptr': the protein-to-RNA ratio. If not provided, defaults to
-                d) 'ptr_tissue': A tissue from which to get or estimate the PTR, if a ptr value is not provided. Options include: 
-                    ['Median', Adrenal', 'Appendices', 'Brain', 'Colon', 'Duodenum', 'Endometrium', 'Esophagus', 'Fallopiantube', 'Fat', 'Gallbladder', 'Heart', 
-                    'Kidney', 'Liver', 'Lung', 'Lymphnode', 'Ovary', 'Pancreas', 'Placenta', 'Prostate', 'Rectum', 'Salivarygland', 'Smallintestine', 'Smoothmuscle', 
-                    'Spleen', 'Stomach', 'Testis', 'Thyroid', 'Tonsil', 'Urinarybladder']
-                    Defaults to 'Median'
-                e) 'constant_ptr': bool 
-                    whether to estimate the same PTR for all genes (True). Not recommended. Will override provided ptr/ptr_tissue
+                a) 'alpha_m': The mrna first-order degradation constant (hrs^-1). If not provided, defaults to a gene-specific value from build/Gregersen_mrna_turnover_processed.tsv if hgnc_id is in the dataframe, otherwise to 0.061
+                b) 'alpha_p': The protein first-order degradation constant (hrs^-1). If not provided, defaults to a gene-specific value from build/protein_turnover.csv if hgnc_id is in the dataframe, otherwise to 0.018
+                c) 'ptr': float or str
+                        the protein-to-RNA ratio. default values drawn from: build/PTR_Gagneur_processed.tsv
+                        if float, assumes it is a specified ptr value
+                        if str, assumes it is a tissue (must be one of tissues in the .tsv column, or "Median"); 
+                        will take the gene-specific tissue-median if the HGNC ID is present in the dataframe, otherwise the median across all genes in the tissue
+                        if None/nan, will take the gene-specific median across all tissues if HGNC ID is present in the dataframe, otherwise the whole dataframe median
+                        
+                        str tissue options: ['Median', Adrenal', 'Appendices', 'Brain', 'Colon', 'Duodenum', 'Endometrium', 'Esophagus', 'Fallopiantube', 'Fat', 'Gallbladder', 'Heart', 
+                                        'Kidney', 'Liver', 'Lung', 'Lymphnode', 'Ovary', 'Pancreas', 'Placenta', 'Prostate', 'Rectum', 'Salivarygland', 'Smallintestine', 'Smoothmuscle', 
+                                        'Spleen', 'Stomach', 'Testis', 'Thyroid', 'Tonsil', 'Urinarybladder']
+              
         '''
         
         self.hgnc_id = hgnc_id
@@ -147,7 +150,6 @@ class gene_information():
             del ptms[k]
         self.ptms = ptms
         
-        
         if pd.isna(tmd) or tmd == None or round(tmd) == 0:
             self.tmd = 0
         else:
@@ -173,66 +175,71 @@ class gene_information():
             self.n_introns = n_exons - 1
         else:
             raise TypeError(self.hgnc_id + ': n_exons must either be an integer >= 1 or None/nan')
-        
-#         self.keff = keff
-#         if self.keff == None and self.module == 'Machinery':
-#             warnings.warn(self.hgnc_id + ': No keff specified for this enzyme, will assume a value in model building')
-#         elif self.keff != None and self.module == 'Non-Machinery':
-#             warnings.warn(self.hgnc_id + ': keff specified for a non-machinery protein, will not be used')
-            
-            
+
         self.final_locations = None
         
         
         # coupling parameters
-        ptr_tissue_orig = None
-        if coupling_params == None or pd.isna(coupling_params):
-            coupling_params = params.coupling_params
-        else:
-            if 'ptr_tissue' in coupling_params.keys():
-                ptr_tissue_orig = coupling_params['ptr_tissue']
-            for k in params.coupling_params.keys():
-                if (k not in coupling_params.keys()) or (coupling_params[k] == None) or (pd.isna(coupling_params[k])):
-                    coupling_params[k] = params.coupling_params[k]
-                    
-        # get the PTR
-        if not coupling_params['constant_ptr']:
-            if not (coupling_params['ptr'] is None or pd.isna(coupling_params['ptr'])):
-                self.ptr = coupling_params['ptr']
-                if not (ptr_tissue_orig is None or pd.isna(ptr_tissue_orig)):
-                    warnings.warn('You have indicated using a specific PTR, ignoring user input PTR tissue')
-                
+        if type(coupling_params) != dict:
+            if not(coupling_params == None or pd.isna(coupling_params)):
+                raise ValueError('Provided coupling parameters are not formatted correctly')
+            self.coupling_params = {'alpha_m': None, 'alpha_p': None, 'ptr': None}  
+        else: 
+            self.coupling_params = coupling_params
+        self.get_coupling()
+    
+    def get_coupling(self):
+        # ptr-----    
+        if 'ptr' not in self.coupling_params:
+            self.coupling_params['ptr'] = None    
+        if type(self.coupling_params['ptr']) == float or type(self.coupling_params['ptr']) == int: # specified ptr
+            if not (self.coupling_params['ptr'] > 0): #float('nan') will return True as desired
+                warnings.warn('Invalid ptr value provided, will use default instead')
+                self.coupling_params['ptr'] = None
+        elif type(self.coupling_params['ptr']) == str: # unspecified ptr, but tissue specified
+            if self.coupling_params['ptr'] not in params.ptr.columns.tolist():
+                mssg = 'The specified tissue, type' + self.coupling_params['ptr'] + ' is not available'
+                mssg += 'Will use default values instead'
+                warnings.warn(mssg)
+                self.coupling_params['ptr'] = None # will forward to next statement
+            else: # tissue 
+                val = float('nan')
+                if self.hgnc_id in params.ptr.HGNC_ID.tolist():
+                    val = params.ptr.groupby(params.ptr.HGNC_ID).median().loc[self.hgnc_id, self.coupling_params['ptr']]
+
+                if not pd.isna(val): # the if statement above can still product a nan
+                    self.coupling_params['ptr'] = val
+                else:
+                    self.coupling_params['ptr'] = params.ptr.groupby(params.ptr.HGNC_ID).median().loc[:, self.coupling_params['ptr']].median()
+        if self.coupling_params['ptr'] is None or pd.isna(self.coupling_params['ptr']): # totally unspecified ptr
+            if self.hgnc_id in params.ptr.HGNC_ID.tolist():
+                self.coupling_params['ptr'] = params.ptr.groupby(params.ptr.HGNC_ID).median().loc[self.hgnc_id, :].median()
             else:
-                if coupling_params['ptr_tissue'] not in params.ptr.columns:
-                    raise ValueError('Specified tissue type for PTR is not available')
-                else: # tissue estimation
-                    if self.hgnc_id in params.ptr[coupling_params['ptr_tissue']].dropna().index:
-                        self.ptr = params.ptr.loc[self.hgnc_id, coupling_params['ptr_tissue']]
-                    else:
-                        self.ptr = params.ptr[coupling_params['ptr_tissue']].median()
-        else:
-            self.ptr = params.constant_ptr
-            if not (coupling_params['ptr'] is None or pd.isna(coupling_params['ptr'])):
-                warnings.warn('You have indicated using a constant PTR, ignoring user input PTR')
-            if not (ptr_tissue_orig is None or pd.isna(ptr_tissue_orig)):
-                warnings.warn('You have indicated using a constant PTR, ignoring user input PTR tissue')
-        
-        self.coupling = dict()
-        self.coupling['mrna_degradation'] = (np.log(2)/coupling_params['mrna_half_life'])/((coupling_params['alpha_p'] + params.mu)*self.ptr)
-        
+                self.coupling_params['ptr'] = params.ptr_median
+        #alpha_p and # alpha_m-----------
+        for tp in params.turnover: 
+            if tp not in self.coupling_params:
+                self.coupling_params[tp] = None
+            if type(self.coupling_params[tp]) == float or type(self.coupling_params[tp]) == int: # specified params.turnover[tp]
+                if not (self.coupling_params[tp] > 0): #float('nan') will return True as desired
+                    warnings.warn('Invalid alpha_p value provided, will use default instead')
+                    self.coupling_params[tp] = None
+            if self.coupling_params[tp] is None or pd.isna(self.coupling_params[tp]): # totally unspecified ptr
+                if self.hgnc_id in params.turnover[tp].index.tolist():
+                    self.coupling_params[tp] = params.turnover[tp][hgnc_id]
+                else:
+                    self.coupling_params[tp] = params.turnover[tp + '__median']
+
         # term for mrna_formation (called dilution to change to dilution in future)
         # can't use correct term currently bc a minimal demand is needed on mrna flux
         # otherwise model tries to compensate by generating biomass via rrna reactions, which causes infeasability
-        self.coupling['mrna_formation'] = ((np.log(2)/coupling_params['mrna_half_life']) + params.mu)/((coupling_params['alpha_p'] + params.mu)*self.ptr)
+        self.coupling['mrna_formation'] = ((self.coupling_params['alpha_m']) + params.mu)/((self.coupling_params['alpha_p'] + params.mu)*self.coupling_params['ptr'])
         self.coupling['mrna_dilution'] = self.coupling.pop('mrna_formation')
         # kept all these lines to make it clear (is really a one liner)
-        
+
         # correct term for dilution:
-#         self.coupling['mrna_dilution'] = params.mu/((coupling_params['alpha_p'] + params.mu)*self.ptr)
+    #         self.coupling['mrna_dilution'] = params.mu/((self.coupling_params['alpha_p'] + params.mu)*self.coupling_params['ptr'])
 
-
-   
-       
     def get_final_locations(self, metabolic_model = params.human_model, final_locations = None):
         '''Assigns a set of final compartments for the protein. For machinery, extracts this from the inputer
         cobrapy model. For non-machinery, final_locations should be specified by a list of strings
@@ -326,7 +333,7 @@ class gene_information():
 
 ptm_cols = ['DSB', 'GPI', 'NG', 'OG']
 ptm_keys = list(params.allowed_ptms.keys())
-cp_keys = ['mrna_half_life', 'alpha_p', 'ptr', 'ptr_tissue', 'constant_ptr']
+cp_keys = ['alpha_m', 'alpha_p', 'ptr']
 
 def generate(hgnc_id, psim = params.psim_me, machinery_list = mach.metabolic_machinery, 
                              metabolic_model = params.human_model):
@@ -342,7 +349,7 @@ def generate(hgnc_id, psim = params.psim_me, machinery_list = mach.metabolic_mac
     if type(entries['LOCATION']) == str:
         entries['LOCATION'] = list(entries['LOCATION'].split(']')[0].split('[')[1].split(','))
     
-    cp_values = entries['MRNA_HALF_LIFE'], entries['ALPHA_P'], entries['PTR'], entries['PTR_TISSUE'], entries['CONSTANT_PTR']
+    cp_values = entries['ALPHA_M'], entries['ALPHA_P'], entries['PTR']
 
     gene_info = gene_information(hgnc_id = entries['HGNC_ID'], 
                     premrna_seq = entries['PREMRNA_SEQ'], mrna_seq = entries['MRNA_SEQ'], 
