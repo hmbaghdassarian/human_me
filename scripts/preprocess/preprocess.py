@@ -13,16 +13,16 @@ import os
 def abs_path(path):
     return os.path.join(os.path.abspath(path),'')
 
-def create_environment(input_path, build_path, outdir = None,
+def create_environment(build_path, input_path = None, outdir = None,
                        n_cores = None):
     '''Creates a .env file to work with pydotenv. 
     
     Parameters
     ----------
-    input_path: str
-        "full/path/to/inputs" - see README to download appropriate files
     build_path: str
         "full/path/to/build_dir" - see README to download appropriate files
+    input_path: str, defaults to build path
+        "full/path/to/inputs" - see README to download appropriate files
     outdir: str, defaults to project root
         "path/to/output_dir" - specifies where to store any output files (e.g., corrected M-model)
     n_cores: int
@@ -32,7 +32,9 @@ def create_environment(input_path, build_path, outdir = None,
     the input_path and build_path args must agree with the outputs of that function. 
     '''
     root_path = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__), '../../'))
-
+    
+    if input_path is None:
+        input_path = build_path
     if outdir is None:
         outdir = root_path
     if not os.path.isdir(outdir):

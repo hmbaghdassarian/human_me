@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[3]:
+# In[1]:
 
 
 import pandas as pd 
@@ -14,14 +14,12 @@ sys.path.insert(1, '../../scripts/') # comment out in python script
 from utils.load_environmental_variables import processed_data_path, build_files_path
 
 
-# In[2]:
+# In[3]:
 
 
-bool_dict = {1: True, 0: False, True: True, False: False}
+psim_me = pd.read_hdf(processed_data_path + 'corrected_psim.h5', key = 'corrected')
 
-psim_me = pd.read_csv(processed_data_path + 'corrected_psim_me.csv', index_col = 0) 
-psim_me['SP'] = psim_me['SP'].map(bool_dict)
-psim_me['CONSTANT_PTR'] = psim_me['CONSTANT_PTR'].map(bool_dict)
+psim_me['SP'] = psim_me['SP'].apply(lambda x: bool(x))
 human_model = cobra.io.read_sbml_model(processed_data_path + 'corrected_model.xml')
 
 

@@ -7,6 +7,7 @@
 import cobra
 
 import os
+import gc
 import warnings
 from tqdm import tqdm
 import ast
@@ -89,10 +90,10 @@ def generate_expression_module(me_reactions):
 
 
 class me_builder():
-    def __init__(self, non_machinery = [], compress_mrna = False, unmodeled_protein_frac = 'default', 
+    def __init__(self, compress_mrna = False, unmodeled_protein_frac = 'default', 
                 psim_me = params.psim_me, m_model = params.human_model):
         
-        self.non_machinery = non_machinery
+        self.non_machinery = open(processed_data_path + 'corrected_non_machinery.txt').read().splitlines()
         self.psim_me = psim_me
         self.m_model = m_model
         
@@ -724,28 +725,27 @@ class me_builder():
 # In[4]:
 
 
-def build_me(non_machinery = [], minimal_proteome = False, compress_mrna = False, dummy_protein = False, 
+def build_me(minimal_proteome = False, compress_mrna = False, dummy_protein = False, 
              unmodeled_protein_frac = 'default', model_id = 'HUMAN_ME_MODEL', psim_me = params.psim_me, 
              m_model = params.human_model):
     '''
     Returns a human ME_model. 
     
     Inputs:
-        1) non_machinery: a list of HGNC_IDs of non_machinery proteins
-        2) minimal_proteome: bool; For reactions with OR in the GPR, the builder by default (False) generates a 
+        1) minimal_proteome: bool; For reactions with OR in the GPR, the builder by default (False) generates a 
         separate reaction for each protein complex (False). If True, builder instead will create one reaction, 
         choosing the protein complex with the lowest molecular weight to catalyze the reaction.
-        3) compress_mrna: boolean, whether to merge the 3 transcription, mrna processing, and mrna export to cytosol 
+        2) compress_mrna: boolean, whether to merge the 3 transcription, mrna processing, and mrna export to cytosol 
         reactions into one single reaction
-        4) unmodeled_protein_frac: string = float (0<=val<1); represents the proportion of the protein biomass not 
+        3) unmodeled_protein_frac: string = float (0<=val<1); represents the proportion of the protein biomass not 
         explicitly modeled by the model. If 0 or None, no dummy protein expressed. If string 'default' instead of float, will use default value of 0.88.  
-        5) model_id: string; id for the me model
+        4) model_id: string; id for the me model
 
     
     '''
     start = time.time()
     
-    builder = me_builder(non_machinery = non_machinery, compress_mrna = compress_mrna, 
+    builder = me_builder(compress_mrna = compress_mrna, 
                          unmodeled_protein_frac = unmodeled_protein_frac, psim_me = psim_me, 
                          m_model = m_model)
     builder.express_metabolic_enzymes()
@@ -766,6 +766,12 @@ def build_me(non_machinery = [], minimal_proteome = False, compress_mrna = False
 
 
     return me_model, builder
+
+
+# In[22]:
+
+
+gc.collect()
 
 
 # In[16]:
