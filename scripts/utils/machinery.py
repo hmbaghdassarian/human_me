@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[1]:
+# In[2]:
 
 
 import pandas as pd
@@ -13,7 +13,7 @@ from utils.load_environmental_variables import build_files_path
 from utils.parameters import human_model
 
 
-# In[2]:
+# In[3]:
 
 
 # define necessary variables 
@@ -21,7 +21,7 @@ rs = pd.read_csv(build_files_path + 'machinery/small_ribosomal_protein.csv', ind
 rl = pd.read_csv(build_files_path + 'machinery/large_ribosomal_protein.csv', index_col = None, skiprows = [0])
 
 
-# In[24]:
+# In[4]:
 
 
 # mrna expression
@@ -94,7 +94,7 @@ degradation_rule1 = ' and '.join(deadenylation_machinery + mrna_degradation_mach
 decapping_rule = ' and '.join(deadenylation_machinery + decapping_degradation_machinery)
 
 
-# In[10]:
+# In[5]:
 
 
 #rrna expression
@@ -126,7 +126,7 @@ RAN = ['HGNC:9846']
 XPO1 = ['HGNC:12825']
 
 
-# In[11]:
+# In[6]:
 
 
 # trna expression
@@ -172,7 +172,7 @@ seq_synthetase_map = {
 }
 
 
-# In[12]:
+# In[7]:
 
 
 # cytoplasmic transport
@@ -250,7 +250,7 @@ LONP2 = ['HGNC:20598']
 importins = ['HGNC:6400', 'HGNC:6394']
 
 
-# In[13]:
+# In[8]:
 
 
 # ribosome biogenesis
@@ -265,7 +265,7 @@ eif5 = ['HGNC:3299', 'HGNC:30793']
 eifs = eif1 + eif2 + eif3 + eif4f + eif5 + ['HGNC:8554']
 
 
-# In[14]:
+# In[9]:
 
 
 # secretory pathway
@@ -319,10 +319,10 @@ endocytic_machinery = sorted(set(proteasome_ubiquitin + escrt + eps + clathrin_m
 cathepsins = ['HGNC:2527', 'HGNC:2529', 'HGNC:9251']
 
 
-# In[ ]:
+# In[10]:
 
 
-metabolic_machinery = sorted([g.id for g in human_model.genes]) # not efficient to do this each time
+metabolic_machinery = sorted([g.id for g in human_model.genes]) 
 expression_machinery = sorted(open(build_files_path + 'expression_machinery.txt').read().splitlines())
 all_machinery = sorted(set(metabolic_machinery + expression_machinery))
 

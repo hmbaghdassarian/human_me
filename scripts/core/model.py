@@ -224,6 +224,8 @@ class ME_Model(cobra.Model):
         
         if solver_type == 'qminos':
             self.solver_ = solve_me.qminos_solver(precision = precision)
+            self.solver_type = 'qminos'
+            self.solver_precision = 'quad'
         else:
             raise ValueError('Only the qMINOS solver is currently implemented')
     
@@ -258,6 +260,8 @@ class ME_Model(cobra.Model):
         if self.solver_ is None:
             warnings.warn('Solver is not initialized with ME_Model.intialize_solver, intializing with default parameters')
             self.initialize_solver()
+        else:
+            self.initialize_solver(solver_type = self.solver_type, precision = self.solver_precision)
             
         sln, stat, hs = self.solver_.solve_lp(me_model = self, mu_val = mu_val, objective = objective)
         return sln, stat, hs
@@ -432,7 +436,7 @@ class ME_Model(cobra.Model):
         
         '''
         with open(file, 'wb') as handle:
-            pickle.dump(me_model, handle)
+            pickle.dump(self, handle)
         
   
 

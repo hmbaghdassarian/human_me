@@ -254,6 +254,7 @@ importins = ['HGNC:6400', 'HGNC:6394']
 
 # ribosome biogenesis
 UCHL3 = ['HGNC:12515']
+RMRP = ['HGNC:10031']
 pre40s_rbfs = ['HGNC:25542', 'HGNC:21173', 'HGNC:32790', 'HGNC:29100']
 pre60s_rbfs = ['HGNC:18477', 'HGNC:25789', 'HGNC:19440', 'HGNC:20870', 'HGNC:17083', 'HGNC:4333']
 

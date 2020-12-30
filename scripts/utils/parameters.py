@@ -86,7 +86,7 @@ alpha_p = alpha_p.groupby(alpha_p.HGNC_ID).median().kdeg # have true median stor
 alpha_m = pd.read_csv(build_files_path + 'Gregersen_mrna_turnover_processed.tsv', sep = '\t', index_col = 0)
 alpha_m = alpha_m.groupby(alpha_m.HGNC_ID).median().median_turnover # have true median stored above
 
-turnover = {'alpha_m': alpha_m, 'alpha_p', alpha_p, 
+turnover = {'alpha_m': alpha_m, 'alpha_p': alpha_p, 
            'alpha_m_median': alpha_m_median, 'alpha_p_median': alpha_p_median}
 
 

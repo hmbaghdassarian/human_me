@@ -208,7 +208,7 @@ def correct_model(model = input_data_path + 'recon2_2.xml'):
     
 
 
-# In[6]:
+# In[3]:
 
 
 def check_non_machinery(non_machinery = input_data_path + 'non_machinery.txt'):
@@ -257,7 +257,7 @@ def check_non_machinery(non_machinery = input_data_path + 'non_machinery.txt'):
     return non_machinery, expression_machinery, metabolic_machinery
 
 
-# In[20]:
+# In[4]:
 
 
 def get_status(psim_me):
@@ -463,10 +463,12 @@ def correct_psim(psim_df = input_data_path + 'psim_me.h5', fill_na = 'default',
     if temp.shape[0] > 0:
         psim_me.loc[temp.index, 'LOCATION'] = temp.LOCATION.tolist()
         revised_genes['non-machinery locations'] = temp.HGNC_ID.tolist()
+        
+    # filter out unecessary gene entries
+    psim_me = psim_me.loc[sorted(set(expression_machinery + metabolic_machinery + non_machinery)), :]
     psim_me.reset_index(inplace = True, drop = True)
     
     del psim_gold
-    
     psim_me.to_hdf(processed_data_path + 'corrected_psim.h5', key = 'corrected')
     with open(processed_data_path + 'corrected_non_machinery.txt', 'w'):
         for i in non_machinery:

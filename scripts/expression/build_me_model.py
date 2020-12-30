@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[1]:
+# In[3]:
 
 
 import cobra
@@ -23,7 +23,7 @@ import sys
 sys.path.insert(1, '../../scripts/') # comment out in python script
 with warnings.catch_warnings():
     warnings.simplefilter('ignore')
-    from utils.load_environmental_variables import build_files_path
+    from utils.load_environmental_variables import build_files_path, processed_data_path
     from utils import parameters as params
     from utils import machinery as mach
     
@@ -62,6 +62,7 @@ def get_all_expression_reactions(hgnc_id, ub_args, psim = params.psim_me, machin
             mrna_reactions, mrna_transcript_c, mrna_deg_proxy  = build_mrna.get_mrna_expression_reactions(gene_info, compress_mrna = compress_mrna)
             protein_reactions, protein_metabolites = build_protein.get_protein_expression_reactions(gene_info, mrna_transcript_c, mrna_deg_proxy, 
                                                                                                     ub_args = ub_args)
+            
 
     return mrna_reactions + protein_reactions, protein_metabolites
 
@@ -444,6 +445,10 @@ class me_builder():
             to_drop = df[df.MW_kDa != df.MW_kDa.min()].index.tolist() 
             if df.shape[0] - len(to_drop) == 1:
                 drop_index += to_drop
+            elif df.machinery.unique().shape[0] == df.shape[0]: 
+                # rare case where two different complexes have the same MW
+                # instead of randomly choosing, to have consistent results, just choose the first option that appears
+                drop_index += df.index.tolist()[1:]
             else:
                 raise ValueError('Something went wrong in selecting a complex by lowest molecular weight')
 
@@ -507,11 +512,14 @@ class me_builder():
 
             if not self.complex_df.loc[i, 'is_complex']:
                 enzyme_to_couple = self.id_protein_map[self.complex_df.loc[i, 'machinery']][self.complex_df.loc[i, 'compartment']]
+                alpha_p = enzyme_to_couple.alpha_p
             else:
                 enzyme_to_couple = self.complex_id_metabolite_map[self.complex_df.loc[i, 'complex_id']]
+                alpha_p = np.median([p.alpha_p for p in enzyme_to_couple.decompose_complex() if isinstance(p, Protein)])
+
 
             # add machinery to substrate side
-            c3 = (params.mu + params.alpha_p)/self.complex_df.loc[i, 'keff']
+            c3 = (params.mu + alpha_p)/self.complex_df.loc[i, 'keff']
             enzyme_to_couple.couple(type = 'catalysis', value = -c3)
 
             if not r_.reversibility:
@@ -587,11 +595,12 @@ class me_builder():
 
                 if not self.complex_df.loc[i, 'is_complex']:
                     metabolite_to_add = self.id_protein_map[self.complex_df.loc[i, 'machinery']][self.complex_df.loc[i, 'compartment']]
+                    alpha_p = metabolite_to_add.alpha_p
                 else:
                     metabolite_to_add = self.complex_id_metabolite_map[self.complex_df.loc[i, 'complex_id']]
-
+                    alpha_p = np.median([p.alpha_p for p in metabolite_to_add.decompose_complex() if isinstance(p, Protein)])
                 # add machinery to substrate side
-                c3 = (params.mu + params.alpha_p)/self.complex_df.loc[i, 'keff']
+                c3 = (params.mu + alpha_p)/self.complex_df.loc[i, 'keff']
                 metabolite_to_add.couple(type = 'catalysis', value = -c3)
 
                 if not rxn.reversibility:
@@ -725,29 +734,32 @@ class me_builder():
 # In[4]:
 
 
-def build_me(minimal_proteome = False, compress_mrna = False, dummy_protein = False, 
-             unmodeled_protein_frac = 'default', model_id = 'HUMAN_ME_MODEL', psim_me = params.psim_me, 
-             m_model = params.human_model):
-    '''
-    Returns a human ME_model. 
+def build_me(minimal_proteome = False, compress_mrna = False,
+             unmodeled_protein_frac = 'default', model_id = 'HUMAN_ME_MODEL'):
+    '''Generates a human ME_model. 
     
-    Inputs:
-        1) minimal_proteome: bool; For reactions with OR in the GPR, the builder by default (False) generates a 
+    Parameters
+    ----------
+    minimal_proteome: bool
+        For reactions with OR in the GPR, the builder by default (False) generates a 
         separate reaction for each protein complex (False). If True, builder instead will create one reaction, 
-        choosing the protein complex with the lowest molecular weight to catalyze the reaction.
-        2) compress_mrna: boolean, whether to merge the 3 transcription, mrna processing, and mrna export to cytosol 
-        reactions into one single reaction
-        3) unmodeled_protein_frac: string = float (0<=val<1); represents the proportion of the protein biomass not 
-        explicitly modeled by the model. If 0 or None, no dummy protein expressed. If string 'default' instead of float, will use default value of 0.88.  
-        4) model_id: string; id for the me model
+        choosing the protein complex with the lowest molecular weight to catalyze the reaction. If a reaction
+        has multiple enzyme options with the same molecular weight, will randomly choose one. 
+    compress_mrna: bool
+        If true, will merge the 3 linear mrna reactions--transcription, processing, and nuclear export--for each
+        gene into a single reaction
+    unmodeled_protein_frac: str or float (0<=val<=1)
+        represents the proportion of the protein biomass not explicitly modeled by the ME reactions. If 0 or None, 
+        no dummy protein expressed. If string 'default' instead of float, will use default value of 0.88.  
+    model_id: string; id for the me model
 
     
     '''
     start = time.time()
     
     builder = me_builder(compress_mrna = compress_mrna, 
-                         unmodeled_protein_frac = unmodeled_protein_frac, psim_me = psim_me, 
-                         m_model = m_model)
+                         unmodeled_protein_frac = unmodeled_protein_frac, psim_me = params.psim_me, 
+                         m_model = params.human_model)
     builder.express_metabolic_enzymes()
     builder.express_expression_enzymes()
     builder.express_dummy_protein()
@@ -768,30 +780,27 @@ def build_me(minimal_proteome = False, compress_mrna = False, dummy_protein = Fa
     return me_model, builder
 
 
-# In[22]:
+# In[5]:
 
 
 gc.collect()
 
 
-# In[16]:
+# In[15]:
 
 
-# non_machinery = []
 # minimal_proteome = True
+# compress_mrna = False 
+# unmodeled_protein_frac = None
 # model_id = 'HUMAN_ME_MODEL'
-# compress_mrna = False
-# psim_me = params.psim_me
-# m_model = params.human_model
-# unmodeled_protein_frac = 0.2
 
 
-# In[19]:
+# In[ ]:
 
 
-# builder = me_builder(non_machinery = non_machinery, compress_mrna = compress_mrna, 
-#                      unmodeled_protein_frac = unmodeled_protein_frac, psim_me = psim_me, 
-#                      m_model = m_model)
+# builder = me_builder(compress_mrna = compress_mrna, 
+#                      unmodeled_protein_frac = unmodeled_protein_frac, psim_me = params.psim_me, 
+#                      m_model = params.human_model)
 # builder.express_metabolic_enzymes()
 # builder.express_expression_enzymes()
 # builder.express_dummy_protein()
@@ -800,6 +809,7 @@ gc.collect()
 # builder.get_keff()
 # if minimal_proteome:
 #     builder.minimize_proteome()
+
 # builder.add_metabolic_machinery()
 # builder.add_expression_machinery()
 # builder.deorphan()

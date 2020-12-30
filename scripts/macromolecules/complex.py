@@ -7,6 +7,7 @@
 import cobra
 import itertools
 import uuid
+import numpy as np
 
 import sys
 sys.path.insert(1, '../../scripts/')
@@ -80,6 +81,7 @@ class Complex(Macromolecule):
                                   charge = sum([m.charge*count for m, count in self.components.items()]), 
                               elements = elements)
         
+#         self.add_alpha_p()                         
         self.reaction_id = None # none before running form_complex(); this is used in update_id() method
     
     def update_id(self, new_id = None):
@@ -139,4 +141,8 @@ class Complex(Macromolecule):
                 biomass_by_type[m.type] = count*(m.formula_weight/1000)
 
         return biomass_by_type
+#     def add_alpha_p(self):
+#         self.alpha_p = np.median([p.alpha_p for p in self.decompose_complex() if isinstance(p, Protein)])# and p.alpha_p is not None])
+#         if pd.isna(self.alpha_p):
+#             self.alpha_p = None
 

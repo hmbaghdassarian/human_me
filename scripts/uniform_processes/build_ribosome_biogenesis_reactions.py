@@ -14,7 +14,7 @@ from Bio import SeqIO
 
 import sys
 sys.path.insert(1, '../../scripts/') 
-from utils.load_environmental_variables import raw_data_path
+from utils.load_environmental_variables import build_files_path
 from utils import machinery as mach
 from utils import parameters as params
 from utils import metabolites as metab
@@ -40,16 +40,16 @@ from expression.protein_expression import build_protein_expression_reactions as 
 
 # rrna sequences
 # assume the ncbi 45s is actually 47s...see notes for details
-rrna_47s_seq = SeqIO.read(raw_data_path + '45s_rrna_seq.txt', "fasta").seq.transcribe()
-rrna_18s_seq = SeqIO.read(raw_data_path + '18s_rrna_seq.txt', "fasta").seq.transcribe()
-rrna_28s_seq = SeqIO.read(raw_data_path + '28s_rrna_seq.txt', "fasta").seq.transcribe()
-rrna_5_8s_seq = SeqIO.read(raw_data_path + '5_8s_rrna_seq.txt', "fasta").seq.transcribe()
+rrna_47s_seq = SeqIO.read(build_files_path + '45s_rrna_seq.txt', "fasta").seq.transcribe()
+rrna_18s_seq = SeqIO.read(build_files_path + '18s_rrna_seq.txt', "fasta").seq.transcribe()
+rrna_28s_seq = SeqIO.read(build_files_path + '28s_rrna_seq.txt', "fasta").seq.transcribe()
+rrna_5_8s_seq = SeqIO.read(build_files_path + '5_8s_rrna_seq.txt', "fasta").seq.transcribe()
 ets_5_seq = rrna_47s_seq[:rrna_47s_seq.index(rrna_18s_seq)]
 its_1_seq = rrna_47s_seq[rrna_47s_seq.index(rrna_18s_seq) + len(rrna_18s_seq):rrna_47s_seq.index(rrna_5_8s_seq)]
 its_2_seq = rrna_47s_seq[rrna_47s_seq.index(rrna_5_8s_seq) + len(rrna_5_8s_seq):rrna_47s_seq.index(rrna_28s_seq)]
 ets_3_seq = rrna_47s_seq[rrna_47s_seq.index(rrna_28s_seq) + len(rrna_28s_seq):]
 
-pre_rrna_5s_seq = SeqIO.read(raw_data_path + '5s_rrna_seq.txt', "fasta").seq.transcribe()
+pre_rrna_5s_seq = SeqIO.read(build_files_path + '5s_rrna_seq.txt', "fasta").seq.transcribe()
 rrna_5s_seq = pre_rrna_5s_seq[:120] # 120 is length of mature 5s_rrna
 
 
@@ -160,6 +160,7 @@ def build_ribosome_protein_expression_reactions(ub_args, compress_mrna = False):
 
     protein_folding_cytosolic, folded_protein_c = build_protein.fold_protein_cytosolic(gene_info, 
                                                                                        processed_unfolded_protein_c)
+    folded_protein_c.alpha_p = gene_info.coupling_params['alpha_p']
     nuclear_import, folded_protein_n = build_protein.transport_nuclear_protein(gene_info, folded_protein_c)
     dcp = build_protein.degrade_cytosolic_protein(gene_info, folded_protein_c, ub_args)
     
@@ -273,7 +274,7 @@ def build_other_rrna_reactions(rrna5s_complex_n, rs_protein_metabolites, rl_prot
     rxn[metab.h2o_n] = -1 # endonuclolytic cleavage event at site 2
     rxn[rrna_45s_n], rxn[rrna_30s_n], rxn[rrna_32_5s_n] = -1, 1, 1
     rrna_30s_formation.add_metabolites(rxn)
-    rrna_30s_formation.gene_reaction_rule = mach.RMRP[0]
+    rrna_30s_formation.gene_reaction_rule = '' #mach.RMRP[0]<--disregarded for now bc ribozyme
 
     #26s formation------------------------------------------------------------------------------------
     rrna_26s_seq = ets_5_frag2_seq[A_0_index:] + rrna_18s_seq + its_1_seq[:site_2_index]

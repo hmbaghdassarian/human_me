@@ -74,10 +74,14 @@ class Protein(Macromolecule):
         elements['O'] -= 1*(L_protein-1)
         
         Macromolecule.__init__(self, id = id_, compartment = compartment, charge = charge, elements = elements)
+        
         if not dummy:
             self.type = 'protein'
         else:
             self.type = 'dummy_protein'
+        
+        if gene_info is not None:
+            self.alpha_p =  gene_info.coupling_params['alpha_p']
 
 
 # In[61]:

@@ -11,7 +11,7 @@ import pandas as pd
 
 import sys
 sys.path.insert(1, '../../scripts/') # comment out in python script
-from utils.load_environmental_variables import raw_data_path
+from utils.load_environmental_variables import build_files_path
 from utils import machinery as mach
 from utils import parameters as params
 from utils import metabolites as metab
@@ -98,15 +98,6 @@ class trna_information():
 
 
 # # Reactions
-
-# In[3]:
-
-
-# def update_trna_degradation(trna_degradation_reaction):
-#     trna_degradation_reaction.subsytem = 'tRNA_Biogenesis'
-#     trna_degradation_reaction.gene_reaction_rule = ' and '.join(mach.lariat_machinery['Exosome'])
-#     return trna_degradation_reaction
-
 
 # In[4]:
 
@@ -360,7 +351,7 @@ def get_base_frequency(seq_col, L):
 
     return final_seq
 
-trna_data = pd.read_excel(raw_data_path + 'trna_leaders_and_trailers.xlsx')
+trna_data = pd.read_excel(build_files_path + 'trna_leaders_and_trailers.xlsx')
 trna_data['Mature_Length'] = trna_data['mature seq'].apply(lambda x: len(x))
 
 L_mature = trna_data.Mature_Length.value_counts()[trna_data.Mature_Length.value_counts() == trna_data.Mature_Length.value_counts().max()].index.tolist()[0]

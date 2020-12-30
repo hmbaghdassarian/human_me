@@ -21,7 +21,7 @@ from utils import parameters as params
 from utils import functions as func
 
 
-# In[30]:
+# In[64]:
 
 
 class gene_information():
@@ -51,8 +51,8 @@ class gene_information():
             the mrna sequence (length must be <= premrna_seq)
         protein_seq: str
             the protein sequence (length must be <= mrna_seq/3)
-        machinery_list: list, default to input M_model genes, optional 
-            each entry is the HGNC ID of a protein that should be considered as catalyzing an M_modle reaction
+        machinery_list: list, default to input M_model genes
+            each entry is the HGNC ID of a protein that should be considered as catalyzing an M_model reaction
         ptms: dict, default {}, optional
             keys (str) representing the ptm and values (int) representing the number of that ptms of that kind for 
             that gene. The exception here is gpi, which is binary with 0 for no GPI Anchor and 1 indicating GPI 
@@ -91,7 +91,7 @@ class gene_information():
         
         # current structure assumes that a protein is either machinery (catalyzing a reaction) or
         # a secreted protein (processed through secretory pathway, does not catalyze reaction) but not both
-            
+        
         if hgnc_id in machinery_list: 
             self.module = 'Machinery'
         else:
@@ -134,12 +134,13 @@ class gene_information():
             n_exons = 1  # n_introns is 0 when the sequence lengths are equal         
             
         if len(mrna_seq) < len(protein_seq)*3:
-            warnings.warn(self.hgnc_id + ': The mrna and protein sequence lengths are inconsistent')
+            raise ValueError(self.hgnc_id + ': The mrna and protein sequence lengths are inconsistent')
         
         # complete checks, assign attributes
         self.premrna_seq = Seq(premrna_seq, generic_rna)
         self.mrna_seq = Seq(mrna_seq, generic_rna)
         self.protein_seq = protein_seq
+        self.L_protein = len(self.protein_seq)
         self.amino_acid_counts = {k: self.protein_seq.count(k) for k in params.amino_acids}
         
         remove_ptms = list()
@@ -157,10 +158,8 @@ class gene_information():
         
         if pd.isna(sp) or sp == None:
             self.sp = False 
-        elif type(sp) != bool:
-            raise TypeError(self.hgnc_id + ': SP must be a boolean')
-        else:
-            self.sp = sp
+        else: 
+            self.sp = bool(sp)
         
         if polyA_length == None or pd.isna(polyA_length):
             self.polyA_length = None
@@ -175,6 +174,23 @@ class gene_information():
             self.n_introns = n_exons - 1
         else:
             raise TypeError(self.hgnc_id + ': n_exons must either be an integer >= 1 or None/nan')
+            
+        #         self.n_introns = round(self.n_introns) # must be an integer
+#         if self.n_introns == 0 and len(self.premrna_seq) > len(self.mrna_seq):
+#            self.n_introns = 1
+        # check for mismatch in premrna and mrna seq for sequences with very similar lengths
+        valid_seq = True
+        for nt in ['A', 'U', 'G', 'C']:
+            if self.premrna_seq.count(nt) - self.mrna_seq.count(nt) < 0:
+                warnings.warn('Mismatch between premrna and mrna seq, settting both to mrna seq')
+                valid_seq = False
+                break
+        if not valid_seq:
+            if self.n_introns > 1:
+                raise ValueError('Unexpected behavior')
+            self.premrna_seq = self.mrna_seq
+            self.n_introns = 0
+
 
         self.final_locations = None
         
@@ -217,23 +233,27 @@ class gene_information():
             else:
                 self.coupling_params['ptr'] = params.ptr_median
         #alpha_p and # alpha_m-----------
-        for tp in params.turnover: 
+        for tp in ['alpha_p', 'alpha_m']: 
             if tp not in self.coupling_params:
                 self.coupling_params[tp] = None
             if type(self.coupling_params[tp]) == float or type(self.coupling_params[tp]) == int: # specified params.turnover[tp]
                 if not (self.coupling_params[tp] > 0): #float('nan') will return True as desired
-                    warnings.warn('Invalid alpha_p value provided, will use default instead')
+                    warnings.warn('Invalid ' + tp + ' value provided, will use default instead')
                     self.coupling_params[tp] = None
             if self.coupling_params[tp] is None or pd.isna(self.coupling_params[tp]): # totally unspecified ptr
                 if self.hgnc_id in params.turnover[tp].index.tolist():
-                    self.coupling_params[tp] = params.turnover[tp][hgnc_id]
+                    self.coupling_params[tp] = params.turnover[tp][self.hgnc_id]
                 else:
-                    self.coupling_params[tp] = params.turnover[tp + '__median']
+                    self.coupling_params[tp] = params.turnover[tp + '_median']
 
         # term for mrna_formation (called dilution to change to dilution in future)
         # can't use correct term currently bc a minimal demand is needed on mrna flux
         # otherwise model tries to compensate by generating biomass via rrna reactions, which causes infeasability
-        self.coupling['mrna_formation'] = ((self.coupling_params['alpha_m']) + params.mu)/((self.coupling_params['alpha_p'] + params.mu)*self.coupling_params['ptr'])
+        self.coupling = dict()
+        denom = (self.coupling_params['alpha_p'] + params.mu)*self.coupling_params['ptr']
+        self.coupling['mrna_degradation'] = self.coupling_params['alpha_m']/denom
+        
+        self.coupling['mrna_formation'] = ((self.coupling_params['alpha_m']) + params.mu)/denom
         self.coupling['mrna_dilution'] = self.coupling.pop('mrna_formation')
         # kept all these lines to make it clear (is really a one liner)
 
@@ -241,7 +261,7 @@ class gene_information():
     #         self.coupling['mrna_dilution'] = params.mu/((self.coupling_params['alpha_p'] + params.mu)*self.coupling_params['ptr'])
 
     def get_final_locations(self, metabolic_model = params.human_model, final_locations = None):
-        '''Assigns a set of final compartments for the protein. For machinery, extracts this from the inputer
+        '''Assigns a set of final compartments for the protein. For machinery, extracts this from the inpute
         cobrapy model. For non-machinery, final_locations should be specified by a list of strings
         within the allowable compartments. This method helps define necessary transport reactions.
         
@@ -328,7 +348,7 @@ class gene_information():
         print('No errors raised')
 
 
-# In[ ]:
+# In[3]:
 
 
 ptm_cols = ['DSB', 'GPI', 'NG', 'OG']
@@ -340,10 +360,6 @@ def generate(hgnc_id, psim = params.psim_me, machinery_list = mach.metabolic_mac
     '''Generates gene information object from PSIM'''
     
     idx = psim[psim.HGNC_ID == hgnc_id].index.tolist()
-    if len(idx) == 0:
-        raise ValueError(hgnc_id + ' is not in the PSIM')
-    if len(idx) > 1:
-        warnings.warn('More than one entry of this gene by HGNC ID in PSIM, taking the first')
 
     entries = psim.loc[idx[0],:]
     if type(entries['LOCATION']) == str:
@@ -357,7 +373,7 @@ def generate(hgnc_id, psim = params.psim_me, machinery_list = mach.metabolic_mac
                     machinery_list = machinery_list,
                     ptms = dict(zip(['dsb', 'og', 'gpi'],[entries['DSB'], entries['OG'], entries['GPI']])),
                     tmd = entries['TMD'], sp = entries['SP'], polyA_length = entries['POLYA_LENGTH'], 
-                    n_introns = (entries['N_EXONS'] - 1), 
+                    n_exons = entries['N_EXONS'], 
                     coupling_params = dict(zip(cp_keys, cp_values)))
     gene_info.get_final_locations(metabolic_model = metabolic_model, 
                                   final_locations = entries['LOCATION'])
