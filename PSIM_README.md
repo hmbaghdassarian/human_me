@@ -30,56 +30,56 @@ The PSIM is read into the pipeline using the preprocess.correct_inputs.correct_p
 Columns:
 * HGNC_ID  <sup>0</sup>: The gene ID in HGNC format (HGNC:####). There should be an entry for all genes that are included in the M_Model GPR and in non-machinery. 
     * Datatype: str
-2. PREMRNA_SEQ  <sup>1</sup>: The gene premrna sequence. Requirements include that values can only include 'A', 'C', 'G', 'U', and the sequence length must be >= mrna sequence length.  
-    a. Datatype: string
-    b. Default value: Technically none, but preprocess.correct_inputs.correct_psim will fill incorrect values with the gold-standard PSIM values. Requirements include that values can only include 'A', 'C', 'G', 'U', the sequence length must be <= premrna sequence length, and the sequence length must be >= 3*protein sequence length.  
-3. MRNA_SEQ  <sup>1</sup>: The gene mrna sequence (isoform specific). 
-    a. Datatype: str
-    b. Default value: Technically none, but preprocess.correct_inputs.correct_psim will fill incorrect values with the gold-standard PSIM values. 
-4. PROTEIN_SEQ  <sup>1</sup>: The gene protein sequence (isoform specific). Requirements include values can only include one-letter amino-acid codes and the sequence length <= (mrna sequence length/3)
-    a. Datatype: str
-    b. Default value: Technically none, but preprocess.correct_inputs.correct_psim will fill incorrect values with the gold-standard PSIM values. 
-5. POLYA_LENGTH <sup>3</sup>: The length of the mature mRNA polyA tail. 
-    a. Datatype: int 
-    b. Default value: Randomly draws from a johnsonsu distribution
-6. N_EXONS <sup>3</sup>: The number of exons in the premrna (isoform specific). Use to estimate the number of introns (as # of exons - 1). 
-    a. Datatype: int
-    b. Default value: Estimated as (premrna sequence length)/6700
-7. TMD <sup>4</sup>: The number of transmembrane domains contained in the sequence.
-    a. Datatype: int
-    b. Default value: 0
-8. SP <sup>4</sup>: Whether the protein contains a secretory pathway signal peptide. This option is not currently implemented as all proteins destined for secretory pathway compartments are assumed to have a signal peptide (SP). In the future, this option will be used for non-canonical secretion
-    a. Datatype: bool
-    b. Default value: True for secretory pathway destined proteins, False otherwise
-9. DSB <sup>4</sup>: The number of disulfide bonds in the protein. 
-    a. Datatype: int
-    b. Default value: 0
-10. GPI <sup>4</sup>: Whether a GPI anchor is present in the protein. 0 if not present, 1 otherwise.  
-    a. Datatype: int
-    b. Default value: 0
-11. OG <sup>4</sup>: The number of utilized O-linked glycosylation sites in the protein. 
-    a. Datatype: int
-    b. Default value: 0
-12. NG <sup>4</sup>: The number of utilized N-linked glycosylation sites in the protein. 
-    a. Datatype: int
-    b. Default value: 0
-13. ALPHA_M <sup>3</sup>: The mrna degradation/turnover rate (hrs^-1). Used in calculating coupling constraints.
-    a. Datatype: float
-    b. Default value: 0.06 hrs^-1
-14. ALPHA_P <sup>3</sup>: The protein degradation/turnover rate (hrs^-1). Used in calculating coupling constraints.
-    a. Datatype: float
-    b. Default value: 0.02 hrs^-1
-15. PTR <sup>3</sup>: The protein to rna ratio, as described in https://doi.org/10.15252/msb.20188513. Used in calculating coupling constraints.
-    a. Datatype: float
-    b. Default value: 65163
-16. LOCATION <sup>2</sup>: The final location of the protein. Required for non-machinery, disregarded for machinery (pipeline infers location from the reaction compartments).  
-    a. Datatype: str, on of utils.paramaters.compartments.keys()
+* PREMRNA_SEQ  <sup>1</sup>: The gene premrna sequence. Requirements include that values can only include 'A', 'C', 'G', 'U', and the sequence length must be >= mrna sequence length.  
+    * Datatype: string
+    * Default value: Technically none, but preprocess.correct_inputs.correct_psim will fill incorrect values with the gold-standard PSIM values. Requirements include that values can only include 'A', 'C', 'G', 'U', the sequence length must be <= premrna sequence length, and the sequence length must be >= 3*protein sequence length.  
+* MRNA_SEQ  <sup>1</sup>: The gene mrna sequence (isoform specific). 
+    * Datatype: str
+    * Default value: Technically none, but preprocess.correct_inputs.correct_psim will fill incorrect values with the gold-standard PSIM values. 
+* PROTEIN_SEQ  <sup>1</sup>: The gene protein sequence (isoform specific). Requirements include values can only include one-letter amino-acid codes and the sequence length <= (mrna sequence length/3)
+    * Datatype: str
+    * Default value: Technically none, but preprocess.correct_inputs.correct_psim will fill incorrect values with the gold-standard PSIM values. 
+* POLYA_LENGTH <sup>3</sup>: The length of the mature mRNA polyA tail. 
+    * Datatype: int 
+    * Default value: Randomly draws from a johnsonsu distribution
+* N_EXONS <sup>3</sup>: The number of exons in the premrna (isoform specific). Use to estimate the number of introns (as # of exons - 1). 
+    * Datatype: int
+    * Default value: Estimated as (premrna sequence length)/6700
+* TMD <sup>4</sup>: The number of transmembrane domains contained in the sequence.
+    * Datatype: int
+    * Default value: 0
+* SP <sup>4</sup>: Whether the protein contains a secretory pathway signal peptide. This option is not currently implemented as all proteins destined for secretory pathway compartments are assumed to have a signal peptide (SP). In the future, this option will be used for non-canonical secretion
+    * Datatype: bool
+    * Default value: True for secretory pathway destined proteins, False otherwise
+* DSB <sup>4</sup>: The number of disulfide bonds in the protein. 
+    * Datatype: int
+    * Default value: 0
+* GPI <sup>4</sup>: Whether a GPI anchor is present in the protein. 0 if not present, 1 otherwise.  
+    * Datatype: int
+    * Default value: 0
+* OG <sup>4</sup>: The number of utilized O-linked glycosylation sites in the protein. 
+    * Datatype: int
+    * Default value: 0
+* NG <sup>4</sup>: The number of utilized N-linked glycosylation sites in the protein. 
+    * Datatype: int
+    * Default value: 0
+* ALPHA_M <sup>3</sup>: The mrna degradation/turnover rate (hrs^-1). Used in calculating coupling constraints.
+    * Datatype: float
+    * Default value: 0.06 hrs^-1
+* ALPHA_P <sup>3</sup>: The protein degradation/turnover rate (hrs^-1). Used in calculating coupling constraints.
+    * Datatype: float
+    * Default value: 0.02 hrs^-1
+* PTR <sup>3</sup>: The protein to rna ratio, as described in https://doi.org/10.15252/msb.20188513. Used in calculating coupling constraints.
+    * Datatype: float
+    * Default value: 65163
+* LOCATION <sup>2</sup>: The final location of the protein. Required for non-machinery, disregarded for machinery (pipeline infers location from the reaction compartments).  
+    * Datatype: str, on of utils.paramaters.compartments.keys()
     
 Additional Information in Gold-Standard PSIM:
-17. Machinery <sup>5</sup>: Whether a protein is considered machinery according to the full Recon2.2 ('Metabolic'), the GPRs for expression reactions ('Expression'), both ('Both'), or neither ('Non-Machinery'). 
-18. Source <sup>5</sup>: From which database the isoform sequences were attained. 
-19. Status <sup>5</sup>: 1 for entries that should work with the pipeline, 0 for entries that will cause an error in the pipeline. 
-20. The remaining columns <sup>5</sup> are various IDs for the gene: 'GENE_SYMBOL', 'GeneID', 'ENSG_ID', 'ENST_ID', 'ENSP_ID', 'REFT_ID', 'REFP_ID','UNIPROT_ID'. 
+* Machinery <sup>5</sup>: Whether a protein is considered machinery according to the full Recon2.2 ('Metabolic'), the GPRs for expression reactions ('Expression'), both ('Both'), or neither ('Non-Machinery'). 
+* Source <sup>5</sup>: From which database the isoform sequences were attained. 
+* Status <sup>5</sup>: 1 for entries that should work with the pipeline, 0 for entries that will cause an error in the pipeline. 
+* The remaining columns <sup>5</sup> are various IDs for the gene: 'GENE_SYMBOL', 'GeneID', 'ENSG_ID', 'ENST_ID', 'ENSP_ID', 'REFT_ID', 'REFP_ID','UNIPROT_ID'. 
 
 
 
