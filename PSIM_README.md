@@ -28,8 +28,8 @@ Legend:
 The PSIM is read into the pipeline using the preprocess.correct_inputs.correct_psim function, which will check that all values make sense. If the fill_na argument is set to 'select', all NaN values in the user-provided PSIM are filled with values from the gold-standard PSIM when available, otherwise default. If the fill_na argument is set to 'default', all NaN values are replaced with a default value according to the expression.gene_information.gene_information class. 
 
 Columns:
-1. HGNC_ID  <sup>0</sup>: The gene ID in HGNC format (HGNC:####). There should be an entry for all genes that are included in the M_Model GPR and in non-machinery. 
-    a. Datatype: str
+* HGNC_ID  <sup>0</sup>: The gene ID in HGNC format (HGNC:####). There should be an entry for all genes that are included in the M_Model GPR and in non-machinery. 
+    * Datatype: str
 2. PREMRNA_SEQ  <sup>1</sup>: The gene premrna sequence. Requirements include that values can only include 'A', 'C', 'G', 'U', and the sequence length must be >= mrna sequence length.  
     a. Datatype: string
     b. Default value: Technically none, but preprocess.correct_inputs.correct_psim will fill incorrect values with the gold-standard PSIM values. Requirements include that values can only include 'A', 'C', 'G', 'U', the sequence length must be <= premrna sequence length, and the sequence length must be >= 3*protein sequence length.  
