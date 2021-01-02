@@ -3,10 +3,11 @@
 
 Data Sources
 ------
-We provide a "gold-standard" PSIM (both in the build/ directory and the inputs/ directory with file name "psim_me.h5"). Sources:
-*Sequences were generated form MANE Select, RefSeq Select, and APPRIS. 
-*The number of exons was found using the Ensembl REST API for the specific transcript isoform. 
-*The poly(A)-length was taken from https://doi.org/10.1038/s41592-019-0503-y. 
+We provide a "gold-standard" PSIM (both in the build/ directory and the inputs/ directory with file name "psim_me.h5"). 
+Sources:
+* Sequences were generated form MANE Select, RefSeq Select, and APPRIS. 
+* The number of exons was found using the Ensembl REST API for the specific transcript isoform. 
+* The poly(A)-length was taken from https://doi.org/10.1038/s41592-019-0503-y. 
 * Metadata associated to the secretory pathway was taken from human PSIM specified in  https://doi.org/10.1038/s41467-019-13867-y (https://github.com/LewisLabUCSD/MammalianSecretoryRecon/blob/master/JUPYTER_NOTEBOOKS/RECON2s_python/PSIM_HUMAN.tab)
 * mrna degradation rates were taken from https://doi.org/10.1016/j.molcel.2014.03.017
 * protein degradation rates were taken from https://doi.org/10.1021/pr101183k

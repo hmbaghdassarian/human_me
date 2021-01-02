@@ -87,24 +87,55 @@ six_s_index = 1 #https://www.nature.com/articles/s41594-019-0234-x?draft=collect
 
 
 
-# In[3]:
+# In[35]:
 
 
 psim_rib = params.psim_me.copy()
-def format_location(x):
-    return ['n', 'c']
-psim_rib.LOCATION = psim_rib.LOCATION.apply(lambda x: format_location(x))
-
-
-# In[4]:
-
-
+psim_rib.LOCATION = psim_rib.LOCATION.apply(lambda x: ['n', 'c'])
 exclude = ['POLYUBIQUITINATIONn', 'DEUBIQUITINATIONn', 'DEGRADATIONn']
+
+def cleave_ub(hgnc_id, ub_args, compress_mrna = False):
+    '''Generates reactions specific for ubiquitin-protein fusions. RPL40 and RPS27A have ubiquitin fusions.'''
+    gene_info = gene_information.generate(hgnc_id = hgnc_id, psim = psim_rib, 
+                    machinery_list = list(), metabolic_model = cobra.Model())
+    gene_info.final_locations = {'n': 'Cytosolic Tranport'}
+    gene_info.module = 'Machinery'
+    mrna_expression_reactions, mrna_transcript_c, mrna_deg_proxy = build_mrna.get_mrna_expression_reactions(gene_info, compress_mrna = compress_mrna)
+    translation_elongation_c, unfolded_protein_c = build_protein.c_trln.translate_protein_cytosolic(gene_info, mrna_transcript_c, mrna_deg_proxy)
+
+    # cleaved protein sequence, gene_info object, and cobra.Metabolite
+    processed_seq = gene_info.protein_seq[:gene_info.protein_seq.index(ub_args['single_ubiquitin_sequence'])] + gene_info.protein_seq[gene_info.protein_seq.index(ub_args['single_ubiquitin_sequence']) + len(ub_args['single_ubiquitin_sequence']):]
+    psim_temp = psim_rib.copy()
+    psim_temp.loc[psim_temp[psim_temp.HGNC_ID == hgnc_id].index, 'PROTEIN_SEQ'] = processed_seq
+    gene_info = gene_information.generate(hgnc_id = hgnc_id, psim = psim_temp, 
+                    machinery_list = list(), metabolic_model = cobra.Model())
+    gene_info.final_locations = {'n': 'Cytosolic Tranport'}
+    gene_info.module = 'Machinery'
+    processed_unfolded_protein_c = Protein(id_ = hgnc_id + '_processed_unfolded',compartment = 'c',
+                                    amino_acid_counts = gene_info.amino_acid_counts)
+    ub_cleavage = cobra.Reaction(gene_info.hgnc_id + '_UBIQUITIN_CLEAVAGEc')
+    ub_cleavage.subsytem = 'Protein_Expression'
+    ub_cleavage.add_metabolites({unfolded_protein_c:-1, metab.h2o_c: -1, 
+                                 ub_args['ub_c']: 1, processed_unfolded_protein_c: 1})
+    ub_cleavage.gene_reaction_rule = mach.UCHL3[0]
+
+    protein_folding_cytosolic, folded_protein_c = build_protein.fold_protein_cytosolic(gene_info, 
+                                                                                       processed_unfolded_protein_c)
+    folded_protein_c.alpha_p = gene_info.coupling_params['alpha_p']
+    nuclear_import, folded_protein_n = build_protein.transport_nuclear_protein(gene_info, folded_protein_c)
+    dcp = build_protein.degrade_cytosolic_protein(gene_info, folded_protein_c, ub_args)
+
+    to_add = [translation_elongation_c, ub_cleavage, protein_folding_cytosolic, nuclear_import] + dcp + mrna_expression_reactions
+
+    return to_add, folded_protein_c, folded_protein_n
+
 def build_ribosome_protein_expression_reactions(ub_args, compress_mrna = False):
     '''Reactions associated with transcription and translation of ribosomal proteins'''
     
-    # small ribosome proteins
+    # small ribosome proteins--------------------------------------------------------------------------------
     rs_ids = mach.rs['HGNC ID (gene)'].tolist()
+    RPS27A_HGNC = 'HGNC:10417'
+    rs_ids.remove(RPS27A_HGNC) # RPS27A contains a ubiquitin monomer
     rs_expression_reactions, rs_protein_metabolites = list(), list()
     for i in rs_ids:
         gene_info = gene_information.generate(hgnc_id = i, psim = psim_rib, 
@@ -117,7 +148,7 @@ def build_ribosome_protein_expression_reactions(ub_args, compress_mrna = False):
         rs_expression_reactions += mrna_expression_reactions + protein_expression_reactions
         rs_protein_metabolites += protein_metabolites
     
-    # large ribosome proteins
+    # large ribosome proteins--------------------------------------------------------------------------------
     rl_ids = mach.rl['HGNC ID (gene)'].tolist()
     RPL40_HGNC = 'HGNC:12458'
     rl_ids.remove(RPL40_HGNC) # RPL40 contains a ubiquitin monomer
@@ -132,51 +163,23 @@ def build_ribosome_protein_expression_reactions(ub_args, compress_mrna = False):
         protein_expression_reactions = [r for r in protein_expression_reactions if r.id.split('_')[-1] not in exclude]# no nuclear degradation
         rl_expression_reactions += mrna_expression_reactions + protein_expression_reactions
         rl_protein_metabolites += protein_metabolites
-
-#     #RPS27A ubiquitin-fusion in the future
-    # RPL40-UB FUSION----------------------------------------------------------------------
-    gene_info = gene_information.generate(hgnc_id = RPL40_HGNC, psim = psim_rib, 
-                    machinery_list = list(), metabolic_model = cobra.Model())
-    gene_info.final_locations = {'n': 'Cytosolic Tranport'}
-    gene_info.module = 'Machinery'
-    mrna_expression_reactions, mrna_transcript_c, mrna_deg_proxy = build_mrna.get_mrna_expression_reactions(gene_info, compress_mrna = compress_mrna)
-    translation_elongation_c, unfolded_protein_c = build_protein.c_trln.translate_protein_cytosolic(gene_info, mrna_transcript_c, mrna_deg_proxy)
     
-    # cleaved protein sequence, gene_info object, and cobra.Metabolite
-    processed_seq = gene_info.protein_seq[:gene_info.protein_seq.index(ub_args['single_ubiquitin_sequence'])] + gene_info.protein_seq[gene_info.protein_seq.index(ub_args['single_ubiquitin_sequence']) + len(ub_args['single_ubiquitin_sequence']):]
-    psim_temp = psim_rib.copy()
-    psim_temp.loc[psim_temp[psim_temp.HGNC_ID == RPL40_HGNC].index, 'PROTEIN_SEQ'] = processed_seq
-    gene_info = gene_information.generate(hgnc_id = RPL40_HGNC, psim = psim_temp, 
-                    machinery_list = list(), metabolic_model = cobra.Model())
-    gene_info.final_locations = {'n': 'Cytosolic Tranport'}
-    gene_info.module = 'Machinery'
-    processed_unfolded_protein_c = Protein(id_ = RPL40_HGNC + '_processed_unfolded',compartment = 'c',
-                                    amino_acid_counts = gene_info.amino_acid_counts)
-    ub_cleavage = cobra.Reaction(gene_info.hgnc_id + '_UBIQUITIN_CLEAVAGEc')
-    ub_cleavage.subsytem = 'Protein_Expression'
-    ub_cleavage.add_metabolites({unfolded_protein_c:-1, metab.h2o_c: -1, 
-                                 ub_args['ub_c']: 1, processed_unfolded_protein_c: 1})
-    ub_cleavage.gene_reaction_rule = mach.UCHL3[0]
-
-    protein_folding_cytosolic, folded_protein_c = build_protein.fold_protein_cytosolic(gene_info, 
-                                                                                       processed_unfolded_protein_c)
-    folded_protein_c.alpha_p = gene_info.coupling_params['alpha_p']
-    nuclear_import, folded_protein_n = build_protein.transport_nuclear_protein(gene_info, folded_protein_c)
-    dcp = build_protein.degrade_cytosolic_protein(gene_info, folded_protein_c, ub_args)
-    
-    to_add = [translation_elongation_c, ub_cleavage, protein_folding_cytosolic, nuclear_import] + dcp
-#     for r in to_add:
-#         add_biomass_change(r)
-#         if r.id == 'HGNC:12458_TRANSLATION_ELONGATIONc':
-#             r.add_metabolites({biomass.mrna_: 0}, combine = False)
-
-    rl_expression_reactions += mrna_expression_reactions + to_add
+    # ubiquitin fusions--------------------------------------------------------------------------------------
+    # RPS27A
+    to_add, folded_protein_c, folded_protein_n = cleave_ub(hgnc_id = RPS27A_HGNC, ub_args = ub_args, 
+                                                           compress_mrna = compress_mrna)
+    rs_expression_reactions += to_add
+    rs_protein_metabolites += [folded_protein_c, folded_protein_n]
+    # RPL40
+    to_add, folded_protein_c, folded_protein_n = cleave_ub(hgnc_id = RPL40_HGNC, ub_args = ub_args, 
+                                                           compress_mrna = compress_mrna)
+    rl_expression_reactions += to_add
     rl_protein_metabolites += [folded_protein_c, folded_protein_n] 
 
     return rs_expression_reactions, rs_protein_metabolites, rl_expression_reactions, rl_protein_metabolites
 
 
-# In[5]:
+# In[12]:
 
 
 def build_rrna5s_reactions(rpl5_n, rpl11_n):
@@ -221,7 +224,7 @@ def build_rrna5s_reactions(rpl5_n, rpl11_n):
     return rrna5s_reactions, rrna5s_complex_n, rrna5s_c
 
 
-# In[6]:
+# In[13]:
 
 
 # ets_5_frag1 is from 5' end of 47s to A' site
@@ -582,7 +585,7 @@ def build_other_rrna_reactions(rrna5s_complex_n, rs_protein_metabolites, rl_prot
     return all_reactions, mature_ribosomal_precomplexes, mature_rrna_metabolites
 
 
-# In[7]:
+# In[14]:
 
 
 def build_ribosome(ub_args, compress_mrna = False):
@@ -618,4 +621,10 @@ def build_ribosome(ub_args, compress_mrna = False):
         r.subsystem = 'Ribosome_Biogenesis'
 
     return  all_reactions, ribosome_complex_c
+
+
+# In[ ]:
+
+
+
 
