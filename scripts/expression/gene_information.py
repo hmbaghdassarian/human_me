@@ -187,7 +187,7 @@ class gene_information():
                 break
         if not valid_seq:
             if self.n_introns > 1:
-                raise ValueError('Unexpected behavior')
+                raise ValueError('Internal: Unexpected behavior')
             self.premrna_seq = self.mrna_seq
             self.n_introns = 0
 
@@ -255,13 +255,18 @@ class gene_information():
         
         self.coupling['mrna_formation'] = ((self.coupling_params['alpha_m']) + params.mu)/denom
         self.coupling['mrna_dilution'] = self.coupling.pop('mrna_formation')
+        for k,v in self.coupling.items():
+            if v.subs(params.mu, 1) <= 0:
+                raise ValueError('The coupling constraint "' + k + '" must be positive for gene ' + self.hgnc_id)
         # kept all these lines to make it clear (is really a one liner)
 
         # correct term for dilution:
-    #         self.coupling['mrna_dilution'] = params.mu/((self.coupling_params['alpha_p'] + params.mu)*self.coupling_params['ptr'])
+#         self.coupling['mrna_dilution'] = params.mu/denom
+
+        
 
     def get_final_locations(self, metabolic_model = params.human_model, final_locations = None):
-        '''Assigns a set of final compartments for the protein. For machinery, extracts this from the inpute
+        '''Assigns a set of final compartments for the protein. For machinery, extracts this from the input
         cobrapy model. For non-machinery, final_locations should be specified by a list of strings
         within the allowable compartments. This method helps define necessary transport reactions.
         

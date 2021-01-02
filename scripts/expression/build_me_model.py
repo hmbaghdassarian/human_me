@@ -520,6 +520,8 @@ class me_builder():
 
             # add machinery to substrate side
             c3 = (params.mu + alpha_p)/self.complex_df.loc[i, 'keff']
+            if c3.subs(params.mu, 1) <= 0:
+                raise ValueError('The catalysis coupling constraint is negative for ' + enzyme_to_couple.id)
             enzyme_to_couple.couple(type = 'catalysis', value = -c3)
 
             if not r_.reversibility:
@@ -594,25 +596,27 @@ class me_builder():
                 r.gene_reaction_rule = rxn_me.gene_reaction_rule
 
                 if not self.complex_df.loc[i, 'is_complex']:
-                    metabolite_to_add = self.id_protein_map[self.complex_df.loc[i, 'machinery']][self.complex_df.loc[i, 'compartment']]
-                    alpha_p = metabolite_to_add.alpha_p
+                    enzyme_to_couple = self.id_protein_map[self.complex_df.loc[i, 'machinery']][self.complex_df.loc[i, 'compartment']]
+                    alpha_p = enzyme_to_couple.alpha_p
                 else:
-                    metabolite_to_add = self.complex_id_metabolite_map[self.complex_df.loc[i, 'complex_id']]
-                    alpha_p = np.median([p.alpha_p for p in metabolite_to_add.decompose_complex() if isinstance(p, Protein)])
+                    enzyme_to_couple = self.complex_id_metabolite_map[self.complex_df.loc[i, 'complex_id']]
+                    alpha_p = np.median([p.alpha_p for p in enzyme_to_couple.decompose_complex() if isinstance(p, Protein)])
                 # add machinery to substrate side
                 c3 = (params.mu + alpha_p)/self.complex_df.loc[i, 'keff']
-                metabolite_to_add.couple(type = 'catalysis', value = -c3)
+                if c3.subs(params.mu, 1) <= 0:
+                    raise ValueError('The catalysis coupling constraint is negative for ' + enzyme_to_couple.id)
+                enzyme_to_couple.couple(type = 'catalysis', value = -c3)
 
                 if not rxn.reversibility:
-                    r.couple(metabolites = metabolite_to_add, types = 'catalysis')
+                    r.couple(metabolites = enzyme_to_couple, types = 'catalysis')
                     reactions = [r]
                 else: # add a forward and reverse reaction for reversible reactions
                     r_f,r_r = r.copy(), r.copy()
                     r_f.lower_bound, r_r.lower_bound, r_r.upper_bound = 0,0, abs(r.lower_bound)
                     r_r.add_metabolites({metab: -coeff for metab, coeff in r_r.metabolites.items()}, combine = False)
 
-                    r_f.couple(metabolites = metabolite_to_add, types = 'catalysis')
-                    r_r.couple(metabolites = metabolite_to_add, types = 'catalysis')
+                    r_f.couple(metabolites = enzyme_to_couple, types = 'catalysis')
+                    r_r.couple(metabolites = enzyme_to_couple, types = 'catalysis')
                     
                     r_f.id, r_r.id = r_f.id + '_F', r_r.id + '_R'
                     reactions = [r_f, r_r]
