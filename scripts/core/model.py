@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[2]:
+# In[1]:
 
 
 import pickle
@@ -9,8 +9,7 @@ import os
 
 import cobra
 from cobra.core.dictlist import DictList
-from cobra.util.context import get_context
-from six import iteritems
+from six import iteritems, string_types
 
 import sympy
 from sympy import lambdify
@@ -31,10 +30,11 @@ from core.reaction import ME_Reaction
 from me_solver import solve_me
 
 
-# In[2]:
+# In[87]:
 
 
 class ME_Model(cobra.Model):
+# rewritten methods------------------------------------------------------------------------------------------------
     def __init__(self,  m_model, id_or_model, name = None):
         '''
         A simple object with an identifier
@@ -76,8 +76,6 @@ class ME_Model(cobra.Model):
         Reactions with identifiers identical to a reaction already in the
         model are ignored.
 
-        The change is reverted upon exit when using the model as a context.
-
         Parameters
         ----------
         reaction_list : list
@@ -93,9 +91,7 @@ class ME_Model(cobra.Model):
         # First check whether the reactions exist in the model.
         pruned = DictList(filter(existing_filter, reaction_list))
 
-        context = get_context(self)
-
-                # Add reactions. Also take care of genes and metabolites in the loop.
+        # Add reactions. Also take care of genes and metabolites in the loop.
         for reaction in pruned:
             reaction._model = self
             # Build a `list()` because the dict will be modified in the loop.
@@ -112,33 +108,23 @@ class ME_Model(cobra.Model):
                         metabolite.id)
                     reaction._metabolites[model_metabolite] = stoichiometry
                     model_metabolite._reaction.add(reaction)
-                    if context:
-                        context(partial(
-                            model_metabolite._reaction.remove, reaction))
-        for gene in list(reaction._genes):
-            # If the gene is not in the model, add it
-            if not self.genes.has_id(gene.id):
-                self.genes += [gene]
-                gene._model = self
+            
+            for gene in list(reaction._genes):
+                # If the gene is not in the model, add it
+                if not self.genes.has_id(gene.id):
+                    self.genes += [gene]
+                    gene._model = self
 
-                if context:
-                    # Remove the gene later
-                    context(partial(self.genes.__isub__, [gene]))
-                    context(partial(setattr, gene, '_model', None))
-
-            # Otherwise, make the gene point to the one in the model
-            else:
-                model_gene = self.genes.get_by_id(gene.id)
-                if model_gene is not gene:
-                    reaction._dissociate_gene(gene)
-                    reaction._associate_gene(model_gene)
+                # Otherwise, make the gene point to the one in the model
+                else:
+                    model_gene = self.genes.get_by_id(gene.id)
+                    if model_gene is not gene:
+                        reaction._dissociate_gene(gene)
+                        reaction._associate_gene(model_gene)
 
         self.reactions += pruned
 
-        if context:
-            context(partial(self.reactions.__isub__, pruned))
-        
-        
+      
         # make sure index and metabolite/list order are the same
         for idx, r_id in enumerate(self.reactions):
             if idx != self.reactions.index(r_id):
@@ -147,6 +133,60 @@ class ME_Model(cobra.Model):
         for idx, m_id in enumerate(self.metabolites):
             if idx != self.metabolites.index(m_id):
                 raise ValueError('Indexing should be changed')
+        
+        self._clean_metabolites()
+    
+    def remove_reactions(self, reactions, remove_orphans=True):
+        """Remove reactions from the model.
+
+        Parameters
+        ----------
+        reactions : list
+            A list with reactions (`cobra.Reaction`), or their id's, to remove
+
+        remove_orphans : bool, default True
+            Remove orphaned genes and metabolites from the model as well
+
+        """
+        if isinstance(reactions, string_types) or hasattr(reactions, "id"):
+            warnings.warn("need to pass in a list")
+            reactions = [reactions]
+
+        for reaction in reactions:
+            # Make sure the reaction is in the model
+            try:
+                reaction = self.reactions[self.reactions.index(reaction)]
+            except ValueError:
+                warnings.warn(reaction.id + 'not in model')
+
+            else:
+                self.reactions.remove(reaction)
+                reaction._model = None
+
+                for met in reaction._metabolites:
+                    if reaction in met._reaction:
+                        met._reaction.remove(reaction)
+                        if remove_orphans and len(met._reaction) == 0:
+                            self.remove_metabolites(met)
+
+                for gene in reaction._genes:
+                    if reaction in gene._reaction:
+                        gene._reaction.remove(reaction)
+                        if remove_orphans and len(gene._reaction) == 0:
+                            self.genes.remove(gene)
+
+                # remove reference to the reaction in all groups
+                associated_groups = self.get_associated_groups(reaction)
+                for group in associated_groups:
+                    group.remove_members(reaction)
+# new methods------------------------------------------------------------------------------------------------                    
+    def _clean_metabolites(self):
+        '''Remove reactions assigned to metabolites which are not in the model'''
+        for m in self.metabolites:
+            for r in m.reactions:
+                if r not in self.reactions:
+                    m._reaction.remove(r)
+                    
     def create_stoichiometric_matrix(self, array_type = 'numpy', mu_val = None, inplace = True):
 
         """
@@ -437,6 +477,6 @@ class ME_Model(cobra.Model):
         '''
         with open(file, 'wb') as handle:
             pickle.dump(self, handle)
-        
-  
+    
+    
 
