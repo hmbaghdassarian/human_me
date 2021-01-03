@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[3]:
+# In[1]:
 
 
 import cobra
@@ -115,6 +115,7 @@ class me_builder():
                 self.unmodeled_protein_frac = unmodeled_protein_frac
             else:
                 raise ValueError('Unmodeled protein fraction must be a value in the range [0,1)')
+        
         self.deorphaned = None
         self.orphan = None
         
@@ -259,7 +260,6 @@ class me_builder():
                         m.type = 'dummy_protein'
                         
             self.dummy_protein = {'protein_metabolite': dm[0], 'dummy_expression_reactions': dummy_reactions}
-            self.dummy_protein['alpha_p'] = dummy_psim['ALPHA_P'][0] if not pd.isna(dummy_psim['ALPHA_P'][0]) else params.alpha_p
             self.me_reactions += self.dummy_protein['dummy_expression_reactions']
             
         else:
@@ -505,7 +505,7 @@ class me_builder():
                             id = r_.id, name = r_.name, subsystem = r_.subsystem, lower_bound = r_.lower_bound, 
                             upper_bound = r_.upper_bound, 
                                 cobra_id = r_.id)
-            r.add_metabolites(r_.metabolites)
+            r.add_metabolites(r_.metabolites, combine = False)
             r.gene_reaction_rule = r_.gene_reaction_rule
 
             metabolites = r.metabolites.copy() # original reaction metabolites
@@ -576,13 +576,13 @@ class me_builder():
                 rxn_me = ME_Reaction(type_ = ['catalysis'], 
                                 id = rxn.id, name = rxn.name, subsystem = rxn.subsystem, lower_bound = rxn.lower_bound, 
                                 upper_bound = rxn.upper_bound)
-                rxn_me.add_metabolites(rxn.metabolites)
+                rxn_me.add_metabolites(rxn.metabolites, combine = False)
                 rxn_me.gene_reaction_rule = rxn.gene_reaction_rule
             else: # translation reactions
                 rxn_me = ME_Reaction(type_ = rxn.type + ['catalysis'], 
                                 id = rxn.id, name = rxn.name, subsystem = rxn.subsystem, lower_bound = rxn.lower_bound, 
                                 upper_bound = rxn.upper_bound)
-                rxn_me.add_metabolites(rxn.metabolites)
+                rxn_me.add_metabolites(rxn.metabolites, combine = False)
                 rxn_me.coupled_metabolites = rxn.coupled_metabolites
                 rxn_me.gene_reaction_rule = rxn.gene_reaction_rule
 
@@ -591,7 +591,7 @@ class me_builder():
                 r = ME_Reaction(type_ = rxn_me.type,id = rxn_me.id, name = rxn_me.name, 
                                 subsystem = rxn_me.subsystem, lower_bound = rxn_me.lower_bound, 
                                 upper_bound = rxn_me.upper_bound)
-                r.add_metabolites(rxn_me.metabolites)
+                r.add_metabolites(rxn_me.metabolites, combine = False)
                 r.coupled_metabolites = rxn_me.coupled_metabolites
                 r.gene_reaction_rule = rxn_me.gene_reaction_rule
 
@@ -660,7 +660,23 @@ class me_builder():
             enzymeless_reactions += [r for r in self.me_reactions if len(r.genes) == 0]
             if exclude is None:
                 # metabolic module enzymes to exclude
-                self.orphan = [r.id for r in self.m_model.exchanges + self.m_model.demands]
+                self.orphan = [r.id for r in self.m_model.exchanges + self.m_model.demands if len(r.genes) == 0]
+                orphan = [] 
+                for r_id in self.orphan: # secondary exchange reactions
+                    r = self.m_model.reactions.get_by_id(r_id)
+                    if len(r.metabolites) > 1 or list(r.metabolites)[0].compartment != 'b':
+                        raise ValueError('Incorrectly formatted exchange reaction: ' + r.id + '. Must follow Recon2.2 format.')
+
+                    assoc_rxn = list(list(r.metabolites)[0].reactions)
+                    assoc_rxn.remove(r)
+                    if len(assoc_rxn) > 0:
+                        for r_ in assoc_rxn: # id the second exchange reaction (Recon2.2 format)
+                            cond1 = (sorted(r_.compartments) == ['b', 'e'])
+                            cond2 = (len(set(['_'.join(m.id.split('_')[:-1]) for m in list(r_.metabolites)])) == 1)
+                            cond3 = (len(r_.genes) == 0)
+                            if cond1 and cond2 and cond3 :
+                                orphan.append(r_.id)
+                self.orphan += orphan
                 # expression module enzymes to exclude
                 expression_rids = ['CYTOSOLIC_PROTEIN_FOLDING', 'IMPORTtn', 'COMPLEX_FORMATION', 
                               'RIBOSOME_COMPLEX_DISSOCIATIONc', 'UNFOLDr', 'biomass_to_biomass', 
@@ -670,21 +686,26 @@ class me_builder():
                     self.orphan += [r.id for r in rc if er in r.id]
             else:
                 self.orphan = exclude 
-            
+
             self.orphan = sorted(set(self.orphan))
             deorphan = [r for r in enzymeless_reactions if r.id not in self.orphan]
             self.deorphaned = list()
 
             if len(deorphan) > 0:
-                c3 = (params.mu + self.dummy_protein['alpha_p'])/self.dummy_protein['keff']
+                c3 = (params.mu + self.dummy_protein['protein_metabolite'].alpha_p)/self.dummy_protein['keff']
                 self.dummy_protein['protein_metabolite'].couple(type = 'catalysis', value = -c3)
-
+                
+                metabolic_ids = [r.id for r in self.m_model.reactions]
                 for r_ in deorphan:
+                    if r_.id in metabolic_ids:
+                        cid = r_.id
+                    else:
+                        cid = None
                     r = ME_Reaction(type_ = ['catalysis'], 
                                     id = r_.id, name = r_.name, subsystem = r_.subsystem, lower_bound = r_.lower_bound, 
                                     upper_bound = r_.upper_bound, 
-                                        cobra_id = r_.id)
-                    r.add_metabolites(r_.metabolites)
+                                        cobra_id = cid)
+                    r.add_metabolites(r_.metabolites, combine = False)
                     r.gene_reaction_rule = r_.gene_reaction_rule
                     metabolites = r.metabolites.copy() # original reaction metabolites
 
@@ -790,16 +811,16 @@ def build_me(minimal_proteome = False, compress_mrna = False,
 gc.collect()
 
 
-# In[15]:
+# In[6]:
 
 
 # minimal_proteome = True
 # compress_mrna = False 
-# unmodeled_protein_frac = None
+# unmodeled_protein_frac = 0.1
 # model_id = 'HUMAN_ME_MODEL'
 
 
-# In[ ]:
+# In[7]:
 
 
 # builder = me_builder(compress_mrna = compress_mrna, 
@@ -818,4 +839,22 @@ gc.collect()
 # builder.add_expression_machinery()
 # builder.deorphan()
 # me_model = builder.build_me_model(model_id = model_id)
+
+
+# In[ ]:
+
+
+# sln, stat, _ = me_model.solve_lp(mu_val = 1e-9)
+
+
+# In[ ]:
+
+
+
+
+
+# In[ ]:
+
+
+
 

@@ -5,6 +5,7 @@
 
 
 import pandas as pd
+import numpy as np
 import itertools
 
 import os
@@ -94,7 +95,7 @@ def hydrolyze_atp(rxn, n_atp, compartment):
     return rxn
 
 
-# In[ ]:
+# In[5]:
 
 
 def get_base_counts_and_elements(seq, triphosphate = True):
@@ -134,25 +135,50 @@ def get_base_counts_and_elements(seq, triphosphate = True):
     return base_counts, elements
 
 
-# In[12]:
+# In[6]:
 
 
 def parse_me_reaction_id(x):
+    '''Get HGNC ID associated with an expression module reaction
+    
+    Parameters
+    ----------
+    x: str
+        cobra.Reaction.id
+    
+    Returns
+    ----------
+    parsed x: str
+        HGNC ID
+    '''
+    
+    
     if 'HGNC' in x.split('_')[0]:
         return '_'.join(x.split('_')[1:])
     else:
         return x
 
 
-# In[14]:
+# In[7]:
 
 
 def SASA(mw):
-    '''Estimate the protein solvent-accessible surface area from the molecular weight'''
+    '''Estimate the protein solvent-accessible surface area from the molecular weight
+    
+    Parameters
+    ----------
+    mw: float
+        protein molecular weight (in kDa)
+    
+    Returns
+    ----------
+    SASA: float
+        approximate protein solvent accesible surface area
+    '''
     return mw**(0.75)
 
 
-# In[ ]:
+# In[9]:
 
 
 def average_protein_features(psim_me, protein_ids, context_specific = True):
@@ -165,12 +191,14 @@ def average_protein_features(psim_me, protein_ids, context_specific = True):
         protein specific information matrix, same as corrected input file (see preprocessing output)
     protein_ids: list
         each entry is a string protein HGNC ID, the list should include all proteins included in the ME Model
+    context_specific: bool, default True
+        whether to use the use provided input M-model and PSIM, or get an average dummy representative of the whole proteome
 
 
     Returns
     ----------
     dummy_psim: pd.DataFrame
-        same as PSIM but with one row, representing the average features of all proteins in the model
+        same as PSIM but with one row, representing the average features of all proteins 
     '''
     if context_specific:
         psim = psim_me.copy()
@@ -221,22 +249,31 @@ def average_protein_features(psim_me, protein_ids, context_specific = True):
     for aa in params.amino_acids:
         protein_seq += aa*int(round(protein_avg_prop[aa]*protein_L))
 
-    median_vals = ['POLYA_LENGTH', 'N_INTRONS', 'MRNA_HALF_LIFE', 'ALPHA_P', 'PTR']
-    max_arg = ['PTR_TISSUE', 'CONSTANT_PTR']
-
     dummy_psim = pd.DataFrame(columns = psim.columns)
-    dummy_psim.loc[0,:] = ['HGNC:DUMMY', premrna_seq, mrna_seq, protein_seq] + [float('nan')]*(dummy_psim.shape[1] - 4)
+    dummy_psim.loc[0,:] = float('nan')
+    dummy_psim.loc[0,['HGNC_ID', 'PREMRNA_SEQ', 'MRNA_SEQ', 'PROTEIN_SEQ']] = ['HGNC:DUMMY', premrna_seq, mrna_seq, protein_seq] 
     dummy_psim.LOCATION = ['[c]']
-
+    
+    # secretory args will be disregarded anyways for now
+    median_vals = ['POLYA_LENGTH', 'N_EXONS', 'ALPHA_M', 'ALPHA_P', 'TMD', 'DSB', 'OG', 'NG']
     for col in median_vals:
         dummy_psim[col] = psim[col].median()
-
-    for col in max_arg:
-        vc = pd.value_counts(psim[col].fillna('nan').values.flatten())
-        replace_val = vc[vc == vc.max()].index[0]
-        if replace_val == 'nan':
-            dummy_psim[col] = float('nan')
+        
+    
+    argmax_vals = ['SP', 'GPI']
+    
+    # deal with PTR column
+    if psim.PTR.dropna().convert_dtypes().dtype is np.dtype('float64'):
+        dummy_psim.PTR = psim.PTR.median()
+    elif isinstance(psim.PTR.dropna().convert_dtypes().dtype, pd.StringDtype):
+        argmax_vals += ['PTR']
+    
+    for col in argmax_vals:
+        if psim[col].dropna().shape[0] > 0:
+            val = psim[col].dropna().value_counts().idxmax()
         else:
-            dummy_psim[col] = replace_val
+            val = float('nan')
+        dummy_psim[col] = val    
+        
     return dummy_psim
 

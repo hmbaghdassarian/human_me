@@ -30,12 +30,12 @@ from core.reaction import ME_Reaction
 from me_solver import solve_me
 
 
-# In[87]:
+# In[99]:
 
 
 class ME_Model(cobra.Model):
 # rewritten methods------------------------------------------------------------------------------------------------
-    def __init__(self,  m_model, id_or_model, name = None):
+    def __init__(self,  id_or_model, name = None, m_model = None):
         '''
         A simple object with an identifier
     
@@ -63,7 +63,11 @@ class ME_Model(cobra.Model):
         '''
         
         super().__init__(id_or_model, name)
-        self.m_model = m_model.copy()
+        if m_model is not None:
+            if type(m_model) == cobra.Model:
+                self.m_model = m_model.copy()
+            else:
+                raise ValueError('m_model must be None or a cobra.Model')
         self.S = None
         self.solver_ = None
         self.orphan = None
