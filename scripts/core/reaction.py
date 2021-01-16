@@ -48,11 +48,20 @@ class ME_Reaction(cobra.Reaction):
         self.coupled_metabolites = None
     
     def _couple(self, metabolite, type):
-        '''Add coupling coefficient and associated metadata to reaction for a coupled metabolite'''
+        '''Add coupling coefficient and associated metadata to reaction for a coupled metabolite
+        
+        Parameters
+        ----------
+        metabolite: macromolecules.macromolecule.Macromolecule
+            a macromolecule with an associated coupling coefficient
+        type: str
+            the type of reactions that are being coupled (one of ['mrna_degradation', 'mrna_formation', 'catalysis'])
+        
+        '''
         
         if metabolite.coupling_coefficient is None:
             raise ValueError('Cannot add coupling metadata to reaction for a metabolite without coupling coefficient metadata')
-        if type not in metabolite.coupling_coefficient:
+        if type not in metabolite.coupling_coefficient: # this also checks correct coupling types defined
             raise ValueError('Incorrect coupling coefficient type specified for this metabolite')
 
         if self.coupled_metabolites is None:
@@ -63,12 +72,23 @@ class ME_Reaction(cobra.Reaction):
         self.add_metabolites({metabolite: metabolite.coupling_coefficient[type]}, combine = True)
     
     def couple(self, metabolites, types):
-        '''Add coupling coefficient and associated metadata to reaction for a coupled metabolite or list of coupled metabolites'''
+        '''Add coupling coefficient and associated metadata to reaction for a coupled metabolites
+        
+        Parameters
+        ----------
+        metabolite: macromolecules.macromolecule.Macromolecule or list 
+            list of macromolecules or single macromolecule with associated coupling coefficients
+        type: str or list
+            the type of reactions that are being coupled (options: ['mrna_degradation', 'mrna_formation', 'catalysis'])
+        
+        '''
+
         if isinstance(metabolites, list):
             for metabolite, type in dict(zip(metabolites,types)).items():
                 self._couple(metabolite,type)
         else:
             self._couple(metabolites,types)
+        
             
     def check_me_bounds(self, lb, ub):
         if self.type == ['biomass']:

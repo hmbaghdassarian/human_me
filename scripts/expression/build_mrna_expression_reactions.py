@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[5]:
+# In[1]:
 
 
 import cobra
@@ -28,14 +28,14 @@ from macromolecules.RNA import RNA_fragment, pre_mRNA, mRNA
 from macromolecules.macromolecule import Macromolecule
 
 
-# In[11]:
+# In[2]:
 
 
 class express_mrna():
     def __init__(self, gene_info):
-        self.gene_info = gene_info
         self.reactions = []
         self.lariat = None
+        self.gene_info = gene_info
     
     def transcribe_premrna(self):
         # elongation reaction
@@ -89,7 +89,8 @@ class express_mrna():
         rxn[self.mrna_n] = 1
 
         # splicing
-        if self.gene_info.n_introns > 0: #self.premrna.length > self.mrna_n.length - self.polyA_length: 
+#         if self.premrna.length > self.mrna_n.length - self.polyA_length: 
+        if self.gene_info.n_introns > 0: 
             lariat_seq = ''
             for nt in ['A', 'U', 'G', 'C']:
 
@@ -239,10 +240,9 @@ class express_mrna():
     def add_subsystem(self):
         for r in self.reactions:
             r.subsytem = 'mRNA_expression'
-#             add_biomass_change(r)
 
 
-# In[7]:
+# In[3]:
 
 
 def get_mrna_expression_reactions(gene_info, compress_mrna = False):

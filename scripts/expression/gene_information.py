@@ -44,7 +44,7 @@ class gene_information():
         Parameters
         ----------
         hgnc_id: str
-            gene HGNC ID in the format HGNC: #### 
+            gene HGNC ID in the format HGNC:#### 
         premrna_seq: str
             the premrna sequence
         mrna_seq: str
@@ -246,24 +246,15 @@ class gene_information():
                 else:
                     self.coupling_params[tp] = params.turnover[tp + '_median']
 
-        # term for mrna_formation (called dilution to change to dilution in future)
-        # can't use correct term currently bc a minimal demand is needed on mrna flux
-        # otherwise model tries to compensate by generating biomass via rrna reactions, which causes infeasability
         self.coupling = dict()
         denom = (self.coupling_params['alpha_p'] + params.mu)*self.coupling_params['ptr']
         self.coupling['mrna_degradation'] = self.coupling_params['alpha_m']/denom
-        
         self.coupling['mrna_formation'] = ((self.coupling_params['alpha_m']) + params.mu)/denom
-        self.coupling['mrna_dilution'] = self.coupling.pop('mrna_formation')
+#         self.coupling['mrna_dilution'] = params.mu/denom
+
         for k,v in self.coupling.items():
             if v.subs(params.mu, 1) <= 0:
                 raise ValueError('The coupling constraint "' + k + '" must be positive for gene ' + self.hgnc_id)
-        # kept all these lines to make it clear (is really a one liner)
-
-        # correct term for dilution:
-#         self.coupling['mrna_dilution'] = params.mu/denom
-
-        
 
     def get_final_locations(self, metabolic_model = params.human_model, final_locations = None):
         '''Assigns a set of final compartments for the protein. For machinery, extracts this from the input
@@ -330,7 +321,7 @@ class gene_information():
         if len(set(self.final_locations.values())) > 1:
             if len(set(self.final_locations.values())) == 2:
                 self.coupling['mrna_degradation'] = 0.5*self.coupling['mrna_degradation']
-                self.coupling['mrna_dilution'] = 0.5*self.coupling['mrna_dilution']
+                self.coupling['mrna_formation'] = 0.5*self.coupling['mrna_formation']
             else:
                 raise ValueError('Have not yet accounted for Non-Canonical Secretion or other synthesis forms in coupling of mrna degradataion to protein synthesis')
 

@@ -25,7 +25,7 @@ def translate_protein_cytosolic(gene_info, mrna_transcript_c, mrna_deg_proxy):
 
     # peptide bond formation: https://d1j63owfs0b5j3.cloudfront.net/pop-quiz/answerImage/Amino-Acid-1-popquiz.png
     # tRNA amino acide release: https://rnajournal.cshlp.org/content/14/8/1526/F1.expansion.html
-
+    
     rxn = dict()
     for aa_code, aa_count in gene_info.amino_acid_counts.items():
         rxn[charged_trna_map[aa_code]] = -aa_count # tRNA consumption
@@ -55,9 +55,9 @@ def translate_protein_cytosolic(gene_info, mrna_transcript_c, mrna_deg_proxy):
     translation_elongation.add_metabolites(rxn)
     #coupling
     mrna_deg_proxy.couple(type = 'mrna_degradation', value = -gene_info.coupling['mrna_degradation'])
-    mrna_transcript_c.couple(type = 'mrna_dilution', value = -gene_info.coupling['mrna_dilution'])
+    mrna_transcript_c.couple(type = 'mrna_formation', value = -gene_info.coupling['mrna_formation'])
     translation_elongation.couple(metabolites = [mrna_deg_proxy, mrna_transcript_c], 
-                                 types = ['mrna_degradation', 'mrna_dilution'])
+                                 types = ['mrna_degradation', 'mrna_formation'])
 
 
     return translation_elongation, unfolded_protein_c

@@ -50,17 +50,22 @@ class Macromolecule(cobra.Metabolite):
     
     def couple(self, type, value):
         '''
-        Input:
-            type: a string, one of ['catalysis', 'mrna_degradation', 'mrna_dilution']
-            value: The coupling coefficient value (sympy.Expr or float)
-            combine: boolean, whether to 
+        Parameters
+        ----------
+            type: str
+                the type of reaction this macromolecule is coupled to
+            value: float or sympy.Expr (function of parameters.mu)
+                the coupling coefficient value 
         
-        Returns: self.coupling_coefficient, dictionary of possible coupling coefficients and their values for the macromolecule
+        Returns
+        ----------
+        self.coupling_coefficient: dictionary 
+            dictionary of length one, key is the type, value is the coupling coefficient 
         
         '''
         
-        if type not in ['catalysis', 'mrna_degradation', 'mrna_dilution']:
-            raise ValueError('The couple id must be one of catalysis, mrna_degradation, or mrna_dilution')
+        if type not in ['catalysis', 'mrna_degradation', 'mrna_formation']:
+            raise ValueError('The couple id must be one of catalysis, mrna_degradation, or mrna_formation')
         else:
             if self.coupling_coefficient is None:
                 self.coupling_coefficient = {type: value}
