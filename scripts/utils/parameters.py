@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[1]:
+# In[2]:
 
 
 import pandas as pd 
@@ -32,8 +32,12 @@ mu = parse_expr('mu')
 # In[4]:
 
 
-compartments = human_model.compartments.copy()
-compartments['pm'] = 'plasma membrane'
+# compartments = human_model.compartments.copy()
+# compartments['pm'] = 'plasma membrane'
+
+compartments = {'c': 'cytoplasm', 'l': 'lysosome', 'r': 'endoplasmic reticulum', 'e': 'extracellular space', 'm': 'mitochondrion',
+ 'g': 'Golgi apparatus', 'n': 'nucleus', 'b': 'boundary', 'i': 'mitochondrial intermembrane space', 
+ 'x': 'peroxisome', 'pm': 'plasma membrane'}
 
 allowed_ptms = {'dsb': 'disulfide bond formation', 'gpi': 'GPI Anchor', 'og': 'O-linked glycosylation'}#,
                #'ng': 'N-linked glycosylation'}
@@ -60,6 +64,8 @@ ptt_length = 160 # amino acid length greater than which co-translatioanl translo
 nuclear_diffusion_limit = 40 # 40 kDA and less proteins diffuse through nucleus
 L_sp = 22 # secretory pathway signal peptide degradation
 Kv = 0.7 # secretory pathway vesicle coat coefficients
+
+membrane_diffusion_limit = 504 # 504 Da includes ATP, uncharged molecules at this diffusion limit are passive, no dummy
 
 
 # In[11]:
