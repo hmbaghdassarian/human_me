@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[4]:
+# In[1]:
 
 
 import cobra
@@ -16,7 +16,7 @@ from macromolecules.complex import Complex
 from macromolecules.macromolecule import Macromolecule
 
 
-# In[3]:
+# In[2]:
 
 
 class Biomass(cobra.Metabolite):
@@ -24,7 +24,7 @@ class Biomass(cobra.Metabolite):
         cobra.Metabolite.__init__(self, id = id, charge = charge, compartment = compartment)
 
 
-# In[4]:
+# In[3]:
 
 
 # make the biomass metabolites
@@ -42,7 +42,8 @@ lipid_ = Biomass('biomass_lipid')
 # other_ = Biomass('biomass_other')
 
 # variable
-protein_, unmodeled_protein_ = Biomass('biomass_protein'),  Biomass('biomass_unmodeled_protein')
+protein_ = Biomass('biomass_protein')
+unmodeled_protein_ =  Biomass('biomass_unmodeled_protein')
 trna_ = Biomass('biomass_tRNA')
 rrna_ = Biomass('biomass_rRNA')
 mrna_ = Biomass('biomass_mRNA')
@@ -54,30 +55,27 @@ biomass_mapper = {'rrna': rrna_, 'protein': protein_, 'dummy_protein': unmodeled
                      'premrna': premrna_}
 
 
-# In[5]:
+# In[10]:
 
 
 # biomass formation reactions
 
-biomass_metabolites = [dna_, carb_, lipid_, trna_, rrna_, mrna_, premrna_] #, other_]
+biomass_metabolites = [dna_, carb_, lipid_, trna_, rrna_, mrna_, premrna_, other_rna_, 
+                       protein_, unmodeled_protein_] #, other_]
 for bm in biomass_metabolites:
-    reaction_ = cobra.Reaction(bm.id.split('_')[1] + '_biomass_to_biomass')
+    reaction_ = cobra.Reaction('_'.join(bm.id.split('_')[1:]) + '_biomass_to_biomass')
     reaction_.add_metabolites({bm: -1, biomass_: 1})
     biomass_reactions.append(reaction_)
-    
-reaction_ = cobra.Reaction('other_rna_biomass_to_biomass')
-reaction_.add_metabolites({other_rna_: -1, biomass_: 1})
-biomass_reactions.append(reaction_)
 
-# protein biomass with unmodeled protein 
-pb_reaction = cobra.Reaction('protein_biomass_to_biomass')
-pb_reaction.add_metabolites({protein_: -1, biomass_: 1})
-# biomass_reactions.append(reaction_)
+# # protein biomass with unmodeled protein 
+upb_reaction = biomass_reactions.pop(len(biomass_reactions) - 1)
+# pb_reaction = cobra.Reaction('protein_biomass_to_biomass')
+# pb_reaction.add_metabolites({protein_: -1, biomass_: 1})
 
 
 # The following reactions convert the biomass components which are a constant proportion from the metabolic model formulation to the ME model formulation. Briefly, the coefficients of the precursor reactions must be scaled by their molecular weight, and the product must be equal to the constant proportion of that class of biomass, bounded by growth (flux through reaction = growth rate). 
 
-# In[ ]:
+# In[8]:
 
 
 # constant biomass reactions
@@ -145,7 +143,7 @@ lipid_reaction._lower_bound, lipid_reaction._upper_bound = params.mu, params.mu
 biomass_reactions += [dna_reaction, carbohydrate_reaction, lipid_reaction]
 
 
-# In[ ]:
+# In[9]:
 
 
 def add_biomass_change(reaction):
@@ -158,7 +156,7 @@ def add_biomass_change(reaction):
     biomass_change = dict()
     md = reaction._metabolites.copy()
     
-    # coupling does not contribute to biomass change
+    # coupling does not contribute to biomass change - subtract from stoichiometry
     if isinstance(reaction, ME_Reaction) and reaction.coupled_metabolites is not None:
         for metabolite, type in reaction.coupled_metabolites.items():
             md[metabolite] -= metabolite.coupling_coefficient[type] # coupling not part of mass balance
