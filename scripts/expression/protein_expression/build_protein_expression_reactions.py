@@ -72,7 +72,7 @@ def transport_nuclear_protein(gene_info, folded_protein_c):
 
 def get_nuclear_reactions(gene_info, folded_protein_c, ub_args):
     nuclear_import, folded_protein_n = transport_nuclear_protein(gene_info, folded_protein_c)
-    nuclear_degradation_reactions = degradation.degrade(folded_protein_n, ub_args = ub_args)
+    nuclear_degradation_reactions = degradation.degrade(macromolecule = folded_protein_n, **{'ub_args': ub_args})
     
     return [nuclear_import] + nuclear_degradation_reactions, folded_protein_n
 
@@ -195,7 +195,7 @@ def transport_peroxisome(gene_info, folded_protein_c):
 
 def get_peroxisomal_reactions(gene_info, folded_protein_c):
     peroxisomal_transport, folded_protein_x = transport_peroxisome(gene_info, folded_protein_c)
-    peroxisomal_degradation = degradation.degrade(folded_protein_x)
+    peroxisomal_degradation = degradation.degrade(macromolecule = folded_protein_x)
     
     return [peroxisomal_transport, peroxisomal_degradation], folded_protein_x
 
@@ -538,7 +538,7 @@ def secrete_protein(gene_info, modified_protein_g):
 
 # # Protein Expression All
 
-# In[19]:
+# In[11]:
 
 
 def get_protein_expression_reactions(gene_info, mrna_transcript_c, mrna_deg_proxy, ub_args):
@@ -558,7 +558,7 @@ def get_protein_expression_reactions(gene_info, mrna_transcript_c, mrna_deg_prox
 
                 if 'c' in gene_info.final_locations.keys() or 'x' in gene_info.final_locations.keys() or ('n' in gene_info.final_locations.keys() and folded_protein_c.formula_weight/1000 <= params.nuclear_diffusion_limit):
                    # cytoplasmic degradation of folded proteins: cytoplasmic proteins, peroxisomal proteins, or nuclear proteins undergoing passive diffusion
-                    protein_expression_reactions += degradation.degrade(folded_protein_c, ub_args = ub_args)
+                    protein_expression_reactions += degradation.degrade(folded_protein_c, **{'ub_args':ub_args})
 
                     if 'c' in gene_info.final_locations.keys():
                         protein_metabolites += [folded_protein_c]
@@ -577,7 +577,7 @@ def get_protein_expression_reactions(gene_info, mrna_transcript_c, mrna_deg_prox
 
             if 'i' in gene_info.final_locations.keys(): # no folding for i, but cytoplasmic degradation
                 protein_expression_reactions += degradation.degrade(macromolecule = unfolded_protein_c, 
-                                                                             ub_args = ub_args)
+                                                                             **{'ub_args': ub_args})
             # mitochondrial transport and degradation ('i' and 'm')
             if ('m' in gene_info.final_locations.keys()) or ('i' in gene_info.final_locations.keys()):
                 if ('m' in gene_info.final_locations.keys()) and ('i' in gene_info.final_locations.keys()):
@@ -661,13 +661,13 @@ def get_protein_expression_reactions(gene_info, mrna_transcript_c, mrna_deg_prox
                 protein_metabolites += [retro_protein_r]
             if ptt_:
                 erad_reactions, unfolded_protein_c = degradation.degrade(macromolecule = retro_protein_r, 
-                                                                          unfolded_protein_c = unfolded_protein_c)
+                                                     **{'unfolded_protein_c': unfolded_protein_c})
                 protein_expression_reactions += erad_reactions
                 if 'i' not in gene_info.final_locations.keys(): # this reaction doesn't already exist
-                    protein_expression_reactions += degradation.degrade(unfolded_protein_c, ub_args)
+                    protein_expression_reactions += degradation.degrade(unfolded_protein_c, **{'ub_args': ub_args})
             else:
                 erad_reactions, unfolded_protein_c = degradation.degrade(macromolecule = retro_protein_r,
-                                                                          unfolded_protein_c = None)
+                                                                          **{'unfolded_protein_c': None})
                 protein_expression_reactions += erad_reactions
                 # since metabolite id is different for unfolded_protein_c (see erad) and proteasomal degradation
                 # reactions use metabolite id rather than gene_info.hgnc_id, 
@@ -675,7 +675,8 @@ def get_protein_expression_reactions(gene_info, mrna_transcript_c, mrna_deg_prox
                 # in the case of multi-localization 
                 #(this unfolded protein is different than cytosolically translated ones bc of the)
                 # signal peptide degradation reaction
-                protein_expression_reactions += degradation.degrade(unfolded_protein_c, ub_args)
+                protein_expression_reactions += degradation.degrade(macromolecule = unfolded_protein_c, 
+                                                                    **{'ub_args': ub_args})
         # PM/L degradation needed
         # endocytosis of plasma membrane proteins
         if 'l' in gene_info.final_locations.keys() or 'pm' in gene_info.final_locations.keys():
@@ -687,8 +688,8 @@ def get_protein_expression_reactions(gene_info, mrna_transcript_c, mrna_deg_prox
             # endocytosis
             if 'pm' in gene_info.final_locations.keys():
                 protein_pm = [p for p in secreted_proteins if p.compartment == 'pm'][0]
-                endocytosis_reactions, protein_l = degradation.build_endocytosis_reactions(                                                   macromolecule_pm = protein_pm, ub_args = ub_args,
-                                                   macromolecule_l = protein_l)  
+                endocytosis_reactions, protein_l = degradation.build_endocytosis_reactions(                                                   macromolecule_pm = protein_pm, 
+                                                   **{'ub_args': ub_args, 'macromolecule_l': protein_l})
                 
                 protein_expression_reactions += endocytosis_reactions
             
@@ -705,7 +706,7 @@ def get_protein_expression_reactions(gene_info, mrna_transcript_c, mrna_deg_prox
     return protein_expression_reactions, protein_metabolites
 
 
-# In[20]:
+# In[12]:
 
 
 # working version pre-degradation: '0', 
@@ -713,49 +714,49 @@ def get_protein_expression_reactions(gene_info, mrna_transcript_c, mrna_deg_prox
 #                                             dummy_protein = False
 
 
-# In[25]:
+# In[13]:
 
 
-# import random
-# import pandas as pd
-# from expression.gene_information import gene_information
-# import expression.build_mrna_expression_reactions as build_mrna
-# from expression.protein_expression import ubiquitin
+import random
+import pandas as pd
+from expression.gene_information import gene_information
+import expression.build_mrna_expression_reactions as build_mrna
+from expression.protein_expression import ubiquitin
 
-# psim_toy = pd.DataFrame(columns = ['HGNC_ID', 'PREMRNA_SEQ', 'MRNA_SEQ', 'PROTEIN_SEQ', 'POLYA_LENGTH', 'TMD', 
-#                                'SP', 'N_INTRONS', 'DSB', 'GPI', 'OG', 'LOCATION'])
+psim_toy = pd.DataFrame(columns = ['HGNC_ID', 'PREMRNA_SEQ', 'MRNA_SEQ', 'PROTEIN_SEQ', 'POLYA_LENGTH', 'TMD', 
+                               'SP', 'N_INTRONS', 'DSB', 'GPI', 'OG', 'LOCATION'])
 
-# hgnc_id, premrna_seq = 'HGNC:TOY', ''.join(random.choices(['U', 'C', 'G', 'A'], k = 100))
-# mrna_seq = premrna_seq[25:75]
-# # note that there is no check that the protein_sequence corresponds to the mrna_sequence beyond checking for the length
-# protein_seq = ''.join(random.choices(params.amino_acids, k = int(len(mrna_seq)/3)))
-# polyA_length, tmd, sp, n_exons, dsb, gpi, og  = None, 1, True, None, 2, 2, 2
-# ub_args = ubiquitin.express_ubiquitin(compress_mrna = False)
+hgnc_id, premrna_seq = 'HGNC:TOY', ''.join(random.choices(['U', 'C', 'G', 'A'], k = 100))
+mrna_seq = premrna_seq[25:75]
+# note that there is no check that the protein_sequence corresponds to the mrna_sequence beyond checking for the length
+protein_seq = ''.join(random.choices(params.amino_acids, k = int(len(mrna_seq)/3)))
+polyA_length, tmd, sp, n_exons, dsb, gpi, og  = None, 1, True, None, 2, 2, 2
+ub_args = ubiquitin.express_ubiquitin(compress_mrna = False)
 
-# import itertools
-# reactions = list()
+import itertools
+reactions = list()
 
-# location = ['r', 'g', 'l', 'pm']
-# psim_toy.loc[0,:] = [hgnc_id, premrna_seq, mrna_seq, protein_seq, polyA_length, tmd, sp, n_exons, dsb, gpi, og, location]
-# gene_info = gene_information(hgnc_id, premrna_seq, mrna_seq, protein_seq,
-#                  ptms = {}, tmd = tmd, sp = sp, polyA_length = polyA_length, 
-#                  n_exons = n_exons) 
-# gene_info.get_final_locations(metabolic_model = cobra.Model(''), final_locations = location)
+location = ['r', 'g', 'l', 'pm']
+psim_toy.loc[0,:] = [hgnc_id, premrna_seq, mrna_seq, protein_seq, polyA_length, tmd, sp, n_exons, dsb, gpi, og, location]
+gene_info = gene_information(hgnc_id, premrna_seq, mrna_seq, protein_seq,
+                 ptms = {}, tmd = tmd, sp = sp, polyA_length = polyA_length, 
+                 n_exons = n_exons) 
+gene_info.get_final_locations(metabolic_model = cobra.Model(''), final_locations = location)
 
-# transcription_reactions, mrna_transcript_c, mrna_deg_proxy = build_mrna.get_mrna_expression_reactions(gene_info)
-
-
-
-# protein_expression_reactions, protein_metabolites = get_protein_expression_reactions(gene_info, 
-#                                                  mrna_transcript_c, mrna_deg_proxy, 
-#                                                 ub_args = ub_args)
-# if len([r for r in protein_expression_reactions if len(r.check_mass_balance()) > 0]) > 0:
-#     raise ValueError('Imbalanced Reaction')
-
-# protein_expression_reactions
+transcription_reactions, mrna_transcript_c, mrna_deg_proxy = build_mrna.get_mrna_expression_reactions(gene_info)
 
 
-# In[18]:
+
+protein_expression_reactions, protein_metabolites = get_protein_expression_reactions(gene_info, 
+                                                 mrna_transcript_c, mrna_deg_proxy, 
+                                                ub_args = ub_args)
+if len([r for r in protein_expression_reactions if len(r.check_mass_balance()) > 0]) > 0:
+    raise ValueError('Imbalanced Reaction')
+
+protein_expression_reactions
+
+
+# In[14]:
 
 
 # import random

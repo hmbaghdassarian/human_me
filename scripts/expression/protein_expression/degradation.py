@@ -22,7 +22,8 @@ from utils import functions as func
 # In[4]:
 
 
-def protein_polyubiquitination(macromolecule, ub_args):
+def protein_polyubiquitination(macromolecule, **kwargs):
+    ub_args = kwargs['ub_args']
 
     polyubiquitinate_protein = cobra.Reaction(macromolecule.id + '_POLYUBIQUITINATION' + macromolecule.compartment)
     polyubiquitinate_protein.subsytem = 'Protein_Expression'
@@ -73,7 +74,10 @@ def protein_polyubiquitination(macromolecule, ub_args):
     else:
         raise ValueError(macromolecule.id + ': Current compartment, ' + macromolecule.compartment + ' does not have polyubiquitination reactions available')
 
-def proteasomal_degradation(macromolecule, polyub_macromolecule, ub_args):
+def proteasomal_degradation(macromolecule, **kwargs):
+    polyub_macromolecule = kwargs['polyub_macromolecule']
+    ub_args = kwargs['ub_args']
+    
     if macromolecule.compartment != polyub_macromolecule.compartment:
         raise ValueError('Polyubiquitinated and deubiquitinated protein compartment does not match')
     if macromolecule.compartment not in ['c', 'n']:
@@ -104,8 +108,9 @@ def proteasomal_degradation(macromolecule, polyub_macromolecule, ub_args):
 
     return [deubiquitination, protein_degradation]
 
-def degrade_cytosolic_nuclear_protein(macromolecule, ub_args):
+def degrade_cytosolic_nuclear_protein(macromolecule, **kwargs):
     '''Degradation reactions for cytosolic or nuclear proteins'''
+    ub_args = kwargs['ub_args']
     polyubiquitinate_macromolecule, polyub_macromolecule = protein_polyubiquitination(macromolecule = macromolecule, 
                                                                                   ub_args = ub_args) 
     proteasomal_degradation_reactions = proteasomal_degradation(macromolecule = macromolecule, 
@@ -289,7 +294,12 @@ def retrograde_er(macromolecule):
     
     return retrograde_transport, retro_protein_r
 
-def build_erad_reactions(macromolecule, unfolded_protein_c = None):
+def build_erad_reactions(macromolecule, **kwargs):
+    if 'unfolded_protein_c' in kwargs.keys():
+        unfolded_protein_c = kwargs['unfolded_protein_c']
+    else:
+        unfolded_protein_c = None
+        
     if macromolecule.compartment == 'g':
         raise ValueError('This situation is only for complexes, see commented out code below')
         #retrograde_transport, macromolecule = retrograde_er(macromolecule)
@@ -352,7 +362,13 @@ def build_erad_reactions(macromolecule, unfolded_protein_c = None):
 # In[ ]:
 
 
-def build_endocytosis_reactions(macromolecule_pm, ub_args, macromolecule_l = None):
+def build_endocytosis_reactions(macromolecule_pm, **kwargs):
+    ub_args = kwargs['ub_args']
+    if 'macromolecule_l' in kwargs.keys():
+        macromolecule_l = kwargs['macromolecule_l']
+    else:
+        macromolecule_l = None    
+    
     ##polyubiquitination for lysosomal targetting-------------------------------------
     polyubiquitinate_protein, polyub_macromolecule_pm = protein_polyubiquitination(macromolecule = macromolecule_pm, 
                                                                                          ub_args = ub_args)
@@ -411,7 +427,11 @@ def lysosomal_degradation(macromolecule):
 
     return lysosomal_degradation_reactions
 
-def degrade_lysosomal_pm_protein(macromolecule, ub_args = None):
+def degrade_lysosomal_pm_protein(macromolecule, **kwargs):
+    if 'ub_args' in kwargs.keys():
+        ub_args = kwargs['ub_args']
+    else:
+        ub_args = None  
     if macromolecule.compartment == 'pm':
         raise ValueError('This is for complexes in the future (see commented code below)')
         # endocytosis_reactions, macromlecule = build_endocytosis_reactions(macromolecule_pm = protein_pm, 
@@ -439,32 +459,12 @@ degrade_map = {'c': degrade_cytosolic_nuclear_protein, 'n': degrade_cytosolic_nu
                'r': build_erad_reactions, 'g': build_erad_reactions, 
               'l': degrade_lysosomal_pm_protein, 'pm': degrade_lysosomal_pm_protein}
 
-def degrade(macromolecule, ub_args = None, unfolded_protein_c = None, macromolecule_l = None):
+def degrade(macromolecule, **kwargs):
     '''Compartment-specific degradation reactions for proteins or protein-protein complexes'''
     
     if not type(macromolecule) == Protein or type(macromolecule) == Complex:
         raise ValueError('Macromolecule to degrade must be protein or complex')
     
-    if ub_args is not None and macromolecule_l is not None:
-         deg_reactions = degrade_map[macromolecule.compartment](macromolecule, ub_args, macromolecule_l)
-    elif ub_args is not None:
-        deg_reactions = degrade_map[macromolecule.compartment](macromolecule, ub_args)
-    elif unfolded_protein_c is not None:
-        deg_reactions = degrade_map[macromolecule.compartment](macromolecule, unfolded_protein_c)
-    else:
-        deg_reactions = degrade_map[macromolecule.compartment](macromolecule)
+    deg_reactions = degrade_map[macromolecule.compartment](macromolecule, **kwargs)
     return deg_reactions
-
-
-# 0. check the reaction where gene_info is changed in protein expression; iteratively update protein.ptm with each ptm (so that intermediate metabolites are updated); variable arguments to degrade using **args
-# 
-# 1. must add an "amino acid counts" and "L_protein" attribute to complex for complexes of only protein types. Should be sum of all proteins
-# 2a. keep degradation reactions of monomers as is assuming they can all be targetted for degradation; but, add degradation of complexes; 
-# 2b. alternatively, backtrack to remove degradation reactions of inactive monomers, with only complexes forming degradation (will be difficult to remove during with all the if statements in final protein expression reaction)
-# 3. either way, force flux through the compartment specific, protein-specific reaction. Will need to track whether the same enzymatic unit catalyzes multiple reactions in the same compartment; in this case, will need to think of something...
-
-# In[ ]:
-
-
-
 

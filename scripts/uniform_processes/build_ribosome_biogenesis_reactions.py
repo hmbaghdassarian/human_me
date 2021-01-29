@@ -140,7 +140,7 @@ def cleave_ub(hgnc_id, ub_args, compress_mrna = False):
     folded_protein_c.hgnc_id = gene_info.hgnc_id
     #------------------
     nuclear_import, folded_protein_n = build_protein.transport_nuclear_protein(gene_info, folded_protein_c)
-    dcp = degradation.degrade(folded_protein_c, ub_args)
+    dcp = degradation.degrade(folded_protein_c, **{'ub_args':ub_args})
 
     to_add = [translation_elongation_c, ub_cleavage, protein_folding_cytosolic, nuclear_import] + dcp + mrna_expression_reactions
 
