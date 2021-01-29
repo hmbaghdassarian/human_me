@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[1]:
+# In[8]:
 
 
 import cobra
@@ -30,6 +30,7 @@ from uniform_processes import biomass
 import expression.build_mrna_expression_reactions as build_mrna
 from expression import gene_information
 from expression.protein_expression import cytosolic_translation as c_trln
+from expression.protein_expression import degradation
 from expression.protein_expression import build_protein_expression_reactions as build_protein
 
 
@@ -87,7 +88,16 @@ six_s_index = 1 #https://www.nature.com/articles/s41594-019-0234-x?draft=collect
 
 
 
-# In[35]:
+# In[11]:
+
+
+# from expression.protein_expression import ubiquitin
+# compress_mrna = False
+# ub_args = ubiquitin.express_ubiquitin(compress_mrna = compress_mrna)
+# rs_expression_reactions, rs_protein_metabolites, rl_expression_reactions, rl_protein_metabolites = build_ribosome_protein_expression_reactions(ub_args, compress_mrna)
+
+
+# In[9]:
 
 
 psim_rib = params.psim_me.copy()
@@ -122,8 +132,15 @@ def cleave_ub(hgnc_id, ub_args, compress_mrna = False):
     protein_folding_cytosolic, folded_protein_c = build_protein.fold_protein_cytosolic(gene_info, 
                                                                                        processed_unfolded_protein_c)
     folded_protein_c.alpha_p = gene_info.coupling_params['alpha_p']
+    
+    # for degradation------------------
+    folded_protein_c.L_protein = gene_info.L_protein
+    folded_protein_c.amino_acid_counts = gene_info.amino_acid_counts
+    folded_protein_c.ptms = gene_info.ptms
+    folded_protein_c.hgnc_id = gene_info.hgnc_id
+    #------------------
     nuclear_import, folded_protein_n = build_protein.transport_nuclear_protein(gene_info, folded_protein_c)
-    dcp = build_protein.degrade_cytosolic_protein(gene_info, folded_protein_c, ub_args)
+    dcp = degradation.degrade(folded_protein_c, ub_args)
 
     to_add = [translation_elongation_c, ub_cleavage, protein_folding_cytosolic, nuclear_import] + dcp + mrna_expression_reactions
 

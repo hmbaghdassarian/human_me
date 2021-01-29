@@ -217,6 +217,7 @@ USP5, UBA1, UBE2D3, STUB1 = ['HGNC:12628'], ['HGNC:12469'], ['HGNC:12476'], ['HG
 RNF181, UB2EV1 = ['HGNC:28037'], ['HGNC:12494']
 UB_ligases_c = UBA1 + UBE2D3 + STUB1
 UB_ligases_n = UBA1 + UB2EV1 + RNF181
+UB_ligases = {'c': UB_ligases_c, 'n': UB_ligases_n}
 
 proteasome_structural = ['HGNC:9554', 'HGNC:9560', 'HGNC:9557', 'HGNC:9556', 'HGNC:9564', 'HGNC:9565', 'HGNC:9558',
                         'HGNC:9566', 'HGNC:9567']
@@ -255,6 +256,7 @@ importins = ['HGNC:6400', 'HGNC:6394']
 
 # ribosome biogenesis
 UCHL3 = ['HGNC:12515']
+# RMRP = ['HGNC:10031'] # disregarded for now bc ribozyme
 pre40s_rbfs = ['HGNC:25542', 'HGNC:21173', 'HGNC:32790', 'HGNC:29100']
 pre60s_rbfs = ['HGNC:18477', 'HGNC:25789', 'HGNC:19440', 'HGNC:20870', 'HGNC:17083', 'HGNC:4333']
 
