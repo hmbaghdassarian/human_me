@@ -6,6 +6,7 @@
 
 import cobra
 import itertools
+import collections
 import uuid
 import numpy as np
 
@@ -19,23 +20,29 @@ from utils import machinery as mach
 
 
 cotransloc_ids = set([mid + '_folded_protein_r' for mid in mach.ctnm + mach.translation_efs]) 
+def flatten_list(list_):
+    return [item for sublist in list_ for item in sublist]
 
 
 # In[2]:
 
 
-def flatten_list(list_):
-    return [item for sublist in list_ for item in sublist]
-    
 class Complex(Macromolecule):
+    '''Complexes formed by non-covalent interactions between macromolecules'''
     def __init__(self, metabolites, complex_id = None, ignore_compartment = False):
         '''
-        Inputs:
-        metabolites is a list of Macromolecule objects (protein or RNA or complex, not generic metabolites)
-        complex_id is a string for the id of the complex metabolite, otherwise will form a random id
-        ignore_compartment is a boolean whether ot ignore the metabolite compartments, mainly for internal use
-        Output:
-        A Macromolecule object representing the complex formed between macromolecules
+        Parameters
+        ----------
+        metabolites: list 
+            each entry is a Macromolecule object (protein or RNA or complex, not generic metabolites)
+        complex_id: str
+            the id of the complex metabolite; if None, will generate a random id
+        ignore_compartment: bool 
+            whether to ignore the metabolite compartments, mainly for internal use
+        
+        Returns
+        ----------
+        A Complex object representing the complex formed between input macromolecules
         
         '''
         # checks
@@ -81,9 +88,10 @@ class Complex(Macromolecule):
                                   charge = sum([m.charge*count for m, count in self.components.items()]), 
                               elements = elements)
         
-#         self.add_alpha_p()                         
         self.reaction_id = None # none before running form_complex(); this is used in update_id() method
-    
+        self._deg_initialized = False
+        self.enzyme = False
+        
     def update_id(self, new_id = None):
         '''In cases where complex id is too long (see build_me_model generate_complex_reactions method)'''
 
@@ -96,10 +104,23 @@ class Complex(Macromolecule):
         self.id = self.temp_id + '_complex_' + self.compartment
     
     
-    def form_complex(self, reaction_id = None):
+    def form_complex(self, reaction_id = None, reversible = True):
 
-        '''
-        Output: A cobra.Reaction object representing the complex formation between metabolites stored in self.complex_formation
+        '''The reaction required to generate the Complex object
+        Note: assumes non-covalent complex formation (in terms of elemental balance)
+
+        Parameters
+        -----------
+        reaction_id: str
+            ID to assign to the reaction
+        reversible: bool
+            Whether the reaction is reversible. Setting to True may make model more efficient (allows reuse of 
+            self.components if involved in other reactions)
+
+        Returns
+        ----------
+        complex_formation: cobra.Reaction 
+            the complex formation between metabolites stored in self.components
 
         '''
         
@@ -113,7 +134,8 @@ class Complex(Macromolecule):
         rxn = {m: -count for m,count in self.components.items()}
         rxn[self] = 1
         complex_formation.add_metabolites(rxn)
-        complex_formation.lower_bound = -1000 # reversible
+        if reversible:
+            complex_formation.lower_bound = -1000 # reversible
         
         return complex_formation
     
@@ -141,8 +163,75 @@ class Complex(Macromolecule):
                 biomass_by_type[m.type] = count*(m.formula_weight/1000)
 
         return biomass_by_type
-#     def add_alpha_p(self):
-#         self.alpha_p = np.median([p.alpha_p for p in self.decompose_complex() if isinstance(p, Protein)])# and p.alpha_p is not None])
-#         if pd.isna(self.alpha_p):
-#             self.alpha_p = None
+
+    def _initialize_deg_params(self):
+        '''Initialize attributes for creating degradation reactions'''
+        
+        self._deg_initialized = True
+        dc = self.decompose_complex()
+        complex_types = list(set([m.type for m in dc]))
+        if len(complex_types) > 1 or complex_types[0] != 'protein':
+            raise ValueError('Complexes can only be degraded if composed only of proteins')
+        
+        self._amino_acid_counts = collections.Counter()
+        self._ptms = collections.Counter()
+        self._L_protein = 0
+        for p,c in dc.items():
+            self._L_protein += p._L_protein*c
+            for i in range(c):
+                self._amino_acid_counts.update(p._amino_acid_counts)
+                if hasattr(p, '_ptms'):
+                    self._ptms.update(p._ptms)
+        
+        if len(self._ptms) > 0:
+            raise ValueError('PTMs to Complexes is currently unaccounted for and will likely lead to imbalances in degradation reactions')
+            
+        self._deg_id = self.temp_id
+        self._degradation_reactions = []
+        
+        del dc
+        del complex_types
+        
+    def _consolidate_degradation_rxns(self):
+        '''Remove redundant IDs'''
+        self._degradation_reactions = list(set(self._degradation_reactions))
+
+
+# In[ ]:
+
+
+def add_complex_metabolites(cplx, met_to_add, complex_id):
+    '''Add a metabolite to an existing complex object, returning it as a new complex
+    
+    Parameters
+    -----------
+    cplx: macromolecules.complex.Complex
+        The Complex object to be appended
+    met_to_add: dict
+        The metabolites to add to the complex. Keys are objects inherited from 
+        macrmolecules.macromolecule.Macromolecule and values are the number of copies of this metabolite to add.
+    complex_id: str
+        The new id for the new complex
+    
+    Returns
+    ----------
+    cplx2: macromolecules.complex.Complex
+        The new Complex object with the added metabolites
+    
+    '''
+    
+    
+    mtblts = list()
+    for m,c in cplx.components.items():
+        mtblts += [m]*c
+    for m,c in met_to_add.items():
+        mtblts += [m]*c
+
+    cplx2 = Complex(metabolites = mtblts,
+            complex_id = complex_id)
+    if cplx._deg_initialized:
+        cplx2._initialize_deg_params()
+        cplx2._degradation_reactions += cplx._degradation_reactions # inherit degradation reactions
+        cplx2._consolidate_degradation_rxns()
+    return cplx2
 

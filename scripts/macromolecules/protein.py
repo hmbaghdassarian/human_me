@@ -11,7 +11,7 @@ from utils import metabolites as metab
 from macromolecules.macromolecule import Macromolecule
 
 
-# In[ ]:
+# In[2]:
 
 
 class Protein(Macromolecule):
@@ -52,25 +52,25 @@ class Protein(Macromolecule):
         
         if gene_info is not None:
             # for degradation
-            self.L_protein = gene_info.L_protein
-            self.hgnc_id = gene_info.hgnc_id
-            self.amino_acid_counts = gene_info.amino_acid_counts
-            self.ptms = gene_info.ptms
+            self._L_protein = gene_info.L_protein
+            self._deg_id = gene_info.hgnc_id
+            self._amino_acid_counts = gene_info.amino_acid_counts
+            self._ptms = gene_info.ptms
             
             # for rest of pipeline
             self.alpha_p =  gene_info.coupling_params['alpha_p']
             id_ = gene_info.hgnc_id + '_' + id_ + '_protein_' + compartment 
             
         else:
-            self.amino_acid_counts = amino_acid_counts
-            self.L_protein = sum(amino_acid_counts.values())
+            self._amino_acid_counts = amino_acid_counts
+            self._L_protein = sum(amino_acid_counts.values())
             id_ = id_ + '_protein_' + compartment
         
-        charge = sum([metab.seq_amino_acid_map_compartments[compartment][aa_code].charge*aa_count for aa_code, aa_count in self.amino_acid_counts.items()])
+        charge = sum([metab.seq_amino_acid_map_compartments[compartment][aa_code].charge*aa_count for aa_code, aa_count in self._amino_acid_counts.items()])
         
         elements = {'C': 0, 'H': 0, 'N': 0, 'O': 0, 'S': 0}
         if compartment in metab.seq_amino_acid_map_compartments.keys():
-            for aa_code, aa_count in self.amino_acid_counts.items():
+            for aa_code, aa_count in self._amino_acid_counts.items():
                 aa_elements = metab.seq_amino_acid_map_compartments[compartment][aa_code].elements
                 for element in aa_elements:
                     elements[element] += aa_count*aa_elements[element]
@@ -78,8 +78,8 @@ class Protein(Macromolecule):
             raise ValueError('Internal: Must add ' + compartment + ' compartment to amino acid map in metab')
 
         # peptide bond formation
-        elements['H'] -= 2*(self.L_protein-1)
-        elements['O'] -= 1*(self.L_protein-1)
+        elements['H'] -= 2*(self._L_protein-1)
+        elements['O'] -= 1*(self._L_protein-1)
         
         Macromolecule.__init__(self, id = id_, compartment = compartment, charge = charge, elements = elements)
         
@@ -87,6 +87,13 @@ class Protein(Macromolecule):
             self.type = 'protein'
         else:
             self.type = 'dummy_protein'
+        
+        self.enzyme = False # whether the protein is involved in catalysis of a reaction
+        self._degradation_reactions = [] # associated degradation reactions for protein monomer, if any
+    
+    def _consolidate_degradation_rxns(self):
+        '''Remove redundant IDs'''
+        self._degradation_reactions = list(set(self._degradation_reactions))
 
 
 # In[61]:

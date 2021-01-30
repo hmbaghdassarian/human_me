@@ -134,10 +134,10 @@ def cleave_ub(hgnc_id, ub_args, compress_mrna = False):
     folded_protein_c.alpha_p = gene_info.coupling_params['alpha_p']
     
     # for degradation------------------
-    folded_protein_c.L_protein = gene_info.L_protein
-    folded_protein_c.amino_acid_counts = gene_info.amino_acid_counts
-    folded_protein_c.ptms = gene_info.ptms
-    folded_protein_c.hgnc_id = gene_info.hgnc_id
+    folded_protein_c._L_protein = gene_info.L_protein
+    folded_protein_c._amino_acid_counts = gene_info.amino_acid_counts
+    folded_protein_c._ptms = gene_info.ptms
+    folded_protein_c._hgnc_id = gene_info.hgnc_id
     #------------------
     nuclear_import, folded_protein_n = build_protein.transport_nuclear_protein(gene_info, folded_protein_c)
     dcp = degradation.degrade(folded_protein_c, **{'ub_args':ub_args})
