@@ -1,7 +1,9 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[48]:
+# This script provides a complete set of specific degradation reactions for complexes, based on their compartment. For proteins, conditional inclusion of various reactions based on gene features, etc is implemented in the build_protein_express_reactions script.
+
+# In[1]:
 
 
 import cobra
@@ -17,78 +19,18 @@ from macromolecules.protein import Protein
 from macromolecules.complex import Complex
 from macromolecules.complex import add_complex_metabolites
 
+from core.reaction import Protein_Degradation_Reaction, Complex_Degradation_Reaction
 
-# In[49]:
 
+# In[2]:
 
-class Protein_Degradation_Reaction(cobra.Reaction):
-    def __init__(self, id=None, name='', subsystem='', lower_bound=0.0, upper_bound=None):
-        cobra.Reaction.__init__(self, id=id, name=name, subsystem=subsystem, lower_bound=lower_bound, 
-                                upper_bound=upper_bound)
-        self._macromolecules = [] # list of macromolecule ids associated with this degradation reaction
-        self._enzymes = None # list of enzyme ids associated with this degradation reaction
-        self.final_reaction = False # whether the reaction is the "final" (to amino acids) degradation reaction
-        self.subsystem = 'Protein_Degradation'
-        
-    def _update_tracking(self, macromolecules):
-        '''Mutual tracking of degradation reactions associated with a macromolecule and vice-versa'''
-        if type(macromolecules) != list:
-            macromolecules._degradation_reactions.append(self.id)
-            self._macromolecules.append(macromolecules)
-        else:
-            for macromolecule in macromolecules:
-                macromolecule._degradation_reactions.append(self.id)
-                self._macromolecules.append(macromolecule)
-    def _consolidate_macromolecules(self):
-        '''Remove redundant macromolecules'''
-        for m in self._macromolecules:
-            m._consolidate_degradation_rxns()
-        self._macromolecules = list(set(self._macromolecules))
-        
-    def _update_enzymes(self):
-        '''Update enzymes list to include macromolecules that are classified as enzymes'''
-        self._enzymes = [m for m in self._macromolecules if m.enzyme]
-        for m in self.enzymes:
-            if self.id not in m._degradation_reactions:
-                raise ValueErorr('Improper tracking of degradation reactions and associated macromolecules')
-
-class Complex_Degradation_Reaction(cobra.Reaction):
-    def __init__(self, id=None, name='', subsystem='', lower_bound=0.0, upper_bound=None):
-        cobra.Reaction.__init__(self, id=id, name=name, subsystem=subsystem, lower_bound=lower_bound, 
-                                upper_bound=upper_bound)
-        self._macromolecules = [] # list of macromolecule ids associated with this degradation reaction
-        self._enzymes = None # list of enzyme ids associated with this degradation reaction
-        self.final_reaction = False # whether the reaction is the "final" (to amino acids) degradation reaction
-        self.subsystem = 'Complex_Degradation'
-        
-    def _update_tracking(self, macromolecules):
-        '''Mutual tracking of degradation reactions associated with a macromolecule and vice-versa'''
-        if type(macromolecules) != list:
-            macromolecules._degradation_reactions.append(self.id)
-            self._macromolecules.append(macromolecules)
-        else:
-            for macromolecule in macromolecules:
-                macromolecule._degradation_reactions.append(self.id)
-                self._macromolecules.append(macromolecule)
-    def _consolidate_macromolecules(self):
-        '''Remove redundant macromolecules'''
-        for m in self._macromolecules:
-            m._consolidate_degradation_rxns()
-        self._macromolecules = list(set(self._macromolecules))
-        
-    def _update_enzymes(self):
-        '''Update enzymes list to include macromolecules that are classified as enzymes'''
-        self._enzymes = [m for m in self._macromolecules if m.enzyme]
-        for m in self.enzymes:
-            if self.id not in m._degradation_reactions:
-                raise ValueErorr('Improper tracking of degradation reactions and associated macromolecules')
 
 deg_reaction_map = {'protein': Protein_Degradation_Reaction, 'complex': Complex_Degradation_Reaction}
 
 
 # # Cytosol and Nucleus
 
-# In[50]:
+# In[3]:
 
 
 def protein_polyubiquitination(macromolecule, **kwargs):
@@ -170,7 +112,6 @@ def proteasomal_degradation(macromolecule, **kwargs):
     
     rxn = {metab.seq_amino_acid_map_compartments[macromolecule.compartment][aa_code]: aa_counts for aa_code, aa_counts in aac.items()}
     rxn[polyub_macromolecule] = -1
-    print(macromolecule._L_protein)
     rxn[metab.h2o_compartments[macromolecule.compartment]] = -h2o_length
     rxn[ub_args['polyub_' + macromolecule.compartment]] =  1
     # atp hydrolysis for translocation/unfolding  - known 1 ATP per 2 residues - https://www.nature.com/articles/s41586-018-0736-4
@@ -181,7 +122,7 @@ def proteasomal_degradation(macromolecule, **kwargs):
     protein_degradation.gene_reaction_rule = ' and '.join(mach.proteasome_machinery)
     
     # tracking
-    protein_degradation.final_reaction = True
+    protein_degradation.sink = True
     for r in [deubiquitination, protein_degradation]:
         r._update_tracking(macromolecules = [macromolecule, polyub_macromolecule])
     
@@ -201,7 +142,7 @@ def degrade_cytosolic_nuclear_protein(macromolecule, **kwargs):
 
 # # Mitochondria and Intermembrane Space
 
-# In[51]:
+# In[4]:
 
 
 def degrade_mitochondrial_protein(macromolecule):
@@ -228,7 +169,7 @@ def degrade_mitochondrial_protein(macromolecule):
   
     mitochondrial_degradation.add_metabolites(rxn)
     
-    mitochondrial_degradation.final_reaction = True
+    mitochondrial_degradation.sink = True
     mitochondrial_degradation._update_tracking(macromolecule)
     
     return [mitochondrial_degradation]
@@ -247,7 +188,7 @@ def degrade_peroxisomal_protein(macromolecule):
     rxn = func.hydrolyze_atp(rxn, n_atp = macromolecule._L_protein*2, compartment = 'x')
     peroxisomal_degradation.add_metabolites(rxn)
     
-    peroxisomal_degradation.final_reaction = True
+    peroxisomal_degradation.sink = True
     peroxisomal_degradation._update_tracking(macromolecule)
     
     return [peroxisomal_degradation]
@@ -255,7 +196,7 @@ def degrade_peroxisomal_protein(macromolecule):
 
 # # Secretory Pathway Degradation
 
-# In[52]:
+# In[5]:
 
 
 def unfold_secretory_protein(macromolecule):
@@ -269,7 +210,12 @@ def unfold_secretory_protein(macromolecule):
     unfold_protein = deg_reaction_map[macromolecule.type](macromolecule._deg_id + '_UNFOLD' + macromolecule.compartment)
     unfolded_protein = macromolecule.copy()
     if macromolecule.compartment == 'r': # not "unfolding/misfolding" for lysosomal degradation
-        unfolded_protein.id = unfolded_protein.id.replace('folded', 'unfolded')
+        if 'folded' in unfolded_protein.id:
+            unfolded_protein.id = unfolded_protein.id.replace('folded', 'unfolded')
+        elif 'HGNC:' in unfolded_protein.id:
+            unfolded_protein.id = unfolded_protein.id[:unfolded_protein.id.index('_')] + '_unfolded' +             unfolded_protein.id[unfolded_protein.id.index('_'):]
+        else:
+            unfolded_protein.id =  'unfolded_' + unfolded_protein.id
     
     rxn = dict()
     rxn[macromolecule] = -1
@@ -385,19 +331,31 @@ def retrograde_er(macromolecule):
 
 def build_erad_reactions(macromolecule, **kwargs):
     if 'unfolded_protein_c' in kwargs.keys():
+        if macromolecule.type == 'complex':
+            raise ValueError(macromolecule.id + ': Unexpected input argument for ERAD of complexes')
         unfolded_protein_c = kwargs['unfolded_protein_c']
     else:
         unfolded_protein_c = None
-        
-    if macromolecule.compartment == 'g':
-        raise ValueError('This situation is only for complexes, see commented out code below')
-        #retrograde_transport, macromolecule = retrograde_er(macromolecule)
-    else:
-        retrograde_transport = None
     
-    if macromolecule.compartment != 'r':
-        raise ValueError('ERAD can only occur with proteins in ER compartment')
-    unfold_er_protein, unmodified_protein_r = unfold_secretory_protein(macromolecule)
+    if 'ub_args' in kwargs.keys():
+        ub_args = kwargs['ub_args']
+    elif macromolecule.type == 'complex':
+        raise ValueError('"ub_args" must be provided in kwargs for ERAD of complexes')
+    
+    macromolecule_r = macromolecule
+    if macromolecule.compartment == 'g':
+        if macromolecule.type == 'protein':
+            err = 'Internal: Unexpected direct ERAD of Golgi protein (hard-coded seperate retrograde transport' 
+            err += 'reaction); this situation is only for complexes. Should work without this error, but just double check. '
+            raise ValueError(err)
+        else:
+            retrograde_transport, macromolecule_r = retrograde_er(macromolecule)
+    elif macromolecule.compartment == 'r':
+        retrograde_transport = None
+    else:
+        raise ValueError('ERAD is only for Golgi or ER proteins in current model implementation')
+
+    unfold_er_protein, unmodified_protein_r = unfold_secretory_protein(macromolecule_r)
     
 
     # Retro-translocation
@@ -423,19 +381,28 @@ def build_erad_reactions(macromolecule, **kwargs):
 
     erad_reactions = [unfold_er_protein, retrotranslocate_protein]
     if retrograde_transport is not None:
-        erad_reactions.append(retrograde_transport)
+        erad_reactions = [retrograde_transport] + erad_reactions
     
-    for r in erad_reactions:
-        r._update_tracking([macromolecule, unmodified_protein_r, unfolded_protein_c])
-    return erad_reactions, unfolded_protein_c
+    # protein portion hard-coded into protein_expression script, complex degradation is added through build_me    
+    if macromolecule.type == 'protein': 
+        for r in erad_reactions:
+            r._update_tracking([macromolecule, macromolecule_r, unmodified_protein_r, unfolded_protein_c]) #redundanciese dealt with in _consolidate_tracking
+        return erad_reactions, unfolded_protein_c
+    else: # this portion is hard-coded in protein_expression portion
+        erad_reactions += degrade_cytosolic_nuclear_protein(unfolded_protein_c, **{'ub_args': ub_args})
+        for r in erad_reactions:
+            r._update_tracking([macromolecule, macromolecule_r, unmodified_protein_r, unfolded_protein_c]) 
+        return erad_reactions
 
 
-# In[53]:
+# In[6]:
 
 
 def build_endocytosis_reactions(macromolecule_pm, **kwargs):
     ub_args = kwargs['ub_args']
     if 'macromolecule_l' in kwargs.keys():
+        if macromolecule.type == 'complex':
+            raise ValueError(macromolecule.id + ': Unexpected provision of lysosomal complex in endocytosis (internal)')
         macromolecule_l = kwargs['macromolecule_l']
     else:
         macromolecule_l = None    
@@ -443,7 +410,6 @@ def build_endocytosis_reactions(macromolecule_pm, **kwargs):
     ##polyubiquitination for lysosomal targetting-------------------------------------
     polyubiquitinate_protein, polyub_macromolecule_pm = protein_polyubiquitination(macromolecule = macromolecule_pm, 
                                                                                          ub_args = ub_args)
-    
     polyub_macromolecule_l = polyub_macromolecule_pm.change_compartment('l')
     
     
@@ -456,7 +422,7 @@ def build_endocytosis_reactions(macromolecule_pm, **kwargs):
             raise ValueError('Endocytosis: lysosomal and plasma membrane protein lengths disagree')
         
 
-    endocytosis = deg_reaction_map[type(macromolecule_pm)](macromolecule_pm._deg_id + '_CLATHRIN_ENDOCYTOSIS')    
+    endocytosis = deg_reaction_map[macromolecule_pm.type](macromolecule_pm._deg_id + '_CLATHRIN_ENDOCYTOSIS')    
     
     rxn = {polyub_macromolecule_pm: -1, macromolecule_l: 1, metab.h2o_c: -1, ub_args['polyub_c']: 1}
     
@@ -490,13 +456,15 @@ def lysosomal_degradation(macromolecule):
     
     degrade_lysosomal_protein = deg_reaction_map[macromolecule.type](macromolecule._deg_id + '_LYSOSOMAL_DEGRADATION')
     
+    h2o_length = macromolecule._L_protein - 1 if macromolecule.type == 'protein' else     macromolecule._L_protein - sum(macromolecule.decompose_complex().values()) #non-covalent bonds, +1,-1 cancel out
+    
     rxn = {metab.seq_amino_acid_map_l[aa_code]: aa_counts for aa_code, aa_counts in macromolecule._amino_acid_counts.items()}
-    rxn[unmodified_macromolecule], rxn[metab.h2o_l] = -1, -(macromolecule._L_protein-1)
+    rxn[unmodified_macromolecule], rxn[metab.h2o_l] = -1, -h2o_length
     rxn = func.hydrolyze_atp(rxn, n_atp=macromolecule._L_protein*params.proteolysis_translocation_atp_cost, compartment = 'l')
     
     degrade_lysosomal_protein.add_metabolites(rxn)
     degrade_lysosomal_protein.gene_reaction_rule = ' and '.join(mach.cathepsins)
-    degrade_lysosomal_protein.final_reaction = True
+    degrade_lysosomal_protein.sink = True
     
     lysosomal_degradation_rxns += [degrade_lysosomal_protein]
     
@@ -509,29 +477,36 @@ def degrade_lysosomal_pm_protein(macromolecule, **kwargs):
     if 'ub_args' in kwargs.keys():
         ub_args = kwargs['ub_args']
     else:
+        if macromolecule.compartment == 'pm':
+            raise ValueError('ub_args must be provided in **kwargs for degradation of plasma-membrane proteins')
         ub_args = None  
+    
+    macromolecule_l = macromolecule
     if macromolecule.compartment == 'pm':
-        raise ValueError('This is for complexes in the future (see commented code below)')
-        # endocytosis_reactions, macromlecule = build_endocytosis_reactions(macromolecule_pm = protein_pm, 
-                                                                               #protein_l = protein_l,
-                                                                               # ub_args = ub_args)   
+        if macromolecule.type == 'protein':
+            err = 'Internal: Unexpected direct endocytosis of plasma-membrane protein when should be hardcoded in protein_expression script' 
+            err += ' this situation is expected only to be used for complexes. Should work without this error,' 
+            err += ' but just double check.'
+            raise ValueError(err)
+        endocytosis_reactions, macromolecule_l = build_endocytosis_reactions(macromolecule_pm = macromolecule, 
+                                                                               ub_args = ub_args)   
     else:
         endocytosis_reactions = None
-    if macromolecule.compartment != 'l':
+    if macromolecule_l.compartment != 'l':
         raise ValueError('Must be a lysosomal protein/complex being degraded')
     
-    deg_reactions = lysosomal_degradation(macromolecule)
+    deg_reactions = lysosomal_degradation(macromolecule_l)
     if endocytosis_reactions is not None:
         deg_reactions += endocytosis_reactions
     
     for r in deg_reactions:
-        r._update_tracking([macromolecule])
+        r._update_tracking([macromolecule, macromolecule_l]) #redundanciese dealt with in _consolidate_tracking
     return deg_reactions
     
     
 
 
-# In[54]:
+# In[7]:
 
 
 degrade_reaction_map = {'c': degrade_cytosolic_nuclear_protein, 'n': degrade_cytosolic_nuclear_protein, 
@@ -550,19 +525,22 @@ def degrade(macromolecule, **kwargs):
     
     deg_reactions = degrade_reaction_map[macromolecule.compartment](macromolecule, **kwargs)
     
-    if macromolecule.compartment not in ['r', 'g']:
+    if macromolecule.compartment not in ['r', 'g'] or macromolecule.type == 'complex':
         dr = deg_reactions
     else:
         dr = deg_reactions[0]
+    
+    err = False
     for r in dr:
         r._consolidate_macromolecules()    
-    
-    if len([r for r in deg_reactions if len(r.check_mass_balance()) > 0])>0:
+        if len(r.check_mass_balance()) > 0:
+            err = True
+    if err:
         raise ValueError(macromolecule.id + ': Degradation reactions are unbalanced')
     return deg_reactions
 
 
-# In[55]:
+# In[37]:
 
 
 # import random
@@ -596,27 +574,22 @@ def degrade(macromolecule, **kwargs):
 #     gene_info.get_final_locations(metabolic_model = cobra.Model(''), final_locations = location)
 #     proteins.append(Protein(id_ = 'a', compartment = 'c', gene_info = gene_info))
     
-#     proteins_ = list()
-#     for p in proteins:
-#         proteins_.append(p.change_compartment('x'))
-# #     proteins = proteins_
+# #     proteins_ = proteins
+# proteins_ = list()
+# for p in proteins:
+#     proteins_.append(p.change_compartment('l'))
+# proteins = proteins_
 
 # cplx = Complex(metabolites = proteins_+proteins_, complex_id = 'test')
+# cplx = Complex(metabolites = [cplx, cplx] + proteins_ + proteins_, complex_id = 'test2')
 # # cplx._initialize_deg_params()
 
 
-# In[56]:
+# In[27]:
 
 
-# rxns = degrade(proteins_[0])#, **{'ub_args': ub_args})
-# print([r.check_mass_balance() for r in rxns])
-# rxns[0]
-
-
-# In[57]:
-
-
-# rxns = degrade(cplx)
-# print([r.check_mass_balance() for r in rxns])
-# rxns[0]
+# if macromolecule.compartment in ['c', 'n', 'r', 'pm']:
+#    degrade(macromolecule, **{'ub_args': ub_args})
+# else:
+#     degrade(macromolecule)
 

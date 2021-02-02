@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[25]:
+# In[1]:
 
 
 import cobra
@@ -25,7 +25,7 @@ from uniform_processes import biomass
 
 # Ubiquitin expression
 
-# In[26]:
+# In[2]:
 
 
 def express_ubiquitin(compress_mrna = False):

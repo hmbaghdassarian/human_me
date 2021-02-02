@@ -250,3 +250,69 @@ class ME_Reaction(cobra.Reaction):
                     products_.append(k)
         return products_
 
+
+# In[ ]:
+
+
+class Protein_Degradation_Reaction(cobra.Reaction):
+    def __init__(self, id=None, name='', subsystem='', lower_bound=0.0, upper_bound=None):
+        cobra.Reaction.__init__(self, id=id, name=name, subsystem=subsystem, lower_bound=lower_bound, 
+                                upper_bound=upper_bound)
+        self._macromolecules = [] # list of macromolecule ids associated with this degradation reaction
+        self._enzymes = None # list of enzyme ids associated with this degradation reaction
+        self.sink = False # whether the reaction is the "final" (to amino acids) degradation reaction
+        self.subsystem = 'Protein_Degradation'
+        
+    def _update_tracking(self, macromolecules):
+        '''Mutual tracking of degradation reactions associated with a macromolecule and vice-versa'''
+        if type(macromolecules) != list:
+            macromolecules._degradation_reactions.append(self.id)
+            self._macromolecules.append(macromolecules)
+        else:
+            for macromolecule in macromolecules:
+                macromolecule._degradation_reactions.append(self.id)
+                self._macromolecules.append(macromolecule)
+    def _consolidate_macromolecules(self):
+        '''Remove redundant macromolecules'''
+        for m in self._macromolecules:
+            m._consolidate_degradation_rxns()
+        self._macromolecules = list(set(self._macromolecules))
+        
+    def _update_enzymes(self):
+        '''Update enzymes list to include macromolecules that are classified as enzymes'''
+        self._enzymes = [m for m in self._macromolecules if m.enzyme]
+        for m in self.enzymes:
+            if self.id not in m._degradation_reactions:
+                raise ValueErorr('Improper tracking of degradation reactions and associated macromolecules')
+
+class Complex_Degradation_Reaction(cobra.Reaction):
+    def __init__(self, id=None, name='', subsystem='', lower_bound=0.0, upper_bound=None):
+        cobra.Reaction.__init__(self, id=id, name=name, subsystem=subsystem, lower_bound=lower_bound, 
+                                upper_bound=upper_bound)
+        self._macromolecules = [] # list of macromolecule ids associated with this degradation reaction
+        self._enzymes = None # list of enzyme ids associated with this degradation reaction
+        self.sink = False # whether the reaction is the "final" (to amino acids) degradation reaction
+        self.subsystem = 'Complex_Degradation'
+        
+    def _update_tracking(self, macromolecules):
+        '''Mutual tracking of degradation reactions associated with a macromolecule and vice-versa'''
+        if type(macromolecules) != list:
+            macromolecules._degradation_reactions.append(self.id)
+            self._macromolecules.append(macromolecules)
+        else:
+            for macromolecule in macromolecules:
+                macromolecule._degradation_reactions.append(self.id)
+                self._macromolecules.append(macromolecule)
+    def _consolidate_macromolecules(self):
+        '''Remove redundant macromolecules'''
+        for m in self._macromolecules:
+            m._consolidate_degradation_rxns()
+        self._macromolecules = list(set(self._macromolecules))
+        
+    def _update_enzymes(self):
+        '''Update enzymes list to include macromolecules that are classified as enzymes'''
+        self._enzymes = [m for m in self._macromolecules if m.enzyme]
+        for m in self.enzymes:
+            if self.id not in m._degradation_reactions:
+                raise ValueErorr('Improper tracking of degradation reactions and associated macromolecules')
+

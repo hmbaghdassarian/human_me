@@ -750,7 +750,7 @@ def get_protein_expression_reactions(gene_info, mrna_transcript_c, mrna_deg_prox
 # protein_expression_reactions
 
 # # for p in protein_metabolites:
-# #     fr = [r for r in protein_expression_reactions if r.id in p._degradation_reactions and r.final_reaction]
+# #     fr = [r for r in protein_expression_reactions if r.id in p._degradation_reactions and r.sink]
 # #     if len(fr) > 1:
 # #         print(p)
 # #         print(fr)

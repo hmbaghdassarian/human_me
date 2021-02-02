@@ -14,6 +14,7 @@ import sys
 sys.path.insert(1, '../../scripts/')
 from macromolecules.macromolecule import Macromolecule
 from utils import machinery as mach
+from utils import parameters as params
 
 
 # In[9]:
@@ -198,11 +199,10 @@ class Complex(Macromolecule):
     
     def change_compartment(self, new_compartment):
         '''Returns a copy of the complex metabolite, but in new compartment'''
-        return self.change_compartment_and_components(new_compartment)
-    def change_compartment_and_components(self, new_compartment):
+        return self._change_compartment_and_components(new_compartment)
+    def _change_compartment_and_components(self, new_compartment):
         '''Returns a copy of the complex metabolite, but in new compartment. 
         Recursive to change all components (nested complexes and their components)'''
-
 
         if new_compartment == self.compartment:
             raise ValueError('The macromolecule is already in this compartment')
@@ -215,159 +215,12 @@ class Complex(Macromolecule):
             if m.type != 'complex':
                 metabolites += [m.change_compartment(new_compartment)]*c
             else:
-                metabolites += [m.change_compartment_and_components(new_compartment)]*c
+                metabolites += [m._change_compartment_and_components(new_compartment)]*c
 
-        new_complex = Complex(metabolites = metabolites, complex_id = complex.temp_id)
+        new_complex = Complex(metabolites = metabolites, complex_id = self.temp_id)
         if self._deg_initialized:
             new_complex._initialize_deg_params()
         return new_complex
-
-
-# In[92]:
-
-
-import sys
-import random
-import pandas as pd
-from expression.gene_information import gene_information
-import expression.build_mrna_expression_reactions as build_mrna
-from expression.protein_expression import ubiquitin
-from macromolecules.protein import Protein
-from utils import parameters as params
-
-proteins = []
-for i in range(2):
-    psim_toy = pd.DataFrame(columns = ['HGNC_ID', 'PREMRNA_SEQ', 'MRNA_SEQ', 'PROTEIN_SEQ', 'POLYA_LENGTH', 'TMD', 
-                                   'SP', 'N_INTRONS', 'DSB', 'GPI', 'OG', 'LOCATION'])
-
-    hgnc_id, premrna_seq = 'HGNC:TOY', ''.join(random.choices(['U', 'C', 'G', 'A'], k = 100))
-    mrna_seq = premrna_seq[25:75]
-    # note that there is no check that the protein_sequence corresponds to the mrna_sequence beyond checking for the length
-    protein_seq = ''.join(random.choices(params.amino_acids, k = int(len(mrna_seq)/3)))
-    polyA_length, tmd, sp, n_exons, dsb, gpi, og  = None, 1, True, None, 2, 2, 2
-    ub_args = ubiquitin.express_ubiquitin(compress_mrna = False)
-
-    import itertools
-    reactions = list()
-
-    location = list(params.compartments.keys())
-    psim_toy.loc[0,:] = [hgnc_id, premrna_seq, mrna_seq, protein_seq, polyA_length, tmd, sp, n_exons, dsb, gpi, og, location]
-    gene_info = gene_information(hgnc_id, premrna_seq, mrna_seq, protein_seq,
-                     ptms = {}, tmd = tmd, sp = sp, polyA_length = polyA_length, 
-                     n_exons = n_exons) 
-    gene_info.get_final_locations(metabolic_model = cobra.Model(''), final_locations = location)
-    proteins.append(Protein(id_ = 'a', compartment = 'c', gene_info = gene_info))
-    
-    proteins_ = list()
-    for p in proteins:
-        proteins_.append(p.change_compartment('g'))
-#     proteins = proteins_
-
-cplx = Complex(metabolites = proteins_+proteins_, complex_id = 'test')
-cplx = Complex(metabolites = [cplx, cplx] + proteins_ + proteins_, complex_id = 'test')
-cplx._initialize_deg_params()
-
-
-# In[93]:
-
-
-new_complex = cplx.change_compartment('c')
-
-
-# In[95]:
-
-
-new_complex.components
-
-
-# In[97]:
-
-
-cplx.components
-
-
-# In[ ]:
-
-
-
-
-
-# In[69]:
-
-
-def change_compartment(complex, new_compartment):
-    '''Returns a copy of the macromolecule metabolite, but in new compartment. 
-    Recursive to change all components (nested complexes and their components)'''
-    
-    
-    if new_compartment == complex.compartment:
-        raise ValueError('The macromolecule is already in this compartment')
-    if new_compartment not in params.compartments.keys():
-        err = 'Specified compartment is not considered in the ME Model. Please input one of the following: ' 
-        err += ', '.join(list(params.compartments.keys()))
-
-    metabolites = list()
-    for m,c in complex.components.items():
-        if m.type != 'complex':
-            metabolites += [m.change_compartment(new_compartment)]*c
-        else:
-            metabolites += [change_compartment(m, new_compartment)]*c
-    
-    new_complex = Complex(metabolites = metabolites, complex_id = complex.temp_id)
-    if complex._deg_initialized:
-        new_complex._initialize_deg_params()
-    return new_complex
-
-    
-    
-
-
-# In[82]:
-
-
-
-
-
-# In[72]:
-
-
-new_complex = change_compartment(complex = cplx, new_compartment = 'c')
-
-
-# In[74]:
-
-
-new_complex._L_protein
-
-
-# In[57]:
-
-
-cplx.components
-
-
-# In[51]:
-
-
-cplx._L_protein
-
-
-# In[ ]:
-
-
-
-
-
-# In[ ]:
-
-
-
-
-
-# In[ ]:
-
-
-
 
 
 # In[ ]:
