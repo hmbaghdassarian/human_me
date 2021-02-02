@@ -35,7 +35,7 @@ with warnings.catch_warnings():
     
     with func.HiddenPrints():
         from macromolecules.protein import Protein
-        from macromolecules.complex import Complex
+        from macromolecules.complex import Complex, Ribosomal_Complex
         
         import expression.build_mrna_expression_reactions as build_mrna
         from expression import gene_information
@@ -92,7 +92,20 @@ def generate_expression_module(me_reactions):
 
 class me_builder():
     def __init__(self, compress_mrna = False, dummy_protein = True, 
+                 deg_args = {'couple': True, 'reversible_complex_formation': False, 'nonenzyme_degradation': False, 
+                          'complex_degradation': True},
                 psim_me = params.psim_me, m_model = params.human_model):
+
+        # check deg args
+        if not deg_args['complex_degradation']:
+            if not deg_args['nonenzyme_degradation'] or not deg_args['reversible_complex_formation']:
+                err = 'If complex degradation is not included, the formation must be reversible and the individual '
+                err += 'components must be able to be degraded. Set nonenzyme_degradation and reversible_complex_formation'
+                err += ' to True or complex_degradation to True'
+                raise ValueError(err)
+        if deg_args['couple'] and not deg_args['complex_degradation']:
+            raise ValueError('In order to couple metabolic catalysis to enzyme degradation, complex_degradation must be True')
+        self.deg_args = deg_args
         
         self.non_machinery = open(processed_data_path + 'corrected_non_machinery.txt').read().splitlines()
         self.psim_me = psim_me
@@ -103,7 +116,8 @@ class me_builder():
         print('Generate ubiquitin reactions for proteasomal degradation')
         self.ub_args = ubiquitin.express_ubiquitin(compress_mrna = self.compress_mrna)
         print('Generate ribosome')
-        ribosomal_reactions, self.ribosome_complex_c = build_ribosome(self.ub_args, self.compress_mrna )
+        ribosomal_reactions, self.ribosome_complex_c = build_ribosome(self.ub_args, self.compress_mrna, 
+                                                                    self.deg_args['reversible_complex_formation'])
         
         self.dummy_protein = dummy_protein
             
@@ -372,13 +386,20 @@ class me_builder():
             machinery = unique_complexes.loc[i, 'machinery'].split(';')
 
             machinery_metabolites = list()
+            counter_rib = 0
             for m in machinery:
                 if m != 'ribosome':
                     machinery_metabolites.append(self.id_protein_map[m][compartment])
+
                 else:
                     machinery_metabolites.append(self.ribosome_complex_c)
+                    counter_rib += 1
 
-            complex_metabolite = Complex(metabolites = machinery_metabolites, complex_id = complex_id)
+            if counter_rib==0:
+                complex_metabolite = Complex(metabolites = machinery_metabolites, complex_id = complex_id)
+            else:
+                complex_metabolite = Ribosomal_Complex(metabolites = machinery_metabolites, complex_id = complex_id)
+            
             if len(complex_id) > 247: # ids that are too long
                 complex_metabolite.update_id(new_id = str(counter)) # complex_metabolite.udate_id()
                 counter += 1
@@ -387,7 +408,7 @@ class me_builder():
                 self.complex_df.complex_id.replace(to_replace = complex_id, value = complex_metabolite.temp_id, 
                                                    inplace = True)
 
-            complex_reaction = complex_metabolite.form_complex()
+            complex_reaction = complex_metabolite.form_complex(reversible = self.deg_args['reversible_complex_formation'])
 
             complex_formation_reactions.append(complex_reaction)
             self.complex_id_metabolite_map[complex_metabolite.temp_id] = complex_metabolite
@@ -793,8 +814,10 @@ class me_builder():
 # In[4]:
 
 
-def build_me(minimal_proteome = False, compress_mrna = False,
-             dummy_protein = True, model_id = 'HUMAN_ME_MODEL'):
+def build_me(minimal_proteome = True, compress_mrna = True, dummy_protein = True,
+             deg_args = {'couple': True, 'reversible_complex_formation': False, 'nonenzyme_degradation': False, 
+                          'complex_degradation': True},
+             model_id = 'HUMAN_ME_MODEL'):
     '''Generates a human ME_model. 
     
     Parameters
@@ -810,14 +833,34 @@ def build_me(minimal_proteome = False, compress_mrna = False,
     dummy_protein: bool [True]
         whether to add a representative dummy protein to catalyze orphan reactions 
     model_id: string; id for the me model
+    deg_args: dict
+        A number of options related to protein and complex degradation. Becomes important in slow growth conditions.
+        Note the default values focus on coupling fluxes and degrading the specific enzymes associated with 
+        each reaction. 
 
-    
+        Key value pairs:
+            "couple": bool
+                Whether to explicitly couple enzyme degradation reactions to metabolic catalysis. Becomes 
+                particularly important in slow growth conditions.
+            "reversible_complex_formation": bool
+                Whether reactions to form complexes are reversible (<->) or not (-->). Setting to True may make
+                model more efficient (reuse of proteins involved in catalysis of multiple reactions in same compartment)
+            "nonenzyme_degradation": bool
+                Whether to retain degradation reactions (associated with the build_protein_expression script) for
+                proteins that form complexes rather than become monomeric enzymes; i.e., all individual complex 
+                subunits have their own protein degradation reaction. Note that even if set to False, 
+                protein intermediates associated with the monomeric enzyme that had degradation rections are retained.
+                Regardless of this parameter, only the specific enzymatic degradation reaction associated with the 
+                catalysis reaction will be coupled. Independent of complex_degradation and 
+                reversible_complex_formation arguments
+            "complex_degration": bool
+                Whether to generate degradation reactions for whole complexes in addition to individual monomers
+                (required for coupling)
     '''
-    start = time.time()
     
+    start = time.time()
     builder = me_builder(compress_mrna = compress_mrna, 
-                         dummy_protein = dummy_protein, psim_me = params.psim_me, 
-                         m_model = params.human_model)
+                         dummy_protein = dummy_protein, deg_args = deg_args)
     builder.express_metabolic_enzymes()
     builder.express_expression_enzymes()
     builder.express_dummy_protein()
@@ -841,28 +884,45 @@ def build_me(minimal_proteome = False, compress_mrna = False,
 # In[5]:
 
 
-gc.collect()
+# if macromolecule.compartment in ['c', 'n', 'r', 'pm']:
+#    degrade(macromolecule, **{'ub_args': ub_args})
+# else:
+#     degrade(macromolecule)
+    
+# current: deg_args = {'reversible_complex_formation': True, 
+#                        'couple' = False, 
+#                        'nonenzyme_degradation': True, 
+#                        'complex_degradation': False}
 
 
 # In[6]:
 
 
-# minimal_proteome = True
-# compress_mrna = True 
-# dummy_protein = True 
-# model_id = 'HUMAN_ME_MODEL'
+gc.collect()
 
 
 # In[7]:
 
 
-# builder = me_builder(compress_mrna = compress_mrna, 
-#                      dummy_protein = dummy_protein, psim_me = params.psim_me, 
-#                      m_model = params.human_model)
-# builder.express_metabolic_enzymes()
-# builder.express_expression_enzymes()
-# builder.express_dummy_protein()
-# builder.get_complex_info()
+minimal_proteome = True
+compress_mrna = True 
+dummy_protein = False 
+model_id = 'HUMAN_ME_MODEL'
+deg_args = {'reversible_complex_formation': True, 
+                       'couple': False, 
+                       'nonenzyme_degradation': True, 
+                       'complex_degradation': False}
+
+
+# In[8]:
+
+
+builder = me_builder(compress_mrna = compress_mrna, 
+                         dummy_protein = dummy_protein, deg_args = deg_args)
+builder.express_metabolic_enzymes()
+builder.express_expression_enzymes()
+builder.express_dummy_protein()
+builder.get_complex_info()
 # builder.generate_complex_reactions()
 # builder.get_keff()
 # if minimal_proteome:
@@ -874,6 +934,85 @@ gc.collect()
 # me_model = builder.build_me_model(model_id = model_id)
 # print('solve')
 # sln, stat, _ = me_model.solve_lp(mu_val = 1e-9)
+
+
+# In[9]:
+
+
+self = copy.deepcopy(builder)
+
+
+# In[10]:
+
+
+unique_complexes = self.complex_df[self.complex_df.is_complex]
+unique_complexes = unique_complexes.drop_duplicates(subset = 'complex_id', keep = 'first')
+unique_complexes.reset_index(inplace = True, drop = True)
+
+complex_formation_reactions = list() # store all complex formation reactions
+
+counter = 0
+for i in unique_complexes.index:
+    print(i)
+    complex_id = unique_complexes.loc[i, 'complex_id']
+    compartment = unique_complexes.loc[i, 'compartment']
+    machinery = unique_complexes.loc[i, 'machinery'].split(';')
+
+    machinery_metabolites = list()
+    counter_rib = 0
+    for m in machinery:
+        if m != 'ribosome':
+            machinery_metabolites.append(self.id_protein_map[m][compartment])
+            
+        else:
+            machinery_metabolites.append(self.ribosome_complex_c)
+            counter_rib += 1
+    
+    if counter_rib==0:
+        complex_metabolite = Complex(metabolites = machinery_metabolites, complex_id = complex_id)
+    else:
+        complex_metabolite = Ribosomal_Complex(metabolites = machinery_metabolites, complex_id = complex_id)
+
+
+    if len(complex_id) > 247: # ids that are too long
+        complex_metabolite.update_id(new_id = str(counter)) # complex_metabolite.udate_id()
+        counter += 1
+
+        new_id = complex_metabolite.id
+        self.complex_df.complex_id.replace(to_replace = complex_id, value = complex_metabolite.temp_id, 
+                                           inplace = True)
+
+    complex_reaction = complex_metabolite.form_complex(reversible = self.deg_args['reversible_complex_formation'])
+
+    complex_formation_reactions.append(complex_reaction)
+    self.complex_id_metabolite_map[complex_metabolite.temp_id] = complex_metabolite
+    self.complex_reactions_map[complex_metabolite.temp_id] = complex_reaction.id
+
+self.complex_formation_reactions = complex_formation_reactions
+
+
+# In[24]:
+
+
+counter_rib
+
+
+# In[27]:
+
+
+complex_metabolite = Ribosomal_Complex(metabolites = machinery_metabolites)
+
+
+# In[28]:
+
+
+complex_metabolite.form_complex(reversible = self.deg_args['reversible_complex_formation'])
+
+
+# In[29]:
+
+
+complex_metabolite._check_metabolite_types()
 
 
 # In[ ]:

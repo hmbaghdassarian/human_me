@@ -25,4 +25,4 @@ for dp in dummy_protein:
             except:
                 res.loc[counter, : ] = [dp, mp, cm, float('nan')]
             counter += 1
-res.to_csv('trash.csv')
+res.to_csv('trash2.csv')

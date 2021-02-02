@@ -52,7 +52,7 @@ class Protein(Macromolecule):
         
         if gene_info is not None:
             # for degradation
-            self._L_protein = gene_info.L_protein
+            self.length = gene_info.L_protein
             self._deg_id = gene_info.hgnc_id
             self._amino_acid_counts = gene_info.amino_acid_counts
             self._ptms = gene_info.ptms
@@ -63,7 +63,7 @@ class Protein(Macromolecule):
             
         else:
             self._amino_acid_counts = amino_acid_counts
-            self._L_protein = sum(amino_acid_counts.values())
+            self.length = sum(amino_acid_counts.values())
             id_ = id_ + '_protein_' + compartment
         
         charge = sum([metab.seq_amino_acid_map_compartments[compartment][aa_code].charge*aa_count for aa_code, aa_count in self._amino_acid_counts.items()])
@@ -78,8 +78,8 @@ class Protein(Macromolecule):
             raise ValueError('Internal: Must add ' + compartment + ' compartment to amino acid map in metab')
 
         # peptide bond formation
-        elements['H'] -= 2*(self._L_protein-1)
-        elements['O'] -= 1*(self._L_protein-1)
+        elements['H'] -= 2*(self.length-1)
+        elements['O'] -= 1*(self.length-1)
         
         Macromolecule.__init__(self, id = id_, compartment = compartment, charge = charge, elements = elements)
         

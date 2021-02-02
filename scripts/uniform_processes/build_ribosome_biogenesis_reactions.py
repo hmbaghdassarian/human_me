@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[8]:
+# In[1]:
 
 
 import cobra
@@ -20,7 +20,7 @@ from utils import parameters as params
 from utils import metabolites as metab
 from utils import functions as func
 
-from macromolecules.complex import Complex#, add_biomass_change
+from macromolecules.complex import Ribosomal_Complex
 from macromolecules.RNA import rRNA, RNA_fragment
 from macromolecules.protein import Protein
 
@@ -88,7 +88,7 @@ six_s_index = 1 #https://www.nature.com/articles/s41594-019-0234-x?draft=collect
 
 
 
-# In[11]:
+# In[3]:
 
 
 # from expression.protein_expression import ubiquitin
@@ -97,7 +97,7 @@ six_s_index = 1 #https://www.nature.com/articles/s41594-019-0234-x?draft=collect
 # rs_expression_reactions, rs_protein_metabolites, rl_expression_reactions, rl_protein_metabolites = build_ribosome_protein_expression_reactions(ub_args, compress_mrna)
 
 
-# In[9]:
+# In[4]:
 
 
 psim_rib = params.psim_me.copy()
@@ -196,7 +196,7 @@ def build_ribosome_protein_expression_reactions(ub_args, compress_mrna = False):
     return rs_expression_reactions, rs_protein_metabolites, rl_expression_reactions, rl_protein_metabolites
 
 
-# In[12]:
+# In[5]:
 
 
 def build_rrna5s_reactions(rpl5_n, rpl11_n):
@@ -219,7 +219,7 @@ def build_rrna5s_reactions(rpl5_n, rpl11_n):
     for k,v in metab.nmp_map_n.items():
         rxn[v] = deg_base_counts[k]
 
-    rrna5s_complex_n = Complex([rrna5s_n, rpl5_n, rpl11_n])
+    rrna5s_complex_n = Ribosomal_Complex([rrna5s_n, rpl5_n, rpl11_n])
 
     rxn[pre_rrna5s_n], rxn[rpl5_n], rxn[rpl11_n]  = -1, -1, -1
     rxn[rrna5s_complex_n] = 1
@@ -241,7 +241,7 @@ def build_rrna5s_reactions(rpl5_n, rpl11_n):
     return rrna5s_reactions, rrna5s_complex_n, rrna5s_c
 
 
-# In[13]:
+# In[6]:
 
 
 # ets_5_frag1 is from 5' end of 47s to A' site
@@ -252,7 +252,7 @@ def build_rrna5s_reactions(rpl5_n, rpl11_n):
 # its_1_frag2_seq is less than E site (some degradation) + a polyA/U tail
 
 def build_other_rrna_reactions(rrna5s_complex_n, rs_protein_metabolites, rl_protein_metabolites, 
-                              rpl5_n, rpl11_n, rrna5s_c):
+                              rpl5_n, rpl11_n, rrna5s_c, reversible_complex_formation = False):
 
     # https://www.ncbi.nlm.nih.gov/pmc/articles/PMC6315592/ figure 2
 
@@ -387,8 +387,8 @@ def build_other_rrna_reactions(rrna5s_complex_n, rs_protein_metabolites, rl_prot
 
     # pre40s complex------------------------------------------------------------------------------------
     metabolites = [m for m in rs_protein_metabolites if m.compartment == 'n'] + [rrna_18se_processed_n]
-    pre40s_complex_n = Complex(metabolites = metabolites, complex_id = 'pre40s', )
-    pre40s_complex_formation = pre40s_complex_n.form_complex()
+    pre40s_complex_n = Ribosomal_Complex(metabolites = metabolites, complex_id = 'pre40s')
+    pre40s_complex_formation = pre40s_complex_n.form_complex(reversible = reversible_complex_formation)
     pre40s_complex_formation.lower_bound = 0
     pre40s_complex_formation.gene_reaction_rule = ' and '.join(mach.pre40s_rbfs)
 
@@ -412,7 +412,7 @@ def build_other_rrna_reactions(rrna5s_complex_n, rs_protein_metabolites, rl_prot
     rrna_18s_formation = cobra.Reaction('40s_MATURATION')
     # endonuclolytic cleavage event at site 3
     metabolites = [m for m in rs_protein_metabolites if m.compartment == 'c'] + [rrna_18s_c]
-    forty_s_complex_c = Complex(metabolites = metabolites, complex_id = '40s')
+    forty_s_complex_c = Ribosomal_Complex(metabolites = metabolites, complex_id = '40s')
 
     rrna_18s_formation.add_metabolites({metab.h2o_n: -1, pre40s_complex_c: -1, forty_s_complex_c: 1, 
                                         its_1_frag2_c: 1})
@@ -537,8 +537,8 @@ def build_other_rrna_reactions(rrna5s_complex_n, rs_protein_metabolites, rl_prot
     # pre60s complex formation------------------------------------------------------------------------------------
     rl_2 = list(set(rl_protein_metabolites).difference([rpl5_n, rpl11_n]))
     metabolites = [m for m in rl_2 if m.compartment == 'n'] + [rrna_28s_n, rrna_6s_n, rrna5s_complex_n]
-    pre60s_complex_n = Complex(metabolites = metabolites, complex_id = 'pre60s')
-    pre60s_complex_formation = pre60s_complex_n.form_complex(reaction_id = 'pre60s')
+    pre60s_complex_n = Ribosomal_Complex(metabolites = metabolites, complex_id = 'pre60s')
+    pre60s_complex_formation = pre60s_complex_n.form_complex(reaction_id = 'pre60s', reversible = reversible_complex_formation)
     # add a gtp hydrolysis to the complex formation: https://www.embopress.org/doi/full/10.15252/embj.2018100278
     rxn = pre60s_complex_formation.metabolites.copy()
     # gtp hydrolysis
@@ -567,7 +567,7 @@ def build_other_rrna_reactions(rrna5s_complex_n, rs_protein_metabolites, rl_prot
     rrna_28s_c = rrna_28s_n.change_compartment('c')
 
     metabolites = [m for m in rl_2 if m.compartment == 'c'] + [rrna_28s_c, rrna_5_8s_c, rrna5s_c]
-    sixty_s_complex_c = Complex(metabolites = metabolites, complex_id = '60s')
+    sixty_s_complex_c = Ribosomal_Complex(metabolites = metabolites, complex_id = '60s')
     rrna_5_8s_formation = cobra.Reaction('60s_maturation')
     rxn = dict()
 
@@ -602,20 +602,22 @@ def build_other_rrna_reactions(rrna5s_complex_n, rs_protein_metabolites, rl_prot
     return all_reactions, mature_ribosomal_precomplexes, mature_rrna_metabolites
 
 
-# In[14]:
+# In[7]:
 
 
-def build_ribosome(ub_args, compress_mrna = False):
+def build_ribosome(ub_args, compress_mrna = False, reversible_complex_formation = False):
     with func.HiddenPrints():
         rs_expression_reactions, rs_protein_metabolites, rl_expression_reactions, rl_protein_metabolites = build_ribosome_protein_expression_reactions(ub_args, compress_mrna)
     rpl5_n = [m for m in rl_protein_metabolites if m.id == 'HGNC:10360_folded_protein_n'][0]
     rpl11_n = [m for m in rl_protein_metabolites if m.id == 'HGNC:10301_folded_protein_n'][0]
     rrna5s_reactions, rrna5s_complex_n, rrna5s_c = build_rrna5s_reactions(rpl5_n, rpl11_n)
-    other_rrna_reactions, mature_ribosomal_precomplexes, mature_rrna_metabolites = build_other_rrna_reactions(rrna5s_complex_n, rs_protein_metabolites, rl_protein_metabolites, rpl5_n, rpl11_n, rrna5s_c)
+    other_rrna_reactions, mature_ribosomal_precomplexes, mature_rrna_metabolites =         build_other_rrna_reactions(rrna5s_complex_n, rs_protein_metabolites, rl_protein_metabolites, 
+                                   rpl5_n, rpl11_n, rrna5s_c, 
+                                   reversible_complex_formation = reversible_complex_formation)
 
     # ribosome complex formation
-    ribosome_complex_c = Complex(metabolites = mature_ribosomal_precomplexes, complex_id = 'mature_ribosome')
-    ribosome_complex_formation = ribosome_complex_c.form_complex()
+    ribosome_complex_c = Ribosomal_Complex(metabolites = mature_ribosomal_precomplexes, complex_id = 'mature_ribosome')
+    ribosome_complex_formation = ribosome_complex_c.form_complex(reversible = reversible_complex_formation)
     # add a gtp hydrolysis to the complex formation: https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5861459/
     rxn = ribosome_complex_formation.metabolites.copy()
     rxn[metab.ntp_map_c['G']], rxn[metab.h2o_c], rxn[metab.ndp_map_c['G']], rxn[metab.pi_c], rxn[metab.h_c]  = -1, -1, 1, 1, 1
@@ -638,10 +640,4 @@ def build_ribosome(ub_args, compress_mrna = False):
         r.subsystem = 'Ribosome_Biogenesis'
 
     return  all_reactions, ribosome_complex_c
-
-
-# In[ ]:
-
-
-
 

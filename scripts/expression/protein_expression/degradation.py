@@ -3,26 +3,28 @@
 
 # This script provides a complete set of specific degradation reactions for complexes, based on their compartment. For proteins, conditional inclusion of various reactions based on gene features, etc is implemented in the build_protein_express_reactions script.
 
-# In[1]:
+# In[2]:
 
 
 import cobra
 
 import sys
 sys.path.insert(1, '../../../scripts/')
+from preprocess import parse_complex
+
 from utils import machinery as mach
 from utils import parameters as params
 from utils import metabolites as metab
 from utils import functions as func
 
 from macromolecules.protein import Protein
-from macromolecules.complex import Complex
+from macromolecules.complex import Complex, Ribosomal_Complex
 from macromolecules.complex import add_complex_metabolites
 
 from core.reaction import Protein_Degradation_Reaction, Complex_Degradation_Reaction
 
 
-# In[2]:
+# In[3]:
 
 
 deg_reaction_map = {'protein': Protein_Degradation_Reaction, 'complex': Complex_Degradation_Reaction}
@@ -30,7 +32,7 @@ deg_reaction_map = {'protein': Protein_Degradation_Reaction, 'complex': Complex_
 
 # # Cytosol and Nucleus
 
-# In[3]:
+# In[4]:
 
 
 def protein_polyubiquitination(macromolecule, **kwargs):
@@ -82,6 +84,7 @@ def protein_polyubiquitination(macromolecule, **kwargs):
     return polyubiquitinate_protein, polyub_macromolecule
 
 def proteasomal_degradation(macromolecule, **kwargs):
+    '''Can handle proteins, complexes, and ribosomal complexes'''
     polyub_macromolecule = kwargs['polyub_macromolecule']
     ub_args = kwargs['ub_args']
     
@@ -99,28 +102,53 @@ def proteasomal_degradation(macromolecule, **kwargs):
     
     #------------------------------degradation------------------------------------
     protein_degradation = deg_reaction_map[macromolecule.type](macromolecule.id + '_PROTEASOMAL_DEGRADATION' + macromolecule.compartment)
-    
-    h2o_length = macromolecule._L_protein
+
+    protein_length = macromolecule.length if type(macromolecule) != Ribosomal_Complex else macromolecule.length['protein']
+    h2o_length = protein_length
+
     if macromolecule.type == 'protein':
         aac = macromolecule._amino_acid_counts.copy()
-    else:
+    else: # complexes
+        if type(macromolecule) != Ribosomal_Complex: #non ribosomal complexes
+            h2o_length -= sum(macromolecule.decompose_complex().values()) # non-covalent bonds don't require h2o, 
+        else: # ribosomal complexes
+            h2o_length -= sum([v for m,v in macromolecule.decompose_complex().items() if m.type == 'protein']) # non-covalent bonds don't require h2o, 
         aac = polyub_macromolecule._amino_acid_counts.copy()
         aac.subtract(ub_args['polyub_' + macromolecule.compartment]._amino_acid_counts)
-        h2o_length -= sum(macromolecule.decompose_complex().values()) # non-covalent bonds don't require h2o, 
         h2o_length += 1 # 1 required for fused polyub
-        
-    
+
+
     rxn = {metab.seq_amino_acid_map_compartments[macromolecule.compartment][aa_code]: aa_counts for aa_code, aa_counts in aac.items()}
     rxn[polyub_macromolecule] = -1
     rxn[metab.h2o_compartments[macromolecule.compartment]] = -h2o_length
     rxn[ub_args['polyub_' + macromolecule.compartment]] =  1
     # atp hydrolysis for translocation/unfolding  - known 1 ATP per 2 residues - https://www.nature.com/articles/s41586-018-0736-4
-    rxn = func.hydrolyze_atp(rxn, n_atp = macromolecule._L_protein/2, 
+    rxn = func.hydrolyze_atp(rxn, n_atp = protein_length/2, 
                              compartment = macromolecule.compartment)
 
-    protein_degradation.add_metabolites(rxn)
-    protein_degradation.gene_reaction_rule = ' and '.join(mach.proteasome_machinery)
-    
+    machinery_ = mach.proteasome_machinery
+    if type(macromolecule) == Ribosomal_Complex:
+        rm = [m for m in macromolecule.decompose_complex() if m.type != 'protein']
+        if sorted([m.id for m in rm]) != ['18s_rrna_c', '28s_rrna_c', '5_8s_rrna_c', '5s_rrna_c']:
+            err = 'Internal: Only expect rrna of mature ribosome complex to be degraded. Should work with current code'
+            err += ' but double check as other RNA molecules are not expected and appropriate machinery is added.'
+            raise ValueError(err)
+
+        for rm_ in rm:
+            new_rxn = rm_.exonucleolytic_degradation(reaction_name = '', update = True)
+            for m,c in new_rxn.metabolites.items():
+                if not hasattr(m, 'type') or m.type != 'rrna':
+                    if m in rxn.keys():
+                        rxn[m] += c
+                    else:
+                        rxn[m] = c
+
+        machinery_ += mach.exosome['HGNC ID (gene)'].tolist() #rrna degradation machinery
+
+    machinery_ = sorted(set(machinery_))
+    protein_degradation.add_metabolites(rxn)    
+    protein_degradation.gene_reaction_rule = ' and '.join(machinery_)
+
     # tracking
     protein_degradation.sink = True
     for r in [deubiquitination, protein_degradation]:
@@ -142,13 +170,13 @@ def degrade_cytosolic_nuclear_protein(macromolecule, **kwargs):
 
 # # Mitochondria and Intermembrane Space
 
-# In[4]:
+# In[5]:
 
 
 def degrade_mitochondrial_protein(macromolecule):
     rxn = {metab.seq_amino_acid_map_m[aa_code]: aa_counts for aa_code, aa_counts in macromolecule._amino_acid_counts.items()}
     
-    h2o_length = macromolecule._L_protein - 1 if macromolecule.type == 'protein' else     macromolecule._L_protein - sum(macromolecule.decompose_complex().values()) #non-covalent bonds, +1,-1 cancel out
+    h2o_length = macromolecule.length - 1 if macromolecule.type == 'protein' else     macromolecule.length - sum(macromolecule.decompose_complex().values()) #non-covalent bonds, +1,-1 cancel out
     rxn[macromolecule], rxn[metab.h2o_m] = -1, -h2o_length
     
     if macromolecule.compartment == 'm':
@@ -156,7 +184,7 @@ def degrade_mitochondrial_protein(macromolecule):
         mitochondrial_degradation.gene_reaction_rule = mach.mLON[0]
         
         # ATP hydrolysis by LON: 2 ATP per residue - https://www.ncbi.nlm.nih.gov/pmc/articles/PMC2518814/
-        rxn = func.hydrolyze_atp(rxn, n_atp = macromolecule._L_protein*2, compartment = 'm')
+        rxn = func.hydrolyze_atp(rxn, n_atp = macromolecule.length*2, compartment = 'm')
         
 
     elif macromolecule.compartment == 'i':
@@ -165,7 +193,7 @@ def degrade_mitochondrial_protein(macromolecule):
         # in the future, may want to add ubqituin-proteasome: 
         
         # ATP hydrolysis by m/i-AAA: 1 ATP per 2 residues -- no source, assumes same as 26S proteasome
-        rxn = func.hydrolyze_atp(rxn, n_atp = macromolecule._L_protein*params.proteolysis_translocation_atp_cost, compartment = 'i')
+        rxn = func.hydrolyze_atp(rxn, n_atp = macromolecule.length*params.proteolysis_translocation_atp_cost, compartment = 'i')
   
     mitochondrial_degradation.add_metabolites(rxn)
     
@@ -180,12 +208,12 @@ def degrade_peroxisomal_protein(macromolecule):
     peroxisomal_degradation = deg_reaction_map[macromolecule.type](macromolecule._deg_id + '_DEGRADATIONx')
     peroxisomal_degradation.gene_reaction_rule = mach.LONP2[0]
     
-    h2o_length = macromolecule._L_protein - 1 if macromolecule.type == 'protein' else     macromolecule._L_protein - sum(macromolecule.decompose_complex().values()) #non-covalent bonds +1,-1 cancel out
+    h2o_length = macromolecule.length - 1 if macromolecule.type == 'protein' else     macromolecule.length - sum(macromolecule.decompose_complex().values()) #non-covalent bonds +1,-1 cancel out
     
     rxn = {metab.seq_amino_acid_map_x[aa_code]: aa_counts for aa_code, aa_counts in macromolecule._amino_acid_counts.items()}
     rxn[macromolecule], rxn[metab.h2o_x] = -1, -h2o_length
     # ATP hydrolysis by LON: 2 ATP per residue - https://www.ncbi.nlm.nih.gov/pmc/articles/PMC2518814/
-    rxn = func.hydrolyze_atp(rxn, n_atp = macromolecule._L_protein*2, compartment = 'x')
+    rxn = func.hydrolyze_atp(rxn, n_atp = macromolecule.length*2, compartment = 'x')
     peroxisomal_degradation.add_metabolites(rxn)
     
     peroxisomal_degradation.sink = True
@@ -196,7 +224,7 @@ def degrade_peroxisomal_protein(macromolecule):
 
 # # Secretory Pathway Degradation
 
-# In[5]:
+# In[6]:
 
 
 def unfold_secretory_protein(macromolecule):
@@ -395,7 +423,7 @@ def build_erad_reactions(macromolecule, **kwargs):
         return erad_reactions
 
 
-# In[6]:
+# In[7]:
 
 
 def build_endocytosis_reactions(macromolecule_pm, **kwargs):
@@ -418,7 +446,7 @@ def build_endocytosis_reactions(macromolecule_pm, **kwargs):
     if macromolecule_l == None:
         macromolecule_l = macromolecule_pm.change_compartment('l')
     else:
-        if macromolecule_l._L_protein != macromolecule_pm._L_protein:
+        if macromolecule_l.length != macromolecule_pm.length:
             raise ValueError('Endocytosis: lysosomal and plasma membrane protein lengths disagree')
         
 
@@ -427,11 +455,11 @@ def build_endocytosis_reactions(macromolecule_pm, **kwargs):
     rxn = {polyub_macromolecule_pm: -1, macromolecule_l: 1, metab.h2o_c: -1, ub_args['polyub_c']: 1}
     
     # gtp hydrolysis for vesicle scission
-    rxn[metab.ntp_map_c['G']] = -round(macromolecule_pm._L_protein) * params.transport_translocation_atp_cost
-    rxn[metab.h2o_c] -= round(macromolecule_pm._L_protein) * params.transport_translocation_atp_cost
-    rxn[metab.ndp_map_c['G']] = round(macromolecule_pm._L_protein) * params.transport_translocation_atp_cost
-    rxn[metab.pi_c] = round(macromolecule_pm._L_protein) * params.transport_translocation_atp_cost
-    rxn[metab.h_c] = round(macromolecule_pm._L_protein) * params.transport_translocation_atp_cost
+    rxn[metab.ntp_map_c['G']] = -round(macromolecule_pm.length) * params.transport_translocation_atp_cost
+    rxn[metab.h2o_c] -= round(macromolecule_pm.length) * params.transport_translocation_atp_cost
+    rxn[metab.ndp_map_c['G']] = round(macromolecule_pm.length) * params.transport_translocation_atp_cost
+    rxn[metab.pi_c] = round(macromolecule_pm.length) * params.transport_translocation_atp_cost
+    rxn[metab.h_c] = round(macromolecule_pm.length) * params.transport_translocation_atp_cost
 
     
     endocytosis.add_metabolites(rxn)
@@ -456,11 +484,11 @@ def lysosomal_degradation(macromolecule):
     
     degrade_lysosomal_protein = deg_reaction_map[macromolecule.type](macromolecule._deg_id + '_LYSOSOMAL_DEGRADATION')
     
-    h2o_length = macromolecule._L_protein - 1 if macromolecule.type == 'protein' else     macromolecule._L_protein - sum(macromolecule.decompose_complex().values()) #non-covalent bonds, +1,-1 cancel out
+    h2o_length = macromolecule.length - 1 if macromolecule.type == 'protein' else     macromolecule.length - sum(macromolecule.decompose_complex().values()) #non-covalent bonds, +1,-1 cancel out
     
     rxn = {metab.seq_amino_acid_map_l[aa_code]: aa_counts for aa_code, aa_counts in macromolecule._amino_acid_counts.items()}
     rxn[unmodified_macromolecule], rxn[metab.h2o_l] = -1, -h2o_length
-    rxn = func.hydrolyze_atp(rxn, n_atp=macromolecule._L_protein*params.proteolysis_translocation_atp_cost, compartment = 'l')
+    rxn = func.hydrolyze_atp(rxn, n_atp=macromolecule.length*params.proteolysis_translocation_atp_cost, compartment = 'l')
     
     degrade_lysosomal_protein.add_metabolites(rxn)
     degrade_lysosomal_protein.gene_reaction_rule = ' and '.join(mach.cathepsins)
@@ -506,7 +534,7 @@ def degrade_lysosomal_pm_protein(macromolecule, **kwargs):
     
 
 
-# In[7]:
+# In[8]:
 
 
 degrade_reaction_map = {'c': degrade_cytosolic_nuclear_protein, 'n': degrade_cytosolic_nuclear_protein, 
@@ -540,7 +568,7 @@ def degrade(macromolecule, **kwargs):
     return deg_reactions
 
 
-# In[37]:
+# In[9]:
 
 
 # import random
@@ -585,7 +613,19 @@ def degrade(macromolecule, **kwargs):
 # # cplx._initialize_deg_params()
 
 
-# In[27]:
+# In[15]:
+
+
+# cplx.change_compartment('c')
+
+
+# In[14]:
+
+
+# cplx.compartment
+
+
+# In[11]:
 
 
 # if macromolecule.compartment in ['c', 'n', 'r', 'pm']:
