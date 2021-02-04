@@ -11,7 +11,7 @@ from utils import metabolites as metab
 from macromolecules.macromolecule import Macromolecule
 
 
-# In[2]:
+# In[3]:
 
 
 class Protein(Macromolecule):
@@ -53,10 +53,9 @@ class Protein(Macromolecule):
         if gene_info is not None:
             # for degradation
             self.length = gene_info.L_protein
-            self._deg_id = gene_info.hgnc_id
             self._amino_acid_counts = gene_info.amino_acid_counts
             self._ptms = gene_info.ptms
-            
+            self._deg_id = gene_info.hgnc_id
             # for rest of pipeline
             self.alpha_p =  gene_info.coupling_params['alpha_p']
             id_ = gene_info.hgnc_id + '_' + id_ + '_protein_' + compartment 
@@ -64,7 +63,7 @@ class Protein(Macromolecule):
         else:
             self._amino_acid_counts = amino_acid_counts
             self.length = sum(amino_acid_counts.values())
-            id_ = id_ + '_protein_' + compartment
+            id_ = id_ + '_protein_' + compartment            
         
         charge = sum([metab.seq_amino_acid_map_compartments[compartment][aa_code].charge*aa_count for aa_code, aa_count in self._amino_acid_counts.items()])
         

@@ -154,7 +154,14 @@ def parse_me_reaction_id(x):
     
     
     if 'HGNC' in x.split('_')[0]:
-        return '_'.join(x.split('_')[1:])
+        pdr = False
+        for exception in ['_POLYUBIQUITINATION', '_DEUBIQUITINATION', '_PROTEASOMAL_DEGRADATION']:
+            if exception in x:
+                pdr = True
+        if not pdr:
+            return '_'.join(x.split('_')[1:])
+        else:
+            return '_'.join(x[x.index('_' + x[-1] + '_') + 2:].split('_')[1:]) 
     else:
         return x
 

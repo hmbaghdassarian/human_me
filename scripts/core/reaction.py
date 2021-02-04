@@ -16,6 +16,7 @@ from six import iteritems
 import sys
 sys.path.insert(1, '../../scripts/')
 from utils import parameters as params
+from utils import machinery as mach
 
 
 # In[2]:
@@ -262,6 +263,7 @@ class Protein_Degradation_Reaction(cobra.Reaction):
         self._enzymes = None # list of enzyme ids associated with this degradation reaction
         self.sink = False # whether the reaction is the "final" (to amino acids) degradation reaction
         self.subsystem = 'Protein_Degradation'
+        self._ribosomal_degradation = False # see complex_degradation_reaction for details
         
     def _update_tracking(self, macromolecules):
         '''Mutual tracking of degradation reactions associated with a macromolecule and vice-versa'''
@@ -281,9 +283,13 @@ class Protein_Degradation_Reaction(cobra.Reaction):
     def _update_enzymes(self):
         '''Update enzymes list to include macromolecules that are classified as enzymes'''
         self._enzymes = [m for m in self._macromolecules if m.enzyme]
-        for m in self.enzymes:
+        for m in self._enzymes:
             if self.id not in m._degradation_reactions:
                 raise ValueErorr('Improper tracking of degradation reactions and associated macromolecules')
+    def _set_proteasomal_degradation(self, **kwargs):
+        '''For code consistency, mainly for Complex_Degradation_Reaction, see that method'''
+        
+        self.gene_reaction_rule = ' and '.join(mach.proteasome_machinery)
 
 class Complex_Degradation_Reaction(cobra.Reaction):
     def __init__(self, id=None, name='', subsystem='', lower_bound=0.0, upper_bound=None):
@@ -293,6 +299,7 @@ class Complex_Degradation_Reaction(cobra.Reaction):
         self._enzymes = None # list of enzyme ids associated with this degradation reaction
         self.sink = False # whether the reaction is the "final" (to amino acids) degradation reaction
         self.subsystem = 'Complex_Degradation'
+        self._ribosomal_degradation = False
         
     def _update_tracking(self, macromolecules):
         '''Mutual tracking of degradation reactions associated with a macromolecule and vice-versa'''
@@ -312,7 +319,44 @@ class Complex_Degradation_Reaction(cobra.Reaction):
     def _update_enzymes(self):
         '''Update enzymes list to include macromolecules that are classified as enzymes'''
         self._enzymes = [m for m in self._macromolecules if m.enzyme]
-        for m in self.enzymes:
+        for m in self._enzymes:
             if self.id not in m._degradation_reactions:
                 raise ValueErorr('Improper tracking of degradation reactions and associated macromolecules')
+    def _set_proteasomal_degradation(self, macromolecule, ribosomal_complex):
+        '''Quick addition of attribute for build_me script, since current format has the machinery for
+        the proteosomal degradation different than standard complexes (to degrad rRNAs as well). 
+        Change in machinery hard-coded into degradation.degrade script and double-checked in build_me script.
+        
+        macromolecule: Protein or Complex instance
+        ribosomal_complex: bool
+            whether or not the macromolecule is a ribosomal complex
+        '''
+        
+        if not ribosomal_complex:
+            machinery_ = mach.proteasome_machinery
+        else:
+            self._ribosomal_degradation = True
+            # hard-coded
+            machinery_ = list(set(mach.proteasome_machinery + mach.exosome['HGNC ID (gene)'].tolist()))
+
+            # this is more flexible, but hardcoded check in degradation.proteasomal_degradation
+            # renders this unecessary (keep for future iterations)
+            
+#             # add machinery
+#             counter = 0
+#             machinery_ = list()
+#             if len(set([m for m in mdc if m.type == 'protein'])) > 0:
+#                 machinery_ += mach.proteasome_machinery
+#                 counter += 1
+#             if len(rm) > 0:
+#                 machinery_ += mach.exosome['HGNC ID (gene)'].tolist() #rrna degradation machinery
+#                 counter += 1
+        
+#             if counter != 2:
+#                 err = 'Internal: Only expect mature ribosome complex with rRNA and protein to be degraded. 
+#                 err += 'Should work with current code, but double check'
+#                 raise ValueError(err)
+       
+        self.gene_reaction_rule = ' and '.join(machinery_)
+        
 

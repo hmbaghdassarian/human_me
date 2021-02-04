@@ -3,7 +3,7 @@
 
 # This script provides a complete set of specific degradation reactions for complexes, based on their compartment. For proteins, conditional inclusion of various reactions based on gene features, etc is implemented in the build_protein_express_reactions script.
 
-# In[2]:
+# In[1]:
 
 
 import cobra
@@ -24,7 +24,7 @@ from macromolecules.complex import add_complex_metabolites
 from core.reaction import Protein_Degradation_Reaction, Complex_Degradation_Reaction
 
 
-# In[3]:
+# In[2]:
 
 
 deg_reaction_map = {'protein': Protein_Degradation_Reaction, 'complex': Complex_Degradation_Reaction}
@@ -32,13 +32,14 @@ deg_reaction_map = {'protein': Protein_Degradation_Reaction, 'complex': Complex_
 
 # # Cytosol and Nucleus
 
-# In[4]:
+# In[3]:
 
 
 def protein_polyubiquitination(macromolecule, **kwargs):
     ub_args = kwargs['ub_args']
-
-    polyubiquitinate_protein = deg_reaction_map[macromolecule.type](macromolecule.id + '_POLYUBIQUITINATION' + macromolecule.compartment)
+    
+    r_id = macromolecule.id if macromolecule.type == 'protein' else macromolecule._deg_id
+    polyubiquitinate_protein = deg_reaction_map[macromolecule.type](r_id + '_POLYUBIQUITINATION' + macromolecule.compartment)
     cmap = {'n': 'n', 'c': 'c', 'pm': 'c'}
     if macromolecule.compartment not in cmap.keys():
         raise ValueError(macromolecule.id + ': Current compartment, ' + macromolecule.compartment + ' does not have polyubiquitination reactions available')
@@ -92,8 +93,9 @@ def proteasomal_degradation(macromolecule, **kwargs):
         raise ValueError('Polyubiquitinated and deubiquitinated protein compartment does not match')
     if macromolecule.compartment not in ['c', 'n']:
         raise ValueError(macromolecule.id + ': Only proteins/complexes in nucleus and cytosol are considered for proteasomal degradation')
+    r_id = macromolecule.id if macromolecule.type == 'protein' else macromolecule._deg_id
     #------------------------------deubiquitination------------------------------------  
-    deubiquitination = deg_reaction_map[macromolecule.type](macromolecule.id + '_DEUBIQUITINATION' + macromolecule.compartment)
+    deubiquitination = deg_reaction_map[macromolecule.type](r_id + '_DEUBIQUITINATION' + macromolecule.compartment)
     deubiquitination.add_metabolites({polyub_macromolecule: -1, 
                                       metab.h2o_compartments[macromolecule.compartment]: -1, 
                                         macromolecule: 1, ub_args['polyub_' + macromolecule.compartment]: 1})
@@ -101,17 +103,19 @@ def proteasomal_degradation(macromolecule, **kwargs):
     deubiquitination.gene_reaction_rule = ' and '.join(mach.proteasome_machinery)
     
     #------------------------------degradation------------------------------------
-    protein_degradation = deg_reaction_map[macromolecule.type](macromolecule.id + '_PROTEASOMAL_DEGRADATION' + macromolecule.compartment)
+    protein_degradation = deg_reaction_map[macromolecule.type](r_id + '_PROTEASOMAL_DEGRADATION' + macromolecule.compartment)
 
     protein_length = macromolecule.length if type(macromolecule) != Ribosomal_Complex else macromolecule.length['protein']
     h2o_length = protein_length
-
+    
+    rcp = False
     if macromolecule.type == 'protein':
         aac = macromolecule._amino_acid_counts.copy()
     else: # complexes
         if type(macromolecule) != Ribosomal_Complex: #non ribosomal complexes
             h2o_length -= sum(macromolecule.decompose_complex().values()) # non-covalent bonds don't require h2o, 
         else: # ribosomal complexes
+            rcp = True
             h2o_length -= sum([v for m,v in macromolecule.decompose_complex().items() if m.type == 'protein']) # non-covalent bonds don't require h2o, 
         aac = polyub_macromolecule._amino_acid_counts.copy()
         aac.subtract(ub_args['polyub_' + macromolecule.compartment]._amino_acid_counts)
@@ -125,11 +129,19 @@ def proteasomal_degradation(macromolecule, **kwargs):
     # atp hydrolysis for translocation/unfolding  - known 1 ATP per 2 residues - https://www.nature.com/articles/s41586-018-0736-4
     rxn = func.hydrolyze_atp(rxn, n_atp = protein_length/2, 
                              compartment = macromolecule.compartment)
-
-    machinery_ = mach.proteasome_machinery
-    if type(macromolecule) == Ribosomal_Complex:
-        rm = [m for m in macromolecule.decompose_complex() if m.type != 'protein']
-        if sorted([m.id for m in rm]) != ['18s_rrna_c', '28s_rrna_c', '5_8s_rrna_c', '5s_rrna_c']:
+    
+    #------------
+    # add attribute to indicate unique ribosomal whether unique ribosomal complex machinery
+    # also adds gene_reaction rules:
+    protein_degradation._set_proteasomal_degradation(macromolecule = macromolecule, 
+                                                  ribosomal_complex = rcp) 
+    #------------
+    
+    if rcp:
+        mdc = macromolecule.decompose_complex()
+        rm = [m for m in mdc if m.type != 'protein']
+        # hardcoded check
+        if sorted([m.id for m in rm]) != ['18s_rrna_c', '28s_rrna_c', '5_8s_rrna_c', '5s_rrna_c'] or not (len([m for m in mdc if m.type == 'protein']) > 0):
             err = 'Internal: Only expect rrna of mature ribosome complex to be degraded. Should work with current code'
             err += ' but double check as other RNA molecules are not expected and appropriate machinery is added.'
             raise ValueError(err)
@@ -142,12 +154,7 @@ def proteasomal_degradation(macromolecule, **kwargs):
                         rxn[m] += c
                     else:
                         rxn[m] = c
-
-        machinery_ += mach.exosome['HGNC ID (gene)'].tolist() #rrna degradation machinery
-
-    machinery_ = sorted(set(machinery_))
-    protein_degradation.add_metabolites(rxn)    
-    protein_degradation.gene_reaction_rule = ' and '.join(machinery_)
+    protein_degradation.add_metabolites(rxn) 
 
     # tracking
     protein_degradation.sink = True
@@ -170,7 +177,7 @@ def degrade_cytosolic_nuclear_protein(macromolecule, **kwargs):
 
 # # Mitochondria and Intermembrane Space
 
-# In[5]:
+# In[4]:
 
 
 def degrade_mitochondrial_protein(macromolecule):
@@ -224,7 +231,7 @@ def degrade_peroxisomal_protein(macromolecule):
 
 # # Secretory Pathway Degradation
 
-# In[6]:
+# In[5]:
 
 
 def unfold_secretory_protein(macromolecule):
@@ -423,7 +430,7 @@ def build_erad_reactions(macromolecule, **kwargs):
         return erad_reactions
 
 
-# In[7]:
+# In[6]:
 
 
 def build_endocytosis_reactions(macromolecule_pm, **kwargs):
@@ -482,7 +489,7 @@ def lysosomal_degradation(macromolecule):
         unmodified_macromolecule = macromolecule
     
     
-    degrade_lysosomal_protein = deg_reaction_map[macromolecule.type](macromolecule._deg_id + '_LYSOSOMAL_DEGRADATION')
+    degrade_lysosomal_protein = deg_reaction_map[macromolecule.type](macromolecule._deg_id + '_LYSOSOMAL_DEGRADATIONl')
     
     h2o_length = macromolecule.length - 1 if macromolecule.type == 'protein' else     macromolecule.length - sum(macromolecule.decompose_complex().values()) #non-covalent bonds, +1,-1 cancel out
     
@@ -534,7 +541,7 @@ def degrade_lysosomal_pm_protein(macromolecule, **kwargs):
     
 
 
-# In[8]:
+# In[7]:
 
 
 degrade_reaction_map = {'c': degrade_cytosolic_nuclear_protein, 'n': degrade_cytosolic_nuclear_protein, 
@@ -568,7 +575,7 @@ def degrade(macromolecule, **kwargs):
     return deg_reactions
 
 
-# In[9]:
+# In[11]:
 
 
 # import random
@@ -601,35 +608,22 @@ def degrade(macromolecule, **kwargs):
 #                      n_exons = n_exons) 
 #     gene_info.get_final_locations(metabolic_model = cobra.Model(''), final_locations = location)
 #     proteins.append(Protein(id_ = 'a', compartment = 'c', gene_info = gene_info))
-    
-# #     proteins_ = proteins
-# proteins_ = list()
-# for p in proteins:
-#     proteins_.append(p.change_compartment('l'))
-# proteins = proteins_
+
+# proteins_ = proteins
+# # proteins_ = list()
+# # for p in proteins:
+# #     proteins_.append(p.change_compartment('m'))
+# # proteins = proteins_
 
 # cplx = Complex(metabolites = proteins_+proteins_, complex_id = 'test')
 # cplx = Complex(metabolites = [cplx, cplx] + proteins_ + proteins_, complex_id = 'test2')
-# # cplx._initialize_deg_params()
+# cplx._initialize_deg_params()
 
+# rcplx = Ribosomal_Complex(metabolites = proteins_+proteins_, complex_id = 'test')
+# rcplx = Ribosomal_Complex(metabolites = [rcplx, rcplx] + proteins_ + proteins_, complex_id = 'test2')
+# rcplx._initialize_deg_params()
 
-# In[15]:
-
-
-# cplx.change_compartment('c')
-
-
-# In[14]:
-
-
-# cplx.compartment
-
-
-# In[11]:
-
-
-# if macromolecule.compartment in ['c', 'n', 'r', 'pm']:
-#    degrade(macromolecule, **{'ub_args': ub_args})
-# else:
-#     degrade(macromolecule)
+# rxns1 = degrade(proteins[0], **{'ub_args': ub_args})
+# rxns2 = degrade(cplx, **{'ub_args': ub_args})
+# # rxns3 = degrade(rcplx, **{'ub_args': ub_args})
 

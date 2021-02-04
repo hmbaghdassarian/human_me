@@ -6,6 +6,7 @@
 
 import pickle
 import os
+import pathlib
 
 import cobra
 from cobra.core.dictlist import DictList
@@ -30,7 +31,7 @@ from core.reaction import ME_Reaction
 from me_solver import solve_me
 
 
-# In[99]:
+# In[2]:
 
 
 class ME_Model(cobra.Model):
@@ -426,13 +427,13 @@ class ME_Model(cobra.Model):
                         r_ = r # non-metabolic reactions
 
                     machinery = [m for m,v in r.coupled_metabolites.items() if v == 'catalysis']
-                    if len(machinery) > 1:
+                    if len(machinery) > 1 and not r.id.endswith('_COMPLEX_PROTEASOMAL_DEGRADATIONc'):
                         raise ValueError('Unexpected coupling of multiple machinery: ' + r.id)
                     if not dummy:
                         if (len(r.genes) == 0 and len(machinery) > 0) or (len(r.genes) > 0 and len(machinery) == 0):
                             raise ValueError('Unexpected addition/lack of machinery: ' + r.id)
                     else:
-                        if len(machinery) != 1:
+                        if len(machinery) != 1 and not r.id.endswith('_COMPLEX_PROTEASOMAL_DEGRADATIONc'):
                             raise ValueError('Unexpected number of machinery coupled: ' + r.id)
                         machinery = machinery[0]
                         if ((len(r_.genes) == 0) and (machinery.id != 'HGNC:DUMMY_folded_protein_c')) or ((len(r_.genes) > 0) and (machinery.id == 'HGNC:DUMMY_folded_protein_c')):
@@ -440,7 +441,7 @@ class ME_Model(cobra.Model):
 
                     if len(r.genes)>0:
                         if type(machinery) == list:
-                            if len(machinery) != 1:
+                            if len(machinery) != 1 and not r.id.endswith('_COMPLEX_PROTEASOMAL_DEGRADATIONc'):
                                 raise ValueError('Unexpected number of machinery coupled: ' + r.id)
                             else:
                                 machinery = machinery[0]
@@ -479,6 +480,12 @@ class ME_Model(cobra.Model):
             will save to file = "full/path/to/filename.pickle"
         
         '''
+        if '.' in file:
+            p = pathlib.Path(file)
+            extensions = "".join(p.suffixes)
+            file = str(p).replace(extensions, '.pickle')
+        else:
+            file = file + '.pickle'
         with open(file, 'wb') as handle:
             pickle.dump(self, handle)
     

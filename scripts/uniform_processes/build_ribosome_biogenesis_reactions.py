@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[1]:
+# In[37]:
 
 
 import cobra
@@ -36,7 +36,7 @@ from expression.protein_expression import build_protein_expression_reactions as 
 
 # # rRNA
 
-# In[2]:
+# In[38]:
 
 
 # rrna sequences
@@ -88,7 +88,7 @@ six_s_index = 1 #https://www.nature.com/articles/s41594-019-0234-x?draft=collect
 
 
 
-# In[3]:
+# In[39]:
 
 
 # from expression.protein_expression import ubiquitin
@@ -97,7 +97,7 @@ six_s_index = 1 #https://www.nature.com/articles/s41594-019-0234-x?draft=collect
 # rs_expression_reactions, rs_protein_metabolites, rl_expression_reactions, rl_protein_metabolites = build_ribosome_protein_expression_reactions(ub_args, compress_mrna)
 
 
-# In[4]:
+# In[40]:
 
 
 psim_rib = params.psim_me.copy()
@@ -121,8 +121,7 @@ def cleave_ub(hgnc_id, ub_args, compress_mrna = False):
                     machinery_list = list(), metabolic_model = cobra.Model())
     gene_info.final_locations = {'n': 'Cytosolic Tranport'}
     gene_info.module = 'Machinery'
-    processed_unfolded_protein_c = Protein(id_ = hgnc_id + '_processed_unfolded',compartment = 'c',
-                                    amino_acid_counts = gene_info.amino_acid_counts)
+    processed_unfolded_protein_c = Protein(id_ = 'processed_unfolded',compartment = 'c', gene_info = gene_info)#Protein(id_ = hgnc_id + '_processed_unfolded',compartment = 'c', amino_acid_counts = gene_info.amino_acid_counts)
     ub_cleavage = cobra.Reaction(gene_info.hgnc_id + '_UBIQUITIN_CLEAVAGEc')
     ub_cleavage.subsytem = 'Protein_Expression'
     ub_cleavage.add_metabolites({unfolded_protein_c:-1, metab.h2o_c: -1, 
@@ -196,7 +195,7 @@ def build_ribosome_protein_expression_reactions(ub_args, compress_mrna = False):
     return rs_expression_reactions, rs_protein_metabolites, rl_expression_reactions, rl_protein_metabolites
 
 
-# In[5]:
+# In[41]:
 
 
 def build_rrna5s_reactions(rpl5_n, rpl11_n):
@@ -241,7 +240,7 @@ def build_rrna5s_reactions(rpl5_n, rpl11_n):
     return rrna5s_reactions, rrna5s_complex_n, rrna5s_c
 
 
-# In[6]:
+# In[42]:
 
 
 # ets_5_frag1 is from 5' end of 47s to A' site
@@ -602,10 +601,10 @@ def build_other_rrna_reactions(rrna5s_complex_n, rs_protein_metabolites, rl_prot
     return all_reactions, mature_ribosomal_precomplexes, mature_rrna_metabolites
 
 
-# In[7]:
+# In[45]:
 
 
-def build_ribosome(ub_args, compress_mrna = False, reversible_complex_formation = False):
+def build_ribosome(ub_args, compress_mrna = True, reversible_complex_formation = False):
     with func.HiddenPrints():
         rs_expression_reactions, rs_protein_metabolites, rl_expression_reactions, rl_protein_metabolites = build_ribosome_protein_expression_reactions(ub_args, compress_mrna)
     rpl5_n = [m for m in rl_protein_metabolites if m.id == 'HGNC:10360_folded_protein_n'][0]

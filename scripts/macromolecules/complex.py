@@ -177,7 +177,7 @@ class Complex(Macromolecule):
         if len(self._ptms) > 0:
             raise ValueError('PTMs to Complexes is currently unaccounted for and will likely lead to imbalances in degradation reactions')
             
-        self._deg_id = self.temp_id
+        self._deg_id = self.temp_id + '_COMPLEX'
         self._degradation_reactions = []
         del dc        
         
@@ -324,7 +324,7 @@ class Ribosomal_Complex(Complex):
         if len(self._ptms) > 0:
             raise ValueError('PTMs to Complexes is currently unaccounted for and will likely lead to imbalances in degradation reactions')
             
-        self._deg_id = self.temp_id
+        self._deg_id = self.temp_id + '_COMPLEX'
         self._degradation_reactions = []
         
         del dc
