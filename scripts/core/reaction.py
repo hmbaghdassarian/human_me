@@ -47,6 +47,7 @@ class ME_Reaction(cobra.Reaction):
         self.type = type_
         self.cobra_id = cobra_id
         self.coupled_metabolites = None
+        self._protein_deg_proxy = False
     
     def _couple(self, metabolite, type):
         '''Add coupling coefficient and associated metadata to reaction for a coupled metabolite
@@ -56,7 +57,8 @@ class ME_Reaction(cobra.Reaction):
         metabolite: macromolecules.macromolecule.Macromolecule
             a macromolecule with an associated coupling coefficient
         type: str
-            the type of reactions that are being coupled (one of ['mrna_degradation', 'mrna_formation', 'catalysis'])
+            the type of reactions that are being coupled (one of ['mrna_degradation', 'mrna_formation', 'catalysis', 
+            'enzyme_degradation'])
         
         '''
         
@@ -77,9 +79,9 @@ class ME_Reaction(cobra.Reaction):
         
         Parameters
         ----------
-        metabolite: macromolecules.macromolecule.Macromolecule or list 
+        metabolites: macromolecules.macromolecule.Macromolecule or list 
             list of macromolecules or single macromolecule with associated coupling coefficients
-        type: str or list
+        types: str or list
             the type of reactions that are being coupled (options: ['mrna_degradation', 'mrna_formation', 'catalysis'])
         
         '''
@@ -250,6 +252,16 @@ class ME_Reaction(cobra.Reaction):
                 if float(v.subs(params.mu, 1)) >= 0:
                     products_.append(k)
         return products_
+    def _add_protein_deg_proxy(self, protein_deg_proxy):
+        '''Proxy metabolite for protein degradation'''
+        if not protein_deg_proxy.type == 'proxy':
+            raise ValueError('Expected proxy macromolecule')
+        if self._protein_deg_proxy:
+            raise ValueError('Protein degradation proxy already added')
+            
+        self.add_metabolites({protein_deg_proxy: 1})
+        self._protein_deg_proxy = True
+        self.protein_deg_proxy = protein_deg_proxy
 
 
 # In[ ]:

@@ -939,6 +939,7 @@ class me_builder():
                 dr_map[r.id] = r
 
             catalysis_reactions = [r for r in self.final_reactions if isinstance(r, ME_Reaction) and 'catalysis' in r.type and func.get_reaction_compartment(r) != 'e']
+            # tracker = dict()
             for r in tqdm(catalysis_reactions):
                 enzymes = [m for m,t in r.coupled_metabolites.items() if t == 'catalysis']
                 deg_reactions = list()
@@ -959,8 +960,19 @@ class me_builder():
 
                 deg_reactions = [r_ for r_ in self.final_reactions if r_.id in deg_reactions]
                 for dr, dp in list(zip(deg_reactions, deg_proxies)):
-                    dr.add_metabolites({dp: 1})
+                    # keeping track of whether the enzyme degradation reaction already has a proxy metabolite for 
+                    # coupling (occurs in scenarios where an enzyme catalyzes multiple reactions)
+                    if not dr._protein_deg_proxy: 
+                        dr._add_protein_deg_proxy(dp)
+                    else:
+                        dp = dr.protein_deg_proxy
+
+                    if (self.check_all) and ('enzyme_degradation' in r.coupled_metabolites.values()) and (not dr_map[r.id]._ribosomal_degradation): 
+                        raise ValueError('This reaction already is coupled to degradation')
                     r.couple(metabolites = dp, types = 'enzyme_degradation')
+                    #.couple works in scenarios where r == dr because .couple uses .add_metabolites(combine = True)
+
+
     
     def build_me_model(self, model_id = 'HUMAN_ME_MODEL'):
         print('Add biomass component to reactions')
@@ -1076,35 +1088,184 @@ gc.collect()
 # In[6]:
 
 
-# minimal_proteome = True
-# compress_mrna = True 
-# dummy_protein = True 
-# model_id = 'HUMAN_ME_MODEL'
-# # #og # deg_args = {'reversible_complex_formation': True, 
-# #                        'couple': False, 
-# #                        'nonenzyme_degradation': True, 
-# #                        'complex_degradation': False}
+minimal_proteome = True
+cm = True
+dp = True
+da = {'reversible_complex_formation': True, 
+                       'couple': True, 
+                       'nonenzyme_degradation': False, 
+                       'complex_degradation': True}
 
-# deg_args = {'reversible_complex_formation': True, 
-#                        'couple': False, 
-#                        'nonenzyme_degradation': False, 
-#                        'complex_degradation': True}
-
-# builder = me_builder(compress_mrna = compress_mrna, 
-#                          dummy_protein = dummy_protein, deg_args = deg_args)
-# builder.express_metabolic_enzymes()
-# builder.express_expression_enzymes()
-# builder.express_dummy_protein()
-# builder.get_complex_info()
-# builder.generate_complex_reactions()
-# builder.get_keff()
-# if minimal_proteome:
-#     builder.minimize_proteome()
-# builder.add_metabolic_machinery()
-# builder.add_expression_machinery()
-# builder.deorphan()
+builder = me_builder(compress_mrna = cm,
+                         dummy_protein = dp, deg_args = da)
+builder.express_metabolic_enzymes()
+builder.express_expression_enzymes()
+builder.express_dummy_protein()
+builder.get_complex_info()
+builder.generate_complex_reactions()
+builder.get_keff()
+if minimal_proteome:
+    builder.minimize_proteome()
+builder.add_metabolic_machinery()
+builder.add_expression_machinery()
+builder.deorphan()
 # builder.incorporate_protein_degradation()
-# me_model = builder.build_me_model(model_id = model_id)
-# # print('solve')
-# # sln, stat, _ = me_model.solve_lp(mu_val = 1e-9)
+
+
+# In[42]:
+
+
+self = copy.deepcopy(builder)
+
+
+# In[26]:
+
+
+# from uniform_processes.biomass import biomass_mapper
+# pdr = [r for r in self.me_reactions if isinstance(r, Protein_Degradation_Reaction)]
+# dr_map = dict()
+# for r in pdr + self.complex_degradation_reactions:
+#     r._update_enzymes()
+#     dr_map[r.id] = r
+
+# catalysis_reactions = [r for r in self.final_reactions if isinstance(r, ME_Reaction) and 'catalysis' in r.type and func.get_reaction_compartment(r) != 'e']
+# r = [r for r in catalysis_reactions if r.id == 'HGNC:9479_DEGRADATIONm'][0]
+
+# enzymes = [m for m,t in r.coupled_metabolites.items() if t == 'catalysis']
+# deg_reactions = list()
+# deg_proxies = list()
+# for e in enzymes: # in case multiple catalysis proteins (ribosomal degradatio)
+#     deg_reactions_ = [r_id for r_id in e._degradation_reactions if (dr_map[r_id].sink) and (e in dr_map[r_id]._enzymes)]
+#     if len(deg_reactions_) == 0:
+#         raise ValueError('No degradation reactions associated with catalyzing enzyme')
+#     elif len(deg_reactions_) > 1:
+#         raise ValueError('More than 1 degradation reaction associated with catalyzing enzyme')
+#     deg_reactions += deg_reactions_
+#     dp = Macromolecule(e._deg_id + '_enzyme_deg_proxy', proxy = True)
+#     dp.couple(type = 'enzyme_degradation', value = -e.alpha_p/e.keff)
+#     deg_proxies.append(dp)
+
+# if len(deg_reactions) > 1 and not (r.id in dr_map or dr_map[r.id]._ribosomal_degradation):
+#     raise ValueError('More than 1 degradation reaction associated with the catalysis reaction')
+
+# deg_reactions = [r_ for r_ in self.final_reactions if r_.id in deg_reactions]
+# dr,dp = list(zip(deg_reactions, deg_proxies))[0]
+
+
+# In[27]:
+
+
+# dr == r
+# dr.add_metabolites({dp: 1})
+# r.couple(metabolites = dp, types = 'enzyme_degradation')
+# add_biomass_change(r)
+
+
+# In[43]:
+
+
+
+
+
+# In[31]:
+
+
+#         else: # self catalysis reactions
+#             tracker[r] = list(zip(deg_reactions, deg_proxies))
+    
+# for r, drp in tracker.items():
+#     for dr, dp in drp:
+#         r.add_metabolites({dp: 1})
+#         r.couple(metabolites = dp, types = 'enzyme_degradation')
+#         biomass.add_biomass_change(r)
+
+
+# In[36]:
+
+
+dr.coupled_metabolites
+
+
+# In[40]:
+
+
+dr.couple(dr.protein_deg_proxy, types = 'enzyme_degradation')
+
+
+# In[41]:
+
+
+dr
+
+
+# In[16]:
+
+
+r.coupled_metabolites
+
+
+# In[ ]:
+
+
+
+
+
+# In[ ]:
+
+
+
+
+
+# In[ ]:
+
+
+enzymes = [m for m,t in r.coupled_metabolites.items() if t == 'catalysis']
+deg_reactions = list()
+deg_proxies = list()
+for e in enzymes: # in case multiple catalysis proteins (ribosomal degradatio)
+    deg_reactions_ = [r_id for r_id in e._degradation_reactions if (dr_map[r_id].sink) and (e in dr_map[r_id]._enzymes)]
+    if len(deg_reactions_) == 0:
+        raise ValueError('No degradation reactions associated with catalyzing enzyme')
+    elif len(deg_reactions_) > 1:
+        raise ValueError('More than 1 degradation reaction associated with catalyzing enzyme')
+    deg_reactions += deg_reactions_
+    dp = Macromolecule(e._deg_id + '_enzyme_deg_proxy', proxy = True)
+    dp.couple(type = 'enzyme_degradation', value = -e.alpha_p/e.keff)
+    deg_proxies.append(dp)
+
+
+# In[ ]:
+
+
+
+
+
+# In[ ]:
+
+
+tracker
+
+
+# In[ ]:
+
+
+for r, drp in tracker.items():
+    if r != drp[0][0]:
+        print('woa')
+        
+
+
+# In[ ]:
+
+
+
+
+
+# In[ ]:
+
+
+
+me_model = builder.build_me_model(model_id = model_id)
+# print('solve')
+# sln, stat, _ = me_model.solve_lp(mu_val = 1e-9)
 
