@@ -64,7 +64,7 @@ class Macromolecule(cobra.Metabolite):
         
         '''
         
-        if type not in ['catalysis', 'protein_degradation', 'mrna_degradation', 'mrna_formation']:
+        if type not in ['catalysis', 'enzyme_degradation', 'mrna_degradation', 'mrna_formation']:
             raise ValueError('The couple id must be one of catalysis, mrna_degradation, or mrna_formation')
         else:
             if self.coupling_coefficient is None:

@@ -11,6 +11,10 @@ from expression import build_me_model
 dummy_protein = [True, False]
 minimal_proteome = [True, False]
 compress_mrna = [True, False]
+deg_args = {'reversible_complex_formation': True, 
+                       'couple': False, 
+                       'nonenzyme_degradation': True, 
+                       'complex_degradation': False}
 
 counter = 0
 res = pd.DataFrame(columns = ['dp', 'mp', 'cm', 'status'])
@@ -19,7 +23,7 @@ for dp in dummy_protein:
         for cm in compress_mrna:
             try:
                 toy_me_model, builder = build_me_model.build_me(minimal_proteome = mp, compress_mrna = cm, 
-                                                            dummy_protein = dp)
+                                                            dummy_protein = dp, deg_args = deg_args)
                 sln, stat, _ = toy_me_model.solve_lp(mu_val =  1e-9)
                 res.loc[counter, : ] = [dp, mp, cm, stat.max()]
             except:

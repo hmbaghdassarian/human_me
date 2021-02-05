@@ -11,7 +11,7 @@ from utils import metabolites as metab
 from macromolecules.macromolecule import Macromolecule
 
 
-# In[3]:
+# In[5]:
 
 
 class Protein(Macromolecule):
@@ -88,6 +88,7 @@ class Protein(Macromolecule):
             self.type = 'dummy_protein'
         
         self.enzyme = False # whether the protein is involved in catalysis of a reaction
+        
         self._degradation_reactions = [] # associated degradation reactions for protein monomer, if any
     
     def _consolidate_degradation_rxns(self):

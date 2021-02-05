@@ -84,6 +84,7 @@ class Complex(Macromolecule):
         self.reaction_id = None # none before running form_complex(); this is used in update_id() method
         self._deg_initialized = False
         self.enzyme = False
+        self.keff = None
         
     def update_id(self, new_id = None):
         '''In cases where complex id is too long (see build_me_model generate_complex_reactions method)'''
@@ -216,6 +217,8 @@ class Complex(Macromolecule):
         types = list(set([m.type for m in self.decompose_complex()]))
         if len(types) > 1 or types[0] != 'protein':
             raise ValueError('ME-Model is currently designed to only handle protein-protein complexes')
+    def get_alpha_p(self):
+        self.alpha_p = np.median([p.alpha_p*c for p,c in self.decompose_complex().items() if p.type == 'protein'])
 
 
 # In[ ]:
@@ -285,6 +288,8 @@ class Ribosomal_Complex(Complex):
         self.reaction_id = None # none before running form_complex(); this is used in update_id() method
         self._deg_initialized = False
         self.enzyme = False
+        self.keff = None
+
     def decompose_complex(self, decomposed_complex = None):
         '''Recursive method to get the complex by its individual components, including nested complexes'''
         if decomposed_complex == None:
@@ -307,6 +312,7 @@ class Ribosomal_Complex(Complex):
         '''Initialize attributes for creating degradation reactions'''
         
         self._deg_initialized = True
+        self.keff = None
         dc = self.decompose_complex()
         self._check_metabolite_types()
         

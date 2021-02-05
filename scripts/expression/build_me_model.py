@@ -30,16 +30,17 @@ with warnings.catch_warnings():
     from utils import functions as func  
     from preprocess import parse_complex
     
-    from core.reaction import ME_Reaction
+    from core.reaction import ME_Reaction, Complex_Degradation_Reaction, Protein_Degradation_Reaction
     from core.model import ME_Model
     
     with func.HiddenPrints():
+        from macromolecules.macromolecule import Macromolecule
         from macromolecules.protein import Protein
         from macromolecules.complex import Complex, Ribosomal_Complex
         
         import expression.build_mrna_expression_reactions as build_mrna
         from expression import gene_information
-        from expression.protein_expression import ubiquitin
+        from expression.protein_expression import ubiquitin, degradation
         from expression.protein_expression import build_protein_expression_reactions as build_protein
         
         from uniform_processes.build_ribosome_biogenesis_reactions import build_ribosome
@@ -86,6 +87,17 @@ def generate_expression_module(me_reactions):
            raise ValueError('The expression module model contains unexpected machinery')
     return expression_machinery_me, expression_module
 
+def parse_complex_degradation_reaction_id(r_id):
+    '''Generates universal reaction ID analagous to func.parse_me_reaction_id specifically for Complex_Degradation_Reaction'''
+    if r_id.count('_COMPLEX_') == 1:
+        return r_id[r_id.index('_COMPLEX_') + len('_COMPLEX_'):]
+    else:
+        return '_'.join(r_id.split('_')[[i for i in range(len(r_id.split('_'))) if r_id.split('_')[i] == 'COMPLEX'][-1]+1:])
+    
+def flatten_list(t):
+    #https://stackoverflow.com/questions/952914/how-to-make-a-flat-list-out-of-list-of-lists
+    return [item for sublist in t for item in sublist]
+
 
 # In[3]:
 
@@ -93,7 +105,7 @@ def generate_expression_module(me_reactions):
 class me_builder():
     def __init__(self, compress_mrna = False, dummy_protein = True, 
                  deg_args = {'couple': True, 'reversible_complex_formation': False, 'nonenzyme_degradation': False, 
-                          'complex_degradation': True},
+                          'complex_degradation': True}, check_all = True,
                 psim_me = params.psim_me, m_model = params.human_model):
 
         # check deg args
@@ -132,6 +144,8 @@ class me_builder():
         
         self.id_reactions_map = dict()
         self.complex_reactions_map = dict()
+        
+        self.check_all = check_all
     
     def express_metabolic_enzymes(self):
         # get protein expression for all metabolic reactions
@@ -238,14 +252,16 @@ class me_builder():
         del expression_module
         
         expression_machinery_me = expression_machinery_me_2
-        # list of hgnc ids of machinery that overlap with metabolic reactions and expression reactions 
-        # but that are not used in the expression reactions for this specific model
-        excess_reactions = sorted(set(mach.metabolic_machinery).intersection(mach.expression_machinery).difference(set(mach.metabolic_machinery).intersection(expression_machinery_me)))
-        # filter for excess reactions with different protein localization for the expression reactions they catalyze
-        # than the metabolic reaction they catalyze
-        excess_reactions = [hgnc_id for hgnc_id in excess_reactions if len(self.id_protein_map[hgnc_id])>1]
-        if len(excess_reactions) > 0:
-            raise ValueError('There are excess expression machinery reactions')
+        
+        if self.check_all:
+            # list of hgnc ids of machinery that overlap with metabolic reactions and expression reactions 
+            # but that are not used in the expression reactions for this specific model
+            excess_reactions = sorted(set(mach.metabolic_machinery).intersection(mach.expression_machinery).difference(set(mach.metabolic_machinery).intersection(expression_machinery_me)))
+            # filter for excess reactions with different protein localization for the expression reactions they catalyze
+            # than the metabolic reaction they catalyze
+            excess_reactions = [hgnc_id for hgnc_id in excess_reactions if len(self.id_protein_map[hgnc_id])>1]
+            if len(excess_reactions) > 0:
+                raise ValueError('There are excess expression machinery reactions')
     
     def express_dummy_protein(self):
         if self.dummy_protein:
@@ -320,7 +336,7 @@ class me_builder():
             else:
                 pass
 
-        me_complex_df.reaction_id = me_complex_df.reaction_id.apply(lambda x: func. parse_me_reaction_id(x))
+        me_complex_df.reaction_id = me_complex_df.reaction_id.apply(lambda x: func.parse_me_reaction_id(x))
         me_complex_df.drop_duplicates(keep = 'first', inplace = True) # if all but reaction id HGNC were the same
         me_complex_df.reset_index(inplace = True, drop = True)
         me_complex_df['category'] = 'expression_reaction'
@@ -377,7 +393,8 @@ class me_builder():
         unique_complexes = unique_complexes.drop_duplicates(subset = 'complex_id', keep = 'first')
         unique_complexes.reset_index(inplace = True, drop = True)
 
-        complex_formation_reactions = list() # store all complex formation reactions
+        self.complex_formation_reactions = list() # store all complex formation reactions
+        complex_degradation_reactions = list()
 
         counter = 0
         for i in unique_complexes.index:
@@ -399,7 +416,7 @@ class me_builder():
                 complex_metabolite = Complex(metabolites = machinery_metabolites, complex_id = complex_id)
             else:
                 complex_metabolite = Ribosomal_Complex(metabolites = machinery_metabolites, complex_id = complex_id)
-            
+
             if len(complex_id) > 247: # ids that are too long
                 complex_metabolite.update_id(new_id = str(counter)) # complex_metabolite.udate_id()
                 counter += 1
@@ -408,19 +425,59 @@ class me_builder():
                 self.complex_df.complex_id.replace(to_replace = complex_id, value = complex_metabolite.temp_id, 
                                                    inplace = True)
 
-            complex_reaction = complex_metabolite.form_complex(reversible = self.deg_args['reversible_complex_formation'])
+            complex_formation_reaction = complex_metabolite.form_complex(reversible = self.deg_args['reversible_complex_formation'])
+            if self.deg_args['complex_degradation']:
+                if complex_metabolite.compartment in ['c', 'n', 'r','g', 'pm']:
+                    complex_degradation_reaction = degradation.degrade(complex_metabolite, **{'ub_args': self.ub_args})
+                elif complex_metabolite.compartment == 'e':
+                    complex_degradation_reaction = list()
+                else:
+                    complex_degradation_reaction = degradation.degrade(complex_metabolite)
 
-            complex_formation_reactions.append(complex_reaction)
+                complex_degradation_reactions += complex_degradation_reaction
+            else:
+                complex_degradation_reaction = list()
+
+            self.complex_formation_reactions.append(complex_formation_reaction)
             self.complex_id_metabolite_map[complex_metabolite.temp_id] = complex_metabolite
-            self.complex_reactions_map[complex_metabolite.temp_id] = complex_reaction.id
+            self.complex_reactions_map[complex_metabolite.temp_id] = [r.id for r in [complex_formation_reaction]                                                                       + complex_degradation_reaction]
 
-        self.complex_formation_reactions = complex_formation_reactions
+
+        if self.deg_args['complex_degradation'] and self.check_all:
+            # --check that machinery is the same for complex degradation (with exception of proteasomal degradation of ribosome)
+            # as protein degradation
+
+            # double check that only ribosomal degradation has additional machinery
+            # this following code can be commented out if don't want to double check
+            # keep, so in future iterations, can be used to iteratively add new machinery
+
+            # this is all pretty hard-coded, starting from core.reaction.Complex_Degradation_Reaction._set_proteasomal_degration()
+
+            reactions_to_add = []
+            self.complex_degradation_reactions = complex_degradation_reactions
+            for r in self.complex_degradation_reactions:
+                if len(r.genes)>0:
+                    rxn_mach = parse_complex.eval_complex(r.gene_reaction_rule)
+                    for rm in rxn_mach:
+                        if type(rm) != list:
+                            rm = [rm]
+                        else:
+                            rm = sorted(rm)
+                        present = self.complex_df[(self.complex_df.machinery == ';'.join(rm)) & (self.complex_df.compartment == func.get_reaction_compartment(r))                            & (self.complex_df.reaction_id == parse_complex_degradation_reaction_id(r.id))]
+                        if present.shape[0] == 0:
+                            reactions_to_add.append(r)
+
+            if  len(reactions_to_add) != 2 or not np.all([r._ribosomal_degradation for r in reactions_to_add]):
+                err = 'Internal: Expected proteasomal degradation of ribosomal complexes to be the only difference in '
+                err += 'machinery of complex degradation reactions. If other missed ones (perhaps in very small model '
+                err += 'scenarios, but seems unlikely), will have to account for iteratitively adding new machinery '
+                err += 'degradation reactions'
+                print(err)
+                raise ValueError('See internal error message above')
         
     def get_keff(self):
-        # for reactions that show up more than once
-        reactions_to_track = self.m_model.reactions + self.me_reactions
-        self.reaction_counter = dict(zip(sorted(set([r.id for r in reactions_to_track])), [0]*len(reactions_to_track))) 
-
+        '''Calculate the keff of all enzymes'''
+        # calculated beforeprotein minimization to get average of all proteins
         # get SASA and keff values for coupling
         print('Calculate enzyme k_effs')
         # deal with metabolic reactions first
@@ -436,13 +493,15 @@ class me_builder():
         self.complex_df['SASA'] = self.complex_df.MW_kDa.apply(lambda x: func.SASA(x))
         median_SASA = self.complex_df.SASA.median()
         self.complex_df['keff'] = self.complex_df['SASA'].apply(lambda x: x*(params.keff_median/median_SASA))
-        
+
         if self.dummy_protein is not None:
-            self.dummy_protein['keff'] = func.SASA(self.dummy_protein['protein_metabolite'].formula_weight/1000)*(params.keff_median/median_SASA)
-    
+            self.dummy_protein['protein_metabolite'].keff = func.SASA(self.dummy_protein['protein_metabolite'].formula_weight/1000)*(params.keff_median/median_SASA)
+
     def minimize_proteome(self):
         c_og = self.complex_df.copy()
         n_reactions_og = len(self.me_reactions) + len(self.complex_formation_reactions)
+        if self.deg_args['complex_degradation']:
+            n_reactions_og += len(self.complex_degradation_reactions)
 
         drop_index = list()
         reaction_multiple = self.complex_df[self.complex_df.creates_multiple_reactions].reaction_id.unique().tolist()
@@ -467,11 +526,18 @@ class me_builder():
 
         # get rid of redundant complexes
         complexes_to_drop = sorted(set(c_og[c_og.is_complex].complex_id).difference(self.complex_df.complex_id))#sorted(set(self.complex_id_metabolite_map.keys()).difference(self.complex_df.complex_id))
-        complexes_to_drop_id = [self.complex_reactions_map[c_id] for c_id in complexes_to_drop]
+        complexes_to_drop_id = flatten_list([self.complex_reactions_map[c_id] for c_id in complexes_to_drop])
         self.complex_formation_reactions = [r for r in self.complex_formation_reactions if r.id not in complexes_to_drop_id]
+
+        if self.deg_args['complex_degradation']:
+            self.complex_degradation_reactions = [r for r in self.complex_degradation_reactions if r.id not in complexes_to_drop_id]
+
         for c_id in complexes_to_drop:
             del self.complex_reactions_map[c_id]
             del self.complex_id_metabolite_map[c_id]
+
+
+
 
         # individual proteins is more complcated because we have to check by compartment and if they are 
         # used in complexes
@@ -497,12 +563,16 @@ class me_builder():
                         self.id_protein_map[hgnc_id] = {k:v for k,v in self.id_protein_map[hgnc_id].items() if k != comp}
         self.me_reactions = [r for r in self.me_reactions if r.id not in reactions_to_remove]
         n_reactions = len(self.me_reactions) + len(self.complex_formation_reactions)
+        if self.deg_args['complex_degradation']:
+            n_reactions += len(self.complex_degradation_reactions)
 
         print('A total of {} reactions were dropped when forming a minimal proteome'.format(n_reactions_og - n_reactions))
 
     def add_metabolic_machinery(self):
         print('Add machinery to metabolic module reactions')
+        self._check_catalysis_coefficient = {}
         metabolic_reactions = [r.id for r in self.m_model.reactions]
+        reaction_counter = dict(zip(sorted(set(metabolic_reactions)), [0]*len(metabolic_reactions))) 
         final_reactions = []
 
         # deal with metabolic reactions first
@@ -521,16 +591,24 @@ class me_builder():
 
             if not self.complex_df.loc[i, 'is_complex']:
                 enzyme_to_couple = self.id_protein_map[self.complex_df.loc[i, 'machinery']][self.complex_df.loc[i, 'compartment']]
-                alpha_p = enzyme_to_couple.alpha_p
             else:
                 enzyme_to_couple = self.complex_id_metabolite_map[self.complex_df.loc[i, 'complex_id']]
-                alpha_p = np.median([p.alpha_p for p in enzyme_to_couple.decompose_complex() if isinstance(p, Protein)])
-
-
+                enzyme_to_couple.get_alpha_p()
+            enzyme_to_couple.keff = self.complex_df.loc[i, 'keff']
+            
             # add machinery to substrate side
-            c3 = (params.mu + alpha_p)/self.complex_df.loc[i, 'keff']
-            if c3.subs(params.mu, 1) <= 0:
-                raise ValueError('The catalysis coupling constraint is negative for ' + enzyme_to_couple.id)
+            c3 = (params.mu + enzyme_to_couple.alpha_p)/enzyme_to_couple.keff
+            
+            if self.check_all:
+                if not enzyme_to_couple.enzyme:
+                    if enzyme_to_couple.id in self._check_catalysis_coefficient:
+                        raise ValueError('Enzyme exists but is not classified as one')
+                    self._check_catalysis_coefficient[enzyme_to_couple.id] = [c3]
+                else:
+                    self._check_catalysis_coefficient[enzyme_to_couple.id] += [c3]
+            
+                if c3.subs(params.mu, 1) <= 0:
+                    raise ValueError('The catalysis coupling constraint is negative for ' + enzyme_to_couple.id)
             enzyme_to_couple.couple(type = 'catalysis', value = -c3)
 
             if not r_.reversibility:
@@ -540,10 +618,10 @@ class me_builder():
                 r_f,r_r = r.copy(), r.copy()
                 r_f.lower_bound, r_r.lower_bound, r_r.upper_bound = 0,0, abs(r.lower_bound)
                 r_r.add_metabolites({metab: -coeff for metab, coeff in r_r.metabolites.items()}, combine = False)
-                
+
                 r_f.couple(metabolites = enzyme_to_couple, types = 'catalysis')
                 r_r.couple(metabolites = enzyme_to_couple, types = 'catalysis')
-                
+
 
                 r_f.id, r_r.id = r_f.id + '_F', r_r.id + '_R'
                 reactions = [r_f, r_r]
@@ -552,11 +630,11 @@ class me_builder():
             if self.complex_df.loc[i, 'creates_multiple_reactions']:
                 for j in range(len(reactions)):
                     r_ = reactions[j]
-                    r_.id = r_.id + '_' + str(self.reaction_counter[reaction_id])
+                    r_.id = r_.id + '_' + str(reaction_counter[reaction_id])
                     reactions[j] = r_
-                if self.reaction_counter[reaction_id] == 0: # tracking that all metabolic reactions are added
+                if reaction_counter[reaction_id] == 0: # tracking that all metabolic reactions are added
                     metabolic_reactions.remove(reaction_id)
-                self.reaction_counter[reaction_id] += 1
+                reaction_counter[reaction_id] += 1
             else:
                 metabolic_reactions.remove(reaction_id) # tracking that all metabolic reactions are added
             final_reactions += reactions
@@ -575,9 +653,20 @@ class me_builder():
         self.complex_df = self.complex_df[self.complex_df.category == 'expression_reaction']
         self.complex_df.reset_index(inplace = True, drop = True)
 
+        expression_reactions = self.me_reactions.copy()
+        if self.deg_args['complex_degradation']:
+            expression_reactions += [r for r in self.complex_degradation_reactions if not r._ribosomal_degradation]
+            # filter out ribosomal_degradation reactions
+        expression_reactions = [r for r in expression_reactions if len(r.genes)>0]
+        reaction_counter = dict(zip(sorted(set([r.id for r in expression_reactions])), [0]*len(expression_reactions))) 
+
         print('Add machinery to expression module reactions')
-        for rxn in tqdm([r__ for r__ in self.me_reactions if len(r__.genes) > 0]):
-            reaction_id_short = func.parse_me_reaction_id(rxn.id) # abbreviated version
+        for rxn in tqdm(expression_reactions):
+            if type(rxn) != Complex_Degradation_Reaction:
+                reaction_id_short = func.parse_me_reaction_id(rxn.id) # abbreviated version
+            else:
+                reaction_id_short = parse_complex_degradation_reaction_id(rxn.id)
+
             reaction_id = rxn.id # original reaction id
             idx = self.complex_df[self.complex_df.reaction_id == reaction_id_short].index.tolist()
 
@@ -595,6 +684,8 @@ class me_builder():
                 rxn_me.coupled_metabolites = rxn.coupled_metabolites
                 rxn_me.gene_reaction_rule = rxn.gene_reaction_rule
 
+
+
             for i in idx:
                 # necessary to keep same metabolite type
                 r = ME_Reaction(type_ = rxn_me.type,id = rxn_me.id, name = rxn_me.name, 
@@ -603,17 +694,27 @@ class me_builder():
                 r.add_metabolites(rxn_me.metabolites, combine = False)
                 r.coupled_metabolites = rxn_me.coupled_metabolites
                 r.gene_reaction_rule = rxn_me.gene_reaction_rule
-
+                
                 if not self.complex_df.loc[i, 'is_complex']:
                     enzyme_to_couple = self.id_protein_map[self.complex_df.loc[i, 'machinery']][self.complex_df.loc[i, 'compartment']]
-                    alpha_p = enzyme_to_couple.alpha_p
                 else:
                     enzyme_to_couple = self.complex_id_metabolite_map[self.complex_df.loc[i, 'complex_id']]
-                    alpha_p = np.median([p.alpha_p for p in enzyme_to_couple.decompose_complex() if isinstance(p, Protein)])
+                    enzyme_to_couple.get_alpha_p()
+                enzyme_to_couple.keff = self.complex_df.loc[i, 'keff']
+            
                 # add machinery to substrate side
-                c3 = (params.mu + alpha_p)/self.complex_df.loc[i, 'keff']
-                if c3.subs(params.mu, 1) <= 0:
-                    raise ValueError('The catalysis coupling constraint is negative for ' + enzyme_to_couple.id)
+                c3 = (params.mu + enzyme_to_couple.alpha_p)/enzyme_to_couple.keff
+                
+                if self.check_all:
+                    if not enzyme_to_couple.enzyme:
+                        if enzyme_to_couple.id in self._check_catalysis_coefficient:
+                            raise ValueError('Enzyme exists but is not classified as one')
+                        self._check_catalysis_coefficient[enzyme_to_couple.id] = [c3]
+                    else:
+                        self._check_catalysis_coefficient[enzyme_to_couple.id] += [c3]
+                
+                    if c3.subs(params.mu, 1) <= 0:
+                        raise ValueError('The catalysis coupling constraint is negative for ' + enzyme_to_couple.id)
                 enzyme_to_couple.couple(type = 'catalysis', value = -c3)
 
                 if not rxn.reversibility:
@@ -626,7 +727,7 @@ class me_builder():
 
                     r_f.couple(metabolites = enzyme_to_couple, types = 'catalysis')
                     r_r.couple(metabolites = enzyme_to_couple, types = 'catalysis')
-                    
+
                     r_f.id, r_r.id = r_f.id + '_F', r_r.id + '_R'
                     reactions = [r_f, r_r]
 
@@ -634,17 +735,40 @@ class me_builder():
                 if self.complex_df.loc[i, 'creates_multiple_reactions']:
                     for j in range(len(reactions)):
                         r_ = reactions[j]
-                        r_.id = r_.id + '_' + str(self.reaction_counter[reaction_id])
+                        r_.id = r_.id + '_' + str(reaction_counter[reaction_id])
                         reactions[j] = r_
-                    self.reaction_counter[reaction_id] += 1
+                    reaction_counter[reaction_id] += 1
                 self.final_reactions += reactions
-        
+
+        if self.deg_args['complex_degradation']:
+            # hard-coded for ribosomal degradation
+            enzyme_to_couple = [self.complex_id_metabolite_map[self.complex_df[self.complex_df.reaction_id == 'PROTEASOMAL_DEGRADATIONc'].complex_id.tolist()[0]]]
+            enzyme_to_couple.append(self.complex_id_metabolite_map[self.complex_df[self.complex_df.reaction_id == '5s_rRNA_DEGRADATIONc'].complex_id.tolist()[0]])
+            ribosomal_degradation_reactions = [r for r in self.complex_degradation_reactions if r._ribosomal_degradation]
+
+            for rxn in ribosomal_degradation_reactions:
+                rxn_me = ME_Reaction(type_ = ['catalysis'], 
+                                id = rxn.id, name = rxn.name, subsystem = rxn.subsystem, lower_bound = rxn.lower_bound, 
+                                upper_bound = rxn.upper_bound)
+                rxn_me.add_metabolites(rxn.metabolites, combine = False)
+                rxn_me.gene_reaction_rule = rxn.gene_reaction_rule
+                rxn_me.couple(metabolites = enzyme_to_couple, types = ['catalysis', 'catalysis'])
+                self.final_reactions.append(rxn_me)
+
         if self.dummy_protein is None:
             self.final_reactions += [r for r in self.me_reactions if len(r.genes) == 0]
+            if self.deg_args['complex_degradation']:
+                self.final_reactions += [r for r in self.complex_degradation_reactions if len(r.genes) == 0]
             self.final_reactions += self.complex_formation_reactions 
-            
+
         self.complex_df = backup.copy()
         del backup
+        
+        if self.check_all:
+            for k,v in self._check_catalysis_coefficient.items():
+                if len(set(v)) != 1:
+                    raise ValueError(k + ' received multiple coupling coefficients for different reactions')
+        del self._check_catalysis_coefficient
     
     def deorphan(self, exclude = None):
         '''Couples dummy protein to reactions that don't have specified genes ("de-orphaning")
@@ -663,12 +787,14 @@ class me_builder():
             a list of ME_Model reaction IDs for reactions there were not de-orphaned despite having 0 specified genes 
 
         '''
+        
 
         if self.dummy_protein is not None:
             print('Deorphan enzymeless reactions')
-            enzymeless_reactions = [r for r in self.m_model.reactions if len(r.genes) == 0]
-            enzymeless_reactions += [r for r in self.me_reactions if len(r.genes) == 0]
+            enzymeless_reactions = [r for r in self.m_model.reactions + self.me_reactions if len(r.genes) == 0]
             enzymeless_reactions += self.complex_formation_reactions
+            if self.deg_args['complex_degradation']:
+                enzymeless_reactions += [r for r in self.complex_degradation_reactions if len(r.genes) == 0]
 
             if len(set([r.id for r in enzymeless_reactions]).intersection(self.final_reactions)) > 0:
                 raise ValueError('Incorrect parsing of reaction lists for dummy protein')
@@ -743,7 +869,7 @@ class me_builder():
             self.deorphaned = list()
 
             if len(deorphan) > 0:
-                c3 = (params.mu + self.dummy_protein['protein_metabolite'].alpha_p)/self.dummy_protein['keff']
+                c3 = (params.mu + self.dummy_protein['protein_metabolite'].alpha_p)/self.dummy_protein['protein_metabolite'].keff
                 self.dummy_protein['protein_metabolite'].couple(type = 'catalysis', value = -c3)
 
                 metabolic_ids = [r.id for r in self.m_model.reactions]
@@ -779,7 +905,63 @@ class me_builder():
 
             self.final_reactions += self.orphan
             self.orphan = [r.id for r in self.orphan + biomass.biomass_reactions + [biomass.upb_reaction]]
+    def incorporate_protein_degradation(self):
+        '''Removes degradation reactions of inactive monomers and couples protein degradation to catalysis, depending on 
+        deg_args input'''
 
+        if self.check_all and self.deg_args['complex_degradation']:
+            for r in self.complex_degradation_reactions:
+                r._update_enzymes() # updates rxn ._enzymes attribute to include all macromolecules involved in reaction catalysis
+                if not (len(r._enzymes) > 0):
+                    raise ValueError(r.id + ': this Complex_Degradation_Reaction is not associated with an active enzyme')
+
+        if not self.deg_args['nonenzyme_degradation']: # remove degradation reactions of nonenzymes (degraded in complex)
+            reactions_to_remove = list()
+            pdr = [r for r in self.me_reactions if isinstance(r, Protein_Degradation_Reaction)]
+            for r in pdr:
+                r._update_enzymes()
+                if not(len(r._enzymes) > 0):
+                    reactions_to_remove.append(r.id)
+            print('{} of {} protein degradation reactions will be removed because they are not associated with an active enzyme'.format(len(reactions_to_remove), len(pdr)))
+
+            if self.check_all and len(set(reactions_to_remove).difference([r.id for r in self.final_reactions]))>0:
+                raise ValueError('Untracked protein degradation reactions (not in final reactions list)')
+
+            self.final_reactions = [r for r in self.final_reactions if r.id not in reactions_to_remove]
+
+        if self.deg_args['couple']:
+            print('Couple enzyme degradation to catalysis')
+
+            pdr = [r for r in self.me_reactions if isinstance(r, Protein_Degradation_Reaction)]
+            dr_map = dict()
+            for r in pdr + self.complex_degradation_reactions:
+                r._update_enzymes()
+                dr_map[r.id] = r
+
+            catalysis_reactions = [r for r in self.final_reactions if isinstance(r, ME_Reaction) and 'catalysis' in r.type and func.get_reaction_compartment(r) != 'e']
+            for r in tqdm(catalysis_reactions):
+                enzymes = [m for m,t in r.coupled_metabolites.items() if t == 'catalysis']
+                deg_reactions = list()
+                deg_proxies = list()
+                for e in enzymes: # in case multiple catalysis proteins (ribosomal degradatio)
+                    deg_reactions_ = [r_id for r_id in e._degradation_reactions if (dr_map[r_id].sink) and (e in dr_map[r_id]._enzymes)]
+                    if len(deg_reactions_) == 0:
+                        raise ValueError('No degradation reactions associated with catalyzing enzyme')
+                    elif len(deg_reactions_) > 1:
+                        raise ValueError('More than 1 degradation reaction associated with catalyzing enzyme')
+                    deg_reactions += deg_reactions_
+                    dp = Macromolecule(e._deg_id + '_enzyme_deg_proxy', proxy = True)
+                    dp.couple(type = 'enzyme_degradation', value = -e.alpha_p/e.keff)
+                    deg_proxies.append(dp)
+
+                if len(deg_reactions) > 1 and not (r.id in dr_map or dr_map[r.id]._ribosomal_degradation):
+                    raise ValueError('More than 1 degradation reaction associated with the catalysis reaction')
+
+                deg_reactions = [r_ for r_ in self.final_reactions if r_.id in deg_reactions]
+                for dr, dp in list(zip(deg_reactions, deg_proxies)):
+                    dr.add_metabolites({dp: 1})
+                    r.couple(metabolites = dp, types = 'enzyme_degradation')
+    
     def build_me_model(self, model_id = 'HUMAN_ME_MODEL'):
         print('Add biomass component to reactions')
         for r in self.final_reactions:
@@ -816,7 +998,7 @@ class me_builder():
 
 def build_me(minimal_proteome = True, compress_mrna = True, dummy_protein = True,
              deg_args = {'couple': True, 'reversible_complex_formation': False, 'nonenzyme_degradation': False, 
-                          'complex_degradation': True},
+                          'complex_degradation': True}, check_all = True,
              model_id = 'HUMAN_ME_MODEL'):
     '''Generates a human ME_model. 
     
@@ -832,7 +1014,6 @@ def build_me(minimal_proteome = True, compress_mrna = True, dummy_protein = True
         gene into a single reaction
     dummy_protein: bool [True]
         whether to add a representative dummy protein to catalyze orphan reactions 
-    model_id: string; id for the me model
     deg_args: dict
         A number of options related to protein and complex degradation. Becomes important in slow growth conditions.
         Note the default values focus on coupling fluxes and degrading the specific enzymes associated with 
@@ -852,15 +1033,19 @@ def build_me(minimal_proteome = True, compress_mrna = True, dummy_protein = True
                 protein intermediates associated with the monomeric enzyme that had degradation rections are retained.
                 Regardless of this parameter, only the specific enzymatic degradation reaction associated with the 
                 catalysis reaction will be coupled. Independent of complex_degradation and 
-                reversible_complex_formation arguments
+                reversible_complex_formation arguments.
             "complex_degration": bool
                 Whether to generate degradation reactions for whole complexes in addition to individual monomers
                 (required for coupling)
+    check_all: bool
+        Whether to check that building is proceeding correctly. Increases run time
+    model_id: str
+        id for the me model
     '''
     
     start = time.time()
     builder = me_builder(compress_mrna = compress_mrna, 
-                         dummy_protein = dummy_protein, deg_args = deg_args)
+                         dummy_protein = dummy_protein, deg_args = deg_args, check_all = check_all)
     builder.express_metabolic_enzymes()
     builder.express_expression_enzymes()
     builder.express_dummy_protein()
@@ -872,6 +1057,7 @@ def build_me(minimal_proteome = True, compress_mrna = True, dummy_protein = True
     builder.add_metabolic_machinery()
     builder.add_expression_machinery()
     builder.deorphan()
+    builder.incorporate_protein_degradation()
     me_model = builder.build_me_model(model_id = model_id)
 
     end = time.time()
@@ -884,139 +1070,41 @@ def build_me(minimal_proteome = True, compress_mrna = True, dummy_protein = True
 # In[5]:
 
 
-# if macromolecule.compartment in ['c', 'n', 'r', 'pm']:
-#    degrade(macromolecule, **{'ub_args': ub_args})
-# else:
-#     degrade(macromolecule)
-    
-# current: deg_args = {'reversible_complex_formation': True, 
-#                        'couple' = False, 
-#                        'nonenzyme_degradation': True, 
-#                        'complex_degradation': False}
+gc.collect()
 
 
 # In[6]:
 
 
-gc.collect()
+# minimal_proteome = True
+# compress_mrna = True 
+# dummy_protein = True 
+# model_id = 'HUMAN_ME_MODEL'
+# # #og # deg_args = {'reversible_complex_formation': True, 
+# #                        'couple': False, 
+# #                        'nonenzyme_degradation': True, 
+# #                        'complex_degradation': False}
 
+# deg_args = {'reversible_complex_formation': True, 
+#                        'couple': False, 
+#                        'nonenzyme_degradation': False, 
+#                        'complex_degradation': True}
 
-# In[7]:
-
-
-minimal_proteome = True
-compress_mrna = True 
-dummy_protein = False 
-model_id = 'HUMAN_ME_MODEL'
-deg_args = {'reversible_complex_formation': True, 
-                       'couple': False, 
-                       'nonenzyme_degradation': True, 
-                       'complex_degradation': False}
-
-
-# In[8]:
-
-
-builder = me_builder(compress_mrna = compress_mrna, 
-                         dummy_protein = dummy_protein, deg_args = deg_args)
-builder.express_metabolic_enzymes()
-builder.express_expression_enzymes()
-builder.express_dummy_protein()
-builder.get_complex_info()
+# builder = me_builder(compress_mrna = compress_mrna, 
+#                          dummy_protein = dummy_protein, deg_args = deg_args)
+# builder.express_metabolic_enzymes()
+# builder.express_expression_enzymes()
+# builder.express_dummy_protein()
+# builder.get_complex_info()
 # builder.generate_complex_reactions()
 # builder.get_keff()
 # if minimal_proteome:
 #     builder.minimize_proteome()
-
 # builder.add_metabolic_machinery()
 # builder.add_expression_machinery()
 # builder.deorphan()
+# builder.incorporate_protein_degradation()
 # me_model = builder.build_me_model(model_id = model_id)
-# print('solve')
-# sln, stat, _ = me_model.solve_lp(mu_val = 1e-9)
-
-
-# In[9]:
-
-
-self = copy.deepcopy(builder)
-
-
-# In[10]:
-
-
-unique_complexes = self.complex_df[self.complex_df.is_complex]
-unique_complexes = unique_complexes.drop_duplicates(subset = 'complex_id', keep = 'first')
-unique_complexes.reset_index(inplace = True, drop = True)
-
-complex_formation_reactions = list() # store all complex formation reactions
-
-counter = 0
-for i in unique_complexes.index:
-    print(i)
-    complex_id = unique_complexes.loc[i, 'complex_id']
-    compartment = unique_complexes.loc[i, 'compartment']
-    machinery = unique_complexes.loc[i, 'machinery'].split(';')
-
-    machinery_metabolites = list()
-    counter_rib = 0
-    for m in machinery:
-        if m != 'ribosome':
-            machinery_metabolites.append(self.id_protein_map[m][compartment])
-            
-        else:
-            machinery_metabolites.append(self.ribosome_complex_c)
-            counter_rib += 1
-    
-    if counter_rib==0:
-        complex_metabolite = Complex(metabolites = machinery_metabolites, complex_id = complex_id)
-    else:
-        complex_metabolite = Ribosomal_Complex(metabolites = machinery_metabolites, complex_id = complex_id)
-
-
-    if len(complex_id) > 247: # ids that are too long
-        complex_metabolite.update_id(new_id = str(counter)) # complex_metabolite.udate_id()
-        counter += 1
-
-        new_id = complex_metabolite.id
-        self.complex_df.complex_id.replace(to_replace = complex_id, value = complex_metabolite.temp_id, 
-                                           inplace = True)
-
-    complex_reaction = complex_metabolite.form_complex(reversible = self.deg_args['reversible_complex_formation'])
-
-    complex_formation_reactions.append(complex_reaction)
-    self.complex_id_metabolite_map[complex_metabolite.temp_id] = complex_metabolite
-    self.complex_reactions_map[complex_metabolite.temp_id] = complex_reaction.id
-
-self.complex_formation_reactions = complex_formation_reactions
-
-
-# In[24]:
-
-
-counter_rib
-
-
-# In[27]:
-
-
-complex_metabolite = Ribosomal_Complex(metabolites = machinery_metabolites)
-
-
-# In[28]:
-
-
-complex_metabolite.form_complex(reversible = self.deg_args['reversible_complex_formation'])
-
-
-# In[29]:
-
-
-complex_metabolite._check_metabolite_types()
-
-
-# In[ ]:
-
-
-
+# # print('solve')
+# # sln, stat, _ = me_model.solve_lp(mu_val = 1e-9)
 
