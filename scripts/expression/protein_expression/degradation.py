@@ -436,9 +436,9 @@ def build_erad_reactions(macromolecule, **kwargs):
 def build_endocytosis_reactions(macromolecule_pm, **kwargs):
     ub_args = kwargs['ub_args']
     if 'macromolecule_l' in kwargs.keys():
-        if macromolecule.type == 'complex':
-            raise ValueError(macromolecule.id + ': Unexpected provision of lysosomal complex in endocytosis (internal)')
         macromolecule_l = kwargs['macromolecule_l']
+        if macromolecule_l is not None and macromolecule_l.type == 'complex':
+            raise ValueError(macromolecule_l.id + ': Unexpected provision of lysosomal complex in endocytosis (internal)')
     else:
         macromolecule_l = None    
     
@@ -575,7 +575,7 @@ def degrade(macromolecule, **kwargs):
     return deg_reactions
 
 
-# In[11]:
+# In[13]:
 
 
 # import random
@@ -609,11 +609,11 @@ def degrade(macromolecule, **kwargs):
 #     gene_info.get_final_locations(metabolic_model = cobra.Model(''), final_locations = location)
 #     proteins.append(Protein(id_ = 'a', compartment = 'c', gene_info = gene_info))
 
-# proteins_ = proteins
-# # proteins_ = list()
-# # for p in proteins:
-# #     proteins_.append(p.change_compartment('m'))
-# # proteins = proteins_
+# # proteins_ = proteins
+# proteins_ = list()
+# for p in proteins:
+#     proteins_.append(p.change_compartment('g'))
+# proteins = proteins_
 
 # cplx = Complex(metabolites = proteins_+proteins_, complex_id = 'test')
 # cplx = Complex(metabolites = [cplx, cplx] + proteins_ + proteins_, complex_id = 'test2')
@@ -626,4 +626,10 @@ def degrade(macromolecule, **kwargs):
 # rxns1 = degrade(proteins[0], **{'ub_args': ub_args})
 # rxns2 = degrade(cplx, **{'ub_args': ub_args})
 # # rxns3 = degrade(rcplx, **{'ub_args': ub_args})
+
+
+# In[ ]:
+
+
+
 

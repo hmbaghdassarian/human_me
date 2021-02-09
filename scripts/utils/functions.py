@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[1]:
+# In[2]:
 
 
 import pandas as pd
@@ -31,22 +31,25 @@ class HiddenPrints:
         sys.stdout = self._original_stdout
 
 
-# In[3]:
+# In[11]:
 
 
 def get_reaction_compartment(reaction):
     '''Input is a cobra.Reaction, output is a singular compartment. This function maps reactions to a particular 
     compartment according to some rules'''
     
-    compartments_ = sorted([m.compartment for m in reaction.metabolites.keys() if m.compartment is not None])
+    compartments_ = list(set([m.compartment for m in reaction.metabolites.keys() if m.compartment is not None]))
     # sorted to choose the first one in alphabetical order given a tie
-    if len(set(compartments_)) > 1: # for reactions that occur in more than one compartment
-        if 'c' in compartments_: # remove cytoplasmic compartment as a choice in multi-machinery
-            compartments_ = sorted([c for c in compartments_ if c != 'c'])
-        if len(set(compartments_)) > 1:
-            compartments_ = [max(compartments_, key = compartments_.count)]
+    if len(compartments_) > 1: # for reactions that occur in more than one compartment
+        if sorted(compartments_) == ['c', 'e']: # in the future can say if 'c' and 'e' in compartments_, make protein a plasma membrane one
+            compartments_ = ['pm']
+        else:
+            if 'c' in compartments_: # remove cytoplasmic compartment as a choice in multi-machinery
+                compartments_.remove('c')
+            if len(set(compartments_)) > 1:
+                compartments_ = [max(sorted(compartments_), key = compartments_.count)]
     
-    compartments_ = sorted(set(compartments_))
+#     compartments_ = sorted(set(compartments_))
     if len(compartments_) != 1:
         raise ValueError('Failed to map reaction to a singular compartment')
     elif compartments_[0] not in params.compartments.keys():
@@ -151,6 +154,9 @@ def parse_me_reaction_id(x):
     parsed x: str
         HGNC ID
     '''
+    # used to store complex information in build_me
+    # since duplicate complexes are checked for, perfect parsing is not necessary, except 
+    # in the case of protein degradation, since it must match parsing of complex degradation reactions 
     
     
     if 'HGNC' in x.split('_')[0]:
@@ -161,7 +167,10 @@ def parse_me_reaction_id(x):
         if not pdr:
             return '_'.join(x.split('_')[1:])
         else:
-            return '_'.join(x[x.index('_' + x[-1] + '_') + 2:].split('_')[1:]) 
+            if not x.endswith('pm'):
+                return '_'.join(x[x.index('_' + x[-1] + '_') + 2:].split('_')[1:]) 
+            else:
+                return '_'.join(x[x.index('_' + x[-2:] + '_') + 2:].split('_')[1:]) 
     else:
         return x
 
