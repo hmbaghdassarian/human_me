@@ -146,7 +146,7 @@ biomass_reactions += [dna_reaction, carbohydrate_reaction, lipid_reaction]
 # In[9]:
 
 
-def add_biomass_change(reaction):
+def add_biomass_change(reaction, inplace = True):
     '''
     
     Input: cobra.Reaction
@@ -166,7 +166,7 @@ def add_biomass_change(reaction):
     
     for m, count in md.items():
         if isinstance(m, Macromolecule):# and not isinstance(count, sympy.Expr):
-            if not isinstance(m, Complex):
+            if not isinstance(m, Complex): # includes ribosomes
                 if m.type in biomass_change:
                     biomass_change[m.type] += (count*m.formula_weight/1000)
                 else:
@@ -183,5 +183,9 @@ def add_biomass_change(reaction):
         del biomass_change['proxy']
     
     biomass_change = {biomass_mapper[k]:v for k,v in biomass_change.items()}
-    reaction.add_metabolites(biomass_change, combine = False)
+    
+    if inplace:
+        reaction.add_metabolites(biomass_change, combine = False)
+    else:
+        return biomass_change
 
