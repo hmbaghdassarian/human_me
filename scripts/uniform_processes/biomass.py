@@ -162,21 +162,26 @@ def add_biomass_change(reaction, inplace = True):
             md[metabolite] -= metabolite.coupling_coefficient[type] # coupling not part of mass balance
     
     # extracellular proteins do not contribute to biomass
-    md = {m:count for m,count in md.items() if m.compartment != 'e'}
+#     md = {m:count for m,count in md.items() if m.compartment != 'e'}
     
     for m, count in md.items():
-        if isinstance(m, Macromolecule):# and not isinstance(count, sympy.Expr):
-            if not isinstance(m, Complex): # includes ribosomes
-                if m.type in biomass_change:
-                    biomass_change[m.type] += (count*m.formula_weight/1000)
+        if m.compartment != 'e':
+            if isinstance(m, Macromolecule):# and not isinstance(count, sympy.Expr):
+                if m.type != 'complex': # includes ribosomes
+                    if not(m.type == 'trna' and (reaction.id.startswith('CHARGING_TRNA_') or (isinstance(reaction, ME_Reaction) and 'translation' in reaction.type))):
+                        # above line exclude trna charging/unchraging from change in trna biomass
+                        # this removes tradeoffs between generating protein biomass and maintaining
+                        # trna biomass
+                        if m.type in biomass_change:
+                            biomass_change[m.type] += (count*m.formula_weight/1000)
+                        else:
+                            biomass_change[m.type] = (count*m.formula_weight/1000)
                 else:
-                    biomass_change[m.type] = (count*m.formula_weight/1000)
-            else:
-                for type_, mass_ in m.get_complex_biomass().items():
-                    if type_ in biomass_change:
-                        biomass_change[type_] += (count*mass_)
-                    else:
-                        biomass_change[type_] = (count*mass_)
+                    for type_, mass_ in m.get_complex_biomass().items():
+                        if type_ in biomass_change:
+                            biomass_change[type_] += (count*mass_)
+                        else:
+                            biomass_change[type_] = (count*mass_)
     
     # proxy metabolites do not contribute to bimoass
     if 'proxy' in biomass_change:
