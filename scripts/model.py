@@ -379,9 +379,9 @@ class ME_Model(cobra.Model):
             if math.isnan(flux): 
                 ir[r.id] = flux
             elif (flux > ub + tolerance):
-                ir[r.id] = flux - ub
+                ir[r.id] = abs(flux - ub)
             elif (flux < lb - tolerance):
-                ir[r.id] = lb - flux
+                ir[r.id] = abs(lb - flux)
                 
         if (len(ir)>0 and stat == 0) or (len(ir)==0 and stat != 0):
             warnings.warn('There is a discrepancy between the solver status and reactions that violate bound constraints')
