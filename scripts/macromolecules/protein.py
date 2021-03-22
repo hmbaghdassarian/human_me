@@ -57,7 +57,7 @@ class Protein(Macromolecule):
             self._ptms = gene_info.ptms
             self._deg_id = gene_info.hgnc_id
             # for rest of pipeline
-            self.alpha_p =  gene_info.coupling_params['alpha_p']
+            self.k_deg =  gene_info.coupling_params['alpha_p']
             id_ = gene_info.hgnc_id + '_' + id_ + '_protein_' + compartment 
             
         else:
@@ -88,7 +88,7 @@ class Protein(Macromolecule):
             self.type = 'dummy_protein'
         
         self.enzyme = False # whether the protein is involved in catalysis of a reaction
-        
+        self.keff = None
         self._degradation_reactions = [] # associated degradation reactions for protein monomer, if any
     
     def _consolidate_degradation_rxns(self):

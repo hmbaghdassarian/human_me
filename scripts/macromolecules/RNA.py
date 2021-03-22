@@ -10,6 +10,7 @@ sys.path.insert(1, '../../scripts/')
 from utils import metabolites as metab
 from utils import machinery as mach
 from utils import functions as func
+from utils import parameters as params
 # from uniform_processes.biomass import biomass_rna_mapper
 from macromolecules.macromolecule import Macromolecule
 
@@ -221,6 +222,7 @@ class rRNA(RNA):
         
         self.type = 'rrna'
         self.id = self.id.replace('RNA', self.type)
+        self.k_deg = params.rrna_degradation_constant
         
         
 class RNA_fragment(RNA):

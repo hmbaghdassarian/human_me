@@ -217,8 +217,8 @@ class Complex(Macromolecule):
         types = list(set([m.type for m in self.decompose_complex()]))
         if len(types) > 1 or types[0] != 'protein':
             raise ValueError('ME-Model is currently designed to only handle protein-protein complexes')
-    def get_alpha_p(self):
-        self.alpha_p = np.median([p.alpha_p*c for p,c in self.decompose_complex().items() if p.type == 'protein'])
+    def get_k_deg(self):
+        self.k_deg = np.median([m.k_deg*c for m,c in self.decompose_complex().items()])
 
 
 # In[ ]:
@@ -334,6 +334,9 @@ class Ribosomal_Complex(Complex):
         self._degradation_reactions = []
         
         del dc
+#     def get_k_deg(self):
+#         self.k_deg = params.ribosomal_degradation_rate
+
 #     def _change_compartment_and_components(self, new_compartment):
 #         '''Returns a copy of the complex metabolite, but in new compartment. 
 #         Recursive to change all components (nested complexes and their components)'''

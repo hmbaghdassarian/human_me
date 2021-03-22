@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[2]:
+# In[1]:
 
 
 import pandas as pd 
@@ -14,7 +14,7 @@ sys.path.insert(1, '../../scripts/') # comment out in python script
 from utils.load_environmental_variables import processed_data_path, build_files_path
 
 
-# In[3]:
+# In[2]:
 
 
 psim_me = pd.read_hdf(processed_data_path + 'corrected_psim.h5', key = 'corrected')
@@ -68,7 +68,7 @@ Kv = 0.7 # secretory pathway vesicle coat coefficients
 membrane_diffusion_limit = 504 # 504 Da includes ATP, uncharged molecules at this diffusion limit are passive, no dummy
 
 
-# In[11]:
+# In[6]:
 
 
 # coupling parameters
@@ -94,6 +94,10 @@ alpha_m = alpha_m.groupby(alpha_m.HGNC_ID).median().median_turnover # have true 
 
 turnover = {'alpha_m': alpha_m, 'alpha_p': alpha_p, 
            'alpha_m_median': alpha_m_median, 'alpha_p_median': alpha_p_median}
+
+# ribosome
+rrna_degradation_constant = np.log(2)/72 # bioid 108025
+# ribosomal_degradation_rate = np.log(2)/300 #bioid 110053 # unused
 
 
 # In[7]:

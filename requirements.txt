@@ -1,3 +1,4 @@
+python==3.6.9
 biopython==1.77
 cmake==3.18.2
 cython==0.29.20
