@@ -12,6 +12,7 @@ from collections import defaultdict
 import warnings
 from math import isinf
 from six import iteritems
+import copy
 
 import sys
 sys.path.insert(1, '../../scripts/')
@@ -103,16 +104,28 @@ class ME_Reaction(cobra.Reaction):
                 raise ValueError('Reaction bounds can only be a function of mu for reactions of type biomass')
 
             
-    def replace_bound_mu(self, mu_val = 1, values = None, _ = True, inplace = False):
+    def replace_bound_mu(self, mu_val = 1, values = None, inplace = False, _ = True):
         '''
         Assumes growth is always > 0. Gives numeric values to bounds for certain methods.
+        
+        Parameters
+        ----------
+        mu_val: float
+            The value for mu to replace the bounds that contain a mu expression with
+        values: list or None
+            Each entry is an expression containing mu to be replaced by mu_val; inplace must be False
+        inplace: bool; default False
+            Whether to replace the bounds inplace on the reaction object (True), or return the bounds
+        _: bool
+            internal use, whether to use cobra.Reaction._upper_bound or cobra.Reaction.upper_bound
+        
         
         '''
         
         if _:
-            lb, ub = self._lower_bound, self._upper_bound
+            lb, ub = copy.copy(self._lower_bound), copy.copy(self._upper_bound)
         else:
-            lb, ub = self.lower_bound, self.upper_bound
+            lb, ub = copy.copy(self.lower_bound), copy.copy(self.upper_bound)
             
         self.check_me_bounds(lb,ub)    
         
@@ -133,7 +146,7 @@ class ME_Reaction(cobra.Reaction):
                 raise TypeError('values must a list')
                 
             for i in range(len(values)):
-                if isinstance(values[i], sympy.Expr): # assumes the sympy expression always containts mu
+                if isinstance(values[i], sympy.Expr): # assumes the sympy expression always contains mu
                     values[i] = float(values[i].subs(params.mu, mu_val))
             if not inplace:
                 return lb, ub, values
@@ -349,8 +362,14 @@ class Complex_Degradation_Reaction(cobra.Reaction):
         else:
             self._ribosomal_degradation = True
             # hard-coded
+            
+            # Option 1: degrade rRNA with ribosomal degradation - see also expression.protein_expression.degradation.proteasomal_degradation
             machinery_ = list(set(mach.proteasome_machinery + mach.exosome['HGNC ID (gene)'].tolist()))
 
+#             # # Option 2: degrade proteins with ribosomal degradation, releasing rRNA as intact - see also expression.protein_expression.degradation.proteasomal_degradation
+#             machinery_ = mach.proteasome_machinery
+
+            
             # this is more flexible, but hardcoded check in degradation.proteasomal_degradation
             # renders this unecessary (keep for future iterations)
             

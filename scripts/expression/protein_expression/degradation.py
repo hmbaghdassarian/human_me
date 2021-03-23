@@ -131,7 +131,7 @@ def proteasomal_degradation(macromolecule, **kwargs):
                              compartment = macromolecule.compartment)
     
     #------------
-    # add attribute to indicate unique ribosomal whether unique ribosomal complex machinery
+    # add attribute to indicate whether unique ribosomal complex machinery
     # also adds gene_reaction rules:
     protein_degradation._set_proteasomal_degradation(macromolecule = macromolecule, 
                                                   ribosomal_complex = rcp) 
@@ -145,7 +145,11 @@ def proteasomal_degradation(macromolecule, **kwargs):
             err = 'Internal: Only expect rrna of mature ribosome complex to be degraded. Should work with current code'
             err += ' but double check as other RNA molecules are not expected and appropriate machinery is added.'
             raise ValueError(err)
+        
+        # 3 spots: 
+        # here, core.reaction.Complex_Degradation_Reaction._set_proteasomal_degradation, and build_me_model.generate_complex_reactions
 
+        # Option 1: degrade rRNA with ribosomal degradation - see also 
         for rm_ in rm:
             new_rxn = rm_.exonucleolytic_degradation(reaction_name = '', update = True)
             for m,c in new_rxn.metabolites.items():
@@ -154,6 +158,12 @@ def proteasomal_degradation(macromolecule, **kwargs):
                         rxn[m] += c
                     else:
                         rxn[m] = c
+#         # Option 2: degrade proteins with ribosomal degradation, releasing rRNA as intact - see also core.reaction.Complex_Degradation_Reaction._set_proteasomal_degradation
+#         for rm_ in rm:
+#             if rm_ in rxn.keys():
+#                 rxn[rm_] += mdc[rm_]
+#             else:
+#                 rxn[rm_] = mdc[rm_]
     protein_degradation.add_metabolites(rxn) 
 
     # tracking

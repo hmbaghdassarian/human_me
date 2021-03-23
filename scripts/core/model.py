@@ -7,6 +7,7 @@
 import pickle
 import os
 import pathlib
+import copy
 
 import cobra
 from cobra.core.dictlist import DictList
@@ -29,6 +30,14 @@ from macromolecules.protein import Protein
 
 from core.reaction import ME_Reaction
 from me_solver import solve_me
+
+
+# In[ ]:
+
+
+def flatten_list(t):
+    #https://stackoverflow.com/questions/952914/how-to-make-a-flat-list-out-of-list-of-lists
+    return [item for sublist in t for item in sublist]
 
 
 # In[2]:
@@ -274,7 +283,7 @@ class ME_Model(cobra.Model):
         else:
             raise ValueError('Only the qMINOS solver is currently implemented')
     
-    def solve_lp(self, mu_val, objective = {'biomass_dilution': 1}):
+    def solve_lp(self, mu_val, objective = {'biomass_dilution': 1}, tolerance = 0):
         '''Solves the linear program for a specified objective at a specified growth rate
 
         Parameters
@@ -286,6 +295,8 @@ class ME_Model(cobra.Model):
             with reaction ids as keys and the coefficient of the lin. comb. as the values. 
 
             Example: simplest case, to maximize reaction with id 'A', objective = {'A': 1}
+        tolerance: float; default 0
+            Threshold below which expected sensitivity of solver is too low to detect infeasibility
 
         Returns
         ----------
@@ -308,7 +319,7 @@ class ME_Model(cobra.Model):
         else:
             self.initialize_solver(solver_type = self.solver_type, precision = self.solver_precision)
             
-        sln, stat, hs = self.solver_.solve_lp(me_model = self, mu_val = mu_val, objective = objective)
+        sln, stat, hs = self.solver_.solve_lp(me_model = self, mu_val = mu_val, objective = objective, tolerance = tolerance)
         return sln, stat, hs
     
     def maximize_growth(self, min_mu=0, max_mu=0.05, mu_accuracy=1e-4, increment = 1, verbose=True):
@@ -357,9 +368,12 @@ class ME_Model(cobra.Model):
         Returns
         ----------
         ir: dict
-            for reactions that cause feasibility, keys are reaction ids for infeasible reactions and values are optimizes reaction fluxes
+            for reactions that cause infeasibility, keys are reaction ids for infeasible reactions and values are 
+            difference by which reaction flux is infeasible
         '''
-
+        if tolerance < 0:
+            tolerance = abs(tolerance)
+            
         ir = dict()
         for r in self.reactions:
             flux = sln[self.reactions.index(r.id)]
@@ -371,8 +385,14 @@ class ME_Model(cobra.Model):
                 ub = float(ub.subs(params.mu, mu_val))
             if isinstance(lb, sympy.Expr):
                 lb = float(lb.subs(params.mu, mu_val))
-            if math.isnan(flux) or ((flux > ub + tolerance) or (flux < lb - tolerance)):
+            
+            counter = 0
+            if math.isnan(flux): 
                 ir[r.id] = flux
+            elif (flux > ub + tolerance):
+                ir[r.id] = abs(flux - ub)
+            elif (flux < lb - tolerance):
+                ir[r.id] = abs(lb - flux)
                 
         if (len(ir)>0 and stat == 0) or (len(ir)==0 and stat != 0):
             warnings.warn('There is a discrepancy between the solver status and reactions that violate bound constraints')
@@ -466,10 +486,39 @@ class ME_Model(cobra.Model):
                     else:
                         pass
 
+    def check_enzymes(self):
+        '''Makes sure all genes being expressed participate in a catalysis reaction (no unecessary expression reactions)'''
+
+        proteins, complexes = [], []
+        active_proteins, active_complexes = [], []
+        for m in self.metabolites:
+            if hasattr(m, 'type'):
+                if m.type == 'protein':
+                    proteins.append(m.id)
+                    if m.enzyme:
+                        active_proteins.append(m.id)
+                elif m.type == 'complex':
+                    complexes.append(m)
+                    if m.enzyme:
+                        active_complexes.append(m)
+
+        complexes = [m for m in complexes if m.id != 'mature_ribosome_complex_c']
+        subsystems = set(flatten_list([[r.subsystem for r in self.metabolites.get_by_id(m.id).reactions] for m in set(complexes).difference(active_complexes)]))
+        if len(subsystems.difference({'Complex_Degradation', 'Ribosome_Biogenesis'})) > 0:
+            raise ValueError('Unexpected inclusion of inactive complexes')
+
+        active_proteins += flatten_list([[p.id for p in m.decompose_complex()] for m in active_complexes])
+        active_proteins = set([i.split('_')[0] if 'HGNC' in i else i for i in active_proteins])
+        proteins = set([i.split('_')[0] if 'HGNC' in i else i for i in proteins])
+        proteins = [i for i in proteins if 'ubiquitin' not in i]
+        if len(set(proteins).difference(active_proteins).difference({'HGNC:12463', 'HGNC:12468'}))>0:
+            raise ValueError('Unexpected inclusion of inactive protein monomers')
+    
     def check(self):
         '''Check reaction coupling and mass balance'''
         self.check_me_mass_balance()
         self.check_coupling()
+        self.check_enzymes()
 
     def pickle(self, file = os.path.join(os.path.abspath(os.getcwd()), 'me_model.pickle')):
         '''Save ME_Model as a pickled object

@@ -5,13 +5,16 @@
 
 
 import os
+import copy
+import warnings
+import time
+
 import numpy as np
 import scipy
+
 from qminospy.solver import QMINOS # need solveME installed and working
 
 from math import log
-import warnings
-import time
 
 import sys
 sys.path.insert(1, '../../scripts/')
@@ -35,7 +38,8 @@ class qminos_solver():
         
         self.precision = 'quad'
 
-    def solve_lp(self, me_model, mu_val, objective = {'biomass_dilution': 1}, close_biomass_dilution = True):   
+    def solve_lp(self, me_model, mu_val, objective = {'biomass_dilution': 1}, tolerance = 0,
+                 close_biomass_dilution = True):   
         '''Solves the linear program for a specified objective at a specified growth rate
 
         Parameters
@@ -49,6 +53,8 @@ class qminos_solver():
             with reaction ids as keys and the coefficient of the lin. comb. as the values. 
 
             Example: simplest case, to maximize reaction with id 'A', objective = {'A': 1}
+        tolerance: float; default 0
+            Threshold below which expected sensitivity of solver is too low to detect infeasibility
         close_biomass_dilution: bool, default True
             Internal use only, whether to constrain the biomass_dilution reaction bounds by mu
 
@@ -105,6 +111,11 @@ class qminos_solver():
         del b_greater
         del b_equal
         del S
+        
+        if tolerance is None:
+            tolerance = 0
+        if tolerance < 0:
+            tolerance = abs(tolerance)
 
         # reaction bounds at mu
         xl, xu = np.zeros(len(me_model.reactions)), np.zeros(len(me_model.reactions))
@@ -112,16 +123,16 @@ class qminos_solver():
         counter = 0
         for r in me_model.reactions:
             if not(isinstance(r, ME_Reaction) and r.type == ['biomass']):
-                xl[counter] = r.lower_bound
-                xu[counter] = r.upper_bound
+                xl[counter] = copy.copy(r.lower_bound) - tolerance
+                xu[counter] = copy.copy(r.upper_bound) + tolerance
             else:
                 if (r.id != 'biomass_dilution') or close_biomass_dilution:
                     bounds = r.replace_bound_mu(mu_val = mu_val, inplace = False)
-                    xl[counter] = bounds[0]
-                    xu[counter] = bounds[1]
+                    xl[counter] = bounds[0] - tolerance
+                    xu[counter] = bounds[1] + tolerance
                 else:
-                    xl[counter] = 0
-                    xu[counter] = 1000
+                    xl[counter] = 0 - tolerance
+                    xu[counter] = 1000 + tolerance
             counter +=1
 
         # objective vector (max c.T*v)
@@ -145,7 +156,7 @@ class qminos_solver():
                 os.remove(fn)
                 
         return sln, stat, hsq   
-    def maximize_growth(self, me_model, min_mu=0, max_mu=0.05, mu_accuracy=1e-4, increment = 1, verbose=True):
+    def maximize_growth(self, me_model, min_mu=0, max_mu=0.05, mu_accuracy=1e-10, increment = 0.02, verbose=True):
         '''Binary search to find the maximum feasible growth rate
 
         Parameters
