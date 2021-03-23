@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[37]:
+# In[1]:
 
 
 import os
@@ -9,12 +9,12 @@ import copy
 import warnings
 import time
 
+from math import log
 import numpy as np
 import scipy
+from collections import OrderedDict
 
 from qminospy.solver import QMINOS # need solveME installed and working
-
-from math import log
 
 import sys
 sys.path.insert(1, '../../scripts/')
@@ -22,7 +22,7 @@ from core.reaction import ME_Reaction
 from utils import functions as func
 
 
-# In[30]:
+# In[3]:
 
 
 class qminos_solver():
@@ -156,7 +156,8 @@ class qminos_solver():
                 os.remove(fn)
                 
         return sln, stat, hsq   
-    def maximize_growth(self, me_model, min_mu=0, max_mu=0.05, mu_accuracy=1e-10, increment = 0.02, verbose=True):
+    def maximize_growth(self, me_model, min_mu=0, max_mu=0.05, mu_accuracy=1e-10, increment = 0.02,
+                        tolerance = 0, verbose=True):
         '''Binary search to find the maximum feasible growth rate
 
         Parameters
@@ -171,6 +172,8 @@ class qminos_solver():
             The maximum error in mu after the binary search
         increment: float, default 1
             The amount to increase growth by when searching for maximum infeasible growth rate from max_mu
+        tolerance: float; default 0
+            Threshold below which expected sensitivity of solver is too low to detect infeasibility
         verbose: bool, default True
             Prints information about each linear program iteration
 
@@ -234,7 +237,8 @@ class qminos_solver():
             print("completed in {:.2f} hours and {} iterations".format(tot, len(feasible_mu+ infeasible_mu)))
       
         mu_max = np.max(feasible_mu)
-        return mu_max, res
+        res_ = OrderedDict({k: res[k] for k in sorted(list(res.keys()))})
+        return mu_max, res_
 
 
 # In[4]:

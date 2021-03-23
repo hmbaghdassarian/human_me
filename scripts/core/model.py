@@ -322,7 +322,8 @@ class ME_Model(cobra.Model):
         sln, stat, hs = self.solver_.solve_lp(me_model = self, mu_val = mu_val, objective = objective, tolerance = tolerance)
         return sln, stat, hs
     
-    def maximize_growth(self, min_mu=0, max_mu=0.05, mu_accuracy=1e-4, increment = 1, verbose=True):
+    def maximize_growth(self, min_mu=0, max_mu=0.05, mu_accuracy=1e-10, increment = 0.02, 
+                        tolerance = 0, verbose=True):
     
         '''Binary search to find the maximum feasible growth rate
 
@@ -346,9 +347,16 @@ class ME_Model(cobra.Model):
         res: dict
             keys are all attempted growth values, values are dictionaries with keys as output from self.solve_lp
         '''
-        mu_max,res = self.solver_.maximize_growth(me_model = self, 
+        if self.solver_ is None:
+            warnings.warn('Solver is not initialized with ME_Model.intialize_solver, intializing with default parameters')
+            self.initialize_solver()
+        else:
+            self.initialize_solver(solver_type = self.solver_type, precision = self.solver_precision)
+        
+        mu_max, res = self.solver_.maximize_growth(me_model = self, 
                                                      min_mu=min_mu, max_mu=max_mu, 
-                                                     mu_accuracy=mu_accuracy, increment = increment, 
+                                                     mu_accuracy=mu_accuracy, increment = increment,
+                                                  tolerance = tolerance,
                                                      verbose=verbose)
         return mu_max, res
 
