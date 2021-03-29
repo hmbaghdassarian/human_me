@@ -292,7 +292,7 @@ class ME_Model(cobra.Model):
             The growth value for which to solve the linear program
         objective: dict, default {'bimoass_dilution': 1}
             The objective function to optimize. Dictionary represent a linear combination of reactions to optimize,
-            with reaction ids as keys and the coefficient of the lin. comb. as the values. 
+            with reaction ids as keys and the coefficient of the lin. comb. as the values. Values must all be 1 or -1.
 
             Example: simplest case, to maximize reaction with id 'A', objective = {'A': 1}
         tolerance: float; default 0
@@ -360,6 +360,55 @@ class ME_Model(cobra.Model):
                                                      verbose=verbose)
         return mu_max, res
 
+    def optimize(self, objective, mu_max, n_points = 10, 
+                 tolerance = 0, n_cores = None, graph = True, fig_name = None):
+        '''General optimization of any non-growth objective
+        
+        Parameters
+        ----------
+        objective: dict
+            The objective function to optimize. Dictionary represent a linear combination of reactions to optimize,
+            with reaction ids as keys and the coefficient of the lin. comb. as the values. Values must all be 1 or -1.
+
+            Example: simplest case, to maximize reaction with id 'A', objective = {'A': 1}
+        mu_max: float
+            the maximum growth value at which the model is feasible; use .maximize_growth() method to identify
+        tolerance: float; default 0
+            Threshold below which expected sensitivity of solver is too low to detect infeasibility
+        n_cores: int, default None
+            the number of workers to use for parallelization
+        graph: bool; default True
+            plot the relationship between growth and the objective function of interest
+        fig_name: str; default None
+            save the plotted figure to 
+            
+        Returns
+        ----------
+        sln: tuple 
+            first element is the growth value at which the non-growth objective is optimized
+            second element is the optimized non-growth objective value
+        predicted: pd.DataFrame
+            1000 growth values between 0 and mu_max, with corresponding interpolated objective values
+        interp_fit: output of scipy.interpolate.interp1d
+            a function to interpolate objective values from growth values, used to generated predicted
+        optimal_vals: collections.OrderedDict
+            keys are n_points growth values between 0 and mu_max, values are the objective value optimized at 
+            the corresponding growth value
+        res: dict
+            keys are n_points growth values between 0 and mu_max, values are the output of .solve_lp at 
+            corresponding growth values with the objective set to the non-growth objective input
+        '''
+        
+        if self.solver_ is None:
+            warnings.warn('Solver is not initialized with ME_Model.intialize_solver, intializing with default parameters')
+            self.initialize_solver()
+        else:
+            self.initialize_solver(solver_type = self.solver_type, precision = self.solver_precision)
+        
+        sln, predicted, interp_fit, optimal_vals, res = self.solver_.optimize(me_model = self, objective = objective, 
+                                                        mu_max = mu_max, n_points = n_points, tolerance = tolerance, 
+                                                        n_cores = n_cores, graph = graph, fig_name = fig_name)
+        return sln, predicted, interp_fit, optimal_vals, res
     
     def infeasible_reactions(self, mu_val, sln, stat, tolerance = 1e-19):
         '''Binary search to find the maximum feasible growth rate

@@ -1,14 +1,24 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[1]:
+# In[ ]:
 
 
 import os
 import copy
 import warnings
 import time
+from tqdm import tqdm
 
+from pathos.multiprocessing import ProcessingPool as Pool
+import gc
+
+import matplotlib.pyplot as plt
+import matplotlib.patches as mpatches
+import seaborn as sns
+get_ipython().run_line_magic('matplotlib', 'inline')
+
+import pandas as pd
 from math import log
 import numpy as np
 import scipy
@@ -22,7 +32,7 @@ from core.reaction import ME_Reaction
 from utils import functions as func
 
 
-# In[3]:
+# In[ ]:
 
 
 class qminos_solver():
@@ -50,7 +60,7 @@ class qminos_solver():
             The growth value for which to solve the linear program
         objective: dict, default {'bimoass_dilution': 1}
             The objective function to optimize. Dictionary represent a linear combination of reactions to optimize,
-            with reaction ids as keys and the coefficient of the lin. comb. as the values. 
+            with reaction ids as keys and the coefficient of the lin. comb. as the values. Values must all be 1 or -1.
 
             Example: simplest case, to maximize reaction with id 'A', objective = {'A': 1}
         tolerance: float; default 0
@@ -74,7 +84,8 @@ class qminos_solver():
             optimal basis (see qminospy.solver.QMINOS)
         '''
 
-
+        if len(set(objective.values()))>1 or len(set(objective.values()).difference([1,-1]))>0:
+            raise ValueError('Objective dictionary values must either only be 1 for maximization or -1 for minimization')
 
         # get stoichiometric matrix at mu_val
         S = me_model.create_stoichiometric_matrix(mu_val = mu_val, array_type = 'numpy', inplace = False)
@@ -145,9 +156,9 @@ class qminos_solver():
             c[r_index] = coeff
 
 
-        qminos_solver = QMINOS()
+        qs = QMINOS()
 
-        sln, stat, hsq = qminos_solver.solvelp(A,b,c,xl,xu,csense,precision=self.precision) 
+        sln, stat, hsq = qs.solvelp(A,b,c,xl,xu,csense,precision=self.precision) 
 
         # remove unwanted output files
         abspath = os.path.abspath(os.getcwd())
@@ -239,9 +250,166 @@ class qminos_solver():
         mu_max = np.max(feasible_mu)
         res_ = OrderedDict({k: res[k] for k in sorted(list(res.keys()))})
         return mu_max, res_
+    def optimize(self, me_model, objective, mu_max, n_points = 10, 
+                 tolerance = 0, n_cores = None, graph = True, fig_name = None):
+        '''General optimization of any non-growth objective
+        
+        Parameters
+        ----------
+        me_model: human_me.core.model.ME_Model
+            ME Model to solve
+        objective: dict
+            The objective function to optimize. Dictionary represent a linear combination of reactions to optimize,
+            with reaction ids as keys and the coefficient of the lin. comb. as the values. 
+
+            Example: simplest case, to maximize reaction with id 'A', objective = {'A': 1}
+        mu_max: float
+            the maximum growth value at which the model is feasible; use .maximize_growth() method to identify
+        tolerance: float; default 0
+            Threshold below which expected sensitivity of solver is too low to detect infeasibility
+        n_cores: int, default None
+            the number of workers to use for parallelization
+        graph: bool; default True
+            plot the relationship between growth and the objective function of interest
+        fig_name: str; default None
+            save the plotted figure to 
+            
+        Returns
+        ----------
+        sln: tuple 
+            first element is the growth value at which the non-growth objective is optimized
+            second element is the optimized non-growth objective value
+        predicted: pd.DataFrame
+            1000 growth values between 0 and mu_max, with corresponding interpolated objective values
+        interp_fit: output of scipy.interpolate.interp1d
+            a function to interpolate objective values from growth values, used to generated predicted
+        optimal_vals: collections.OrderedDict
+            keys are n_points growth values between 0 and mu_max, values are the objective value optimized at 
+            the corresponding growth value
+        res: dict
+            keys are n_points growth values between 0 and mu_max, values are the output of .solve_lp at 
+            corresponding growth values with the objective set to the non-growth objective input
+        '''
+        
+        obj_vals = list(objective.keys())
+        if len(obj_vals) == 1 and obj_vals[0] == 'biomass_dilution':
+            raise ValueError('To optimize for growth, use the .maximize_growth() method')
+        elif len(obj_vals) != 1:
+            raise ValueError('Not currently formatted for linear combinations of objectives')
+             
+        
+        growth_vals = np.arange(0,mu_max + mu_max/n_points, mu_max/(n_points-1))
+        if (n_cores <= 1) or (n_cores is None):
+            res = list()
+            for mu_val in tqdm(growth_vals):
+                sln, stat, hsq = self.solve_lp(me_model = me_model, mu_val = mu_val, objective = objective, tolerance = tolerance,
+                             close_biomass_dilution = True)
+                res.append([sln, stat, hsq])
+        else:
+            # msg: Currently, parallelization errors out at /data2/hratch/Software/qminos_solver/solvemepy/qminospy/solver.py
+            # at line 241-243. for some reason, parallelization doesn't recognize the self.precision = 'quad' as == 'quad'. 
+            # This does not occur in the serial loop. hard-coding the commented lines 244-250 (same as line 193-199)
+            # fixes this issue, but is only a temporary solution. 
+#             raise ValueError('me_solver/solve_me .optimize() method, see message above for error')
+            n_cores = min([n_cores, n_points])
+    #         args_ = zip([me_model]*n_points, list(growth_vals), [objective]*n_points, [tolerance]*n_points, 
+    #                    [True]*n_points)
+            pool = Pool(n_cores)
+            try:
+                res = pool.map(self.solve_lp, [me_model]*n_points, list(growth_vals), [objective]*n_points, [tolerance]*n_points, 
+                       [True]*n_points)
+                pool.close()
+                pool.join()
+                pool.restart()
+                gc.collect()
+            except:
+                pool.close()
+                pool.join()
+                pool.restart()
+                gc.collect()
+                raise ValueError('Parallelization failed')
+            res = [list(r) for r in res]
+
+        reaction_indeces = [me_model.reactions.index(j) for j in sorted(objective.keys())]
+        res = OrderedDict({i[0]: dict(zip(['val', 'sln', 'stat', 'hsq'], 
+                    [(dict(zip(sorted(objective.keys()), i[1][0][reaction_indeces])))] + i[1])) \
+             for i in zip(growth_vals, res)})
+        optimal_vals = OrderedDict({k: sum(v['val'].values()) for k,v in res.items()})
+
+        # estimate objective values across growth using interpolation
+        interp_fit = scipy.interpolate.interp1d(x = list(optimal_vals.keys()),y = list(optimal_vals.values()),
+                                 bounds_error=False)
+        obj_label = 'predicted_' + '_'.join(list(objective.keys()))
+        predicted = pd.DataFrame(data = {'growth': np.arange(0,mu_max + mu_max/1000, mu_max/(1000-1))})
+        predicted[obj_label] = predicted.growth.apply(lambda x: interp_fit(x).item()).values.tolist()
+        
+        if list(objective.values())[0] == 1:
+            optimal_val = predicted[obj_label].max()
+        elif list(objective.values())[0] == -1:
+            optimal_val = predicted[obj_label].min()
+          
+        optimal_val_growth = predicted[predicted[obj_label] == optimal_val].growth.values.tolist()[0]
+        sln = (optimal_val_growth, optimal_val)
+
+        if graph:
+            fig, ax = plt.subplots(figsize = (5,5))
+            sns.lineplot(x = 'growth', y = obj_label, data = predicted, ax = ax)
+            sns.scatterplot(x = list(optimal_vals.keys()), y = list(optimal_vals.values()), color = 'black', ax = ax)
+            plt.plot([optimal_val_growth], [optimal_val], marker='o', markersize=3, color="red")
+            ax.legend(handles=[mpatches.Patch(color='black', label='Solved'), 
+                              mpatches.Patch(color=sns.color_palette('tab10')[0], label='Interpolated')], 
+                     fancybox = True, fontsize = 12)
+            ax.set_xlabel(r'$\mu$ $[hr^{-1}]$', fontsize = 15, labelpad = 5)
+            ax.set_ylabel(ax.get_ylabel().split('predicted_')[1] + r'$\;\frac{mmol}{gDw \;hr}$', fontsize = 15, labelpad = 5)
+            ax.tick_params(axis='both', labelsize=12)
+
+            ax.vlines(x = optimal_val_growth, ymin = ax.get_ylim()[0], ymax = optimal_val, linestyles = '--', 
+                  color = sns.color_palette('pastel')[3])
+            ax.hlines(y = optimal_val, xmin = ax.get_xlim()[0], xmax = optimal_val_growth, linestyles = '--', 
+                      color = sns.color_palette('pastel')[3])
+
+            fig.tight_layout();
+            if fig_name is not None:
+                fig_name = os.path.splitext(fig_name)[0]
+                for ext in ['.png', '.pdf', '.svg']:
+                    plt.savefig(fig_name + ext, bbox_inches = 'tight')
+
+        return sln, predicted, interp_fit, optimal_vals, res
 
 
-# In[4]:
+# In[ ]:
+
+
+# counter = 0
+# lp_path = '/data2/hratch/human_me/other/test_lp/'
+# import pickle
+# import time
+
+# with open(lp_path + 'working_version_' + str(counter) + '.pickle', 'rb') as handle:
+#     me_model = pickle.load(handle)
+
+
+# In[ ]:
+
+
+# # inputs
+# mu_max = 0.03
+# n_points = 10
+# objective = {'ATPS4m_0': 1}
+# tolerance = 1e-20
+# n_cores = 10
+# fig_name = None #path/to/fig_nam (no extension)
+
+
+# In[ ]:
+
+
+# solver = qminos_solver()
+# solver.optimize(me_model = me_model, objective = objective, mu_max = mu_max, 
+#                n_points = n_points, tolerance = tolerance, n_cores = n_cores)
+
+
+# In[ ]:
 
 
 # import pickle
@@ -255,7 +423,7 @@ class qminos_solver():
 # from utils import functions as func
 
 
-# In[5]:
+# In[ ]:
 
 
 # # test LP
@@ -269,7 +437,7 @@ class qminos_solver():
 #                                   precision = 'quad')
 
 
-# In[6]:
+# In[ ]:
 
 
 # import cobra
@@ -292,7 +460,7 @@ class qminos_solver():
 # xq,statq,hsq = test_model.solve_lp(mu_val = 0.03, objective = {'rA': 1})
 
 
-# In[7]:
+# In[ ]:
 
 
 # test_model.solve_lp(mu_val = 1e10, objective = {'rA': 1})
