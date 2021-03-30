@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[ ]:
+# In[1]:
 
 
 import os
@@ -32,7 +32,7 @@ from core.reaction import ME_Reaction
 from utils import functions as func
 
 
-# In[ ]:
+# In[15]:
 
 
 class qminos_solver():
@@ -60,7 +60,8 @@ class qminos_solver():
             The growth value for which to solve the linear program
         objective: dict, default {'bimoass_dilution': 1}
             The objective function to optimize. Dictionary represent a linear combination of reactions to optimize,
-            with reaction ids as keys and the coefficient of the lin. comb. as the values. Values must all be 1 or -1.
+            with reaction ids as keys and the coefficient of the lin. comb. as the values. 
+            Values must either be 1 for maximization or -1 for minimization.
 
             Example: simplest case, to maximize reaction with id 'A', objective = {'A': 1}
         tolerance: float; default 0
@@ -84,8 +85,8 @@ class qminos_solver():
             optimal basis (see qminospy.solver.QMINOS)
         '''
 
-        if len(set(objective.values()))>1 or len(set(objective.values()).difference([1,-1]))>0:
-            raise ValueError('Objective dictionary values must either only be 1 for maximization or -1 for minimization')
+        if len(set(objective.values()).difference([1,-1]))>0:
+            raise ValueError('Objective dictionary values must either be 1 for maximization or -1 for minimization')
 
         # get stoichiometric matrix at mu_val
         S = me_model.create_stoichiometric_matrix(mu_val = mu_val, array_type = 'numpy', inplace = False)
@@ -261,10 +262,11 @@ class qminos_solver():
         objective: dict
             The objective function to optimize. Dictionary represent a linear combination of reactions to optimize,
             with reaction ids as keys and the coefficient of the lin. comb. as the values. 
+            Values can only be all 1 for maximization, or all -1 for minimization. 
 
             Example: simplest case, to maximize reaction with id 'A', objective = {'A': 1}
         mu_max: float
-            the maximum growth value at which the model is feasible; use .maximize_growth() method to identify
+            the maximum growth value at which the model is feasible; use .maximize_growth() method to identify (should be <= mu_max output of .maxmimize_growth() method)
         tolerance: float; default 0
             Threshold below which expected sensitivity of solver is too low to detect infeasibility
         n_cores: int, default None
@@ -291,11 +293,11 @@ class qminos_solver():
             corresponding growth values with the objective set to the non-growth objective input
         '''
         
-        obj_vals = list(objective.keys())
-        if len(obj_vals) == 1 and obj_vals[0] == 'biomass_dilution':
+        obj_keys = list(objective.keys())
+        if len(obj_keys) == 1 and obj_keys[0] == 'biomass_dilution':
             raise ValueError('To optimize for growth, use the .maximize_growth() method')
-        elif len(obj_vals) != 1:
-            raise ValueError('Not currently formatted for linear combinations of objectives')
+        elif len(set(list(objective.values()))) != 1:
+            raise ValueError('Currently, NLP objectives must be either only maximization or minimization (only all 1s or only all -1s in objective dictionary values)')
              
         
         growth_vals = np.arange(0,mu_max + mu_max/n_points, mu_max/(n_points-1))
@@ -340,6 +342,8 @@ class qminos_solver():
         interp_fit = scipy.interpolate.interp1d(x = list(optimal_vals.keys()),y = list(optimal_vals.values()),
                                  bounds_error=False)
         obj_label = 'predicted_' + '_'.join(list(objective.keys()))
+        if len(obj_label) > 30:
+            obj_label = 'predicted_Objective'
         predicted = pd.DataFrame(data = {'growth': np.arange(0,mu_max + mu_max/1000, mu_max/(1000-1))})
         predicted[obj_label] = predicted.growth.apply(lambda x: interp_fit(x).item()).values.tolist()
         
@@ -377,7 +381,7 @@ class qminos_solver():
         return sln, predicted, interp_fit, optimal_vals, res
 
 
-# In[ ]:
+# In[3]:
 
 
 # counter = 0
@@ -388,24 +392,26 @@ class qminos_solver():
 # with open(lp_path + 'working_version_' + str(counter) + '.pickle', 'rb') as handle:
 #     me_model = pickle.load(handle)
 
-
-# In[ ]:
-
-
 # # inputs
+# mu_val = 1e-9
 # mu_max = 0.03
 # n_points = 10
-# objective = {'ATPS4m_0': 1}
+# objective = {'ATPS4m_0': 1, 'DTMPK': 1}
 # tolerance = 1e-20
 # n_cores = 10
 # fig_name = None #path/to/fig_nam (no extension)
 
 
-# In[ ]:
+# In[28]:
 
 
 # solver = qminos_solver()
-# solver.optimize(me_model = me_model, objective = objective, mu_max = mu_max, 
+# sln, stat, _ = solver.solve_lp(me_model, mu_val = mu_val, objective = objective, 
+#                                  tolerance = tolerance)
+
+# solver = qminos_solver()
+# sln, predicted, interp_fit, optimal_vals, res = solver.optimize(me_model = me_model, objective = objective, 
+#                                                                 mu_max = mu_max, 
 #                n_points = n_points, tolerance = tolerance, n_cores = n_cores)
 
 
