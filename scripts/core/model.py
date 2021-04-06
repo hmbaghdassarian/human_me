@@ -27,6 +27,7 @@ sys.path.insert(1, '../../scripts/')
 from utils import parameters as params
 from macromolecules.complex import Complex
 from macromolecules.protein import Protein
+from macromolecules.complex import Ribosomal_Complex
 
 from core.reaction import ME_Reaction
 from me_solver import solve_me
@@ -292,7 +293,8 @@ class ME_Model(cobra.Model):
             The growth value for which to solve the linear program
         objective: dict, default {'bimoass_dilution': 1}
             The objective function to optimize. Dictionary represent a linear combination of reactions to optimize,
-            with reaction ids as keys and the coefficient of the lin. comb. as the values. Values must all be 1 or -1.
+            with reaction ids as keys and the coefficient of the lin. comb. as the values. 
+            Values must either be 1 for maximization or -1 for minimization.
 
             Example: simplest case, to maximize reaction with id 'A', objective = {'A': 1}
         tolerance: float; default 0
@@ -368,11 +370,13 @@ class ME_Model(cobra.Model):
         ----------
         objective: dict
             The objective function to optimize. Dictionary represent a linear combination of reactions to optimize,
-            with reaction ids as keys and the coefficient of the lin. comb. as the values. Values must all be 1 or -1.
+            with reaction ids as keys and the coefficient of the lin. comb. as the values. 
+            Values can only be all 1 for maximization, or all -1 for minimization. 
 
             Example: simplest case, to maximize reaction with id 'A', objective = {'A': 1}
         mu_max: float
             the maximum growth value at which the model is feasible; use .maximize_growth() method to identify
+            (should be <= mu_max output of .maxmimize_growth() method)
         tolerance: float; default 0
             Threshold below which expected sensitivity of solver is too low to detect infeasibility
         n_cores: int, default None
@@ -494,8 +498,10 @@ class ME_Model(cobra.Model):
         '''Checks that all reactions in ME Model received appropriate machinery. Use after self.add_reactions'''
         print('Check correct coupling of metabolic machinery')
         dummy = 'HGNC:DUMMY_folded_protein_c' in [m.id for m in self.metabolites]
+        test_reactions = [r for r in self.reactions if not r.lower_bound == r.upper_bound == 0]
 
-        for r in tqdm(self.reactions):
+
+        for r in tqdm(test_reactions):
             if isinstance(r, ME_Reaction):
                 if r.type != ['biomass']:
                     if r.cobra_id is not None: 
@@ -504,7 +510,7 @@ class ME_Model(cobra.Model):
                         r_ = r # non-metabolic reactions
 
                     machinery = [m for m,v in r.coupled_metabolites.items() if v == 'catalysis']
-                    if len(machinery) > 1 and not r.id.endswith('_COMPLEX_PROTEASOMAL_DEGRADATIONc'):
+                    if len(machinery) > 1 and not (r.id.endswith('_COMPLEX_PROTEASOMAL_DEGRADATIONc')):
                         raise ValueError('Unexpected coupling of multiple machinery: ' + r.id)
                     if not dummy:
                         if (len(r.genes) == 0 and len(machinery) > 0) or (len(r.genes) > 0 and len(machinery) == 0):
@@ -543,8 +549,16 @@ class ME_Model(cobra.Model):
                     else:
                         pass
 
-    def check_enzymes(self):
-        '''Makes sure all genes being expressed participate in a catalysis reaction (no unecessary expression reactions)'''
+    def check_enzymes(self, _additional_ko = list()):
+        '''Makes sure all genes being expressed participate in a catalysis reaction (no unecessary expression reactions)
+        
+        Paramaters
+        ----------
+        additional_ko: list
+            a list of HGNC IDs for genes that were not explicitly knocked-out, but were only involved in catalysis of 
+            reactions catalyzed by a complex which contains another gene that was knocked-out
+            this list is generated in build_me_model/me_builder
+        '''
 
         proteins, complexes = [], []
         active_proteins, active_complexes = [], []
@@ -559,23 +573,29 @@ class ME_Model(cobra.Model):
                     if m.enzyme:
                         active_complexes.append(m)
 
-        complexes = [m for m in complexes if m.id != 'mature_ribosome_complex_c']
+        complexes = [m for m in complexes if not isinstance(m, Ribosomal_Complex)]
         subsystems = set(flatten_list([[r.subsystem for r in self.metabolites.get_by_id(m.id).reactions] for m in set(complexes).difference(active_complexes)]))
         if len(subsystems.difference({'Complex_Degradation', 'Ribosome_Biogenesis'})) > 0:
             raise ValueError('Unexpected inclusion of inactive complexes')
 
         active_proteins += flatten_list([[p.id for p in m.decompose_complex()] for m in active_complexes])
-        active_proteins = set([i.split('_')[0] if 'HGNC' in i else i for i in active_proteins])
+        active_proteins = list(set([i.split('_')[0] if 'HGNC' in i else i for i in active_proteins]))
         proteins = set([i.split('_')[0] if 'HGNC' in i else i for i in proteins])
         proteins = [i for i in proteins if 'ubiquitin' not in i]
-        if len(set(proteins).difference(active_proteins).difference({'HGNC:12463', 'HGNC:12468'}))>0:
+        if len(set(proteins).difference(active_proteins + _additional_ko).difference({'HGNC:12463', 'HGNC:12468'}))>0:
             raise ValueError('Unexpected inclusion of inactive protein monomers')
     
-    def check(self):
-        '''Check reaction coupling and mass balance'''
+    def check(self, _additional_ko = list()):
+        '''Check reaction coupling and mass balance
+        
+        Paramaters
+        ----------
+        additional_ko: list
+            see model.check_enzymes()
+        '''
         self.check_me_mass_balance()
         self.check_coupling()
-        self.check_enzymes()
+        self.check_enzymes(_additional_ko = _additional_ko)
 
     def pickle(self, file = os.path.join(os.path.abspath(os.getcwd()), 'me_model.pickle')):
         '''Save ME_Model as a pickled object
