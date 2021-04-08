@@ -6,7 +6,7 @@ Installation
 
 1. Create a [python virtual environment](https://packaging.python.org/guides/) using the requirements.txt file:
 ```console
-python3.6.9 -m venv <env_name>
+python3 -m venv <env_name> --python=python3.6.9
 source [env_name]/bin/activate
 pip install -r path/to/human_me/requirements.txt
 ```
