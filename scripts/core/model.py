@@ -160,26 +160,30 @@ class ME_Model(cobra.Model):
                 r._map_coupled_metabolites()
     
     def _assign_reaction_types(self):
-        self.reaction_types['biomass'] = [r for r in self.reactions if isinstance(r, Biomass_Reaction)]
-        self.reaction_types['metabolism'] = [r for r in self.reactions if isinstance(r, Metabolic_Reaction)]
-        self.reaction_types['expression'] = [r for r in self.reactions if isinstance(r, Expression_Reaction)]
-        self.reaction_types['ribosome_biogenesis'] = [r for r in self.reactions if hasattr(r, 'ribosome_biogenesis') and r.ribosome_biogenesis]
-        self.reaction_types['ubiquitin_biogenesis'] = [r for r in self.reactions if hasattr(r, 'ubiquitin_biogenesis') and r.ubiquitin_biogenesis]
+        self.reaction_types['biomass'] = [r.id for r in self.reactions if isinstance(r, Biomass_Reaction)]
+        self.reaction_types['metabolism'] = [r.id for r in self.reactions if isinstance(r, Metabolic_Reaction)]
+        self.reaction_types['coupled'] = [r.id for r in self.reactions if hasattr(r, 'coupled_metabolites') and r.coupled_metabolites != dict()]
+
+
+        # get and initialize expression reactions
+        expression_reactions = [r for r in self.reactions if isinstance(r, Expression_Reaction)]
+        self.reaction_types['expression'] = {'all': [r.id for r in expression_reactions]}
+        self.reaction_types['expression']['synthesis'] = {'protein': [], 'mRNA': [], 'complex': []}
+        self.reaction_types['expression']['sink'] = {'protein': [], 'mRNA': [], 'complex': []}
+        self.reaction_types['expression']['ribosome_biogenesis'] = list()
+        self.reaction_types['expression']['ubiquitin_biogenesis'] = list()
         
-        self.reaction_types['synthesis'] = {'protein': [], 'mRNA': [], 'complex': []}
-        for r in self.reactions:
-            if hasattr(r, 'synthesis') and r.synthesis:
-                self.reaction_types['synthesis'][r.synthesis_type] += [r]
-#         self.reaction_types['synthesis'] = [r for r in self.reactions if hasattr(r, 'synthesis') and r.synthesis]
-        
-        self.reaction_types['sink'] = {'protein': [], 'mRNA': [], 'complex': []}
-        for r in self.reactions:
-            if hasattr(r, 'sink') and r.sink:
-                self.reaction_types['sink'][r.sink_type] += [r]
-            self.reaction_types['synthesis'] = {'protein': [], 'mRNA': [], 'complex': []}
-#         self.reaction_types['final_degradation'] = [r for r in self.reactions if hasattr(r, 'sink') and r.sink]
-        
-        self.reaction_types['coupled'] = [r for r in self.reactions if hasattr(r, 'coupled_metabolites') and r.coupled_metabolites != dict()]
+        # categorize expression reactions
+        for r in expression_reactions:
+            if r.synthesis:
+                self.reaction_types['expression']['synthesis'][r.synthesis_type] += [r.id]
+            if r.sink:
+                self.reaction_types['expression']['sink'][r.sink_type] += [r.id]
+            if hasattr(r, 'ribosome_biogenesis') and r.ribosome_biogenesis:
+                self.reaction_types['expression']['ribosome_biogenesis'] += [r.id]
+            if hasattr(r, 'ubiquitin_biogenesis') and r.ubiquitin_biogenesis:
+                self.reaction_types['expression']['ubiquitin_biogenesis'] += [r.id]
+                
         
     def add_reactions(self, reaction_list):
         self._add_reactions(reaction_list)
@@ -520,7 +524,7 @@ class ME_Model(cobra.Model):
     
     def _check_complete_reactions(self):
         '''Checks that all the original metabolic model reactions have been included in the ME-Model'''
-        if len(set([r.id for r in self.m_model.reactions]).difference([r.cobra_id for r in self.reaction_types['metabolism']]))>0:
+        if len(set([r.id for r in self.m_model.reactions]).difference([self.reactions.get_by_id(r_id).cobra_id for r_id in self.reaction_types['metabolism']]))>0:
             raise ValueError('Not all the original metabolic model reactions have been included in the ME-Model')
 
 
@@ -546,7 +550,7 @@ class ME_Model(cobra.Model):
         if orphan is None:
             if not 'orphan' in self.reaction_types:
                 raise ValueError('Must specify a list of orphan reaction IDs')
-            orphan = self.reaction_types['orphan']
+            orphan = [self.reactions.get_by_id(r_id) for r_id in self.reaction_types['orphan']]
         if knock_out is None:
             knock_out = list()
         if additional_ko is None:
@@ -733,6 +737,8 @@ class ME_Model(cobra.Model):
             file = file + '.pickle'
         with open(file, 'wb') as handle:
             pickle.dump(self, handle)
+    def copy(self):
+        return copy.deepcopy(self)
     
     
 
