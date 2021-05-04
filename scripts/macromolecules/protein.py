@@ -82,7 +82,8 @@ class Protein(Macromolecule):
         elements['H'] -= 2*(self.length-1)
         elements['O'] -= 1*(self.length-1)
         
-        Macromolecule.__init__(self, id = id_, compartment = compartment, charge = charge, elements = elements)
+        Macromolecule.__init__(self, id = id_, compartment = compartment, charge = charge, elements = elements, 
+                              hgnc_id = self.hgnc_id)
         
         if not dummy:
             self.type = 'protein'
