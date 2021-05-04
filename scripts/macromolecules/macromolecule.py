@@ -16,7 +16,17 @@ from utils import parameters as params
 
 class Macromolecule(cobra.Metabolite):
     def __init__(self, id=None, formula=None, name="",charge=None, compartment=None, elements = None, 
-                proxy = False):
+                proxy = False, hgnc_id = None):
+        '''Inherits from cobra.Metabolite. See help(cobra.Metabolite) for additional parameters
+        
+        Parameters
+        ----------
+        proxy: bool
+            whether the object is a proxy metabolite (for coupling purposes, no associated mass/charge)
+        hgnc_id: str
+            the associated gene HGNC ID of the macromolecule (HGNC:####)
+        
+        '''
         
         if not proxy and compartment not in params.compartments.keys():
             err = 'Specified compartment is not considered in the ME Model. Please input one of the following: ' 
@@ -32,6 +42,7 @@ class Macromolecule(cobra.Metabolite):
         else:
             self.type = 'proxy'
         self.coupling_coefficient = None
+        self.hgnc_id = hgnc_id
     
     def change_compartment(self, new_compartment):
         '''Returns a copy of the macromolecule metabolite, but in new compartment'''

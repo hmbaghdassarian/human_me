@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[1]:
+# In[7]:
 
 
 from Bio.Seq import Seq
@@ -25,7 +25,7 @@ from macromolecules.RNA import RNA_fragment, pre_mRNA, mRNA
 from macromolecules.macromolecule import Macromolecule
 
 
-# In[9]:
+# In[14]:
 
 
 class express_mrna():
@@ -100,7 +100,7 @@ class express_mrna():
                     lariat_seq += ''.join([nt]*diff)
             
             self.lariat = RNA_fragment(metabolite_name = self.gene_info.hgnc_id, fragment_type='lariat', 
-                                       seq = lariat_seq, triphosphate = False)
+                                       seq = lariat_seq, triphosphate = False, hgnc_id = self.gene_info.hgnc_id)
 
             rxn[self.lariat] = 1
             rxn[metab.h2o_n] -= 1 # endonucleolytic cleavage
@@ -167,7 +167,8 @@ class express_mrna():
         rxn[metab.amet_c], rxn[metab.ahcys_c] = 2, -2 # reverse methyltransferase - cap0 and cap1 structure
 
 #         proxy metabolite for coupling mRNA degradation to protein synthesis flux
-        self.mrna_deg_proxy = Macromolecule(self.gene_info.hgnc_id + '_mrna_deg_proxy', proxy = True)
+        self.mrna_deg_proxy = Macromolecule(self.gene_info.hgnc_id + '_mrna_deg_proxy', proxy = True, 
+                                           hgnc_id = self.gene_info.hgnc_id)
         rxn[self.mrna_deg_proxy] = 1 
 
         h2o_c = [m for m in rxn.keys() if m.id == 'h2o_c'][0] # won't load directly from metab for some reason
@@ -243,7 +244,7 @@ class express_mrna():
         self.reactions.append(transcription)
 
 
-# In[10]:
+# In[15]:
 
 
 def get_mrna_expression_reactions(gene_info, compress_mrna = False):
@@ -264,4 +265,32 @@ def get_mrna_expression_reactions(gene_info, compress_mrna = False):
         em.compress_mrna_module()
 
     return em.reactions, em.mrna_c, em.mrna_deg_proxy 
+
+
+# In[16]:
+
+
+# import random
+# import cobra
+# import pandas as pd
+# import sys
+# sys.path.insert(1, '../../scripts/')
+# from utils import parameters as params
+# from expression.gene_information import gene_information
+
+
+# psim_toy = pd.DataFrame(columns = ['HGNC_ID', 'PREMRNA_SEQ', 'MRNA_SEQ', 'PROTEIN_SEQ', 'POLYA_LENGTH', 'TMD', 
+#                                'SP', 'n_exons', 'DSB', 'GPI', 'OG', 'LOCATION'])
+
+# hgnc_id, premrna_seq = 'HGNC:TOY', ''.join(random.choices(['U', 'C', 'G', 'A'], k = 100))
+# mrna_seq = premrna_seq[25:75]
+# # note that there is no check that the protein_sequence corresponds to the mrna_sequence beyond checking for the length
+# protein_seq = ''.join(random.choices(params.amino_acids, k = int(len(mrna_seq)/3)))
+# polyA_length, tmd, sp, n_exons, dsb, gpi, og  = None, 1, True, None, 2, 2, 2
+
+# gene_info = gene_information(hgnc_id, premrna_seq, mrna_seq, protein_seq,
+#                      ptms = {}, tmd = tmd, sp = sp, polyA_length = polyA_length, 
+#                      n_exons = n_exons) 
+# gene_info.get_final_locations(metabolic_model = cobra.Model(''), final_locations = ['c'])
+# reactions, mrna_c, mrna_deg_proxy = get_mrna_expression_reactions(gene_info, compress_mrna = False)
 

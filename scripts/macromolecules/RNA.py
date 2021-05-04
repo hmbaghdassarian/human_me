@@ -39,7 +39,7 @@ rb_map = dict(zip(molecule_type, [False, True, False, False]))
 
 
 class RNA(Macromolecule):
-    def __init__(self, metabolite_name, seq, compartment = 'n', triphosphate = True):
+    def __init__(self, metabolite_name, seq, compartment = 'n', triphosphate = True, hgnc_id = None):
         '''
         
         Generates an RNA metabolite. Seq is a string of the mrna sequence, triphosphate indicates 
@@ -54,7 +54,8 @@ class RNA(Macromolecule):
         self.length = len(self.sequence)
         self.get_base_counts_and_elements()
 
-        Macromolecule.__init__(self, id = rna_id, compartment = compartment, charge = -self.length, elements = self.elements)
+        Macromolecule.__init__(self, id = rna_id, compartment = compartment, charge = -self.length, elements = self.elements, 
+                              hgnc_id = hgnc_id)
         if triphosphate:
             self.charge -= 3
     
@@ -81,10 +82,11 @@ class RNA(Macromolecule):
         if self.type not in ['premrna', 'rrna', 'trna']:
             raise ValueError('Only premrna, rrna, or trna can be synthesized')  
 
-        hgnc_id = None
-        if self.type == 'premrna':
-            hgnc_id = self.id.split('_')[0]
-        rna_synthesis = Expression_Reaction(id_, subsystem = subsystem_map[self.type], hgnc_id = hgnc_id,
+#         hgnc_id = None
+#         if self.type == 'premrna':
+#             hgnc_id = self.id.split('_')[0]
+        
+        rna_synthesis = Expression_Reaction(id_, subsystem = subsystem_map[self.type], hgnc_id = self.hgnc_id,
                                            ribosome_biogenesis = rb_map[self.type])
         rxn = dict()
         for ntp, base_letter in metab.seq_metabolite_map.items():
@@ -134,11 +136,11 @@ class RNA(Macromolecule):
         else:
             raise ValueError('Only premrna, rrna, or trna can be degraded')   
         
-        hgnc_id = None
-        if _type in ['premrna', 'mrna']:
-            hgnc_id = self.id.split('_')[0]
+#         hgnc_id = None
+#         if _type in ['premrna', 'mrna']:
+#             hgnc_id = self.id.split('_')[0]
         rna_degradation = Expression_Reaction(reaction_name + '_DEGRADATION' + self.compartment, 
-                                             subsystem = subsystem_map[_type], hgnc_id = hgnc_id, 
+                                             subsystem = subsystem_map[_type], hgnc_id = self.hgnc_id, 
                                              ribosome_biogenesis = rb_map[_type])
 
         rxn = dict()
@@ -214,7 +216,7 @@ class pre_mRNA(RNA):
             raise ValueError("Premrna's outside of the nucleus are not currently considered")
         
         RNA.__init__(self, metabolite_name = gene_info.hgnc_id, seq = gene_info.premrna_seq, 
-                     compartment = compartment, triphosphate = triphosphate)
+                     compartment = compartment, triphosphate = triphosphate, hgnc_id = gene_info.hgnc_id)
         self.type = 'premrna'
         self.id = self.id.replace('RNA', self.type)
         self.hgnc_id = gene_info.hgnc_id
@@ -226,7 +228,7 @@ class mRNA(RNA):
         
         
         RNA.__init__(self, metabolite_name = gene_info.hgnc_id, seq = gene_info.mrna_seq, 
-                     compartment = compartment, triphosphate = triphosphate)
+                     compartment = compartment, triphosphate = triphosphate, hgnc_id = gene_info.hgnc_id)
         self.type = 'mrna'
         self.id = self.id.replace('RNA', self.type)
         self.hgnc_id = gene_info.hgnc_id
@@ -252,7 +254,8 @@ class rRNA(RNA):
         
         
 class RNA_fragment(RNA):
-    def __init__(self, metabolite_name, seq, fragment_type, compartment = 'n', triphosphate = True):
+    def __init__(self, metabolite_name, seq, fragment_type, compartment = 'n', triphosphate = True, 
+                hgnc_id = None):
         
         if fragment_type not in ['lariat', 'its', 'ets', '5_leader', '3_trailer', 'trna_intron']:
             raise ValueError('RNA fragment type specified is not considered')
@@ -261,9 +264,11 @@ class RNA_fragment(RNA):
             raise ValueError('Only nuclear or cytosolic RNA fragments are incorporated for now')
         
         RNA.__init__(self, metabolite_name = metabolite_name, seq = seq, compartment = compartment, 
-                     triphosphate = triphosphate)
+                     triphosphate = triphosphate, hgnc_id = hgnc_id)
         
         self.type = 'fragment_rna'
         self.fragment_type = fragment_type
+        if self.fragment_type == 'lariat' and hgnc_id is None:
+            raise ValueError('Must specify hgnc ID for lariats')
         self.id = self.id.replace('RNA', self.fragment_type)
 
