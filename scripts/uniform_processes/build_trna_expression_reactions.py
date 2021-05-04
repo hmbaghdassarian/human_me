@@ -5,7 +5,6 @@
 
 
 import warnings
-import cobra
 
 import pandas as pd
 
@@ -16,7 +15,7 @@ from utils import machinery as mach
 from utils import parameters as params
 from utils import metabolites as metab
 from macromolecules.RNA import tRNA, RNA_fragment
-# from macromolecules.complex import add_biomass_change
+from core.reaction import Expression_Reaction
 
 
 # -To change to individual tRNA molecules rather than a generic one, start with the charge_trna function and also change the trna_biogenesis function
@@ -99,7 +98,7 @@ class trna_information():
 
 # # Reactions
 
-# In[4]:
+# In[3]:
 
 
 class express_trna():
@@ -183,7 +182,7 @@ class express_trna():
 
             rxn[h2o_n] -= n_introns
 
-        trna_processing = cobra.Reaction('PROCESSING_TRNA_' + self.trna_info.id)
+        trna_processing = Expression_Reaction('PROCESSING_TRNA_' + self.trna_info.id, subsystem = 'tRNA_Biogenesis')
         trna_processing.subsytem = 'tRNA_Biogenesis'
         trna_processing.add_metabolites(rxn)
         trna_processing.gene_reaction_rule = ' and '.join(trna_processing_machinery)
@@ -208,7 +207,7 @@ class express_trna():
     def primary_export_trna(self):
         self.trna_c = self.modified_trna_n.change_compartment('c')
 
-        trna_primary_export = cobra.Reaction(self.trna_info.id + 'PRIMARY_EXPORTtn')
+        trna_primary_export = Expression_Reaction(self.trna_info.id + 'PRIMARY_EXPORTtn', subsystem = 'tRNA_Biogenesis')
         trna_primary_export.subsytem = 'tRNA_Biogenesis'
         trna_primary_export.name = 'trna nuclear export'
 
@@ -268,7 +267,7 @@ class express_trna():
             # +1 for loss of negative charge on oxygen of amino acid
             charged_trna_c.charge = self.modified_trna_c.charge + aa.charge + 1 
 
-            trna_charging = cobra.Reaction('CHARGING_TRNA_' + self.trna_info.id + '_' + code)
+            trna_charging = Expression_Reaction('CHARGING_TRNA_' + self.trna_info.id + '_' + code, subsystem = 'tRNA_Biogenesis')
             rxn = {self.modified_trna_c: -1, aa: -1, charged_trna_c: 1, metab.atp_c: -1, metab.ppi_c: 1, 
                    metab.amp_c: 1}
             trna_charging.add_metabolites(rxn)
@@ -289,13 +288,9 @@ class express_trna():
         
         self.reactions += trna_charging_reactions
         self.charged_trna_metabolites = charged_trna_metabolites
-    def add_subsystem(self):
-        for r in self.reactions:
-            r.subsystem = 'tRNA_Biogenesis'
-#             add_biomass_change(r)
 
 
-# In[5]:
+# In[4]:
 
 
 def trna_biogenesis(trna_info):
@@ -307,16 +302,15 @@ def trna_biogenesis(trna_info):
     tb.modify_trna_cytosolic()
     tb.degrade_trna()
     tb.charge_trna()
-    tb.add_subsystem()
     
     return tb.reactions, tb.charged_trna_metabolites, tb.modified_trna_c
 
 
 # # Consensus Sequences
 # 
-# positionally-independent (position won't effect .elements of cobra.Metabolite in cobra.Reaction)
+# positionally-independent (position won't effect .elements of cobra.Metabolite in Expression_Reaction)
 
-# In[6]:
+# In[5]:
 
 
 def get_base_frequency(seq_col, L):
@@ -373,7 +367,7 @@ mature_seq += 'CCA'
 
 # # Generate reactions
 
-# In[7]:
+# In[6]:
 
 
 trna_info = trna_information(maturetrna_sequence = mature_seq , id_ = 'generic', three_trailer_seq = trailer_seq, 

@@ -1,10 +1,8 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[16]:
+# In[1]:
 
-
-import cobra
 
 import sys
 sys.path.insert(1, '../../../scripts/') # comment out in python script
@@ -12,7 +10,7 @@ from utils import machinery as mach
 from utils import parameters as params
 from utils import metabolites as metab
 from utils import functions as func
-from core.reaction import ME_Reaction
+from core.reaction import Expression_Reaction
 
 from macromolecules.protein import Protein
 from expression.protein_expression import cytosolic_translation as c_trln
@@ -21,7 +19,7 @@ from expression.protein_expression import degradation
 from uniform_processes.build_trna_expression_reactions import modified_trna_transcript_c, charged_trna_map
 
 
-# In[17]:
+# In[2]:
 
 
 def fold_protein_cytosolic(gene_info, unfolded_protein_c):
@@ -32,8 +30,8 @@ def fold_protein_cytosolic(gene_info, unfolded_protein_c):
     folded_protein_c = unfolded_protein_c.copy()
     folded_protein_c.id = folded_protein_c.id.replace('unfolded', 'folded')
     rxn = {unfolded_protein_c: -1, folded_protein_c: 1}
-    protein_folding = cobra.Reaction(gene_info.hgnc_id + '_CYTOSOLIC_PROTEIN_FOLDING')
-    protein_folding.subsytem = 'Protein_Expression'
+    protein_folding = Expression_Reaction(gene_info.hgnc_id + '_CYTOSOLIC_PROTEIN_FOLDING', 
+                                         subsystem = 'Protein_Expression', hgnc_id = gene_info.hgnc_id)
     
     if gene_info.L_protein > 100: #chaperone assisted for larger proteins - https://www.nature.com/articles/nature10317
         rxn = func.hydrolyze_atp(rxn, n_atp = gene_info.L_protein*params.proteolysis_translocation_atp_cost, compartment = 'c')
@@ -46,14 +44,14 @@ def fold_protein_cytosolic(gene_info, unfolded_protein_c):
 
 # # Nuclear Reactions
 
-# In[18]:
+# In[3]:
 
 
 def transport_nuclear_protein(gene_info, folded_protein_c):
 
     folded_protein_n = folded_protein_c.change_compartment('n')
 
-    nuclear_import = cobra.Reaction(gene_info.hgnc_id + '_IMPORTtn')
+    nuclear_import = Expression_Reaction(gene_info.hgnc_id + '_IMPORTtn', subsystem = 'Protein_Expression', hgnc_id = gene_info.hgnc_id)
     nuclear_import.subsytem = 'Protein_Expression'
     
     import_rxn = {folded_protein_c: -1, folded_protein_n: 1}
@@ -80,7 +78,7 @@ def get_nuclear_reactions(gene_info, folded_protein_c, ub_args):
 # # Mitochondrial Reactions
 # 
 
-# In[19]:
+# In[4]:
 
 
 # i is intermembrane space, but called inner in compartments BIGG
@@ -91,7 +89,7 @@ def transport_mitochondrial_matrix(gene_info, unfolded_protein_c):
     if unfolded_protein_c.compartment != 'c':
         raise ValueError('Only cytoplasmic proteins can be transported to mitochondrial matrix')
     
-    mitochondrial_matrix_transport = cobra.Reaction(gene_info.hgnc_id + '_IMPORTtm')
+    mitochondrial_matrix_transport = Expression_Reaction(gene_info.hgnc_id + '_IMPORTtm', subsystem = 'Protein_Expression', hgnc_id = gene_info.hgnc_id)
     mitochondrial_matrix_transport.subsytem = 'Protein_Expression'
     pre_protein_m = unfolded_protein_c.change_compartment('m')
     pre_protein_m.id = pre_protein_m.id.replace('unfolded', 'folded_pre')
@@ -121,7 +119,7 @@ def transport_mitochondrial_inter(gene_info, processed_protein_m):
     if processed_protein_m.compartment != 'm':
         raise ValueError('Only the mechanism of mitochondrial matrix import and re-export to inter membrane is considered')
     
-    mitochondrial_inter_transport = cobra.Reaction(gene_info.hgnc_id + '_IMPORTti')
+    mitochondrial_inter_transport = Expression_Reaction(gene_info.hgnc_id + '_IMPORTti', subsystem = 'Protein_Expression', hgnc_id = gene_info.hgnc_id)
     mitochondrial_inter_transport.subsytem = 'Protein_Expression'
     pre_protein_i = processed_protein_m.change_compartment('i')
     
@@ -169,14 +167,14 @@ def get_mitochondrial_reactions(gene_info, unfolded_protein_c, compartments):
 
 # # Peroxisomal
 
-# In[20]:
+# In[5]:
 
 
 def transport_peroxisome(gene_info, folded_protein_c):
     if folded_protein_c.compartment != 'c':
         raise ValueError('Only cytoplasmic proteins can be transported to mitochondrial matrix')
     
-    peroxisomal_transport = cobra.Reaction(gene_info.hgnc_id + '_IMPORTtx')
+    peroxisomal_transport = Expression_Reaction(gene_info.hgnc_id + '_IMPORTtx', subsystem = 'Protein_Expression', hgnc_id = gene_info.hgnc_id)
     peroxisomal_transport.subsytem = 'Protein_Expression'
     folded_protein_x = folded_protein_c.change_compartment('x')
     
@@ -205,7 +203,7 @@ def get_peroxisomal_reactions(gene_info, folded_protein_c):
 
 # # ER transport
 
-# In[21]:
+# In[6]:
 
 
 def post_translational_translocation(gene_info, unfolded_protein_c):
@@ -223,7 +221,8 @@ def post_translational_translocation(gene_info, unfolded_protein_c):
     rxn = func.hydrolyze_atp(rxn, n_atp = 1, compartment = 'c')
     
     if gene_info.tmd > 0 or 'pm' in gene_info.final_locations.keys(): # membrane secreted protein
-        post_translational_translocation_r = cobra.Reaction(gene_info.hgnc_id + '_post_TRANSLOC_3A_IMPORTtr')
+        post_translational_translocation_r = Expression_Reaction(gene_info.hgnc_id + '_post_TRANSLOC_3A_IMPORTtr', 
+                                                                 subsystem = 'Protein_Expression', hgnc_id = gene_info.hgnc_id)
         post_translational_translocation_r.subsytem = 'Protein_Expression'
         post_translational_translocation_r.gene_reaction_rule = ' and '.join(mach.ASNA1 + mach.WRB)
         
@@ -233,7 +232,8 @@ def post_translational_translocation(gene_info, unfolded_protein_c):
      
     else: #non membrane secreted protein
         number_BiP = gene_info.L_protein/40
-        post_translational_translocation_r = cobra.Reaction(gene_info.hgnc_id + '_post_TRANSLOC_3B_IMPORTtr')
+        post_translational_translocation_r = Expression_Reaction(gene_info.hgnc_id + '_post_TRANSLOC_3B_IMPORTtr', 
+                                                                 subsystem = 'Protein_Expression', hgnc_id = gene_info.hgnc_id)
         post_translational_translocation_r.subsytem = 'Protein_Expression'
         post_translational_translocation_r.gene_reaction_rule = ' and '.join(mach.ptnm)
         
@@ -275,9 +275,9 @@ def co_translational_translocation(gene_info, mrna_transcript_c, mrna_deg_proxy)
     
     #------------------------------------------------------------------------------------
 
-    co_translational_translocation_r = ME_Reaction(gene_info.hgnc_id + '_co_TRANSLOC_IMPORTtr', 
-                                                       type_ = ['translation'])
-    co_translational_translocation_r.subsytem = 'Protein_Expression'
+    co_translational_translocation_r = Expression_Reaction(gene_info.hgnc_id + '_co_TRANSLOC_IMPORTtr', 
+                                                           synthesis = True, synthesis_type = 'protein', 
+                                                       subsystem = 'Protein_Expression', hgnc_id = gene_info.hgnc_id)
     co_translational_translocation_r.gene_reaction_rule = ' and '.join(mach.ctnm + mach.translation_efs + ['ribosome'])
     
     co_translational_translocation_r.add_metabolites(rxn)
@@ -301,7 +301,7 @@ def co_translational_translocation(gene_info, mrna_transcript_c, mrna_deg_proxy)
     rxn[metab.h2o_r] = -params.L_sp
     rxn[unprocessed_protein_r],rxn[folded_protein_r] = -1, 1
     
-    sp_degradation = cobra.Reaction(gene_info.hgnc_id + '_SP_degradationr')
+    sp_degradation = Expression_Reaction(gene_info.hgnc_id + '_SP_degradationr', subsystem = 'Protein_Expression', hgnc_id = gene_info.hgnc_id)
     sp_degradation.add_metabolites(rxn)
     sp_degradation.gene_reaction_rule = mach.sp_rule
     ctt_reactions += [sp_degradation]
@@ -311,12 +311,12 @@ def co_translational_translocation(gene_info, mrna_transcript_c, mrna_deg_proxy)
 
 # # ER Modifications
 
-# In[22]:
+# In[7]:
 
 
 def form_disulfide_bond(gene_info, folded_protein_r):
     number_DSB = gene_info.ptms['dsb']
-    disulfide_bond_formation = cobra.Reaction(gene_info.hgnc_id + '_DSBr')
+    disulfide_bond_formation = Expression_Reaction(gene_info.hgnc_id + '_DSBr', subsystem = 'Protein_Expression', hgnc_id = gene_info.hgnc_id)
     modified_protein_dsb_r = folded_protein_r.copy()
     modified_protein_dsb_r.id = modified_protein_dsb_r.id.replace('folded', 'folded_DSB')
     elements = folded_protein_r.elements.copy()
@@ -331,8 +331,8 @@ def form_disulfide_bond(gene_info, folded_protein_r):
     return disulfide_bond_formation, modified_protein_dsb_r
 
 def form_gpi(gene_info, modified_protein_r):
-    gpi_formation = cobra.Reaction(gene_info.hgnc_id + '_GPIr')
-    modified_protein_gpi_r = modified_protein_r.copy()
+    gpi_formation = Expression_Reaction(gene_info.hgnc_id + '_GPIr', subsystem = 'Protein_Expression', hgnc_id = gene_info.hgnc_id)
+    modified_protein_gpi_r = modified_protein_r.copy(), 
     modified_protein_gpi_r.id = modified_protein_gpi_r.id.replace('folded', 'folded_GPI')
     
 #     # need to figure this out correctly!!
@@ -359,7 +359,7 @@ def form_gpi(gene_info, modified_protein_r):
 
 def glycosylate_n_linked(gene_info, modified_protein_r):
     raise ValueError('N-glycosylation not yet incorporated')
-#     n_glycosylation = cobra.Reaction(gene_info.hgnc_id + 'NGLYCOr')
+#     n_glycosylation = Expression_Reaction(gene_info.hgnc_id + 'NGLYCOr')
 #     modified_protein_ng_r = modified_protein_r.copy()
 #     modified_protein_ng_r.id = modified_protein_ng_r.id.replace('folded', 'folded_NG')
 
@@ -401,7 +401,7 @@ def modify_protein_er(gene_info, folded_protein_r):
 
 # # Golgi Reactions
 
-# In[23]:
+# In[8]:
 
 
 def import_golgi(gene_info, modified_protein_r):
@@ -414,7 +414,7 @@ def import_golgi(gene_info, modified_protein_r):
     # gtp hydrolysis
     rxn[metab.ntp_map_c['G']], rxn[metab.h2o_c], rxn[metab.ndp_map_c['G']], rxn[metab.pi_c], rxn[metab.h_c]  = -94, -94, 94, 94, 94
 
-    golgi_import = cobra.Reaction(gene_info.hgnc_id + '_COPII_IMPORTtg')
+    golgi_import = Expression_Reaction(gene_info.hgnc_id + '_COPII_IMPORTtg', subsystem = 'Protein_Expression', hgnc_id = gene_info.hgnc_id)
     golgi_import.add_metabolites(rxn)
     
     
@@ -428,7 +428,7 @@ def import_golgi(gene_info, modified_protein_r):
 
 def glycosylate_o_linked(gene_info, protein_g):
     number_Oglycans = gene_info.ptms['og']
-    o_glycosylation = cobra.Reaction(gene_info.hgnc_id + '_OGg')
+    o_glycosylation = Expression_Reaction(gene_info.hgnc_id + '_OGg', subsystem = 'Protein_Expression', hgnc_id = gene_info.hgnc_id)
 
     # metabolites
     modified_protein_og_g = protein_g.copy()
@@ -475,7 +475,7 @@ def modify_protein_golgi(gene_info, protein_g):
 
 # # Lysosomal, Extracellular, and Plasma Membrane Transport
 
-# In[24]:
+# In[9]:
 
 
 def secrete_protein(gene_info, modified_protein_g):
@@ -501,7 +501,8 @@ def secrete_protein(gene_info, modified_protein_g):
         # gtph hydrolysis
         rxn[metab.ntp_map_c['G']], rxn[metab.h2o_c], rxn[metab.ndp_map_c['G']], rxn[metab.pi_c], rxn[metab.h_c]  = -44, -44, 44, 44, 44
 
-        secrete_protein = cobra.Reaction(gene_info.hgnc_id + '_Clathrin_IMPORTt' + secreted_protein.compartment)
+        secrete_protein = Expression_Reaction(gene_info.hgnc_id + '_Clathrin_IMPORTt' + secreted_protein.compartment, 
+                                             subsystem = 'Protein_Expression', hgnc_id = gene_info.hgnc_id)
         secrete_protein.add_metabolites(rxn)
         secrete_protein.gene_reaction_rule = ' and '.join(mach.clathrin_m)
         secreted_protein_reactions += [secrete_protein]
@@ -511,7 +512,7 @@ def secrete_protein(gene_info, modified_protein_g):
 
 # # Secretory Pathway Protein Degradation
 
-# In[25]:
+# In[10]:
 
 
 # # Jahir's NCBI GPRs to HGNC GPRs
@@ -537,7 +538,7 @@ def secrete_protein(gene_info, modified_protein_g):
 
 # # Protein Expression All
 
-# In[26]:
+# In[11]:
 
 
 def get_protein_expression_reactions(gene_info, mrna_transcript_c, mrna_deg_proxy, ub_args):
@@ -720,13 +721,7 @@ def get_protein_expression_reactions(gene_info, mrna_transcript_c, mrna_deg_prox
     return protein_expression_reactions, protein_metabolites
 
 
-# In[35]:
-
-
-params.human_model
-
-
-# In[39]:
+# In[12]:
 
 
 # import expression.build_mrna_expression_reactions as build_mrna
@@ -740,84 +735,18 @@ params.human_model
 #                                                                                         ub_args = ub_args)
 
 
-# In[ ]:
-
-
-
-
-
-# In[27]:
-
-
-# working version pre-degradation: '0', 
-# minimal_proteome = True, compress_mrna = True, 
-#                                             dummy_protein = False
-
-
-# In[54]:
+# In[14]:
 
 
 # import random
+# import cobra
 # import pandas as pd
 # from expression.gene_information import gene_information
 # import expression.build_mrna_expression_reactions as build_mrna
 # from expression.protein_expression import ubiquitin
 
 # psim_toy = pd.DataFrame(columns = ['HGNC_ID', 'PREMRNA_SEQ', 'MRNA_SEQ', 'PROTEIN_SEQ', 'POLYA_LENGTH', 'TMD', 
-#                                'SP', 'N_EXONS', 'DSB', 'GPI', 'OG', 'LOCATION'])
-
-# hgnc_id, premrna_seq = 'HGNC:TOY', ''.join(random.choices(['U', 'C', 'G', 'A'], k = 100))
-# mrna_seq = premrna_seq[25:75]
-# # note that there is no check that the protein_sequence corresponds to the mrna_sequence beyond checking for the length
-# protein_seq = ''.join(random.choices(params.amino_acids, k = int(len(mrna_seq)/3)))
-# polyA_length, tmd, sp, n_exons, dsb, gpi, og  = None, 1, True, None, 2, 2, 2
-# ub_args = ubiquitin.express_ubiquitin(compress_mrna = False)
-
-# import itertools
-# reactions = list()
-
-# location = ['c']#list(params.compartments.keys())
-# psim_toy.loc[0,:] = # [hgnc_id, premrna_seq, mrna_seq, protein_seq, polyA_length, tmd, sp, n_exons, dsb, gpi, og, location]
-
-
-
-# #params.psim_me[params.psim_me.HGNC_ID == hgnc_id][psim_toy.columns.tolist()].iloc[0,:].tolist()
-# gene_info = gene_information(hgnc_id, premrna_seq, mrna_seq, protein_seq,
-#                  ptms = {}, tmd = tmd, sp = sp, polyA_length = polyA_length, 
-#                  n_exons = n_exons) 
-# gene_info.get_final_locations(metabolic_model = cobra.Model(''), final_locations = location)
-
-# transcription_reactions, mrna_transcript_c, mrna_deg_proxy = build_mrna.get_mrna_expression_reactions(gene_info)
-
-
-
-# protein_expression_reactions, protein_metabolites = get_protein_expression_reactions(gene_info, 
-#                                                  mrna_transcript_c, mrna_deg_proxy, 
-#                                                 ub_args = ub_args)
-# if len([r for r in protein_expression_reactions if len(r.check_mass_balance()) > 0]) > 0:
-#     raise ValueError('Imbalanced Reaction')
-
-# protein_expression_reactions
-
-# # for p in protein_metabolites:
-# #     fr = [r for r in protein_expression_reactions if r.id in p._degradation_reactions and r.sink]
-# #     if len(fr) > 1:
-# #         print(p)
-# #         print(fr)
-# #         print('---------')
-
-
-# In[29]:
-
-
-# import random
-# import pandas as pd
-# from expression.gene_information import gene_information
-# import expression.build_mrna_expression_reactions as build_mrna
-# from expression.protein_expression import ubiquitin
-
-# psim_toy = pd.DataFrame(columns = ['HGNC_ID', 'PREMRNA_SEQ', 'MRNA_SEQ', 'PROTEIN_SEQ', 'POLYA_LENGTH', 'TMD', 
-#                                'SP', 'N_INTRONS', 'DSB', 'GPI', 'OG', 'LOCATION'])
+#                                'SP', 'n_exons', 'DSB', 'GPI', 'OG', 'LOCATION'])
 
 # hgnc_id, premrna_seq = 'HGNC:TOY', ''.join(random.choices(['U', 'C', 'G', 'A'], k = 100))
 # mrna_seq = premrna_seq[25:75]
@@ -830,10 +759,10 @@ params.human_model
 # reactions = list()
 # for l in list(itertools.combinations(params.compartments.keys(),2)):
 #     location = list(l)
-#     psim_toy.loc[0,:] = [hgnc_id, premrna_seq, mrna_seq, protein_seq, polyA_length, tmd, sp, n_introns, dsb, gpi, og, location]
+#     psim_toy.loc[0,:] = [hgnc_id, premrna_seq, mrna_seq, protein_seq, polyA_length, tmd, sp, n_exons, dsb, gpi, og, location]
 #     gene_info = gene_information(hgnc_id, premrna_seq, mrna_seq, protein_seq,
 #                      ptms = {}, tmd = tmd, sp = sp, polyA_length = polyA_length, 
-#                      n_introns = n_introns) 
+#                      n_exons = n_exons) 
 #     gene_info.get_final_locations(metabolic_model = cobra.Model(''), final_locations = location)
 
 #     transcription_reactions, mrna_transcript_c, mrna_deg_proxy = build_mrna.get_mrna_expression_reactions(gene_info)

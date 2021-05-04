@@ -28,11 +28,11 @@ from qminospy.solver import QMINOS # need solveME installed and working
 
 import sys
 sys.path.insert(1, '../../scripts/')
-from core.reaction import ME_Reaction
+from core.reaction import Biomass_Reaction
 from utils import functions as func
 
 
-# In[15]:
+# In[ ]:
 
 
 class qminos_solver():
@@ -47,7 +47,7 @@ class qminos_solver():
         '''
         
         self.precision = 'quad'
-
+    
     def solve_lp(self, me_model, mu_val, objective = {'biomass_dilution': 1}, tolerance = 0,
                  close_biomass_dilution = True):   
         '''Solves the linear program for a specified objective at a specified growth rate
@@ -134,7 +134,7 @@ class qminos_solver():
         xl[:], xu[:] = np.nan, np.nan
         counter = 0
         for r in me_model.reactions:
-            if not(isinstance(r, ME_Reaction) and r.type == ['biomass']):
+            if not(isinstance(r, Biomass_Reaction)):
                 xl[counter] = copy.copy(r.lower_bound) - tolerance
                 xu[counter] = copy.copy(r.upper_bound) + tolerance
             else:
@@ -146,7 +146,7 @@ class qminos_solver():
                     xl[counter] = 0 - tolerance
                     xu[counter] = 1000 + tolerance
             counter +=1
-
+        
         # objective vector (max c.T*v)
         c = np.zeros(len(me_model.reactions))
         for r_id, coeff in objective.items():
@@ -381,7 +381,7 @@ class qminos_solver():
         return sln, predicted, interp_fit, optimal_vals, res
 
 
-# In[3]:
+# In[ ]:
 
 
 # counter = 0
@@ -402,7 +402,7 @@ class qminos_solver():
 # fig_name = None #path/to/fig_nam (no extension)
 
 
-# In[28]:
+# In[ ]:
 
 
 # solver = qminos_solver()

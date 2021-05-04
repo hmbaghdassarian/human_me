@@ -13,9 +13,29 @@ from utils import functions as func
 from utils import parameters as params
 # from uniform_processes.biomass import biomass_rna_mapper
 from macromolecules.macromolecule import Macromolecule
+from core.reaction import Expression_Reaction
 
 
-# In[10]:
+# In[ ]:
+
+
+molecule_type = ['premrna', 'rrna', 'trna']
+synth_mach_map = dict(zip(molecule_type, [' and '.join(mach.ec), '', ' and '.join(mach.rnap3_transcription_machinery)]))
+
+rule_part2 = ' and '.join(mach.lariat_machinery['Exosome'] + mach.lariat_machinery['NEXT Complex']) + ')'
+rule = mach.lariat_machinery["5' Degradation"][0] + ' or (' + rule_part2
+deg_mach_map = dict(zip(molecule_type, 
+                       ['', {'n': rule, 'c': ' and '.join(mach.exosome['HGNC ID (gene)'].tolist())}, 
+                        ' and '.join(mach.lariat_machinery['Exosome'])]))
+
+molecule_type.append('mrna')
+subsystem_map = dict(zip(molecule_type, ['mRNA_expression', 'rRNA_expression', 'tRNA_Biogenesis', 
+                                    'mRNA_expression']))
+rb_map = dict(zip(molecule_type, [False, True, False, False]))
+
+
+
+# In[ ]:
 
 
 class RNA(Macromolecule):
@@ -52,32 +72,29 @@ class RNA(Macromolecule):
         Inputs:
         1) self is an object of type RNA representing the rna molecule to be degraded.
         2) id_ is a string representing the name you want to give the reaction
+        hgnc_id: str
+            HGNC ID of the gene for which this reaction is being generated
         
-        Output: a degradation reaction of type cobra.Reaction
+        Output: a degradation reaction of type Expression_Reaction
         '''
         
-        rna_synthesis = cobra.Reaction(id_)
+        if self.type not in ['premrna', 'rrna', 'trna']:
+            raise ValueError('Only premrna, rrna, or trna can be synthesized')  
+
+        hgnc_id = None
+        if self.type == 'premrna':
+            hgnc_id = self.id.split('_')[0]
+        rna_synthesis = Expression_Reaction(id_, subsystem = subsystem_map[self.type], hgnc_id = hgnc_id,
+                                           ribosome_biogenesis = rb_map[self.type])
         rxn = dict()
         for ntp, base_letter in metab.seq_metabolite_map.items():
             rxn[ntp] = -1*self.base_counts[base_letter]
         # pyrophosphate released per base added, -1 for 3/5' ends
         rxn[metab.ppi_n] = self.length - 1
         rxn[self] = 1
-#         rxn[biomass_rna_mapper[self.type]] = self.formula_weight/1000
-        
         rna_synthesis.add_metabolites(rxn)
-        
-        if self.type == 'premrna':
-            rna_synthesis.subsystem = 'mRNA_expression'
-            rna_synthesis.gene_reaction_rule = ' and '.join(mach.ec)
-        elif self.type == 'rrna':
-            rna_synthesis.subsystem = 'Ribosome_Biogenesis'
-        elif self.type == 'trna': 
-            rna_synthesis.subsystem = 'tRNA_Biogenesis'
-            rna_synthesis.gene_reaction_rule = ' and '.join(mach.rnap3_transcription_machinery)
-        else:
-            raise ValueError('Only premrna, rrna, or trna can be synthesized')
-        
+        rna_synthesis.gene_reaction_rule = synth_mach_map[self.type]
+
         if len(rna_synthesis.check_mass_balance()) > 0:
             raise ValueError('RNA synthesis for ' + id_ + ' is unbalanced')
         elif list(rna_synthesis.compartments) != ['n']:
@@ -93,15 +110,36 @@ class RNA(Macromolecule):
         Inputs:
         1) self is an object of type RNA representing the rna molecule to be degraded.
         2) reaction_name is a string representing the name you want to give the reaction
+        hgnc_id: str
+            HGNC ID of the gene for which this reaction is being generated
         3) balanced is a boolean indicating whether to check for mass balance
         4) update is a boolean indicating whether to update degradation reaction with subsystem and machinery
 
-        Output: a degradation reaction of type cobra.Reaction
+        Output: a degradation reaction of type Expression_Reaction
         no GPRs or subsystems added to reaction
 
         '''
         # exonucleolytic cleavage of RNA reaction
-        rna_degradation = cobra.Reaction(reaction_name + '_DEGRADATION' + self.compartment)
+        if self.type in molecule_type:
+            _type = self.type
+        elif self.type == 'fragment_rna':
+            if self.fragment_type == 'lariat':
+                _type = 'premrna'
+            elif self.fragment_type in ['5_leader', '3_trailer', 'trna_intron']:
+                _type = 'trna'
+            elif self.fragment_type in ['its', 'ets']:
+                _type = 'rrna'
+            else:
+                raise ValueError('Only premrna, rrna, or trna can be degraded')  
+        else:
+            raise ValueError('Only premrna, rrna, or trna can be degraded')   
+        
+        hgnc_id = None
+        if _type in ['premrna', 'mrna']:
+            hgnc_id = self.id.split('_')[0]
+        rna_degradation = Expression_Reaction(reaction_name + '_DEGRADATION' + self.compartment, 
+                                             subsystem = subsystem_map[_type], hgnc_id = hgnc_id, 
+                                             ribosome_biogenesis = rb_map[_type])
 
         rxn = dict()
         rxn[metab.h2o_compartments[self.compartment]] = -self.length + 1# -sum(self.base_counts.values()) + 1
@@ -115,29 +153,14 @@ class RNA(Macromolecule):
             rxn[metab.h_compartments[self.compartment]] = self.length - 1 #sum(self.base_counts.values())-1
         else:
             rxn[metab.h_compartments[self.compartment]] = self.length #sum(self.base_counts.values()) # extra H on 5' end <--unsure about this
-        
-        
-        
-#         if self.type not in biomass_rna_mapper.keys():
-#             raise ValueError('RNA type must be specified as one of ' + ', '.join(biomass_rna_mapper.keys()))
-#         else:
-#             rxn[biomass_rna_mapper[self.type]] = -self.formula_weight/1000 
-        
+
         rna_degradation.add_metabolites(rxn)
         
         if update:
-            if self.type == 'rrna' or (self.type == 'fragment_rna' and self.fragment_type in ['its', 'ets']):
-                rna_degradation.subsystem = 'Ribosome_Biogenesis'
-                if self.compartment == 'n':
-                    rule_part2 = ' and '.join(mach.lariat_machinery['Exosome'] + mach.lariat_machinery['NEXT Complex']) + ')'
-                    rna_degradation.gene_reaction_rule = mach.lariat_machinery["5' Degradation"][0] + ' or (' + rule_part2
-                elif self.compartment == 'c':
-                    rna_degradation.gene_reaction_rule = ' and '.join(mach.exosome['HGNC ID (gene)'].tolist())
-                else:
-                    raise ValueError('Only nuclear and cytosolice rRNA degradation can be updated')
-            elif self.type == 'trna' or (self.type == 'fragment_rna' and self.fragment_type in ['5_leader', '3_trailer', 'trna_intron']):
-                rna_degradation.gene_reaction_rule = ' and '.join(mach.lariat_machinery['Exosome'])
-                rna_degradation.subsystem = 'tRNA_Biogenesis'
+            if _type == 'rrna':
+                rna_degradation.gene_reaction_rule = deg_mach_map[_type][self.compartment]
+            elif _type == 'trna':
+                rna_degradation.gene_reaction_rule = deg_mach_map[_type]
             else:
                 raise ValueError('Only trna or rrna degradation reactions can be updated')
         
@@ -148,6 +171,7 @@ class RNA(Macromolecule):
         if balanced and len(rna_degradation.check_mass_balance())>0:
             raise ValueError('RNA degradation is not mass balanced')
         return rna_degradation 
+    
     def update_metabolite(self, seq, append = False, append_to = None):
         '''Updates the RNA metabolite information according to an input sequence string. If add is True, 
         assumes string is being added, else, assumes string is being removed.'''
@@ -181,7 +205,7 @@ class RNA(Macromolecule):
             raise ValueError('Situation in which RNA sequence is removed or replaced has not been implemented yet')
 
 
-# In[14]:
+# In[ ]:
 
 
 class pre_mRNA(RNA):
@@ -193,6 +217,7 @@ class pre_mRNA(RNA):
                      compartment = compartment, triphosphate = triphosphate)
         self.type = 'premrna'
         self.id = self.id.replace('RNA', self.type)
+        self.hgnc_id = gene_info.hgnc_id
 
 class mRNA(RNA):
     def __init__(self, gene_info, compartment = 'n', triphosphate = True):
@@ -204,6 +229,7 @@ class mRNA(RNA):
                      compartment = compartment, triphosphate = triphosphate)
         self.type = 'mrna'
         self.id = self.id.replace('RNA', self.type)
+        self.hgnc_id = gene_info.hgnc_id
         
 
 class tRNA(RNA):

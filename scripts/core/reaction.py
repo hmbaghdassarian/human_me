@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[2]:
+# In[1]:
 
 
 import cobra
@@ -11,6 +11,7 @@ from operator import attrgetter
 from collections import defaultdict
 import warnings
 from math import isinf
+import numpy as np
 from six import iteritems
 import copy
 
@@ -24,32 +25,22 @@ from utils import machinery as mach
 
 
 class ME_Reaction(cobra.Reaction):
-    '''
-    
-    Inherited from cobra.Reaction. Allows stochiometric coefficient and reaction bounds to be a function of mu.
-    Note: not used in all expression module reactions, just those requiring mu as a parameter.
+    '''Inherited from cobra.Reaction. Allows stochiometric coefficient to be a function of mu.
     
     '''
 
-    def __init__(self,  id, type_, name='', subsystem='', lower_bound=0.0, upper_bound=None, 
-                cobra_id = None):
-        
-        '''Helps distinguish between these reactions, which have mu in bounds, and coupling reactions, which 
-        have mu in stochiometric coefficient.
-        
-        Cobra ID can be input to keep track of original cobra model id from which this reaction was derived.
+    def __init__(self,  id, name='', subsystem='', lower_bound=0.0, upper_bound=None):
         
         '''
-        
-        if len(set(type_).difference(['biomass', 'translation', 'catalysis'])) > 0:
-            raise ValueError('Specified reaction type is not known')
+        Helps distinguish between these reactions, which have mu in bounds, and coupling reactions, which 
+        have mu in stochiometric coefficient.
+        '''
         
         super().__init__(id, name, subsystem, lower_bound, upper_bound)
-        self.type = type_
-        self.cobra_id = cobra_id
-        self.coupled_metabolites = None
+        self.coupled_metabolites = dict()
         self._protein_deg_proxy = False
     
+
     def _couple(self, metabolite, type):
         '''Add coupling coefficient and associated metadata to reaction for a coupled metabolite
         
@@ -67,14 +58,35 @@ class ME_Reaction(cobra.Reaction):
             raise ValueError('Cannot add coupling metadata to reaction for a metabolite without coupling coefficient metadata')
         if type not in metabolite.coupling_coefficient: # this also checks correct coupling types defined
             raise ValueError('Incorrect coupling coefficient type specified for this metabolite')
+        
+        
+        self.add_metabolites({metabolite: metabolite.coupling_coefficient[type]}, combine = True)
+        mmap = {m.id: m for m in self._metabolites}
+        if metabolite.id in mmap: # maintain the coupling attributes this way
+            self._metabolites[metabolite] = self._metabolites.pop(mmap[metabolite.id])
+            metabolite._reaction.add(self)
+            
+        # maintain the coupling attributes
+#         if mmap[metabolite.id].coupling_coefficient is None:
+#             mmap[metabolite.id].coupling_coefficient = metabolite.coupling_coefficient
+#         else:
+#             for type,coeff in metabolite.coupling_coefficient.items():
+#                 if type not in mmap[metabolite.id].coupling_coefficient:
+#                     mmap[metabolite.id].coupling_coefficient[type] = coeff
+#                 elif  mmap[metabolite.id].coupling_coefficient[type] != coeff:
+#                     raise ValueError('Mismatch in coupling coefficient calculation')
 
-        if self.coupled_metabolites is None:
+#         mmap[metabolite.id].enzyme = True
+        
+#         for attr in ['keff', ]
+#         if mmap[metabolite.id].keff is None:
+#             mmap[metabolite.id].keff = metabolite.keff
+
+        if self.coupled_metabolites == dict():
             self.coupled_metabolites = {metabolite: type}
         else:
             self.coupled_metabolites[metabolite] = type
 
-        self.add_metabolites({metabolite: metabolite.coupling_coefficient[type]}, combine = True)
-    
     def couple(self, metabolites, types):
         '''Add coupling coefficient and associated metadata to reaction for a coupled metabolites
         
@@ -92,79 +104,11 @@ class ME_Reaction(cobra.Reaction):
                 self._couple(metabolite,type)
         else:
             self._couple(metabolites,types)
-        
-            
-    def check_me_bounds(self, lb, ub):
-        if self.type == ['biomass']:
-            if isinstance(lb, sympy.Expr) or isinstance(ub, sympy.Expr):
-                if not params.mu in lb.free_symbols and params.mu in ub.free_symbols:
-                    raise ValueError('Currently, if reaction bounds are a function of mu, they must be for both the upper and lower bound')
-        else:
-            if isinstance(lb, sympy.Expr) or isinstance(ub, sympy.Expr):
-                raise ValueError('Reaction bounds can only be a function of mu for reactions of type biomass')
 
             
-    def replace_bound_mu(self, mu_val = 1, values = None, inplace = False, _ = True):
-        '''
-        Assumes growth is always > 0. Gives numeric values to bounds for certain methods.
-        
-        Parameters
-        ----------
-        mu_val: float
-            The value for mu to replace the bounds that contain a mu expression with
-        values: list or None
-            Each entry is an expression containing mu to be replaced by mu_val; inplace must be False
-        inplace: bool; default False
-            Whether to replace the bounds inplace on the reaction object (True), or return the bounds
-        _: bool
-            internal use, whether to use cobra.Reaction._upper_bound or cobra.Reaction.upper_bound
-        
-        
-        '''
-        
-        if _:
-            lb, ub = copy.copy(self._lower_bound), copy.copy(self._upper_bound)
-        else:
-            lb, ub = copy.copy(self.lower_bound), copy.copy(self.upper_bound)
-            
-        self.check_me_bounds(lb,ub)    
-        
-        if isinstance(lb, sympy.Expr):  # check_me_bounds makes sure both lb and ub are symp.Expr objects
-            # replace growth with input mu val (assuming growth always > 0)
-            lb,ub = float(lb.subs(params.mu,mu_val)), float(ub.subs(params.mu,mu_val)) 
-        else:
-            if self.type == ['biomass']:
-                warnings.warn('Bounds do not have a mu value')
-        
-        if values == None:
-            if not inplace:
-                return lb, ub
-            else:
-                self._lower_bound, self._upper_bound = lb,ub
-        else:
-            if not isinstance(values, list):
-                raise TypeError('values must a list')
-                
-            for i in range(len(values)):
-                if isinstance(values[i], sympy.Expr): # assumes the sympy expression always contains mu
-                    values[i] = float(values[i].subs(params.mu, mu_val))
-            if not inplace:
-                return lb, ub, values
-            else:
-                raise ValueError('Either values must be None or inplace False')
-    
-    @property
-    def reversibility(self):
-        """Whether the reaction can proceed in both directions (reversible)
-
-        This is computed from the current upper and lower bounds.
-
-        """
-        lb,ub = self.replace_bound_mu() 
-        if not (isinstance(lb,sympy.Expr) and isinstance(ub,sympy.Expr)):
-            return lb < 0 < ub
-#         else: # if mu is just in one bound 
-#             raise ValueError('For now, mu must be in both reaction bounds if boundaries are a function of mu')
+    def _check_me_bounds(self, lb, ub):
+        if isinstance(lb, sympy.Expr) or isinstance(ub, sympy.Expr):
+            raise ValueError('Reaction bounds can only be a function of mu for reactions of type biomass')
     
     def build_reaction_string(self, use_metabolite_names=False):
         """Generate a human readable reaction string"""
@@ -194,43 +138,63 @@ class ME_Reaction(cobra.Reaction):
 
         reaction_string = ' + '.join(reactant_bits)
         if not self.reversibility:
-            lb,ub = self.replace_bound_mu(_ = False)
-            if lb < 0 and ub <= 0:
+            if self.lower_bound < 0 and self.upper_bound <= 0:
                 reaction_string += ' <-- '
             else:
                 reaction_string += ' --> '
         else:
             reaction_string += ' <=> '
         reaction_string += ' + '.join(product_bits)
-        return reaction_string 
+        return reaction_string
 
-    def check_mass_balance(self, tol = 0):
+    def _map_coupled_metabolites(self):
+        mmap = {m.id: m for m in self.metabolites}
+        cm = dict()
+        for md,type_ in self.coupled_metabolites.items():
+#             mmap[md.id].coupling_coefficient = md.coupling_coefficient
+            cm[mmap[md.id]] = type_
+        self.coupled_metabolites = cm 
+            
+    def check_mass_balance(self, tol = 0, sympy_tol = 1e-15):
         """Compute mass and charge balance for the reaction
 
         returns a dict of {element: amount} for unbalanced elements.
         "charge" is treated as an element in this dict
         This should be empty for balanced reactions.
+        
+        sympy_tol: float
+            sympy.expr conversions may result in some error, account for this when getting rid of the 
+            coupling coefficient values
         """
         
         reaction_element_dict = defaultdict(int)
-        md = self._metabolites.copy()
-        if self.coupled_metabolites is not None:
-            for metabolite, type in self.coupled_metabolites.items():
-                md[metabolite] -= metabolite.coupling_coefficient[type] # coupling not part of mass balance
-        for metabolite, coefficient in iteritems(md):    
+        mmap = {m.id: m for m in self._metabolites}
+        
+        md = dict()
+        for m,c in self.metabolites.items():
+            if m.id not in md:
+                md[m.id] = c
+            else:
+                raise ValueError('Same metabolite id, different objects in reaction') #md[m.id] += c
+        
+        # deal with coupled metabolites (also required id mapping above)
+        for metabolite, type in self.coupled_metabolites.items():
+            md[metabolite.id] -= metabolite.coupling_coefficient[type] # coupling not part of mass balance
+            md[metabolite.id] = float(md[metabolite.id])
+            for val in [1,0]: 
+                if abs((np.sign(md[metabolite.id])*val) - md[metabolite.id]) < 1e-15:
+                    md[metabolite.id] = np.sign(md[metabolite.id])*val
+
+        for m_id, coefficient in iteritems(md):   
+            metabolite = mmap[m_id]
             if metabolite.charge is not None:
                 reaction_element_dict["charge"] += coefficient * metabolite.charge
             for element, amount in iteritems(metabolite.elements):
                 reaction_element_dict[element] += coefficient * amount
 
         return {k: v for k, v in iteritems(reaction_element_dict) if abs(v) > tol}
-
-
     
-    def replace_coefficient_mu(self, mu_val):
-        if len(set(self.type).difference(['translation', 'catalysis'])) > 0:
-            raise ValueError('Mu can only be a coefficient in translation and catalysis reactions')
-        
+    def replace_coefficient_mu(self, mu_val, inplace = True):
         if not (mu_val > 0):
             raise ValueError('Mu must be > 0')
             
@@ -238,7 +202,13 @@ class ME_Reaction(cobra.Reaction):
         for met, coeff in self.metabolites.items():
             if isinstance(coeff, sympy.Expr):
                 new_rxn[met] = float(coeff.subs(params.mu, mu_val))
-        self.add_metabolites(new_rxn, combine = False)
+        
+        if inplace:
+            self.add_metabolites(new_rxn, combine = False)
+        else: 
+            reaction = copy.deepcopy(self)
+            reaction.add_metabolites(new_rxn, combine = False)
+            return reaction
         
     
     @property
@@ -275,19 +245,83 @@ class ME_Reaction(cobra.Reaction):
         self.add_metabolites({protein_deg_proxy: 1})
         self._protein_deg_proxy = True
         self.protein_deg_proxy = protein_deg_proxy
+        
+class Metabolic_Reaction(ME_Reaction):
+    '''Inherited from ME_Reaction, specifies the metabolic reactions in the model'''
+    
+    def __init__(self,  id, cobra_id, name='', subsystem='', lower_bound=0.0, upper_bound=None):
+        '''cobra_id specifies the original reaction name in the M-Model'''
+
+        super().__init__(id, name, subsystem, lower_bound, upper_bound)
+        self.cobra_id = cobra_id
 
 
-# In[ ]:
+class Expression_Reaction(ME_Reaction):
+    '''Inherited from ME_Reaction, specifies the expression reactions in the model'''
+    
+    def __init__(self,  id, subsystem, name='', lower_bound=0.0, upper_bound=None, 
+                hgnc_id = None, 
+                 synthesis = False, synthesis_type = None, sink = False, sink_type = None,
+                 ubiquitin_biogenesis = False, ribosome_biogenesis = False):
+        '''
+        subystem: str
+            one of 'tRNA_Biogenesis', 'rRNA_expression', 'mRNA_expression', 'Protein_Expression', 'Protein_Degradation', 'Complex_Formation', 'Complex_Degradation'
+        synthesis: bool
+            whether the reaction represents the "main" synthesis/production for the macromolecule
+            intended for use with genes (reactions with an associated hgnc id, and complexes)
+        synthesis_type: str
+            one of ['mRNA', 'protein', 'complex']
+            if synthesis is True, the type of macromolecule being synthesized should also be specified
+        sink: bool 
+            whether the reaction represents the "main" sink/degradation for the macromolecule
+            intended for use with genes (reactions with an associated hgnc id, and complexes)
+        sink_type: str
+            one of ['mRNA', 'protein', 'complex']
+            if sink True, the type of macromolecule being degraded should also be specified
+        ubiquitin_biogenesis: bool
+            whether the Expression_Reaction is part of ubiquitin_biogenesis reactions, only used to ignore hgnc_id is None
+        ribosome_biogenesis: bool
+            whether the Expression_Reaction is part of ribosome_biogenesis reactions, only used to ignore hgnc_id is None
+        '''
+        
+        if subsystem not in ['tRNA_Biogenesis', 'rRNA_expression', 'mRNA_expression', 'Protein_Expression', 
+                             'Protein_Degradation', 'Complex_Formation', 'Complex_Degradation']:
+            raise ValueError('Must specify an appropriate expression subsystem')
+            
+        super().__init__(id, name, subsystem, lower_bound, upper_bound)
+        
+        self.ubiquitin_biogenesis = ubiquitin_biogenesis
+        if (not (self.subsystem in ['tRNA_Biogenesis', 'rRNA_expression', 'Complex_Formation', 
+                                   'Complex_Degradation'] or self.ubiquitin_biogenesis)) and (hgnc_id is None):
+            raise ValueError('Must specify hgnc_id of the gene being expressed')
+        
+        self.hgnc_id = hgnc_id
+        self.synthesis = synthesis
+        if self.synthesis and synthesis_type not in ['mRNA', 'protein', 'complex']: 
+            raise ValueError('The synthesis type must be specified')
+        else:
+            self.synthesis_type = synthesis_type
+    
+        self.sink = sink
+        if self.sink and sink_type not in ['mRNA', 'protein', 'complex']: 
+            raise ValueError('The synthesis type must be specified')
+        else:
+            self.sink_type = sink_type
+            
+        self.ribosome_biogenesis = ribosome_biogenesis
 
 
-class Protein_Degradation_Reaction(cobra.Reaction):
-    def __init__(self, id=None, name='', subsystem='', lower_bound=0.0, upper_bound=None):
-        cobra.Reaction.__init__(self, id=id, name=name, subsystem=subsystem, lower_bound=lower_bound, 
-                                upper_bound=upper_bound)
+class Protein_Degradation_Reaction(Expression_Reaction):
+    def __init__(self, id, hgnc_id, sink = False, sink_type = None, name='', lower_bound=0.0, upper_bound=None):
+        '''
+        sink: bool
+            whether the reaction represents the "main" sink/degradation for the macromolecule
+            intended for use with genes (reactions with an associated hgnc id, and complexes)
+        '''
+        super().__init__(id=id, subsystem='Protein_Degradation', sink = sink, sink_type = sink_type, 
+                         name=name, lower_bound=lower_bound, upper_bound=upper_bound, hgnc_id = hgnc_id)
         self._macromolecules = [] # list of macromolecule ids associated with this degradation reaction
         self._enzymes = None # list of enzyme ids associated with this degradation reaction
-        self.sink = False # whether the reaction is the "final" (to amino acids) degradation reaction
-        self.subsystem = 'Protein_Degradation'
         self._ribosomal_degradation = False # see complex_degradation_reaction for details
         
     def _update_tracking(self, macromolecules):
@@ -316,14 +350,21 @@ class Protein_Degradation_Reaction(cobra.Reaction):
         
         self.gene_reaction_rule = ' and '.join(mach.proteasome_machinery)
 
-class Complex_Degradation_Reaction(cobra.Reaction):
-    def __init__(self, id=None, name='', subsystem='', lower_bound=0.0, upper_bound=None):
-        cobra.Reaction.__init__(self, id=id, name=name, subsystem=subsystem, lower_bound=lower_bound, 
-                                upper_bound=upper_bound)
+class Complex_Degradation_Reaction(Expression_Reaction):
+    def __init__(self, id=None, sink = False, sink_type = None, 
+                 name='', lower_bound=0.0, upper_bound=None, hgnc_id = None):
+        '''
+        
+        sink: bool
+            whether the reaction represents the "main" sink/degradation for the macromolecule
+            intended for use with genes (reactions with an associated hgnc id, and complexes)
+        hgnc_id: None
+            always None, for internal use with expression/protein_expression/degradation script
+        '''
+        super().__init__(id=id, subsystem='Complex_Degradation', sink = sink, sink_type = sink_type, 
+                         name=name, lower_bound=lower_bound, upper_bound=upper_bound)
         self._macromolecules = [] # list of macromolecule ids associated with this degradation reaction
         self._enzymes = None # list of enzyme ids associated with this degradation reaction
-        self.sink = False # whether the reaction is the "final" (to amino acids) degradation reaction
-        self.subsystem = 'Complex_Degradation'
         self._ribosomal_degradation = False
         
     def _update_tracking(self, macromolecules):
@@ -390,4 +431,126 @@ class Complex_Degradation_Reaction(cobra.Reaction):
        
         self.gene_reaction_rule = ' and '.join(machinery_)
         
+
+
+# In[3]:
+
+
+def to_metabolic_reaction(reaction, id = None):
+    '''Convert from cobra.Reaction to human_me.core.Metabolic_Reaction'''
+    
+    if id is None:
+        id = reaction.id
+    rxn = Metabolic_Reaction(id = id, cobra_id = reaction.id, name = reaction.name, subsystem = reaction.subsystem,
+                             lower_bound = reaction.lower_bound, upper_bound = reaction.upper_bound)
+    for k in set(reaction.__dict__.keys()).difference(['_id', 'name', 'subsystem', 
+                                                       '_lower_bound', '_upper_bound', 
+                                                      '_model']):
+        rxn.__dict__[k] = copy.deepcopy(reaction.__dict__[k])
+    return rxn
+        
+
+
+# In[4]:
+
+
+class Biomass_Reaction(cobra.Reaction):
+    '''Specifies biomass reactions in the model, allowing reaction bounds to be a function of mu'''
+    
+    def __init__(self,  id, name='', subsystem='', lower_bound=0.0, upper_bound=None):
+        super().__init__(id, name, subsystem, lower_bound, upper_bound)
+
+    def _check_me_bounds(self, lb, ub):
+        if isinstance(lb, sympy.Expr) or isinstance(ub, sympy.Expr):
+            if not params.mu in lb.free_symbols and params.mu in ub.free_symbols:
+                raise ValueError('Currently, if reaction bounds are a function of mu, they must be for both the upper and lower bound')
+    def replace_bound_mu(self, mu_val = 1, values = None, inplace = False, _ = True):
+        '''
+        Assumes growth is always > 0. Gives numeric values to bounds for certain methods.
+        
+        Parameters
+        ----------
+        mu_val: float
+            The value for mu to replace the bounds that contain a mu expression with
+        values: list or None
+            Each entry is an expression containing mu to be replaced by mu_val; inplace must be False
+        inplace: bool; default False
+            Whether to replace the bounds inplace on the reaction object (True), or return the bounds
+        _: bool
+            internal use, whether to use cobra.Reaction._upper_bound or cobra.Reaction.upper_bound
+        
+        
+        '''
+        
+        if _:
+            lb, ub = copy.copy(self._lower_bound), copy.copy(self._upper_bound)
+        else:
+            lb, ub = copy.copy(self.lower_bound), copy.copy(self.upper_bound)
+            
+        self._check_me_bounds(lb,ub)    
+        
+        if isinstance(lb, sympy.Expr):  # _check_me_bounds makes sure both lb and ub are symp.Expr objects
+            # replace growth with input mu val (assuming growth always > 0)
+            lb,ub = float(lb.subs(params.mu,mu_val)), float(ub.subs(params.mu,mu_val)) 
+#         else:
+#             warnings.warn('Bounds do not have a mu value')
+        
+        if values == None:
+            if not inplace:
+                return lb, ub
+            else:
+                self._lower_bound, self._upper_bound = lb,ub
+        else:
+            if not isinstance(values, list):
+                raise TypeError('values must a list')
+                
+            for i in range(len(values)):
+                if isinstance(values[i], sympy.Expr): # assumes the sympy expression always contains mu
+                    values[i] = float(values[i].subs(params.mu, mu_val))
+            if not inplace:
+                return lb, ub, values
+            else:
+                raise ValueError('Either values must be None or inplace False')
+    
+    @property
+    def reversibility(self):
+        """
+        Whether the reaction can proceed in both directions (reversible)
+
+        This is computed from the current upper and lower bounds.
+
+        """
+        lb,ub = self.replace_bound_mu() 
+        return lb < 0 < ub
+    
+    def build_reaction_string(self, use_metabolite_names=False):
+        """Generate a human readable reaction string"""
+
+        def format(number):
+            return "" if number == 1 else str(number).rstrip(".") + " "
+
+        id_type = 'id'
+        if use_metabolite_names:
+            id_type = 'name'
+        reactant_bits = []
+        product_bits = []
+        for met in sorted(self._metabolites, key=attrgetter("id")):
+            coefficient = self._metabolites[met]
+            name = str(getattr(met, id_type))
+            if coefficient >= 0:
+                product_bits.append(format(coefficient) + name)
+            else:
+                reactant_bits.append(format(abs(coefficient)) + name)
+
+        reaction_string = ' + '.join(reactant_bits)
+        if not self.reversibility:
+            lb,ub = self.replace_bound_mu(_ = False)
+            if lb < 0 and ub <= 0:
+                reaction_string += ' <-- '
+            else:
+                reaction_string += ' --> '
+        else:
+            reaction_string += ' <=> '
+        reaction_string += ' + '.join(product_bits)
+        return reaction_string 
 

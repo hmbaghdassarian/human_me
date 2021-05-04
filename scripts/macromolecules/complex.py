@@ -1,10 +1,9 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[8]:
+# In[2]:
 
 
-import cobra
 import itertools
 import collections
 import uuid
@@ -16,8 +15,10 @@ from macromolecules.macromolecule import Macromolecule
 from utils import machinery as mach
 from utils import parameters as params
 
+from core.reaction import Expression_Reaction
 
-# In[9]:
+
+# In[3]:
 
 
 cotransloc_ids = set([mid + '_folded_protein_r' for mid in mach.ctnm + mach.translation_efs]) 
@@ -25,7 +26,7 @@ def flatten_list(list_):
     return [item for sublist in list_ for item in sublist]
 
 
-# In[91]:
+# In[4]:
 
 
 class Complex(Macromolecule):
@@ -85,6 +86,7 @@ class Complex(Macromolecule):
         self._deg_initialized = False
         self.enzyme = False
         self.keff = None
+        self.hgnc_id = None # always None, for internal use with expression/protein_expression/degradation
         
     def update_id(self, new_id = None):
         '''In cases where complex id is too long (see build_me_model generate_complex_reactions method)'''
@@ -98,7 +100,7 @@ class Complex(Macromolecule):
         self.id = self.temp_id + '_complex_' + self.compartment
     
     
-    def form_complex(self, reaction_id = None, reversible = False):
+    def form_complex(self, reaction_id = None, reversible = False, synthesis = True, synthesis_type = 'complex'):
 
         '''The reaction required to generate the Complex object
         Note: assumes non-covalent complex formation (in terms of elemental balance)
@@ -113,7 +115,7 @@ class Complex(Macromolecule):
 
         Returns
         ----------
-        complex_formation: cobra.Reaction 
+        complex_formation: human_me.core.Expression_Reaction 
             the complex formation between metabolites stored in self.components
 
         '''
@@ -124,7 +126,8 @@ class Complex(Macromolecule):
             self.reaction_id = reaction_id + '_COMPLEX_FORMATION' + self.compartment        
         
         
-        complex_formation = cobra.Reaction(self.reaction_id)
+        complex_formation = Expression_Reaction(self.reaction_id, subsystem = 'Complex_Formation', 
+                                               synthesis = synthesis, synthesis_type = synthesis_type)
         rxn = {m: -count for m,count in self.components.items()}
         rxn[self] = 1
         complex_formation.add_metabolites(rxn)
@@ -221,7 +224,7 @@ class Complex(Macromolecule):
         self.k_deg = np.median([m.k_deg*c for m,c in self.decompose_complex().items()])
 
 
-# In[ ]:
+# In[6]:
 
 
 class Ribosomal_Complex(Complex):
@@ -289,6 +292,7 @@ class Ribosomal_Complex(Complex):
         self._deg_initialized = False
         self.enzyme = False
         self.keff = None
+        self.hgnc_id = None # always None, for internal use with expression/protein_expression/degradation
 
     def decompose_complex(self, decomposed_complex = None):
         '''Recursive method to get the complex by its individual components, including nested complexes'''
@@ -304,6 +308,42 @@ class Ribosomal_Complex(Complex):
             return self.decompose_complex(decomposed_complex = Ribosomal_Complex(metabolites = metabolites_, complex_id = 'ignore'))
 
 
+    def form_complex(self, reaction_id = None, reversible = False, synthesis = False, synthesis_type = None):
+
+        '''The reaction required to generate the Complex object
+        Note: assumes non-covalent complex formation (in terms of elemental balance)
+
+        Parameters
+        -----------
+        reaction_id: str
+            ID to assign to the reaction
+        reversible: bool
+            Whether the reaction is reversible. Setting to True may make model more efficient (allows reuse of 
+            self.components if involved in other reactions)
+
+        Returns
+        ----------
+        complex_formation: human_me.core.Expression_Reaction  
+            the complex formation between metabolites stored in self.components
+
+        '''
+        self._check_metabolite_types()
+        if reaction_id is None:
+            self.reaction_id = self.temp_id + '_COMPLEX_FORMATION' + self.compartment
+        else:
+            self.reaction_id = reaction_id + '_COMPLEX_FORMATION' + self.compartment        
+        
+        
+        complex_formation = Expression_Reaction(self.reaction_id, subsystem = 'Complex_Formation', 
+                                               synthesis = synthesis, synthesis_type = synthesis_type, 
+                                                ribosome_biogenesis = True)
+        rxn = {m: -count for m,count in self.components.items()}
+        rxn[self] = 1
+        complex_formation.add_metabolites(rxn)
+        if reversible:
+            complex_formation.lower_bound = -1000 # reversible
+        
+        return complex_formation
     def _check_metabolite_types(self):
         '''Only protein and rRNA can be included in ribosomal complexes'''
         if len((set([m.type for m in self.decompose_complex()])).difference(['protein', 'rrna'])) > 0:
@@ -334,6 +374,27 @@ class Ribosomal_Complex(Complex):
         self._degradation_reactions = []
         
         del dc
+    def _change_compartment_and_components(self, new_compartment):
+            '''Returns a copy of the complex metabolite, but in new compartment. 
+            Recursive to change all components (nested complexes and their components)'''
+
+            if new_compartment == self.compartment:
+                raise ValueError('The macromolecule is already in this compartment')
+            if new_compartment not in params.compartments.keys():
+                err = 'Specified compartment is not considered in the ME Model. Please input one of the following: ' 
+                err += ', '.join(list(params.compartments.keys()))
+
+            metabolites = list()
+            for m,c in self.components.items():
+                if m.type != 'complex':
+                    metabolites += [m.change_compartment(new_compartment)]*c
+                else:
+                    metabolites += [m._change_compartment_and_components(new_compartment)]*c
+
+            new_complex = Ribosomal_Complex(metabolites = metabolites, complex_id = self.temp_id)
+            if self._deg_initialized:
+                new_complex._initialize_deg_params()
+            return new_complex
 #     def get_k_deg(self):
 #         self.k_deg = params.ribosomal_degradation_rate
 
@@ -361,7 +422,6 @@ class Ribosomal_Complex(Complex):
 
 
 # In[ ]:
-
 
 
 def add_complex_metabolites(cplx, met_to_add, complex_id):

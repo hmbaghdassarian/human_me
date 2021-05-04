@@ -4,31 +4,28 @@
 # In[1]:
 
 
-import cobra
-import pandas as pd 
-
 from Bio.Seq import Seq
 from Bio.Alphabet import generic_rna
 
+import pandas as pd 
 import numpy as np
 import statsmodels.api as sm
 import scipy.stats as st
 
 import sys
 sys.path.insert(1, '../../scripts/') # comment out in python script
-# from utils.load_environmental_variables import *
 from utils import machinery as mach
 from utils import parameters as params
 from utils import metabolites as metab
 from utils import functions as func
 from utils.polyA_statistics import calculate_polyA_length
 
+from core.reaction import Expression_Reaction
 from macromolecules.RNA import RNA_fragment, pre_mRNA, mRNA
-# from macromolecules.complex import add_biomass_change
 from macromolecules.macromolecule import Macromolecule
 
 
-# In[2]:
+# In[9]:
 
 
 class express_mrna():
@@ -58,7 +55,8 @@ class express_mrna():
         #+2 for cap
         self.mrna_n.charge += 2#(-self.polyA_length + 2) 
 
-        transcript_processing = cobra.Reaction(self.gene_info.hgnc_id + '_TRANSCRIPTION_PROCESSING')
+        transcript_processing = Expression_Reaction(self.gene_info.hgnc_id + '_TRANSCRIPTION_PROCESSING', 
+                                                    subsystem = 'mRNA_expression', hgnc_id = self.gene_info.hgnc_id)
         rxn = dict()
         
         rxn[metab.atp_n], rxn[metab.ppi_n] = -self.polyA_length, self.polyA_length # polyA tail 
@@ -132,7 +130,8 @@ class express_mrna():
         self.mrna_c = self.mrna_n.change_compartment('c')
 
         # make the transport reaction
-        mrna_export = cobra.Reaction(self.gene_info.hgnc_id + '_mRNA_EXPORTtn')
+        mrna_export = Expression_Reaction(self.gene_info.hgnc_id + '_mRNA_EXPORTtn', subsystem = 'mRNA_expression', 
+                                          hgnc_id = self.gene_info.hgnc_id, synthesis = True, synthesis_type = 'mRNA')
         mrna_export.name = 'mRNA nuclear export'
         rxn = dict()
         rxn[self.mrna_n], rxn[self.mrna_c] = -1, 1
@@ -175,7 +174,9 @@ class express_mrna():
         h_c = [m for m in rxn.keys() if m.id == 'h_c'][0]
 
         if three_to_five: 
-            transcript_degradation_1 = cobra.Reaction(self.gene_info.hgnc_id + "_3'to5'_mRNA_DEGRADATIONc")
+            transcript_degradation_1 = Expression_Reaction(self.gene_info.hgnc_id + "_3'to5'_mRNA_DEGRADATIONc",
+                                                          subsystem = 'mRNA_expression', hgnc_id = self.gene_info.hgnc_id, 
+                                                          sink = True, sink_type = 'mRNA')
             rxn_1 = rxn.copy()
 
             rxn_1[metab.ndp_map_c[self.gene_info.mrna_seq[0]]] = 1
@@ -194,7 +195,9 @@ class express_mrna():
             else:
                 self.reactions.append(transcript_degradation_1)
         if decapping:
-            transcript_degradation_2_decapping = cobra.Reaction(self.gene_info.hgnc_id + "_DECAPPING_mRNA_DEGRADATIONc")
+            transcript_degradation_2_decapping = Expression_Reaction(self.gene_info.hgnc_id + "_DECAPPING_mRNA_DEGRADATIONc", 
+                                                                    subsystem = 'mRNA_expression', hgnc_id = self.gene_info.hgnc_id, 
+                                                                    sink = True, sink_type = 'mRNA')
 
             rxn_2 = rxn.copy()
             rxn_2[[m for m in rxn_2.keys() if m.id == metab.nmp_map_c[self.gene_info.mrna_seq[0]].id][0]] += 1
@@ -225,7 +228,9 @@ class express_mrna():
                     rxn_map[met.id] = met
         rxn = {rxn_map[k]: v for k,v in rxn.items()}
 
-        transcription = cobra.Reaction(self.gene_info.hgnc_id + "_TRANSCRIPTION")
+        transcription = Expression_Reaction(self.gene_info.hgnc_id + "_TRANSCRIPTION", 
+                                           subsystem = 'mRNA_expression', hgnc_id = self.gene_info.hgnc_id, 
+                                           synthesis = True, synthesis_type = 'mRNA')
         transcription.add_metabolites(rxn)
 
         transcription.gene_reaction_rule = ' and '.join(sorted(set([item.id for sublist in [list(r.genes) for r in rxns_to_remove] for item in sublist])))
@@ -236,13 +241,9 @@ class express_mrna():
         for r in rxns_to_remove:
             self.reactions.remove(r)
         self.reactions.append(transcription)
-    
-    def add_subsystem(self):
-        for r in self.reactions:
-            r.subsytem = 'mRNA_expression'
 
 
-# In[3]:
+# In[10]:
 
 
 def get_mrna_expression_reactions(gene_info, compress_mrna = False):
@@ -261,7 +262,6 @@ def get_mrna_expression_reactions(gene_info, compress_mrna = False):
     em.degrade_mrna()
     if compress_mrna:
         em.compress_mrna_module()
-    em.add_subsystem()
 
     return em.reactions, em.mrna_c, em.mrna_deg_proxy 
 

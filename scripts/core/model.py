@@ -24,12 +24,15 @@ from tqdm import tqdm
 
 import sys
 sys.path.insert(1, '../../scripts/')
+from preprocess import parse_complex
 from utils import parameters as params
 from macromolecules.complex import Complex
 from macromolecules.protein import Protein
 from macromolecules.complex import Ribosomal_Complex
 
-from core.reaction import ME_Reaction
+import core
+from core.reaction import Biomass_Reaction, Expression_Reaction, Metabolic_Reaction, Complex_Degradation_Reaction
+
 from me_solver import solve_me
 
 
@@ -81,11 +84,10 @@ class ME_Model(cobra.Model):
                 raise ValueError('m_model must be None or a cobra.Model')
         self.S = None
         self.solver_ = None
-        self.orphan = None
-        self.deorphaned = None
+        self.reaction_types = dict()
         
 
-    def add_reactions(self, reaction_list):
+    def _add_reactions(self, reaction_list):
         """Add reactions to the model.
 
         Reactions with identifiers identical to a reaction already in the
@@ -118,10 +120,10 @@ class ME_Model(cobra.Model):
                 # needs to point to the metabolite in the model.
                 else:
                     # FIXME: Modifying 'private' attributes is horrible.
-                    stoichiometry = reaction._metabolites.pop(metabolite)
+#                     stoichiometry = reaction._metabolites.pop(metabolite) 
                     model_metabolite = self.metabolites.get_by_id(
                         metabolite.id)
-                    reaction._metabolites[model_metabolite] = stoichiometry
+#                     reaction._metabolites[model_metabolite] = stoichiometry 
                     model_metabolite._reaction.add(reaction)
             
             for gene in list(reaction._genes):
@@ -150,6 +152,40 @@ class ME_Model(cobra.Model):
                 raise ValueError('Indexing should be changed')
         
         self._clean_metabolites()
+        
+    def _map_coupled_metabolites(self):      
+        print('Reassign .coupled_metabolites attribute')
+        for r in self.reactions:
+            if hasattr(r, 'coupled_metabolites'):
+                r._map_coupled_metabolites()
+    
+    def _assign_reaction_types(self):
+        self.reaction_types['biomass'] = [r for r in self.reactions if isinstance(r, Biomass_Reaction)]
+        self.reaction_types['metabolism'] = [r for r in self.reactions if isinstance(r, Metabolic_Reaction)]
+        self.reaction_types['expression'] = [r for r in self.reactions if isinstance(r, Expression_Reaction)]
+        self.reaction_types['ribosome_biogenesis'] = [r for r in self.reactions if hasattr(r, 'ribosome_biogenesis') and r.ribosome_biogenesis]
+        self.reaction_types['ubiquitin_biogenesis'] = [r for r in self.reactions if hasattr(r, 'ubiquitin_biogenesis') and r.ubiquitin_biogenesis]
+        
+        self.reaction_types['synthesis'] = {'protein': [], 'mRNA': [], 'complex': []}
+        for r in self.reactions:
+            if hasattr(r, 'synthesis') and r.synthesis:
+                self.reaction_types['synthesis'][r.synthesis_type] += [r]
+#         self.reaction_types['synthesis'] = [r for r in self.reactions if hasattr(r, 'synthesis') and r.synthesis]
+        
+        self.reaction_types['sink'] = {'protein': [], 'mRNA': [], 'complex': []}
+        for r in self.reactions:
+            if hasattr(r, 'sink') and r.sink:
+                self.reaction_types['sink'][r.sink_type] += [r]
+            self.reaction_types['synthesis'] = {'protein': [], 'mRNA': [], 'complex': []}
+#         self.reaction_types['final_degradation'] = [r for r in self.reactions if hasattr(r, 'sink') and r.sink]
+        
+        self.reaction_types['coupled'] = [r for r in self.reactions if hasattr(r, 'coupled_metabolites') and r.coupled_metabolites != dict()]
+        
+    def add_reactions(self, reaction_list):
+        self._add_reactions(reaction_list)
+        self._map_coupled_metabolites()
+        self._assign_reaction_types()
+        
     
     def remove_reactions(self, reactions, remove_orphans=True):
         """Remove reactions from the model.
@@ -225,7 +261,7 @@ class ME_Model(cobra.Model):
         """
 
         if array_type not in ['sympy', 'numpy', 'pandas']:
-            raise ValueError('Incorrect array type specified')
+                raise ValueError('Incorrect array type specified')
         if array_type != 'sympy' and mu_val is None:
             raise ValueError('Must specify a mu_val for non-sympy matrices')
         if array_type == 'sympy' and mu_val is not None:
@@ -240,19 +276,19 @@ class ME_Model(cobra.Model):
 
         m_ind = self.metabolites.index
         r_ind = self.reactions.index
-        
+
         if array_type == 'sympy':
             for reaction in self.reactions:
                 for metabolite, stoich in iteritems(reaction.metabolites):
                     array[m_ind(metabolite), r_ind(reaction)] = stoich
         else:
             for reaction in self.reactions:
-                reaction_type = isinstance(reaction, ME_Reaction) and reaction.type != ['biomass']
+        #             reaction_type = isinstance(reaction, core.reaction.ME_Reaction)
                 for metabolite, stoich in iteritems(reaction.metabolites):
-                    if reaction_type and isinstance(stoich, sympy.Expr):
-                        array[m_ind(metabolite), r_ind(reaction)] = float(stoich.subs(params.mu, mu_val))
+                    if isinstance(stoich, sympy.Expr):
+                        array[m_ind(metabolite.id), r_ind(reaction)] = float(stoich.subs(params.mu, mu_val))
                     else:
-                        array[m_ind(metabolite), r_ind(reaction)] = stoich
+                        array[m_ind(metabolite.id), r_ind(reaction)] = stoich
 
         if array_type == 'pandas':
             metabolite_ids = [met.id for met in self.metabolites]
@@ -463,91 +499,165 @@ class ME_Model(cobra.Model):
     def check_me_mass_balance(self):
         '''Checks that all reactions in ME Model are mass balance. Use after self.add_reactions'''
         print('Check reaction mass balances')
-        metabolic_reactions = [r.id for r in self.m_model.reactions]
 
-        # strange exception ------
-        exception = 'HGNC:9479_DEGRADATIONm' 
-        check = [r for r in self.reactions if r.id != exception]
-        if len([r for r in self.reactions if r.id == exception][0].check_mass_balance(tol = 1e-14))>0:
-            err = True
-        #---------------
+        for r in self.reactions:
+            if len(r.check_mass_balance())>0:
 
-        err = False
-        for r in tqdm(check):
-            if r.subsystem != 'Ribosome_Biogenesis' and r.subsystem != '':
-                if isinstance(r, ME_Reaction):
-                    if r.cobra_id is None and len(r.check_mass_balance())>0 and r.type != ['biomass']:
-                        err = True
-                        break
-                    elif r.cobra_id is not None:
-                        ogr = self.m_model.reactions.get_by_id(r.cobra_id).copy()
-                        if (len([k for k in ogr.metabolites.keys() if k.elements is None]) == 0) and (r.check_mass_balance() != ogr.check_mass_balance()):
-                            err = True
-                            break
+                # account for instances when the original metabolic reaction is unbalances 
+                bool1 = isinstance(r, Metabolic_Reaction)
+                if bool1:
+                    # account for instances when the ME_Reaction version of reversible reactions
+                    if self.m_model.reactions.get_by_id(r.cobra_id).reversibility and r.id.endswith('_R'): # account for reversible reactions
+                        bool1 = self.m_model.reactions.get_by_id(r.cobra_id).check_mass_balance() == {e: -c for e,c in r.check_mass_balance().items()}
+                    else:
+                        bool1 = r.check_mass_balance() == self.m_model.reactions.get_by_id(r.cobra_id).check_mass_balance()
                 else:
-                    if r.id in metabolic_reactions:
-                        ogr = self.m_model.reactions.get_by_id(r.id).copy()
-                        if (len([k for k in ogr.metabolites.keys() if k.elements is None]) == 0) and (r.check_mass_balance() != ogr.check_mass_balance()):
-                            err = True
-                    elif len(r.check_mass_balance())>0:
-                        err = True
-            if err:
-                raise ValueError('Not all expression module reactions are mass balanced') 
-            
-    def check_coupling(self):
-        '''Checks that all reactions in ME Model received appropriate machinery. Use after self.add_reactions'''
-        print('Check correct coupling of metabolic machinery')
-        dummy = 'HGNC:DUMMY_folded_protein_c' in [m.id for m in self.metabolites]
-        test_reactions = [r for r in self.reactions if not r.lower_bound == r.upper_bound == 0]
+                    bool1 = False
+
+                bool2 = isinstance(r, Biomass_Reaction)
+                if not (bool1 or bool2):
+                    raise ValueError('Atleast one reaction is not mass balanced')
+    
+    def _check_complete_reactions(self):
+        '''Checks that all the original metabolic model reactions have been included in the ME-Model'''
+        if len(set([r.id for r in self.m_model.reactions]).difference([r.cobra_id for r in self.reaction_types['metabolism']]))>0:
+            raise ValueError('Not all the original metabolic model reactions have been included in the ME-Model')
 
 
+    def _check_coupling(self, orphan = None, knock_out = list(), additional_ko = list()):
+        '''Checks that all reactions have received appropriate machinery (compares coupled metabolites to GPR)
+        
+        Parameters
+        ----------
+        orphan: list
+            List of reaction IDs in model for reactions that are not expected to have any machinery
+            Defaults to self.reaction_types['orphan']
+        knock_out: list
+            List of HGNC IDs of knocked out genes
+        additional_ko: list
+             a list of HGNC IDs for genes that were not explicitly knocked-out, but were only involved in catalysis of 
+            reactions catalyzed by a complex which contains another gene that was knocked-out
+            this list is generated in build_me_model/me_builder
+        
+        '''
+        print('Make sure all reactions received correct coupled machinery')
+        
+        # set arguments
+        if orphan is None:
+            if not 'orphan' in self.reaction_types:
+                raise ValueError('Must specify a list of orphan reaction IDs')
+            orphan = self.reaction_types['orphan']
+        if knock_out is None:
+            knock_out = list()
+        if additional_ko is None:
+            additional_ko = list()
+        
+        # define list of ribosomal protein hgnc ids
+        rbps = ['HGNC:10404', 'HGNC:10420', 'HGNC:10421', 'HGNC:10424', 'HGNC:10425', 'HGNC:18501', 'HGNC:10426', 
+        'HGNC:10429', 'HGNC:10440', 'HGNC:10441', 'HGNC:10442', 'HGNC:10383', 'HGNC:10384', 'HGNC:10385', 
+        'HGNC:10386', 'HGNC:10387', 'HGNC:10388', 'HGNC:10389', 'HGNC:10396', 'HGNC:10397', 'HGNC:10401', 
+        'HGNC:10402', 'HGNC:10405', 'HGNC:10409', 'HGNC:10410', 'HGNC:10411', 'HGNC:10413', 'HGNC:10414', 
+        'HGNC:10416', 'HGNC:18476', 'HGNC:10418', 'HGNC:10419', 'HGNC:3597', 'HGNC:10417', 'HGNC:10304', 
+        'HGNC:10306', 'HGNC:10368', 'HGNC:10307', 'HGNC:10330', 'HGNC:10305', 'HGNC:10369', 'HGNC:10302', 
+        'HGNC:10359', 'HGNC:10311', 'HGNC:10298', 'HGNC:10371', 'HGNC:10299', 'HGNC:10349', 'HGNC:10372', 
+        'HGNC:10364', 'HGNC:10350', 'HGNC:21370', 'HGNC:10312', 'HGNC:10331', 'HGNC:10315', 'HGNC:10313', 
+        'HGNC:10325', 'HGNC:10348', 'HGNC:10332', 'HGNC:10327', 'HGNC:10354', 'HGNC:10317', 'HGNC:10301', 
+        'HGNC:10333', 'HGNC:10351', 'HGNC:12458', 'HGNC:17050', 'HGNC:10334', 'HGNC:17976', 'HGNC:10328', 
+        'HGNC:10340', 'HGNC:10360', 'HGNC:17094', 'HGNC:10316', 'HGNC:10377', 'HGNC:10345', 'HGNC:13631', 
+        'HGNC:10362', 'HGNC:10329', 'HGNC:10346', 'HGNC:10344', 'HGNC:10363', 'HGNC:10336', 'HGNC:10347', 
+        'HGNC:10353']
+
+
+        test_reactions = [r for r in self.reactions if not r.id in orphan]
         for r in tqdm(test_reactions):
-            if isinstance(r, ME_Reaction):
-                if r.type != ['biomass']:
-                    if r.cobra_id is not None: 
-                        r_ = self.m_model.reactions.get_by_id(r.cobra_id) # metabolic reactions
-                    else:
-                        r_ = r # non-metabolic reactions
+            if isinstance(r, Metabolic_Reaction):
+                r_ = self.m_model.reactions.get_by_id(r.cobra_id).copy()
+            else: # Expression_Reaction
+                r_ = r.copy()
 
-                    machinery = [m for m,v in r.coupled_metabolites.items() if v == 'catalysis']
-                    if len(machinery) > 1 and not (r.id.endswith('_COMPLEX_PROTEASOMAL_DEGRADATIONc')):
-                        raise ValueError('Unexpected coupling of multiple machinery: ' + r.id)
-                    if not dummy:
-                        if (len(r.genes) == 0 and len(machinery) > 0) or (len(r.genes) > 0 and len(machinery) == 0):
-                            raise ValueError('Unexpected addition/lack of machinery: ' + r.id)
-                    else:
-                        if len(machinery) != 1 and not r.id.endswith('_COMPLEX_PROTEASOMAL_DEGRADATIONc'):
-                            raise ValueError('Unexpected number of machinery coupled: ' + r.id)
-                        machinery = machinery[0]
-                        if ((len(r_.genes) == 0) and (machinery.id != 'HGNC:DUMMY_folded_protein_c')) or ((len(r_.genes) > 0) and (machinery.id == 'HGNC:DUMMY_folded_protein_c')):
-                            raise ValueError('(A) Incorrect machinery coupled: ' + r.id)
-
-                    if len(r.genes)>0:
-                        if type(machinery) == list:
-                            if len(machinery) != 1 and not r.id.endswith('_COMPLEX_PROTEASOMAL_DEGRADATIONc'):
-                                raise ValueError('Unexpected number of machinery coupled: ' + r.id)
-                            else:
-                                machinery = machinery[0]
-
-                        mach_me = [p for p in machinery.decompose_complex() if p.type == 'protein' or p.type == 'dummy_protein'] if isinstance(machinery, Complex) else [machinery]
-                        mach_me = [m.id.split('_')[0] for m in mach_me]
-                        mach_m = [g.id for g in list(r_.genes)]
-                        if 'ribosome' in mach_m:
-                            mach_m.remove('ribosome')
-                            mach_m += [p.id.split('_')[0] for p in self.metabolites.get_by_id('mature_ribosome_complex_c').decompose_complex() if isinstance(p, Protein)]
-
-                        if (len(set(mach_me).difference(mach_m)) > 0) or (len(set(mach_me).intersection(mach_m)) == 0):
-                            raise ValueError('(B) Incorrect machinery coupled: ' + r.id)
-                else:
-                    pass
+            if 'or' in r_.gene_reaction_rule and 'and' in r_.gene_reaction_rule:
+                expected_machinery = parse_complex.eval_complex(r_.gene_reaction_rule)
+            elif len(r_.genes) == 0:
+                expected_machinery = []        
             else:
-                if len(r.genes) > 0:
-                    raise ValueError('Uncoupled reaction: ' + r.id)
+                expected_machinery = [g.id for g in r_.genes]
+                if 'and' in r_.gene_reaction_rule:
+                    expected_machinery = [expected_machinery]
+
+            ko = False
+
+            expected_machinery2 = list()
+            for em in expected_machinery:
+                if type(em) == list:
+                    expected_machinery2 += em
                 else:
-                    if dummy and r.id not in self.orphan:
-                        raise ValueError('Dummy protein did not couple: ' + r.id)
+                    expected_machinery2.append(em)
+
+            if len(set(expected_machinery2).difference(knock_out + additional_ko)) == 0:
+                ko = True
+
+            if (not hasattr(r, 'coupled_metabolites') or 'catalysis' not in r.coupled_metabolites.values()) and not ko:
+                raise ValueError('Reaction does not have a record of coupled machinery: ' + r.id)
+            actual_machinery = [m for m,v in r.coupled_metabolites.items() if v == 'catalysis']
+
+
+            if len(actual_machinery) > 0:
+                translation = isinstance(actual_machinery[0], Ribosomal_Complex)
+                ribosomal_degradation = (len(actual_machinery) == 2)
+            else:
+                translation = False
+                ribosomal_degradation = False
+            if not ko:
+                if not (translation or ribosomal_degradation): 
+                    # get complex or protein machinery information
+                    cplx = False
+                    if isinstance(actual_machinery[0], Complex):
+                        cplx = True
+                        am = list()
+                        for p in actual_machinery[0].decompose_complex():
+                            if p.type != 'protein':
+                                raise ValueError('Non-proteins in complex machinery for ' + r.id)
+                            else:
+                                am.append(p.id.split('_')[0])
+                        actual_machinery = sorted(am)
+
+                    # check that machinery matches
+                    if len(expected_machinery) > 0: # non-dummy
+                        err = True
+                        for rm in expected_machinery:
+                            if type(rm) != list: 
+                                if not cplx and actual_machinery[0].id.split('_')[0] == rm:
+                                    err = False
+                            else:
+                                if cplx and sorted(rm) == actual_machinery:
+                                    err = False
+                        if err:
+                            if expected_machinery != knock_out:
+                                raise ValueError('Machinery mismatch for ' + r.id)
                     else:
-                        pass
+                        if len(actual_machinery) > 1 or actual_machinery[0].type != 'dummy_protein': # dummy
+                            raise ValueError('Non-dummy protein coupled to deorphaned reaction')
+                elif ribosomal_degradation:
+                    am = list()
+                    for am_ in actual_machinery:
+                        for p in am_.decompose_complex():
+                            if p.type != 'protein':
+                                raise ValueError('Non-proteins in complex machinery for ' + r.id)
+                            else:
+                                am.append(p.id.split('_')[0])
+                    actual_machinery = sorted(am)
+                    if sorted(expected_machinery[0]) != actual_machinery:
+                        raise ValueError('Incorrect machinery for ribosomal degradation: ' + r.id)
+                elif translation:
+                    actual_machinery = sorted([p.id.split('_')[0] for p in actual_machinery[0].decompose_complex() if p.type == 'protein'])
+                    expected_machinery = sorted([p for p in expected_machinery[0] if p != 'ribosome'] + rbps)
+                    if actual_machinery != expected_machinery:
+                        raise ValueError('Incorrect machinery for translation: ' + r.id)
+                else:
+                    raise ValueError('Unaccounted for reaction criteria')
+    
+
+
 
     def check_enzymes(self, _additional_ko = list()):
         '''Makes sure all genes being expressed participate in a catalysis reaction (no unecessary expression reactions)
@@ -572,29 +682,38 @@ class ME_Model(cobra.Model):
                     complexes.append(m)
                     if m.enzyme:
                         active_complexes.append(m)
-
-        complexes = [m for m in complexes if not isinstance(m, Ribosomal_Complex)]
-        subsystems = set(flatten_list([[r.subsystem for r in self.metabolites.get_by_id(m.id).reactions] for m in set(complexes).difference(active_complexes)]))
-        if len(subsystems.difference({'Complex_Degradation', 'Ribosome_Biogenesis'})) > 0:
+        # check complexes                
+        complexes = [m for m in complexes if not (isinstance(m, Ribosomal_Complex) or '_polyub_complex_' in m.id                                          or np.all([isinstance(r_, Complex_Degradation_Reaction) for r_ in m.reactions]))]
+        if len(list(set(complexes).difference(active_complexes)))>0:
             raise ValueError('Unexpected inclusion of inactive complexes')
 
+
+        # check monomers
         active_proteins += flatten_list([[p.id for p in m.decompose_complex()] for m in active_complexes])
-        active_proteins = list(set([i.split('_')[0] if 'HGNC' in i else i for i in active_proteins]))
+        active_proteins = list(set([i.split('_')[0] if i.startswith('HGNC') else i for i in active_proteins]))
         proteins = set([i.split('_')[0] if 'HGNC' in i else i for i in proteins])
         proteins = [i for i in proteins if 'ubiquitin' not in i]
         if len(set(proteins).difference(active_proteins + _additional_ko).difference({'HGNC:12463', 'HGNC:12468'}))>0:
             raise ValueError('Unexpected inclusion of inactive protein monomers')
     
-    def check(self, _additional_ko = list()):
+    def check(self, orphan = None, knock_out = list(), _additional_ko = list()):
         '''Check reaction coupling and mass balance
         
-        Paramaters
+        Parameters
         ----------
+        orphan: list
+            List of reaction IDs in model for reactions that are not expected to have any machinery
+            Defaults to self.reaction_types['orphan']
+        knock_out: list
+            List of HGNC IDs of knocked out genes
         additional_ko: list
-            see model.check_enzymes()
+             a list of HGNC IDs for genes that were not explicitly knocked-out, but were only involved in catalysis of 
+            reactions catalyzed by a complex which contains another gene that was knocked-out
+            this list is generated in build_me_model/me_builder
         '''
+        self._check_complete_reactions
         self.check_me_mass_balance()
-        self.check_coupling()
+        self._check_coupling(orphan = orphan, knock_out = knock_out, additional_ko = _additional_ko)
         self.check_enzymes(_additional_ko = _additional_ko)
 
     def pickle(self, file = os.path.join(os.path.abspath(os.getcwd()), 'me_model.pickle')):

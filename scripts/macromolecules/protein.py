@@ -50,7 +50,9 @@ class Protein(Macromolecule):
         if id_ is None:
             raise ValueError('Unaccounted for condition in protein id naming')
         
+        self.hgnc_id = None
         if gene_info is not None:
+            self.hgnc_id = gene_info.hgnc_id
             # for degradation
             self.length = gene_info.L_protein
             self._amino_acid_counts = gene_info.amino_acid_counts
