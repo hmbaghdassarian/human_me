@@ -34,6 +34,7 @@ import core
 from core.reaction import Biomass_Reaction, Expression_Reaction, Metabolic_Reaction, Complex_Degradation_Reaction
 
 from me_solver import solve_me
+# obj_type = type
 
 
 # In[ ]:
@@ -153,17 +154,22 @@ class ME_Model(cobra.Model):
         
         self._clean_metabolites()
         
-    def _map_coupled_metabolites(self):      
-        print('Reassign .coupled_metabolites attribute')
+    def _map_coupled_metabolites(self, verbose = False):
+        '''Reassigns metabolite object to the .coupled_metabolites attribute of the reaction
+        to ensure that the metaboltie object is the most up to date version'''
+        
+        if verbose:
+            print('Reassign .coupled_metabolites attribute')
         for r in self.reactions:
             if hasattr(r, 'coupled_metabolites'):
                 r._map_coupled_metabolites()
     
     def _assign_reaction_types(self):
+        '''Organize reactions into their various categories. There will be overlap between the lists'''
+        
         self.reaction_types['biomass'] = [r.id for r in self.reactions if isinstance(r, Biomass_Reaction)]
         self.reaction_types['metabolism'] = [r.id for r in self.reactions if isinstance(r, Metabolic_Reaction)]
-        self.reaction_types['coupled'] = [r.id for r in self.reactions if hasattr(r, 'coupled_metabolites') and r.coupled_metabolites != dict()]
-
+        
 
         # get and initialize expression reactions
         expression_reactions = [r for r in self.reactions if isinstance(r, Expression_Reaction)]
@@ -184,10 +190,12 @@ class ME_Model(cobra.Model):
             if hasattr(r, 'ubiquitin_biogenesis') and r.ubiquitin_biogenesis:
                 self.reaction_types['expression']['ubiquitin_biogenesis'] += [r.id]
                 
+        self.reaction_types['coupled'] = [r.id for r in self.reactions if hasattr(r, 'coupled_metabolites') and r.coupled_metabolites != dict()]
+                
         
-    def add_reactions(self, reaction_list):
+    def add_reactions(self, reaction_list, verbose = False):
         self._add_reactions(reaction_list)
-        self._map_coupled_metabolites()
+        self._map_coupled_metabolites(verbose = verbose)
         self._assign_reaction_types()
         
     
@@ -528,6 +536,19 @@ class ME_Model(cobra.Model):
             raise ValueError('Not all the original metabolic model reactions have been included in the ME-Model')
 
 
+    def _check_reaction_hgncs(self):
+        '''Checks that all reactions that are expected to have an assigned hgnc_id, do'''
+        
+        bool1 = len([r for r in self.reactions if not hasattr(r, 'hgnc_id') and not (isinstance(r, Biomass_Reaction) or isinstance(r, Metabolic_Reaction))]) > 0
+
+        no_hgnc = [r for r in self.reactions if type(r) == Expression_Reaction and r.hgnc_id is None]
+        no_hgnc = [r for r in no_hgnc if (r.subsystem not in ['tRNA_Biogenesis', 'rRNA_expression', 'Complex_Formation', 
+                    'Complex_Degradation']) and (hasattr(r, 'ubiquitin_biogenesis') and not r.ubiquitin_biogenesis)]
+        bool2 = len(no_hgnc)>0
+
+        if bool1 or bool2:
+            raise ValueError('An expression reaction does not have an hgnc_id')
+            
     def _check_coupling(self, orphan = None, knock_out = list(), additional_ko = list()):
         '''Checks that all reactions have received appropriate machinery (compares coupled metabolites to GPR)
         
@@ -715,7 +736,8 @@ class ME_Model(cobra.Model):
             reactions catalyzed by a complex which contains another gene that was knocked-out
             this list is generated in build_me_model/me_builder
         '''
-        self._check_complete_reactions
+        self._check_complete_reactions()
+        self._check_reaction_hgncs()
         self.check_me_mass_balance()
         self._check_coupling(orphan = orphan, knock_out = knock_out, additional_ko = _additional_ko)
         self.check_enzymes(_additional_ko = _additional_ko)
