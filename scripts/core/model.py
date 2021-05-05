@@ -26,6 +26,7 @@ import sys
 sys.path.insert(1, '../../scripts/')
 from preprocess import parse_complex
 from utils import parameters as params
+from macromolecules.macromolecule import Macromolecule
 from macromolecules.complex import Complex
 from macromolecules.protein import Protein
 from macromolecules.complex import Ribosomal_Complex
@@ -536,9 +537,10 @@ class ME_Model(cobra.Model):
             raise ValueError('Not all the original metabolic model reactions have been included in the ME-Model')
 
 
-    def _check_reaction_hgncs(self):
-        '''Checks that all reactions that are expected to have an assigned hgnc_id, do'''
+    def _check_hgncs(self):
+        '''Checks that all reactions and macromolecules that are expected to have an assigned hgnc_id, do'''
         
+        # reactions
         bool1 = len([r for r in self.reactions if not hasattr(r, 'hgnc_id') and not (isinstance(r, Biomass_Reaction) or isinstance(r, Metabolic_Reaction))]) > 0
 
         no_hgnc = [r for r in self.reactions if type(r) == Expression_Reaction and r.hgnc_id is None]
@@ -548,6 +550,14 @@ class ME_Model(cobra.Model):
 
         if bool1 or bool2:
             raise ValueError('An expression reaction does not have an hgnc_id')
+        
+        # macromolecules
+        fragments = ['3_trailer', '5_leader', 'ets', 'its']
+        exceptions = ['ubiquitin_monomer_protein_c', 'cleaved_polyubiquitin_moiety_protein_c', 
+                      'ubiquitin_monomer_protein_n', 'cleaved_polyubiquitin_moiety_protein_n']
+        hgnc_id_metabs = [m for m in self.metabolites if isinstance(m, Macromolecule) and m.hgnc_id is None and                 m.type not in ['trna', 'rrna', 'complex'] and                   not m.id.endswith('COMPLEX_enzyme_deg_proxy') and                  not (hasattr(m, 'fragment_type') and m.fragment_type in fragments) and                  not m.id in exceptions]
+        if len(hgnc_id_metabs)>0:
+            raise ValueError('Some macromolecules did not get an HGNC ID assigned')
             
     def _check_coupling(self, orphan = None, knock_out = list(), additional_ko = list()):
         '''Checks that all reactions have received appropriate machinery (compares coupled metabolites to GPR)
@@ -737,7 +747,7 @@ class ME_Model(cobra.Model):
             this list is generated in build_me_model/me_builder
         '''
         self._check_complete_reactions()
-        self._check_reaction_hgncs()
+        self._check_hgncs()
         self.check_me_mass_balance()
         self._check_coupling(orphan = orphan, knock_out = knock_out, additional_ko = _additional_ko)
         self.check_enzymes(_additional_ko = _additional_ko)

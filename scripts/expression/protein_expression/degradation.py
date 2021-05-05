@@ -54,7 +54,8 @@ def protein_polyubiquitination(macromolecule, **kwargs):
                 polyu_protein_aa_counts[aa_code] = aa_counts*params.n_ub
         polyub_macromolecule = Protein(id_ = '_'.join(macromolecule.id.split('_')[:-1]) + '_polyub', 
                                        compartment = cmap[macromolecule.compartment],
-                           amino_acid_counts = polyu_protein_aa_counts) 
+                           amino_acid_counts = polyu_protein_aa_counts)
+        polyub_macromolecule.hgnc_id = macromolecule.hgnc_id
         if macromolecule.compartment == 'pm':
             polyub_macromolecule.change_compartment('pm')
     else:
@@ -95,6 +96,8 @@ def proteasomal_degradation(macromolecule, **kwargs):
     if macromolecule.compartment not in ['c', 'n']:
         raise ValueError(macromolecule.id + ': Only proteins/complexes in nucleus and cytosol are considered for proteasomal degradation')
     r_id = macromolecule.id if macromolecule.type == 'protein' else macromolecule._deg_id
+    
+    
     #------------------------------deubiquitination------------------------------------  
     deubiquitination = deg_reaction_map[macromolecule.type](r_id + '_DEUBIQUITINATION' + macromolecule.compartment, 
                                                            hgnc_id = macromolecule.hgnc_id)
