@@ -176,6 +176,7 @@ class ME_Model(cobra.Model):
         expression_reactions = [r for r in self.reactions if isinstance(r, Expression_Reaction)]
         self.reaction_types['expression'] = {'all': [r.id for r in expression_reactions]}
         self.reaction_types['expression']['synthesis'] = {'protein': [], 'mRNA': [], 'complex': []}
+        self.reaction_types['expression']['translation'] = list()
         self.reaction_types['expression']['sink'] = {'protein': [], 'mRNA': [], 'complex': []}
         self.reaction_types['expression']['ribosome_biogenesis'] = list()
         self.reaction_types['expression']['ubiquitin_biogenesis'] = list()
@@ -186,6 +187,8 @@ class ME_Model(cobra.Model):
                 self.reaction_types['expression']['synthesis'][r.synthesis_type] += [r.id]
             if r.sink:
                 self.reaction_types['expression']['sink'][r.sink_type] += [r.id]
+            if hasattr(r, 'translation') and r.translation:
+                self.reaction_types['expression']['translation'] += [r.id]
             if hasattr(r, 'ribosome_biogenesis') and r.ribosome_biogenesis:
                 self.reaction_types['expression']['ribosome_biogenesis'] += [r.id]
             if hasattr(r, 'ubiquitin_biogenesis') and r.ubiquitin_biogenesis:

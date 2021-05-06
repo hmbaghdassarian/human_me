@@ -264,6 +264,9 @@ class Expression_Reaction(ME_Reaction):
                  synthesis = False, synthesis_type = None, sink = False, sink_type = None,
                  ubiquitin_biogenesis = False, ribosome_biogenesis = False):
         '''
+        
+        Parameters
+        ----------
         subystem: str
             one of 'tRNA_Biogenesis', 'rRNA_expression', 'mRNA_expression', 'Protein_Expression', 'Protein_Degradation', 'Complex_Formation', 'Complex_Degradation'
         synthesis: bool
@@ -272,9 +275,18 @@ class Expression_Reaction(ME_Reaction):
         synthesis_type: str
             one of ['mRNA', 'protein', 'complex']
             if synthesis is True, the type of macromolecule being synthesized should also be specified
+                *for mRNA, the synthesis reaction is coupled to its respective protein translation reaction
+                *for proteins and complexes, the synthesis reaction is the final reaction producing the enzyme which 
+                will be coupled to the metabolic catalysis reaction
         sink: bool 
             whether the reaction represents the "main" sink/degradation for the macromolecule
             intended for use with genes (reactions with an associated hgnc id, and complexes)
+            
+                *for mRNA, the degradation reaction will be coupled to the protein translation reaction
+                *for proteins and complexes, the degradation reaction will be coupled to the respective
+                metabolic catalysis reaction
+                *exceptions are synthesis and sink of reactions in ubiquitin_biogenesis (True); these are 
+                assigned as synthesis and sink to track ubiquitin, but are not themselves coupled to anything
         sink_type: str
             one of ['mRNA', 'protein', 'complex']
             if sink True, the type of macromolecule being degraded should also be specified
@@ -309,6 +321,40 @@ class Expression_Reaction(ME_Reaction):
             self.sink_type = sink_type
             
         self.ribosome_biogenesis = ribosome_biogenesis
+
+class Protein_Expression_Reaction(Expression_Reaction):
+    '''Inherited from Expression_Reaction, specifies the protein expression reactions in the model'''
+    
+    def __init__(self,  id, name='', lower_bound=0.0, upper_bound=None, 
+                hgnc_id = None, translation = False, synthesis = False, 
+                 ubiquitin_biogenesis = False, ribosome_biogenesis = False):
+        '''
+        
+        Parameters
+        ----------
+        translation: bool
+            whether the reaction represents the "main" synthesis/production for the protein 
+            represents coupling of initial protein product to mRNA (mRNA-->protein coupling)
+        synthesis: bool
+            whether the reaction represents the "main" synthesis/production of an enzyme 
+            that will be coupled to a metabolic reaction as a monomer 
+        ubiquitin_biogenesis: bool
+            whether the Expression_Reaction is part of ubiquitin_biogenesis reactions, only used to ignore hgnc_id is None
+        ribosome_biogenesis: bool
+            whether the Expression_Reaction is part of ribosome_biogenesis reactions, only used to ignore hgnc_id is None
+        '''
+
+        synthesis_type = None
+        if synthesis:
+            synthesis_type = 'protein'
+        super().__init__(id=id, 
+                         name=name, lower_bound=lower_bound, upper_bound=upper_bound, hgnc_id = hgnc_id, 
+                         synthesis = synthesis, synthesis_type = synthesis_type,
+                         ubiquitin_biogenesis = ubiquitin_biogenesis, ribosome_biogenesis = ribosome_biogenesis,
+                         sink = False, sink_type = None, subsystem='Protein_Expression')
+        self.translation = translation
+        
+        
 
 
 class Protein_Degradation_Reaction(Expression_Reaction):

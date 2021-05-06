@@ -10,7 +10,7 @@ from utils import machinery as mach
 from utils import parameters as params
 from utils import metabolites as metab
 from utils import functions as func
-from core.reaction import Expression_Reaction
+from core.reaction import Protein_Expression_Reaction
 
 from macromolecules.protein import Protein
 from expression.protein_expression import cytosolic_translation as c_trln
@@ -30,8 +30,8 @@ def fold_protein_cytosolic(gene_info, unfolded_protein_c):
     folded_protein_c = unfolded_protein_c.copy()
     folded_protein_c.id = folded_protein_c.id.replace('unfolded', 'folded')
     rxn = {unfolded_protein_c: -1, folded_protein_c: 1}
-    protein_folding = Expression_Reaction(gene_info.hgnc_id + '_CYTOSOLIC_PROTEIN_FOLDING', 
-                                         subsystem = 'Protein_Expression', hgnc_id = gene_info.hgnc_id)
+    protein_folding = Protein_Expression_Reaction(gene_info.hgnc_id + '_CYTOSOLIC_PROTEIN_FOLDING', 
+                                         hgnc_id = gene_info.hgnc_id)
     
     if gene_info.L_protein > 100: #chaperone assisted for larger proteins - https://www.nature.com/articles/nature10317
         rxn = func.hydrolyze_atp(rxn, n_atp = gene_info.L_protein*params.proteolysis_translocation_atp_cost, compartment = 'c')
@@ -51,7 +51,7 @@ def transport_nuclear_protein(gene_info, folded_protein_c):
 
     folded_protein_n = folded_protein_c.change_compartment('n')
 
-    nuclear_import = Expression_Reaction(gene_info.hgnc_id + '_IMPORTtn', subsystem = 'Protein_Expression', hgnc_id = gene_info.hgnc_id)
+    nuclear_import = Protein_Expression_Reaction(gene_info.hgnc_id + '_IMPORTtn', hgnc_id = gene_info.hgnc_id)
     nuclear_import.subsytem = 'Protein_Expression'
     
     import_rxn = {folded_protein_c: -1, folded_protein_n: 1}
@@ -89,7 +89,7 @@ def transport_mitochondrial_matrix(gene_info, unfolded_protein_c):
     if unfolded_protein_c.compartment != 'c':
         raise ValueError('Only cytoplasmic proteins can be transported to mitochondrial matrix')
     
-    mitochondrial_matrix_transport = Expression_Reaction(gene_info.hgnc_id + '_IMPORTtm', subsystem = 'Protein_Expression', hgnc_id = gene_info.hgnc_id)
+    mitochondrial_matrix_transport = Protein_Expression_Reaction(gene_info.hgnc_id + '_IMPORTtm', hgnc_id = gene_info.hgnc_id)
     mitochondrial_matrix_transport.subsytem = 'Protein_Expression'
     pre_protein_m = unfolded_protein_c.change_compartment('m')
     pre_protein_m.id = pre_protein_m.id.replace('unfolded', 'folded_pre')
@@ -119,7 +119,7 @@ def transport_mitochondrial_inter(gene_info, processed_protein_m):
     if processed_protein_m.compartment != 'm':
         raise ValueError('Only the mechanism of mitochondrial matrix import and re-export to inter membrane is considered')
     
-    mitochondrial_inter_transport = Expression_Reaction(gene_info.hgnc_id + '_IMPORTti', subsystem = 'Protein_Expression', hgnc_id = gene_info.hgnc_id)
+    mitochondrial_inter_transport = Protein_Expression_Reaction(gene_info.hgnc_id + '_IMPORTti', hgnc_id = gene_info.hgnc_id)
     mitochondrial_inter_transport.subsytem = 'Protein_Expression'
     pre_protein_i = processed_protein_m.change_compartment('i')
     
@@ -174,7 +174,7 @@ def transport_peroxisome(gene_info, folded_protein_c):
     if folded_protein_c.compartment != 'c':
         raise ValueError('Only cytoplasmic proteins can be transported to mitochondrial matrix')
     
-    peroxisomal_transport = Expression_Reaction(gene_info.hgnc_id + '_IMPORTtx', subsystem = 'Protein_Expression', hgnc_id = gene_info.hgnc_id)
+    peroxisomal_transport = Protein_Expression_Reaction(gene_info.hgnc_id + '_IMPORTtx', hgnc_id = gene_info.hgnc_id)
     peroxisomal_transport.subsytem = 'Protein_Expression'
     folded_protein_x = folded_protein_c.change_compartment('x')
     
@@ -221,8 +221,8 @@ def post_translational_translocation(gene_info, unfolded_protein_c):
     rxn = func.hydrolyze_atp(rxn, n_atp = 1, compartment = 'c')
     
     if gene_info.tmd > 0 or 'pm' in gene_info.final_locations.keys(): # membrane secreted protein
-        post_translational_translocation_r = Expression_Reaction(gene_info.hgnc_id + '_post_TRANSLOC_3A_IMPORTtr', 
-                                                                 subsystem = 'Protein_Expression', hgnc_id = gene_info.hgnc_id)
+        post_translational_translocation_r = Protein_Expression_Reaction(gene_info.hgnc_id + '_post_TRANSLOC_3A_IMPORTtr', 
+                                                                 hgnc_id = gene_info.hgnc_id)
         post_translational_translocation_r.subsytem = 'Protein_Expression'
         post_translational_translocation_r.gene_reaction_rule = ' and '.join(mach.ASNA1 + mach.WRB)
         
@@ -232,8 +232,8 @@ def post_translational_translocation(gene_info, unfolded_protein_c):
      
     else: #non membrane secreted protein
         number_BiP = gene_info.L_protein/40
-        post_translational_translocation_r = Expression_Reaction(gene_info.hgnc_id + '_post_TRANSLOC_3B_IMPORTtr', 
-                                                                 subsystem = 'Protein_Expression', hgnc_id = gene_info.hgnc_id)
+        post_translational_translocation_r = Protein_Expression_Reaction(gene_info.hgnc_id + '_post_TRANSLOC_3B_IMPORTtr', 
+                                                                 hgnc_id = gene_info.hgnc_id)
         post_translational_translocation_r.subsytem = 'Protein_Expression'
         post_translational_translocation_r.gene_reaction_rule = ' and '.join(mach.ptnm)
         
@@ -275,9 +275,8 @@ def co_translational_translocation(gene_info, mrna_transcript_c, mrna_deg_proxy)
     
     #------------------------------------------------------------------------------------
 
-    co_translational_translocation_r = Expression_Reaction(gene_info.hgnc_id + '_co_TRANSLOC_IMPORTtr', 
-                                                           synthesis = True, synthesis_type = 'protein', 
-                                                       subsystem = 'Protein_Expression', hgnc_id = gene_info.hgnc_id)
+    co_translational_translocation_r = Protein_Expression_Reaction(gene_info.hgnc_id + '_co_TRANSLOC_IMPORTtr', 
+                                                           translation = True, hgnc_id = gene_info.hgnc_id)
     co_translational_translocation_r.gene_reaction_rule = ' and '.join(mach.ctnm + mach.translation_efs + ['ribosome'])
     
     co_translational_translocation_r.add_metabolites(rxn)
@@ -301,7 +300,7 @@ def co_translational_translocation(gene_info, mrna_transcript_c, mrna_deg_proxy)
     rxn[metab.h2o_r] = -params.L_sp
     rxn[unprocessed_protein_r],rxn[folded_protein_r] = -1, 1
     
-    sp_degradation = Expression_Reaction(gene_info.hgnc_id + '_SP_degradationr', subsystem = 'Protein_Expression', hgnc_id = gene_info.hgnc_id)
+    sp_degradation = Protein_Expression_Reaction(gene_info.hgnc_id + '_SP_degradationr', hgnc_id = gene_info.hgnc_id)
     sp_degradation.add_metabolites(rxn)
     sp_degradation.gene_reaction_rule = mach.sp_rule
     ctt_reactions += [sp_degradation]
@@ -316,7 +315,7 @@ def co_translational_translocation(gene_info, mrna_transcript_c, mrna_deg_proxy)
 
 def form_disulfide_bond(gene_info, folded_protein_r):
     number_DSB = gene_info.ptms['dsb']
-    disulfide_bond_formation = Expression_Reaction(gene_info.hgnc_id + '_DSBr', subsystem = 'Protein_Expression', hgnc_id = gene_info.hgnc_id)
+    disulfide_bond_formation = Protein_Expression_Reaction(gene_info.hgnc_id + '_DSBr', hgnc_id = gene_info.hgnc_id)
     modified_protein_dsb_r = folded_protein_r.copy()
     modified_protein_dsb_r.id = modified_protein_dsb_r.id.replace('folded', 'folded_DSB')
     elements = folded_protein_r.elements.copy()
@@ -331,7 +330,7 @@ def form_disulfide_bond(gene_info, folded_protein_r):
     return disulfide_bond_formation, modified_protein_dsb_r
 
 def form_gpi(gene_info, modified_protein_r):
-    gpi_formation = Expression_Reaction(gene_info.hgnc_id + '_GPIr', subsystem = 'Protein_Expression', hgnc_id = gene_info.hgnc_id)
+    gpi_formation = Protein_Expression_Reaction(gene_info.hgnc_id + '_GPIr', hgnc_id = gene_info.hgnc_id)
     modified_protein_gpi_r = modified_protein_r.copy(), 
     modified_protein_gpi_r.id = modified_protein_gpi_r.id.replace('folded', 'folded_GPI')
     
@@ -359,7 +358,7 @@ def form_gpi(gene_info, modified_protein_r):
 
 def glycosylate_n_linked(gene_info, modified_protein_r):
     raise ValueError('N-glycosylation not yet incorporated')
-#     n_glycosylation = Expression_Reaction(gene_info.hgnc_id + 'NGLYCOr')
+#     n_glycosylation = Protein_Expression_Reaction(gene_info.hgnc_id + 'NGLYCOr')
 #     modified_protein_ng_r = modified_protein_r.copy()
 #     modified_protein_ng_r.id = modified_protein_ng_r.id.replace('folded', 'folded_NG')
 
@@ -414,7 +413,7 @@ def import_golgi(gene_info, modified_protein_r):
     # gtp hydrolysis
     rxn[metab.ntp_map_c['G']], rxn[metab.h2o_c], rxn[metab.ndp_map_c['G']], rxn[metab.pi_c], rxn[metab.h_c]  = -94, -94, 94, 94, 94
 
-    golgi_import = Expression_Reaction(gene_info.hgnc_id + '_COPII_IMPORTtg', subsystem = 'Protein_Expression', hgnc_id = gene_info.hgnc_id)
+    golgi_import = Protein_Expression_Reaction(gene_info.hgnc_id + '_COPII_IMPORTtg', hgnc_id = gene_info.hgnc_id)
     golgi_import.add_metabolites(rxn)
     
     
@@ -428,7 +427,7 @@ def import_golgi(gene_info, modified_protein_r):
 
 def glycosylate_o_linked(gene_info, protein_g):
     number_Oglycans = gene_info.ptms['og']
-    o_glycosylation = Expression_Reaction(gene_info.hgnc_id + '_OGg', subsystem = 'Protein_Expression', hgnc_id = gene_info.hgnc_id)
+    o_glycosylation = Protein_Expression_Reaction(gene_info.hgnc_id + '_OGg', hgnc_id = gene_info.hgnc_id)
 
     # metabolites
     modified_protein_og_g = protein_g.copy()
@@ -501,8 +500,8 @@ def secrete_protein(gene_info, modified_protein_g):
         # gtph hydrolysis
         rxn[metab.ntp_map_c['G']], rxn[metab.h2o_c], rxn[metab.ndp_map_c['G']], rxn[metab.pi_c], rxn[metab.h_c]  = -44, -44, 44, 44, 44
 
-        secrete_protein = Expression_Reaction(gene_info.hgnc_id + '_Clathrin_IMPORTt' + secreted_protein.compartment, 
-                                             subsystem = 'Protein_Expression', hgnc_id = gene_info.hgnc_id)
+        secrete_protein = Protein_Expression_Reaction(gene_info.hgnc_id + '_Clathrin_IMPORTt' + secreted_protein.compartment, 
+                                             hgnc_id = gene_info.hgnc_id)
         secrete_protein.add_metabolites(rxn)
         secrete_protein.gene_reaction_rule = ' and '.join(mach.clathrin_m)
         secreted_protein_reactions += [secrete_protein]
@@ -735,7 +734,7 @@ def get_protein_expression_reactions(gene_info, mrna_transcript_c, mrna_deg_prox
 #                                                                                         ub_args = ub_args)
 
 
-# In[14]:
+# In[13]:
 
 
 # import random

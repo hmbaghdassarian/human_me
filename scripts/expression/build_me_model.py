@@ -150,7 +150,7 @@ def get_complex_df(reactions, knock_out):
     return complex_df
 
 
-# In[3]:
+# In[4]:
 
 
 class me_builder():
@@ -719,9 +719,17 @@ class me_builder():
             if not ko:
                 if not self.complex_df.loc[i, 'is_complex']:
                     enzyme_to_couple = self.id_protein_map[self.complex_df.loc[i, 'machinery']][self.complex_df.loc[i, 'compartment']]
+                    
+                    # back track assign synthesis attribute to monomeric enzymes
+                    srs = [sr for sr in list(enzyme_to_couple.reactions)if enzyme_to_couple in sr.products and                            not isinstance(sr, Protein_Degradation_Reaction)]
+                    if len(srs) != 1:
+                        raise ValueError(enzyme_to_couple.id + ' has an incorrect number of associated synthesis reactions')
+                    srs[0].synthesis, srs[0].synthesis_type = True, 'protein'
                 else:
                     enzyme_to_couple = self.complex_id_metabolite_map[self.complex_df.loc[i, 'complex_id']]
                     enzyme_to_couple.get_k_deg()
+                    if self.check_all and len([1 for r in list(enzyme_to_couple.reactions) if                                                (hasattr(r, 'synthesis') and r.synthesis and                                                enzyme_to_couple in r.products)]) != 1:
+                        raise ValueError(enzyme_to_couple.id + ' has an incorrect number of associated synthesis reactions')
                 enzyme_to_couple.keff = self.complex_df.loc[i, 'keff']
 
                 # add machinery to substrate side
@@ -807,9 +815,16 @@ class me_builder():
 #                 r._metabolites = rxn.metabolites
                 if not self.complex_df.loc[i, 'is_complex']:
                     enzyme_to_couple = self.id_protein_map[self.complex_df.loc[i, 'machinery']][self.complex_df.loc[i, 'compartment']]
+                    # back track assign synthesis attribute to monomeric enzymes
+                    srs = [sr for sr in list(enzyme_to_couple.reactions)if enzyme_to_couple in sr.products and                            not isinstance(sr, Protein_Degradation_Reaction)]
+                    if len(srs) != 1:
+                        raise ValueError(enzyme_to_couple.id + ' has an incorrect number of associated synthesis reactions')
+                    srs[0].synthesis, srs[0].synthesis_type = True, 'protein'
                 else:
                     enzyme_to_couple = self.complex_id_metabolite_map[self.complex_df.loc[i, 'complex_id']]
                     enzyme_to_couple.get_k_deg()
+                    if self.check_all and len([1 for r in list(enzyme_to_couple.reactions) if                                                (hasattr(r, 'synthesis') and r.synthesis and                                                enzyme_to_couple in r.products)]) != 1:
+                        raise ValueError(enzyme_to_couple.id + ' has an incorrect number of associated synthesis reactions')
                 enzyme_to_couple.keff = self.complex_df.loc[i, 'keff']
 
                 # add machinery to substrate side
@@ -1055,7 +1070,7 @@ class me_builder():
                     elif len(deg_reactions_) > 1:
                         raise ValueError('More than 1 degradation reaction associated with catalyzing enzyme')
                     deg_reactions += deg_reactions_
-                    dp = Macromolecule(e._deg_id + '_enzyme_deg_proxy', proxy = True)
+                    dp = Macromolecule(e._deg_id + '_enzyme_deg_proxy', proxy = True, hgnc_id = e.hgnc_id)
                     dp.couple(type = 'enzyme_degradation', value = -e.k_deg/e.keff)
                     deg_proxies.append(dp)
 
@@ -1127,7 +1142,7 @@ class me_builder():
         return me_model
 
 
-# In[4]:
+# In[5]:
 
 
 def build_me(minimal_proteome = True, compress_mrna = True, dummy_protein = True,
@@ -1208,7 +1223,7 @@ def build_me(minimal_proteome = True, compress_mrna = True, dummy_protein = True
     return me_model, builder
 
 
-# In[5]:
+# In[6]:
 
 
 gc.collect()
@@ -1242,9 +1257,9 @@ gc.collect()
 # builder.add_expression_machinery()
 # builder.deorphan()
 # builder.incorporate_protein_degradation()
-# me_model2 = builder.build_me_model(model_id = model_id)
+# me_model = builder.build_me_model(model_id = model_id)
 
 # lp_path = '/data2/hratch/human_me/other/test_lp/'
-# counter = 2
+# counter = 4
 # me_model.pickle(lp_path + 'working_version_' + str(counter) + '.pickle')
 

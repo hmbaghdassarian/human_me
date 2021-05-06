@@ -10,7 +10,7 @@ from utils import machinery as mach
 from utils import parameters as params
 from utils import metabolites as metab
 from utils import functions as func
-from core.reaction import Expression_Reaction
+from core.reaction import Protein_Expression_Reaction
 from uniform_processes.build_trna_expression_reactions import modified_trna_transcript_c, charged_trna_map
 
 from macromolecules.protein import Protein
@@ -44,9 +44,8 @@ def translate_protein_cytosolic(gene_info, mrna_transcript_c, mrna_deg_proxy):
     unfolded_protein_c = Protein(compartment = 'c', id_ = 'unfolded', gene_info = gene_info)
     rxn[unfolded_protein_c] = 1
     
-    translation_elongation = Expression_Reaction(gene_info.hgnc_id + '_TRANSLATION_ELONGATIONc', 
-                                             subsystem = 'Protein_Expression', hgnc_id = gene_info.hgnc_id, 
-                                                synthesis = True, synthesis_type = 'protein')
+    translation_elongation = Protein_Expression_Reaction(gene_info.hgnc_id + '_TRANSLATION_ELONGATIONc', 
+                                             hgnc_id = gene_info.hgnc_id, translation = True)
     translation_elongation.gene_reaction_rule = ' and '.join(mach.translation_efs + ['ribosome']) # GPRs
 
 
