@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[11]:
+# In[1]:
 
 
 import cobra
@@ -37,7 +37,7 @@ from expression.protein_expression import build_protein_expression_reactions as 
 
 # # rRNA
 
-# In[12]:
+# In[2]:
 
 
 # rrna sequences
@@ -89,16 +89,7 @@ six_s_index = 1 #https://www.nature.com/articles/s41594-019-0234-x?draft=collect
 
 
 
-# In[13]:
-
-
-# from expression.protein_expression import ubiquitin
-# compress_mrna = False
-# ub_args = ubiquitin.express_ubiquitin(compress_mrna = compress_mrna)
-# rs_expression_reactions, rs_protein_metabolites, rl_expression_reactions, rl_protein_metabolites = build_ribosome_protein_expression_reactions(ub_args, compress_mrna)
-
-
-# In[14]:
+# In[3]:
 
 
 psim_rib = params.psim_me.copy()
@@ -198,7 +189,7 @@ def build_ribosome_protein_expression_reactions(ub_args, compress_mrna = False):
     return rs_expression_reactions, rs_protein_metabolites, rl_expression_reactions, rl_protein_metabolites
 
 
-# In[15]:
+# In[4]:
 
 
 def build_rrna5s_reactions(rpl5_n, rpl11_n):
@@ -243,7 +234,7 @@ def build_rrna5s_reactions(rpl5_n, rpl11_n):
     return rrna5s_reactions, rrna5s_complex_n, rrna5s_c
 
 
-# In[16]:
+# In[5]:
 
 
 # ets_5_frag1 is from 5' end of 47s to A' site
@@ -411,7 +402,8 @@ def build_other_rrna_reactions(rrna5s_complex_n, rs_protein_metabolites, rl_prot
     its_1_frag2_c = RNA_fragment('1_frag2', seq = its_1_frag2_seq, fragment_type = 'its', compartment='c',
                                                                  triphosphate=False)
 
-    rrna_18s_formation = Expression_Reaction(subsystem = 'rRNA_expression', ribosome_biogenesis = True, id = '40s_MATURATION')
+    rrna_18s_formation = Expression_Reaction(subsystem = 'Complex_Formation', ribosome_biogenesis = True, 
+                                             id = '40s_MATURATION')
     # endonuclolytic cleavage event at site 3
     metabolites = [m for m in rs_protein_metabolites if m.compartment == 'c'] + [rrna_18s_c]
     forty_s_complex_c = Ribosomal_Complex(metabolites = metabolites, complex_id = '40s')
@@ -604,7 +596,7 @@ def build_other_rrna_reactions(rrna5s_complex_n, rs_protein_metabolites, rl_prot
     return all_reactions, mature_ribosomal_precomplexes, mature_rrna_metabolites
 
 
-# In[17]:
+# In[6]:
 
 
 def build_ribosome(ub_args, compress_mrna = True, reversible_complex_formation = False):
@@ -643,4 +635,13 @@ def build_ribosome(ub_args, compress_mrna = True, reversible_complex_formation =
     all_reactions += rs_expression_reactions +  rl_expression_reactions
 
     return  all_reactions, ribosome_complex_c
+
+
+# In[8]:
+
+
+# compress_mrna = False
+# from expression.protein_expression import ubiquitin
+# ub_args = ubiquitin.express_ubiquitin(compress_mrna = compress_mrna)
+# all_reactions, ribosome_complex_c = build_ribosome(ub_args, compress_mrna = compress_mrna)
 

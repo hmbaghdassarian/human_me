@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[7]:
+# In[1]:
 
 
 from Bio.Seq import Seq
@@ -25,7 +25,7 @@ from macromolecules.RNA import RNA_fragment, pre_mRNA, mRNA
 from macromolecules.macromolecule import Macromolecule
 
 
-# In[14]:
+# In[2]:
 
 
 class express_mrna():
@@ -244,7 +244,7 @@ class express_mrna():
         self.reactions.append(transcription)
 
 
-# In[15]:
+# In[3]:
 
 
 def get_mrna_expression_reactions(gene_info, compress_mrna = False):
@@ -267,7 +267,7 @@ def get_mrna_expression_reactions(gene_info, compress_mrna = False):
     return em.reactions, em.mrna_c, em.mrna_deg_proxy 
 
 
-# In[16]:
+# In[4]:
 
 
 # import random

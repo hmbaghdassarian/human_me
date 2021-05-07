@@ -35,7 +35,30 @@ import core
 from core.reaction import Biomass_Reaction, Expression_Reaction, Metabolic_Reaction, Complex_Degradation_Reaction
 
 from me_solver import solve_me
-# obj_type = type
+
+
+# In[ ]:
+
+
+def load_pickled_model(file_name):
+    '''
+    Loads a pickled me_model
+    
+    Parameters
+    ----------
+    file_name: str
+        'full/path/to/me_model.pickle'
+    
+    Returns
+    ----------
+    me_model: ME_Model 
+    
+    '''
+    
+    with open(file_name, 'rb') as handle:
+        me_model = pickle.load(handle)
+    me_model.correct_object_tracking() # lost in pickling/loadings 
+    return me_model
 
 
 # In[ ]:
@@ -153,30 +176,6 @@ class ME_Model(cobra.Model):
             if idx != self.metabolites.index(m_id):
                 raise ValueError('Indexing should be changed')
         
-        self._clean_metabolites()
-        
-    def _map_coupled_metabolites(self, verbose = False):
-        '''Reassigns metabolite object from r.metabolites to the .coupled_metabolites attribute of the reaction
-        to ensure that the metabolite object is the most up to date version (prevents multiple copies from existing)'''
-        
-        if verbose:
-            print('Reassign .coupled_metabolites attribute')
-        for r in self.reactions:
-            if hasattr(r, 'coupled_metabolites'):
-                r._map_coupled_metabolites()
-    
-    def _map_metabolite_reactions(self):
-        '''Fixes strange error in which metabolites do not have all associated reactions 
-        in the .reactions attribute'''
-    
-        metab_reaction_map = {m.id: list() for m in self.metabolites}
-        for r in me_model.reactions:
-            for m in r.metabolites:
-                metab_reaction_map[m.id] += [r.id]
-
-        for m_id, r_list in metab_reaction_map.items():
-            metab = self.metabolites.get_by_id(m_id)
-            metab._reaction = metab._reaction.union([self.reactions.get_by_id(r_id) for r_id in r_list])    
     
     def _assign_reaction_types(self):
         '''Organize reactions into their various categories. There will be overlap between the lists'''
@@ -209,11 +208,48 @@ class ME_Model(cobra.Model):
                 
         self.reaction_types['coupled'] = [r.id for r in self.reactions if hasattr(r, 'coupled_metabolites') and r.coupled_metabolites != dict()]
                 
+    
+    def _map_coupled_metabolites(self):
+        '''Reassigns metabolite object from r.metabolites to the .coupled_metabolites attribute of the reaction
+        to ensure that the metabolite object is the most up to date version (prevents multiple copies from existing)'''
         
-    def add_reactions(self, reaction_list, verbose = False):
-        self._add_reactions(reaction_list)
+        for r in self.reactions:
+            if hasattr(r, 'coupled_metabolites'):
+                r._map_coupled_metabolites()
+    
+    def _map_metabolite_reactions(self):
+        '''Fixes error in which metabolites do not have all associated reactions 
+        in the .reactions attribute'''
+    
+        metab_reaction_map = {m.id: list() for m in self.metabolites}
+        for r in self.reactions:
+            for m in r.metabolites:
+                metab_reaction_map[m.id] += [r.id]
+
+        for m_id, r_list in metab_reaction_map.items():
+            metab = self.metabolites.get_by_id(m_id)
+            metab._reaction = metab._reaction.union([self.reactions.get_by_id(r_id) for r_id in r_list]) 
+    
+    def _clean_metabolites(self):
+        '''Remove or correct reactions assigned to metabolites which are not in the model'''
+        rxn_ids = [r.id for r in self.reactions]
+        for m in self.metabolites:
+            for r in m.reactions:
+                if r.id not in rxn_ids:
+                    m._reaction.remove(r)
+                elif r not in self.reactions:
+                    m._reaction.remove(r)
+                    m._reaction.add(self.reactions.get_by_id(r.id))
+    
+    def correct_object_tracking(self):
+        '''Resolves inconsistencies b/w metabolite.reactions and reaction.metabolites or reaction.coupled_metabolites'''
+        self._clean_metabolites()
         self._map_metabolite_reactions()
-        self._map_coupled_metabolites(verbose = verbose)
+        self._map_coupled_metabolites()
+        
+    def add_reactions(self, reaction_list):
+        self._add_reactions(reaction_list)
+        self.correct_object_tracking()
         self._assign_reaction_types()
         
     
@@ -261,12 +297,6 @@ class ME_Model(cobra.Model):
                 for group in associated_groups:
                     group.remove_members(reaction)
 # new methods------------------------------------------------------------------------------------------------                    
-    def _clean_metabolites(self):
-        '''Remove reactions assigned to metabolites which are not in the model'''
-        for m in self.metabolites:
-            for r in m.reactions:
-                if r not in self.reactions:
-                    m._reaction.remove(r)
                     
     def create_stoichiometric_matrix(self, array_type = 'numpy', mu_val = None, inplace = True):
 
