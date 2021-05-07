@@ -156,14 +156,27 @@ class ME_Model(cobra.Model):
         self._clean_metabolites()
         
     def _map_coupled_metabolites(self, verbose = False):
-        '''Reassigns metabolite object to the .coupled_metabolites attribute of the reaction
-        to ensure that the metaboltie object is the most up to date version'''
+        '''Reassigns metabolite object from r.metabolites to the .coupled_metabolites attribute of the reaction
+        to ensure that the metabolite object is the most up to date version (prevents multiple copies from existing)'''
         
         if verbose:
             print('Reassign .coupled_metabolites attribute')
         for r in self.reactions:
             if hasattr(r, 'coupled_metabolites'):
                 r._map_coupled_metabolites()
+    
+    def _map_metabolite_reactions(self):
+        '''Fixes strange error in which metabolites do not have all associated reactions 
+        in the .reactions attribute'''
+    
+        metab_reaction_map = {m.id: list() for m in self.metabolites}
+        for r in me_model.reactions:
+            for m in r.metabolites:
+                metab_reaction_map[m.id] += [r.id]
+
+        for m_id, r_list in metab_reaction_map.items():
+            metab = self.metabolites.get_by_id(m_id)
+            metab._reaction = metab._reaction.union([self.reactions.get_by_id(r_id) for r_id in r_list])    
     
     def _assign_reaction_types(self):
         '''Organize reactions into their various categories. There will be overlap between the lists'''
@@ -199,6 +212,7 @@ class ME_Model(cobra.Model):
         
     def add_reactions(self, reaction_list, verbose = False):
         self._add_reactions(reaction_list)
+        self._map_metabolite_reactions()
         self._map_coupled_metabolites(verbose = verbose)
         self._assign_reaction_types()
         
