@@ -230,6 +230,15 @@ class ME_Model(cobra.Model):
             metab = self.metabolites.get_by_id(m_id)
             metab._reaction = metab._reaction.union([self.reactions.get_by_id(r_id) for r_id in r_list]) 
     
+    def _map_reaction_metabolites(self):
+        '''Fixes error in which reactions do not have the most up to date metabolites'''
+        
+        for r in self.reactions:
+            for m in r.metabolites:
+                m_ = self.metabolites.get_by_id(m.id)
+                if m != m_:
+                    r._metabolites[m_] = r._metabolites.pop(m)
+                    
     def _clean_metabolites(self):
         '''Remove or correct reactions assigned to metabolites which are not in the model'''
         rxn_ids = [r.id for r in self.reactions]
@@ -243,8 +252,11 @@ class ME_Model(cobra.Model):
     
     def correct_object_tracking(self):
         '''Resolves inconsistencies b/w metabolite.reactions and reaction.metabolites or reaction.coupled_metabolites'''
+        # update metabolites
         self._clean_metabolites()
         self._map_metabolite_reactions()
+        # update reactions
+        self._map_reaction_metabolites()
         self._map_coupled_metabolites()
         
     def add_reactions(self, reaction_list):
