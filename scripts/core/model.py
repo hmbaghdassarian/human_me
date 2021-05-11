@@ -217,18 +217,32 @@ class ME_Model(cobra.Model):
             if hasattr(r, 'coupled_metabolites'):
                 r._map_coupled_metabolites()
     
-    def _map_metabolite_reactions(self):
-        '''Fixes error in which metabolites do not have all associated reactions 
-        in the .reactions attribute'''
+    def _map_metabolite_reactions_and_coupling(self):
+        '''Fixes error in which metabolites do not have all associated reactions or coupling constraints
+        in the .reactions and .coupling_coefficients attributes respectively'''
     
         metab_reaction_map = {m.id: list() for m in self.metabolites}
+        metab_coupling_map = {m.id: dict() for m in self.metabolites if hasattr(m, 'coupling_coefficient')}
         for r in self.reactions:
             for m in r.metabolites:
                 metab_reaction_map[m.id] += [r.id]
 
+                if hasattr(m, 'coupling_coefficient') and m.coupling_coefficient is not None:
+                    for k, c in m.coupling_coefficient.items():
+                        if k in metab_coupling_map[m.id]:
+                            if c != metab_coupling_map[m.id][k]:
+                                raise ValueError('Disagreement in coupling coefficient for the same metabolite: ' + m.id)
+                        else:
+                            metab_coupling_map[m.id][k] = c
+        for m_id, val in metab_coupling_map.items():
+            if len(val) == 0:
+                metab_coupling_map[m_id] = None
+
         for m_id, r_list in metab_reaction_map.items():
             metab = self.metabolites.get_by_id(m_id)
             metab._reaction = metab._reaction.union([self.reactions.get_by_id(r_id) for r_id in r_list]) 
+            if m_id in metab_coupling_map:
+                metab.coupling_coefficient = metab_coupling_map[m_id]
     
     def _map_reaction_metabolites(self):
         '''Fixes error in which reactions do not have the most up to date metabolites'''
@@ -254,7 +268,7 @@ class ME_Model(cobra.Model):
         '''Resolves inconsistencies b/w metabolite.reactions and reaction.metabolites or reaction.coupled_metabolites'''
         # update metabolites
         self._clean_metabolites()
-        self._map_metabolite_reactions()
+        self._map_metabolite_reactions_and_coupling()
         # update reactions
         self._map_reaction_metabolites()
         self._map_coupled_metabolites()
@@ -614,7 +628,7 @@ class ME_Model(cobra.Model):
         fragments = ['3_trailer', '5_leader', 'ets', 'its']
         exceptions = ['ubiquitin_monomer_protein_c', 'cleaved_polyubiquitin_moiety_protein_c', 
                       'ubiquitin_monomer_protein_n', 'cleaved_polyubiquitin_moiety_protein_n']
-        hgnc_id_metabs = [m for m in self.metabolites if isinstance(m, Macromolecule) and m.hgnc_id is None and                 m.type not in ['trna', 'rrna', 'complex'] and                   not m.id.endswith('COMPLEX_enzyme_deg_proxy') and                  not (hasattr(m, 'fragment_type') and m.fragment_type in fragments) and                  not m.id in exceptions]
+        hgnc_id_metabs = [m for m in self.metabolites if isinstance(m, Macromolecule) and m.hgnc_id is None and         m.type not in ['trna', 'rrna', 'complex'] and           not '_'.join(m.id.split('_')[:-1]).endswith('COMPLEX_enzyme_deg_proxy') and          not (hasattr(m, 'fragment_type') and m.fragment_type in fragments) and          not m.id in exceptions]
         if len(hgnc_id_metabs)>0:
             raise ValueError('Some macromolecules did not get an HGNC ID assigned')
             

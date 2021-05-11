@@ -57,7 +57,7 @@ def protein_polyubiquitination(macromolecule, **kwargs):
                            amino_acid_counts = polyu_protein_aa_counts)
         polyub_macromolecule.hgnc_id = macromolecule.hgnc_id
         if macromolecule.compartment == 'pm':
-            polyub_macromolecule.change_compartment('pm')
+            polyub_macromolecule = polyub_macromolecule.change_compartment('pm')
     else:
         fused_poly_ub = ub_args['polyub_' + cmap[macromolecule.compartment]].copy()
         fused_poly_ub.id = fused_poly_ub.id.replace('cleaved_', 'fused_')
