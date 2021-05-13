@@ -12,11 +12,11 @@ from utils import machinery as mach
 from utils import functions as func
 from utils import parameters as params
 # from uniform_processes.biomass import biomass_rna_mapper
-from macromolecules.macromolecule import Macromolecule
+from macromolecules.macromolecule import Macromolecule, Proxy
 from core.reaction import Expression_Reaction
 
 
-# In[ ]:
+# In[3]:
 
 
 molecule_type = ['premrna', 'rrna', 'trna']
@@ -35,7 +35,7 @@ rb_map = dict(zip(molecule_type, [False, True, False, False]))
 
 
 
-# In[ ]:
+# In[4]:
 
 
 class RNA(Macromolecule):
@@ -207,7 +207,7 @@ class RNA(Macromolecule):
             raise ValueError('Situation in which RNA sequence is removed or replaced has not been implemented yet')
 
 
-# In[ ]:
+# In[5]:
 
 
 class pre_mRNA(RNA):
@@ -232,6 +232,10 @@ class mRNA(RNA):
         self.type = 'mrna'
         self.id = self.id.replace('RNA', self.type)
         self.hgnc_id = gene_info.hgnc_id
+    def make_proxy(self):
+        '''Makes a proxy metabolite for coupling mRNA degradation to protein synthesis'''
+        return Proxy(associated_macromolecule = self)
+        
         
 
 class tRNA(RNA):
@@ -271,4 +275,10 @@ class RNA_fragment(RNA):
         if self.fragment_type == 'lariat' and hgnc_id is None:
             raise ValueError('Must specify hgnc ID for lariats')
         self.id = self.id.replace('RNA', self.fragment_type)
+
+
+# In[ ]:
+
+
+
 

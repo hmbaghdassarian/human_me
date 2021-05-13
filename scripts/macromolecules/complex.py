@@ -11,7 +11,7 @@ import numpy as np
 
 import sys
 sys.path.insert(1, '../../scripts/')
-from macromolecules.macromolecule import Macromolecule
+from macromolecules.macromolecule import Macromolecule, Proxy
 from utils import machinery as mach
 from utils import parameters as params
 
@@ -222,6 +222,9 @@ class Complex(Macromolecule):
             raise ValueError('ME-Model is currently designed to only handle protein-protein complexes')
     def get_k_deg(self):
         self.k_deg = np.median([m.k_deg*c for m,c in self.decompose_complex().items()])
+    def make_proxy(self):
+        '''Make a proxy metabolite for coupling enzyme degradation to reaction catalysis'''
+        return Proxy(associated_macromolecule = self)
 
 
 # In[6]:

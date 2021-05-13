@@ -8,7 +8,7 @@ import cobra
 import sys
 sys.path.insert(1, '../../scripts/')
 from utils import metabolites as metab
-from macromolecules.macromolecule import Macromolecule
+from macromolecules.macromolecule import Macromolecule, Proxy
 
 
 # In[5]:
@@ -85,11 +85,12 @@ class Protein(Macromolecule):
         Macromolecule.__init__(self, id = id_, compartment = compartment, charge = charge, elements = elements, 
                               hgnc_id = self.hgnc_id)
         
-        if not dummy:
-            self.type = 'protein'
-        else:
-            self.type = 'dummy_protein'
-        
+#         if not dummy:
+#             self.type = 'protein'
+#         else:
+#             self.type = 'dummy_protein'
+        self.type = 'protein'
+        self.dummy = dummy
         self.enzyme = False # whether the protein is involved in catalysis of a reaction
         self.keff = None
         self._degradation_reactions = [] # associated degradation reactions for protein monomer, if any
@@ -97,6 +98,9 @@ class Protein(Macromolecule):
     def _consolidate_degradation_rxns(self):
         '''Remove redundant IDs'''
         self._degradation_reactions = list(set(self._degradation_reactions))
+    def make_proxy(self):
+        '''Make a proxy metabolite for coupling enzyme degradation to reaction catalysis'''
+        return Proxy(associated_macromolecule = self)
 
 
 # In[61]:

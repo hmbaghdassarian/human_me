@@ -31,6 +31,14 @@ class HiddenPrints:
         sys.stdout = self._original_stdout
 
 
+# In[ ]:
+
+
+def flatten_list(t):
+    #https://stackoverflow.com/questions/952914/how-to-make-a-flat-list-out-of-list-of-lists
+    return [item for sublist in t for item in sublist]
+
+
 # In[11]:
 
 

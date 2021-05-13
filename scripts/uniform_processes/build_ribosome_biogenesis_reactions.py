@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[1]:
+# In[22]:
 
 
 import cobra
@@ -37,7 +37,7 @@ from expression.protein_expression import build_protein_expression_reactions as 
 
 # # rRNA
 
-# In[2]:
+# In[23]:
 
 
 # rrna sequences
@@ -200,7 +200,7 @@ def build_rrna5s_reactions(rpl5_n, rpl11_n):
     rrna5s_transcription.gene_reaction_rule = ' and '.join(mach.rnap3_transcription_machinery)
 
     # PROCESSING - mature rrna (3->5' exonucleolytic cleave of last 24 bases) and complex formation with RPL5/RPL11
-    rrna5s_processing = Expression_Reaction(subsystem = 'rRNA_expression', ribosome_biogenesis = True, id = 'PROCESSING_RRNA5s')
+    rrna5s_processing = Expression_Reaction(subsystem = 'Complex_Formation', ribosome_biogenesis = True, id = 'PROCESSING_RRNA5s')
     rrna5s_n = rRNA(metabolite_name = '5s', seq = rrna_5s_seq, compartment = 'n')
     deg_base_counts = dict()
     for k,v in pre_rrna5s_n.base_counts.items():
@@ -562,7 +562,7 @@ def build_other_rrna_reactions(rrna5s_complex_n, rs_protein_metabolites, rl_prot
 
     metabolites = [m for m in rl_2 if m.compartment == 'c'] + [rrna_28s_c, rrna_5_8s_c, rrna5s_c]
     sixty_s_complex_c = Ribosomal_Complex(metabolites = metabolites, complex_id = '60s')
-    rrna_5_8s_formation = Expression_Reaction(subsystem = 'rRNA_expression', ribosome_biogenesis = True, id = '60s_maturation')
+    rrna_5_8s_formation = Expression_Reaction(subsystem = 'Complex_Formation', ribosome_biogenesis = True, id = '60s_maturation')
     rxn = dict()
 
     rxn[pre60s_complex_c], rxn[sixty_s_complex_c] = -1,1
@@ -637,7 +637,7 @@ def build_ribosome(ub_args, compress_mrna = True, reversible_complex_formation =
     return  all_reactions, ribosome_complex_c
 
 
-# In[8]:
+# In[ ]:
 
 
 # compress_mrna = False

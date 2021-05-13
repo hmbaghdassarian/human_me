@@ -47,10 +47,9 @@ def express_ubiquitin(compress_mrna = False):
 
     ubc_translation_reaction_cytosolic, ubc_c = c_trln.translate_protein_cytosolic(ubc_info, ubc_transcript_c, ubc_deg_proxy)
 
-    ubiquitin_monomerization_ubc = Expression_Reaction(ubc_info.hgnc_id + '_MONOMERIZATIONc', 
-                                                      subsystem = 'Protein_Expression', ubiquitin_biogenesis = True, hgnc_id = ubc_info.hgnc_id, 
-                                                      synthesis = True, synthesis_type = 'protein')
-
+    ubiquitin_monomerization_ubc = Expression_Reaction(ubc_info.hgnc_id + '_MONOMERIZATIONc',
+                                   subsystem = 'Protein_Expression', ubiquitin_biogenesis = True, 
+                                   hgnc_id = ubc_info.hgnc_id, synthesis = True, synthesis_type = 'protein')
     rxn = {ubc_c:-1, ub_c: n_ub_monomers, metab.seq_amino_acid_map_c[ubc_info.protein_seq[n_ub_monomers*76:]]: 1, 
           metab.h2o_c: -n_ub_monomers}
     ubiquitin_monomerization_ubc.add_metabolites(rxn)
@@ -72,8 +71,8 @@ def express_ubiquitin(compress_mrna = False):
     # monomerization from ubb polyub
     n_ub_monomers = ubb_info.protein_seq.count(single_ubiquitin_sequence)
     ubiquitin_monomerization_ubb = Expression_Reaction(ubb_info.hgnc_id + '_MONOMERIZATIONc', 
-                                                      subsystem = 'Protein_Expression', ubiquitin_biogenesis = True, hgnc_id = ubb_info.hgnc_id, 
-                                                      synthesis = True, synthesis_type = 'protein')
+                                   subsystem = 'Protein_Expression', ubiquitin_biogenesis = True, 
+                                   hgnc_id = ubb_info.hgnc_id, synthesis = True, synthesis_type = 'protein')
 
     rxn = {ubb_c:-1, ub_c: n_ub_monomers, metab. seq_amino_acid_map_c[ubb_info.protein_seq[n_ub_monomers*76:]]: 1, 
           metab.h2o_c: -n_ub_monomers}
@@ -85,15 +84,16 @@ def express_ubiquitin(compress_mrna = False):
     polyub_c = Protein(id_ = 'cleaved_polyubiquitin_moiety', amino_acid_counts = polyub_aa_counts,
                         compartment = 'c')
     ubiquitin_monomerization_polyub = Expression_Reaction('POLYUBIQUITIN_MONOMERIZATIONc', 
-                                                         subsystem = 'Protein_Expression', ubiquitin_biogenesis = True, hgnc_id = None)
+                                                          subsystem = 'Protein_Expression', 
+                                                          ubiquitin_biogenesis = True, hgnc_id = None)
 
     rxn = {polyub_c:-1, ub_c: params.n_ub, metab.h2o_c: -(params.n_ub-1)}
     ubiquitin_monomerization_polyub.add_metabolites(rxn)
     ubiquitin_monomerization_polyub.gene_reaction_rule = mach.USP5[0]
 
     # nuclear import of ubiquitin
-    nuclear_import_ub_mono = Expression_Reaction('UBIQUITIN_MONOMER_IMPORTtn', 
-                                                subsystem = 'Protein_Expression', ubiquitin_biogenesis = True, hgnc_id = None)
+    nuclear_import_ub_mono = Expression_Reaction('UBIQUITIN_MONOMER_IMPORTtn', subsystem = 'Protein_Expression', 
+                                                 ubiquitin_biogenesis = True, hgnc_id = None)
     ub_n = ub_c.change_compartment('n')
     ub_n.id, ub_n.compartment = '_'.join(ub_n.id.split('_')[:-1]) + '_n', 'n'
     nuclear_import_ub_mono.add_metabolites({ub_n: 1, ub_c: -1})

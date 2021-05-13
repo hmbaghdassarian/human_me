@@ -167,8 +167,7 @@ class express_mrna():
         rxn[metab.amet_c], rxn[metab.ahcys_c] = 2, -2 # reverse methyltransferase - cap0 and cap1 structure
 
 #         proxy metabolite for coupling mRNA degradation to protein synthesis flux
-        self.mrna_deg_proxy = Macromolecule(self.gene_info.hgnc_id + '_mrna_deg_proxy', proxy = True, 
-                                           hgnc_id = self.gene_info.hgnc_id)
+        self.mrna_deg_proxy = self.mrna_c.make_proxy()
         rxn[self.mrna_deg_proxy] = 1 
 
         h2o_c = [m for m in rxn.keys() if m.id == 'h2o_c'][0] # won't load directly from metab for some reason

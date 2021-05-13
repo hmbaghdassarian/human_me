@@ -8,6 +8,8 @@ import pickle
 import os
 import pathlib
 import copy
+import multiprocessing
+import gc
 
 import cobra
 from cobra.core.dictlist import DictList
@@ -26,6 +28,7 @@ import sys
 sys.path.insert(1, '../../scripts/')
 from preprocess import parse_complex
 from utils import parameters as params
+from utils.functions import flatten_list
 from macromolecules.macromolecule import Macromolecule
 from macromolecules.complex import Complex
 from macromolecules.protein import Protein
@@ -33,6 +36,7 @@ from macromolecules.complex import Ribosomal_Complex
 
 import core
 from core.reaction import Biomass_Reaction, Expression_Reaction, Metabolic_Reaction, Complex_Degradation_Reaction
+from core.gene import Expressed_Gene
 
 from me_solver import solve_me
 
@@ -60,13 +64,25 @@ def load_pickled_model(file_name):
     me_model.correct_object_tracking() # lost in pickling/loadings 
     return me_model
 
+# def create_expressed_gene(hgnc_id, relat_objects, me_model):
+#     g = Expressed_Gene(hgnc_id)
+#     for m in relat_objects['macromolecules']:
+#         g.add_macromolecule(me_model.metabolites.get_by_id(m))
+#     for r in relat_objects['reactions']:
+#         g.add_reaction(me_model.reactions.get_by_id(r))
+#     g.check()
 
-# In[ ]:
+#     return g
 
+def create_expressed_gene(hgnc_id, relat_objects):
+    g = Expressed_Gene(hgnc_id)
+    for m in relat_objects['macromolecules']:
+        g.add_macromolecule(m)
+    for r in relat_objects['reactions']:
+        g.add_reaction(r)
+    g.check()
 
-def flatten_list(t):
-    #https://stackoverflow.com/questions/952914/how-to-make-a-flat-list-out-of-list-of-lists
-    return [item for sublist in t for item in sublist]
+    return g
 
 
 # In[2]:
@@ -74,7 +90,7 @@ def flatten_list(t):
 
 class ME_Model(cobra.Model):
 # rewritten methods------------------------------------------------------------------------------------------------
-    def __init__(self,  id_or_model, name = None, m_model = None):
+    def __init__(self,  id_or_model, name = None, m_model = None, n_cores = os.cpu_count()):
         '''
         A simple object with an identifier
     
@@ -84,6 +100,8 @@ class ME_Model(cobra.Model):
             The cobrapy model object that the ME_Model was built from. Only needed for checking model (.check_model) 
         id_or_model: None or a string
             the identifier to associate with the object
+        n_cores: int
+            # of cores to parallelize on; defaults to all available cores
         
         Returns
         -------
@@ -110,6 +128,7 @@ class ME_Model(cobra.Model):
         self.S = None
         self.solver_ = None
         self.reaction_types = dict()
+        self.n_cores = n_cores
         
 
     def _add_reactions(self, reaction_list):
@@ -209,6 +228,20 @@ class ME_Model(cobra.Model):
         self.reaction_types['coupled'] = [r.id for r in self.reactions if hasattr(r, 'coupled_metabolites') and r.coupled_metabolites != dict()]
                 
     
+    def _get_enzymes(self, reaction_list):
+        '''Run before _add_reactions, track all .enzyme attributes'''
+        self._enzymes = list()
+        for r in reaction_list: 
+            for m in r.metabolites:
+                if hasattr(m, 'enzyme') and m.enzyme:
+                    self._enzymes.append(m.id)
+    
+    def _map_enzymes(self):
+        '''When running _add_reactions, for dummy protein, seems to change .enzyme attribute to False. 
+        Generic correction in case it happens with other enzymes. Related to _get_enzymes() method'''
+        for m_id in self._enzymes:
+            self.metabolites.get_by_id(m_id).enzyme = True
+                    
     def _map_coupled_metabolites(self):
         '''Reassigns metabolite object from r.metabolites to the .coupled_metabolites attribute of the reaction
         to ensure that the metabolite object is the most up to date version (prevents multiple copies from existing)'''
@@ -267,13 +300,15 @@ class ME_Model(cobra.Model):
     def correct_object_tracking(self):
         '''Resolves inconsistencies b/w metabolite.reactions and reaction.metabolites or reaction.coupled_metabolites'''
         # update metabolites
-        self._clean_metabolites()
+        self._clean_metabolites() 
+        self._map_enzymes()
         self._map_metabolite_reactions_and_coupling()
         # update reactions
         self._map_reaction_metabolites()
         self._map_coupled_metabolites()
         
     def add_reactions(self, reaction_list):
+        self._get_enzymes(reaction_list)
         self._add_reactions(reaction_list)
         self.correct_object_tracking()
         self._assign_reaction_types()
@@ -628,7 +663,7 @@ class ME_Model(cobra.Model):
         fragments = ['3_trailer', '5_leader', 'ets', 'its']
         exceptions = ['ubiquitin_monomer_protein_c', 'cleaved_polyubiquitin_moiety_protein_c', 
                       'ubiquitin_monomer_protein_n', 'cleaved_polyubiquitin_moiety_protein_n']
-        hgnc_id_metabs = [m for m in self.metabolites if isinstance(m, Macromolecule) and m.hgnc_id is None and         m.type not in ['trna', 'rrna', 'complex'] and           not '_'.join(m.id.split('_')[:-1]).endswith('COMPLEX_enzyme_deg_proxy') and          not (hasattr(m, 'fragment_type') and m.fragment_type in fragments) and          not m.id in exceptions]
+        hgnc_id_metabs = [m for m in self.metabolites if isinstance(m, Macromolecule) and m.hgnc_id is None and                         m.type not in ['trna', 'rrna', 'complex'] and                           not [hasattr(m, 'amt') and m._amt=='complex'] and                          not (hasattr(m, 'fragment_type') and m.fragment_type in fragments) and                          not m.id in exceptions]
         if len(hgnc_id_metabs)>0:
             raise ValueError('Some macromolecules did not get an HGNC ID assigned')
             
@@ -743,7 +778,7 @@ class ME_Model(cobra.Model):
                             if expected_machinery != knock_out:
                                 raise ValueError('Machinery mismatch for ' + r.id)
                     else:
-                        if len(actual_machinery) > 1 or actual_machinery[0].type != 'dummy_protein': # dummy
+                        if len(actual_machinery) > 1 or not actual_machinery[0].dummy: # dummy
                             raise ValueError('Non-dummy protein coupled to deorphaned reaction')
                 elif ribosomal_degradation:
                     am = list()
@@ -824,7 +859,76 @@ class ME_Model(cobra.Model):
         self.check_me_mass_balance()
         self._check_coupling(orphan = orphan, knock_out = knock_out, additional_ko = _additional_ko)
         self.check_enzymes(_additional_ko = _additional_ko)
+    
+    def _generate_expressed_genes(self):
+        
+        # map all hgnc_ids to all associated macromolecules and reactions
+        hgnc_ids = set([m.hgnc_id for m in self.metabolites if isinstance(m, Macromolecule) and m.hgnc_id is not None])
+        hgnc_ids = {hgnc_id: {'macromolecules': []} for hgnc_id in hgnc_ids}
 
+        for m in self.metabolites:
+            if isinstance(m, Macromolecule) and m.type in ['premrna', 'fragment_rna', 'mrna', 'protein', 'complex', 'proxy']:
+                if m.hgnc_id is not None:
+                    hgnc_ids[m.hgnc_id]['macromolecules'] += [m.id]
+                else:
+                    if m.type == 'complex':
+                        c_hids = [p.hgnc_id for p in m.decompose_complex() if p.hgnc_id is not None]
+                        for c_hid in c_hids:
+                            hgnc_ids[c_hid]['macromolecules'] += [m.id]
+                    elif m.type == 'proxy':
+                        for c_hid in m._complex_hgnc_ids:
+                            hgnc_ids[c_hid]['macromolecules'] += [m.id]
+
+#         for hgnc_id, v in hgnc_ids.items():
+#             v['reactions'] = list(set(flatten_list([[r.id for r in self.metabolites.get_by_id(m_id).reactions] for m_id in v['macromolecules']])))        
+        
+        for v in hgnc_ids.values():
+            v['reactions'] = list(set(flatten_list([[r.id for r in self.metabolites.get_by_id(m_id).reactions] for m_id in v['macromolecules']])))        
+            v['macromolecules'] = [self.metabolites.get_by_id(m_id) for m_id in v['macromolecules']]
+            v['reactions'] = [self.reactions.get_by_id(r_id) for r_id in v['reactions']]
+        
+            
+        pool = multiprocessing.Pool(processes = self.n_cores)
+        try:
+            expressed_genes = pool.starmap(create_expressed_gene, 
+                                           zip(hgnc_ids.keys(), hgnc_ids.values()))
+            pool.close()
+            pool.join()
+            gc.collect()
+            self.expressed_genes = {g.hgnc_id: g for g in expressed_genes}
+        except:
+            pool.close()
+            pool.join()
+            gc.collect()
+            raise ValueError('Parallelization failed while generating expressed genes list') 
+    
+    def knock_out(self, hgnc_id, inplace = False):
+        '''Knocks out a gene by blocking flux through synthesis of the associated mRNA molecule
+        
+        Parameters
+        ----------
+        hgnc_id: str
+            gene id in HGNC format (HGNC:####); must be present in the model
+        inplace: bool
+            whether to return a separate model object with the knocked out reaction (False) or to 
+            change the reaction bounds in change
+        '''
+        
+        if hgnc_id not in self.expressed_genes:
+            raise ValueError('The specified hgnc_id is not present in the ME Model')
+            
+        r_id = self.expressed_genes[hgnc_id].reactions['Expression_Reactions']['mrna']['synthesis']
+        
+        if inplace:
+            self.reactions.get_by_id(r_id)._lower_bound = 0
+            self.reactions.get_by_id(r_id)._upper_bound = 0
+        else:
+            me_model_copy = copy.deepcopy(self)
+            me_model_copy.reactions.get_by_id(r_id)._lower_bound = 0
+            me_model_copy.reactions.get_by_id(r_id)._upper_bound = 0
+            return me_model_copy
+            
+        
     def pickle(self, file = os.path.join(os.path.abspath(os.getcwd()), 'me_model.pickle')):
         '''Save ME_Model as a pickled object
         

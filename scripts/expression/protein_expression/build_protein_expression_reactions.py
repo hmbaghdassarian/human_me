@@ -281,7 +281,7 @@ def co_translational_translocation(gene_info, mrna_transcript_c, mrna_deg_proxy)
     
     co_translational_translocation_r.add_metabolites(rxn)
     #coupling
-    mrna_deg_proxy.couple(type = 'mrna_degradation', value = -gene_info.coupling['mrna_degradation'])
+    mrna_deg_proxy.couple(value = -gene_info.coupling['mrna_degradation'])
     mrna_transcript_c.couple(type = 'mrna_formation', value = -gene_info.coupling['mrna_formation'])
     co_translational_translocation_r.couple(metabolites = [mrna_deg_proxy, mrna_transcript_c], 
                                  types = ['mrna_degradation', 'mrna_formation'])
@@ -720,18 +720,40 @@ def get_protein_expression_reactions(gene_info, mrna_transcript_c, mrna_deg_prox
     return protein_expression_reactions, protein_metabolites
 
 
-# In[12]:
+# In[13]:
 
 
+# import random
+# import cobra
+# import pandas as pd
+# from expression.gene_information import gene_information
 # import expression.build_mrna_expression_reactions as build_mrna
-# from expression import gene_information
 # from expression.protein_expression import ubiquitin
-# gene_info = gene_information.generate(hgnc_id = 'HGNC:9557', psim = params.psim_me, machinery_list = mach.metabolic_machinery, 
-#                                       metabolic_model = params.human_model)
-# # gene_info.final_locations = {'c': 'Cytosolic Tranport'}
-# # mrna_reactions, mrna_transcript_c, mrna_deg_proxy  = build_mrna.get_mrna_expression_reactions(gene_info, compress_mrna = compress_mrna)
-# protein_reactions, protein_metabolites = build_protein.get_protein_expression_reactions(gene_info, mrna_transcript_c, mrna_deg_proxy, 
-#                                                                                         ub_args = ub_args)
+
+# psim_toy = pd.DataFrame(columns = ['HGNC_ID', 'PREMRNA_SEQ', 'MRNA_SEQ', 'PROTEIN_SEQ', 'POLYA_LENGTH', 'TMD', 
+#                                'SP', 'n_exons', 'DSB', 'GPI', 'OG', 'LOCATION'])
+
+# hgnc_id, premrna_seq = 'HGNC:TOY', ''.join(random.choices(['U', 'C', 'G', 'A'], k = 100))
+# mrna_seq = premrna_seq[25:75]
+# # note that there is no check that the protein_sequence corresponds to the mrna_sequence beyond checking for the length
+# protein_seq = ''.join(random.choices(params.amino_acids, k = int(len(mrna_seq)/3)))
+# polyA_length, tmd, sp, n_exons, dsb, gpi, og  = None, 1, True, None, 2, 2, 2
+# ub_args = ubiquitin.express_ubiquitin(compress_mrna = False)
+# l = 'c'
+# location = list(l)
+# psim_toy.loc[0,:] = [hgnc_id, premrna_seq, mrna_seq, protein_seq, polyA_length, tmd, sp, n_exons, dsb, gpi, og, location]
+# gene_info = gene_information(hgnc_id, premrna_seq, mrna_seq, protein_seq,
+#                  ptms = {}, tmd = tmd, sp = sp, polyA_length = polyA_length, 
+#                  n_exons = n_exons) 
+# gene_info.get_final_locations(metabolic_model = cobra.Model(''), final_locations = location)
+
+# transcription_reactions, mrna_transcript_c, mrna_deg_proxy = build_mrna.get_mrna_expression_reactions(gene_info)
+# protein_expression_reactions, protein_metabolites = get_protein_expression_reactions(gene_info, 
+#                                                  mrna_transcript_c, mrna_deg_proxy, 
+#                                                 ub_args = ub_args)
+# reactions += protein_expression_reactions
+
+
 
 
 # In[13]:
