@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[ ]:
+# In[3]:
 
 
 import cobra
@@ -11,7 +11,7 @@ sys.path.insert(1, '../../scripts/')
 from utils import parameters as params
 
 
-# In[ ]:
+# In[4]:
 
 
 class Macromolecule(cobra.Metabolite):
@@ -25,6 +25,9 @@ class Macromolecule(cobra.Metabolite):
             whether the object is a proxy metabolite (for coupling purposes, no associated mass/charge)
         hgnc_id: str
             the associated gene HGNC ID of the macromolecule (HGNC:####)
+        non_machinery: list
+            each element is a string indicating the compartment(s) that the macromolecule should be expressed as
+            non-machinery
         
         '''
         
@@ -74,7 +77,8 @@ class Macromolecule(cobra.Metabolite):
             dictionary of length one, key is the type, value is the coupling coefficient 
         
         '''
-        
+        if hasattr(self, 'non_machinery') and self.non_machinery:
+            raise ValueError('Unexpected coupling of a non_machinery protein:' + self.id)
         if type not in ['catalysis', 'enzyme_degradation', 'mrna_degradation', 'mrna_formation']:
             raise ValueError('The couple id must be one of catalysis, mrna_degradation, enzyme_degradation, or mrna_formation')
         
@@ -88,9 +92,10 @@ class Macromolecule(cobra.Metabolite):
         
         if type == 'catalysis':
             self.enzyme = True
+        
 
 
-# In[ ]:
+# In[5]:
 
 
 class Proxy(Macromolecule):

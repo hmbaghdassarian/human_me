@@ -208,53 +208,79 @@ def correct_model(model = input_data_path + 'recon2_2.xml'):
     
 
 
-# In[3]:
+# In[ ]:
 
 
-def check_non_machinery(non_machinery = input_data_path + 'non_machinery.txt'):
+def check_non_machinery(non_machinery = dict()):
     '''Runs checks on non-machinery input list. Non-machinery are categorized as any proteins
-    to express in the ME-Model that are not listed in the GPR. 
+    to express in the ME-Model that are not catalyzed in the reaction.  
     
     Parameters
     ----------
-    non_machinery: str, list, or None
-        if list: each entry is a string representing a gene id (HGNC ID format) to express in ME-Model
-        if str: "path/to/non_machinery.txt" is a text file containing the same gene ids as described in the list, with separator = '\n'
+    non_machinery: dictionary
+        keys are HGNC IDs, values are a list of strings, each element of which represents a compartment
+        within the metabolic model for the gene to be expressed
             
     '''
-    
-    # load files------------------------------------
-    if type(non_machinery) == str:
-        if os.path.isfile(non_machinery):
-            non_machinery = open(non_machinery).read().splitlines()
-        else:
-            raise ValueError('Non-machinery file does not exist')
-    elif non_machinery is None:
-        non_machinery = []
-    elif type(non_machinery) != list:
-        raise ValueError('The passed non_machinery argument is invalid')
-    
-    expression_machinery = list(open(build_files_path + 'expression_machinery.txt').read().splitlines())
-    if os.path.isfile(processed_data_path + 'corrected_model.xml'):
-        m_model = cobra.io.read_sbml_model(processed_data_path + 'corrected_model.xml')
-    else:
-        raise ValueError('Please run preprocess.correct_inputs.correct_model first')
-    metabolic_machinery = [g.id for g in m_model.genes]
-    #------------------------------------
-    if len([i for i in non_machinery if not i.startswith('HGNC:')]) > 0:
-        raise ValueError('All non-machinery must be in HGNC ID format')
-    
-    
-    if len(list(set(non_machinery).intersection(expression_machinery + metabolic_machinery))) > 0:
-        msg = 'You have specificied some non-machinery genes which overlap with genes in either the metabolic model '
-        msg += 'or the expression module of the ME model. The current format of the model only allows non GPR '
-        msg += 'genes to be categorizes as non-machinery. Removing these from the non-machinery list'
-        warnings.warn(msg)
+    if non_machinery is None:
+        non_machinery = dict()
 
-        non_machinery = list(set(non_machinery).difference(expression_machinery + metabolic_machinery))
+    for hgnc_id, compartments in non_machinery.items():
+        if not hgnc_id.startswith('HGNC:'):
+            raise ValueError('All non-machinery must be in HGNC ID format')
+        non_machinery[hgnc_id] = list(set(compartments).difference(params.compartments.keys()))
     
-    del m_model
-    return non_machinery, expression_machinery, metabolic_machinery
+
+    return non_machinery
+
+
+# In[3]:
+
+
+# def check_non_machinery(non_machinery = input_data_path + 'non_machinery.txt'):
+#     '''Runs checks on non-machinery input list. Non-machinery are categorized as any proteins
+#     to express in the ME-Model that are not listed in the GPR. 
+    
+#     Parameters
+#     ----------
+#     non_machinery: str, list, or None
+#         if list: each entry is a string representing a gene id (HGNC ID format) to express in ME-Model
+#         if str: "path/to/non_machinery.txt" is a text file containing the same gene ids as described in the list, with separator = '\n'
+            
+#     '''
+    
+#     # load files------------------------------------
+#     if type(non_machinery) == str:
+#         if os.path.isfile(non_machinery):
+#             non_machinery = open(non_machinery).read().splitlines()
+#         else:
+#             raise ValueError('Non-machinery file does not exist')
+#     elif non_machinery is None:
+#         non_machinery = []
+#     elif type(non_machinery) != list:
+#         raise ValueError('The passed non_machinery argument is invalid')
+    
+#     expression_machinery = list(open(build_files_path + 'expression_machinery.txt').read().splitlines())
+#     if os.path.isfile(processed_data_path + 'corrected_model.xml'):
+#         m_model = cobra.io.read_sbml_model(processed_data_path + 'corrected_model.xml')
+#     else:
+#         raise ValueError('Please run preprocess.correct_inputs.correct_model first')
+#     metabolic_machinery = [g.id for g in m_model.genes]
+#     #------------------------------------
+#     if len([i for i in non_machinery if not i.startswith('HGNC:')]) > 0:
+#         raise ValueError('All non-machinery must be in HGNC ID format')
+    
+    
+#     if len(list(set(non_machinery).intersection(expression_machinery + metabolic_machinery))) > 0:
+#         msg = 'You have specificied some non-machinery genes which overlap with genes in either the metabolic model '
+#         msg += 'or the expression module of the ME model. The current format of the model only allows non GPR '
+#         msg += 'genes to be categorizes as non-machinery. Removing these from the non-machinery list'
+#         warnings.warn(msg)
+
+#         non_machinery = list(set(non_machinery).difference(expression_machinery + metabolic_machinery))
+    
+#     del m_model
+#     return non_machinery, expression_machinery, metabolic_machinery
 
 
 # In[4]:
@@ -289,7 +315,7 @@ def get_status(psim_me):
     return psim
 
 def correct_psim(psim_df = input_data_path + 'psim_me.h5', fill_na = 'default', 
-                non_machinery = None):
+                non_machinery = dict()):
     '''Makes sure PSIM has all necessary correct information to build ME Model
     
     *Note, the default psim_file, build/psim_me.h5, is a PSIM generated from MANE/RefSeq Select isoforms.
@@ -311,10 +337,9 @@ def correct_psim(psim_df = input_data_path + 'psim_me.h5', fill_na = 'default',
             for required columns, if incorrect in input psim, will fill with  the gold standard PSIM. required columns include *_SEQ and LOCATION for non-machinery
             if PTR is present in input PSIM and a tissue is specified most often in that column (ignoring NaN), all nan values in that column will default to that tissue
             if non-machinery do not specify an appropriate LOCATION, will fill with  the gold standard PSIM
-    non_machinery: str, list, or None
-        if list: each entry is a string representing a gene id (HGNC ID format) to express in ME-Model
-        if str: "path/to/non_machinery.txt" is a text file containing the same gene ids as described in the list, with separator = '\n'
-    
+    non_machinery: dictionary
+        keys are HGNC IDs, values are a list of strings, each element of which represents a compartment
+        within the metabolic model for the gene to be expressed
     Returns
     ----------
     revised_genes: dict
@@ -325,7 +350,14 @@ def correct_psim(psim_df = input_data_path + 'psim_me.h5', fill_na = 'default',
     Also writes corrected PSIM to outdir/corrected_psim_me.h5 (specified in preprocess.create_environment)
     '''
     # run basic non-machinery check
-    non_machinery, expression_machinery, metabolic_machinery = check_non_machinery(non_machinery = non_machinery)
+    non_machinery = check_non_machinery(non_machinery = non_machinery)
+    
+    expression_machinery = list(open(build_files_path + 'expression_machinery.txt').read().splitlines())
+    if os.path.isfile(processed_data_path + 'corrected_model.xml'):
+        m_model = cobra.io.read_sbml_model(processed_data_path + 'corrected_model.xml')
+    else:
+        raise ValueError('Please run preprocess.correct_inputs.correct_model first')
+    metabolic_machinery = [g.id for g in m_model.genes]
 
     # define the required/optional columns-----------------------------------------------------------------
     user_provided = ['HGNC_ID'] # must be fully provided by user
@@ -379,7 +411,7 @@ def correct_psim(psim_df = input_data_path + 'psim_me.h5', fill_na = 'default',
     missing_cols = sorted(set(all_columns).difference(psim_me.columns))
    
     # check genes are present--------------------------------------------------------------------------
-    proteins = metabolic_machinery + non_machinery
+    proteins = list(set(metabolic_machinery + non_machinery))
     psim_me_genes = psim_me.HGNC_ID.tolist()
     psim_gold_genes = psim_gold.HGNC_ID.tolist()
 
@@ -460,6 +492,7 @@ def correct_psim(psim_df = input_data_path + 'psim_me.h5', fill_na = 'default',
     if temp.LOCATION.dropna().shape[0] < temp.shape[0]:
         raise ValueError('The final location for the following non-machinery must be specified: ' + ', '.join(temp[temp.LOCATION.isna()].HGNC_ID.tolist()))
     
+    revised_genes['non-machinery locations'] = []
     if temp.shape[0] > 0:
         psim_me.loc[temp.index, 'LOCATION'] = temp.LOCATION.tolist()
         revised_genes['non-machinery locations'] = temp.HGNC_ID.tolist()
@@ -470,8 +503,8 @@ def correct_psim(psim_df = input_data_path + 'psim_me.h5', fill_na = 'default',
     
     del psim_gold
     psim_me.to_hdf(processed_data_path + 'corrected_psim.h5', key = 'corrected')
-    with open(processed_data_path + 'corrected_non_machinery.txt', 'w'):
-        for i in non_machinery:
-            f.write(i + '\n')
-    return revised_genes
+#     with open(processed_data_path + 'corrected_non_machinery.txt', 'w'):
+#         for i in non_machinery:
+#             f.write(i + '\n')
+    return non_machinery, revised_genes
 

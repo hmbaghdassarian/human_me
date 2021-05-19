@@ -15,7 +15,8 @@ from macromolecules.macromolecule import Macromolecule, Proxy
 
 
 class Protein(Macromolecule):
-    def __init__(self, compartment, id_, gene_info = None, amino_acid_counts = None, dummy = False):
+    def __init__(self, compartment, id_, gene_info = None, amino_acid_counts = None, dummy = False, 
+                non_machinery = False):
         '''
         
         Generates a Macromolecule in the compartment for a protein with either 1) gene_info (gene_information object) or all of 
@@ -41,6 +42,9 @@ class Protein(Macromolecule):
             keys are amino acids, values are the number of occurences in the protein sequence
         dummy: bool, default False
             whether the protein is a dummy protein for the unmodeled protein fraction of the ME-Model
+        non_machinery: bool, default False
+            whether the protein metabolite is non_machinery. *Note, applies to final protein product but
+            not intermediates
 
         '''
         if gene_info is not None and (amino_acid_counts is not None):
@@ -94,12 +98,15 @@ class Protein(Macromolecule):
         self.enzyme = False # whether the protein is involved in catalysis of a reaction
         self.keff = None
         self._degradation_reactions = [] # associated degradation reactions for protein monomer, if any
-    
+        self.non_machinery = non_machinery
+        
     def _consolidate_degradation_rxns(self):
         '''Remove redundant IDs'''
         self._degradation_reactions = list(set(self._degradation_reactions))
     def make_proxy(self):
         '''Make a proxy metabolite for coupling enzyme degradation to reaction catalysis'''
+        if self.non_machinery:
+            raise ValueError('Unexpected generation of coupling proxy metabolites for non-machinery')
         return Proxy(associated_macromolecule = self)
 
 

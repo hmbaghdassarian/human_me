@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[1]:
+# In[4]:
 
 
 import pandas as pd
@@ -21,7 +21,62 @@ from utils import parameters as params
 from utils import functions as func
 
 
-# In[64]:
+# In[5]:
+
+
+def format_final_locations(final_locations, sp, hgnc_id):
+    '''
+    Parameters
+    ----------
+    final_locations: list 
+        each element is a string representing a compartment in the model
+    sp: bool
+        whether a signal peptide is present
+    hgnc_id: str
+        the hgnc id of the associated gene
+    
+    Returns
+    -------
+    final_locations_dict: dict
+        a dictionary with keys as elements in final_locations and values as means of translation
+    '''
+    
+    # transport rules
+    # assume location dictates transport pathway ind of sp;
+    # assume all genes are transported to mitochondria 
+    # thus, two modes of transport:
+    # 1) cytosolic transport: cytosolic translation-->import to final compartment
+    # 2) canonical secretion: transport/translation via secretory pathway to final compartment
+
+
+    # can expand on these based on signal peptide and transmembrane domain logic in the future
+    final_locations_dict = {}    
+    for loc in final_locations: # no signal peptide consideration
+        if loc in ['n', 'c', 'x', 'm', 'i']: 
+            # mitochondrial expression not considered
+            final_locations_dict[loc] = 'Cytosolic Tranport'
+            if sp: 
+                warnings.warn(hgnc_id + ': Signal peptides not considered for ' + params.compartments[loc])
+        else:
+            if not sp:
+                # add non-canonical in future
+
+                # current structure assumes signal peptide presence for multi-localizing proteins with atleast
+                # one compartment in secretory pathway. in the future, presence of signal peptide could be 
+                # conditional for each location, somewhat analogous to transcript isoforms
+
+                warning_ = 'Final location is part of secretory pathway, but no signal peptide indicated.'
+                warning_ += 'Non canonical secretion is not considered currently. Changing sp to True'
+                warnings.warn(warning_)
+                sp = True
+            if sp:
+                final_locations_dict[loc] = 'Canonical Secretion'
+            else:
+                final_locations_dict[loc] = 'Non-Canonical Secretion'
+    return final_locations_dict
+
+
+# In[6]:
 
 
 class gene_information():
@@ -93,9 +148,9 @@ class gene_information():
         # a secreted protein (processed through secretory pathway, does not catalyze reaction) but not both
         
         if hgnc_id in machinery_list: 
-            self.module = 'Machinery'
+            self.machinery = True
         else:
-            self.module = 'Non-Machinery'
+            self.machinery = False
         
         # sequence check
         if premrna_seq == None or mrna_seq == None or protein_seq == None:
@@ -174,10 +229,7 @@ class gene_information():
             self.n_introns = n_exons - 1
         else:
             raise TypeError(self.hgnc_id + ': n_exons must either be an integer >= 1 or None/nan')
-            
-        #         self.n_introns = round(self.n_introns) # must be an integer
-#         if self.n_introns == 0 and len(self.premrna_seq) > len(self.mrna_seq):
-#            self.n_introns = 1
+
         # check for mismatch in premrna and mrna seq for sequences with very similar lengths
         valid_seq = True
         for nt in ['A', 'U', 'G', 'C']:
@@ -192,7 +244,7 @@ class gene_information():
             self.n_introns = 0
 
 
-        self.final_locations = None
+        self.all_locations = None
         
         
         # coupling parameters
@@ -256,80 +308,64 @@ class gene_information():
             if v.subs(params.mu, 1) <= 0:
                 raise ValueError('The coupling constraint "' + k + '" must be positive for gene ' + self.hgnc_id)
 
-    def get_final_locations(self, metabolic_model = params.human_model, final_locations = None):
+    def get_final_locations(self, metabolic_model = params.human_model, nonmachinery_locations = []):
         '''Assigns a set of final compartments for the protein. For machinery, extracts this from the input
-        cobrapy model. For non-machinery, final_locations should be specified by a list of strings
-        within the allowable compartments. This method helps define necessary transport reactions.
+        cobrapy model. This method helps define necessary transport reactions.
         
-        The final output will be a dictionary with keys as the final locations and values as the method of 
-        synthesis (Cytosolic Transport, Mitochondrial Expression - unimplemented, Canonical Secretion, Non-Canonical Secretion) 
-        depending on Boolean rules.'''
+        Parameters
+        ----------
+        metabolic_model: cobra.core.model.Model
+            a cobra metabolic model, with reactions/GPRs helping define final locations for machinery
+        nonmachinery_locations: list
+            a list of strings of final compartments for non-machinery
         
-        if self.module == 'Machinery':
-            if final_locations != None:
-                warnings.warn(self.hgnc_id + ': Final location extacted from cobrapy model, will disregard user input.')
-              
+        Returns
+        -------
+        self.machinery_locations: dictionary
+            keys as the final compartments for enzymes and values as the method of 
+            synthesis (Cytosolic Transport, Mitochondrial Expression - unimplemented, Canonical Secretion, Non-Canonical Secretion) 
+            depending on Boolean rules.
+        self.nonmachinery_locations: dictionary
+            same as self.machinery, but for non-enzyme proteins
+        self.all_locations: dictionary
+            combined machinery and nonmachinery locations
+        
+        '''
+        self.machinery_locations = list()
+        if self.machinery:
             rxns = list(metabolic_model.genes.get_by_id(self.hgnc_id).reactions)
-            final_locations = sorted(set([func.get_reaction_compartment(r) for r in rxns])) # redundancy from multiple reactions
-
-        elif self.module == 'Non-Machinery':
-    
-            if final_locations == None:
-                raise ValueError(self.hgnc_id + ': For non-machinery, must specify the final locations')
-            if type(final_locations) != list:
-                raise ValueError(self.hgnc_id + ': Final locations must be a list of string')
-            if len(set(final_locations).difference(params.compartments.keys())) > 0:
-                error = 'At least one of the locations specified is not allowed in this model.'
-                raise ValueError(error + ' Allowable comparments include: ' + ', '.join(list(params.compartments.keys())))
-        else:
-            raise ValueError('Model does not currently deal with both non-machinery and machinery')
+            self.machinery_locations = sorted(set([func.get_reaction_compartment(r) for r in rxns])) 
    
-        # transport rules
-        # assume location dictates transport pathway ind of sp;
-        # assume all genes are transported to mitochondria 
-        # thus, two modes of transport:
-        # 1) cytosolic transport: cytosolic translation-->import to final compartment
-        # 2) canonical secretion: transport/translation via secretory pathway to final compartment
+        if not self.machinery and len(nonmachinery_locations) == 0:
+                raise ValueError(self.hgnc_id + ': For non-machinery, must specify the final compartments')
         
-        # can expand on these based on signal peptide and transmembrane domain logic in the future
-        self.final_locations = {}    
-        for loc in final_locations: # no signal peptide consideration
-            if loc in ['n', 'c', 'x', 'm', 'i']: 
-                # mitochondrial expression not considered
-                self.final_locations[loc] = 'Cytosolic Tranport'
-                if self.sp: 
-                    warnings.warn(self.hgnc_id + ': Signal peptides not considered for ' + params.compartments[loc])
-            else:
-                if not self.sp:
-                    # add non-canonical in future
-                    
-                    # current structure assumes signal peptide presence for multi-localizing proteins with atleast
-                    # one compartment in secretory pathway. in the future, presence of signal peptide could be 
-                    # conditional for each location, somewhat analogous to transcript isoforms
-                    
-                    warning_ = 'Final location is part of secretory pathway, but no signal peptide indicated.'
-                    warning_ += 'Non canonical secretion is not considered currently. Changing sp to True'
-                    warnings.warn(warning_)
-                    self.sp = True
-                if self.sp:
-                    self.final_locations[loc] = 'Canonical Secretion'
-                else:
-                    self.final_locations[loc] = 'Non-Canonical Secretion'
+        # no overlap in compartments of machinery and non-machinery
+        self.nonmachinery_locations = sorted(set(nonmachinery_locations).difference(self.machinery_locations))
+
+        if len(set(self.nonmachinery_locations).difference(params.compartments.keys())) > 0:
+            error = 'At least one of the locations specified is not allowed in this model.'
+            raise ValueError(error + ' Allowable comparments include: ' + ', '.join(list(params.compartments.keys())))
+   
+        self.machinery_locations = format_final_locations(final_locations = self.machinery_locations, sp = self.sp, hgnc_id = self.hgnc_id)
+        self.nonmachinery_locations = format_final_locations(final_locations = self.nonmachinery_locations, sp = self.sp, hgnc_id = self.hgnc_id)
         
-        # OLD
+        # scale coupling
+        self.all_locations = self.machinery_locations.copy()
+        for k,v in self.nonmachinery_locations.items():
+            self.all_locations[k] = v
         # in the case that protein synthesis flux spread across multiple reactions due to multi-localization
-        if len(set(self.final_locations.values())) > 1:
-            if len(set(self.final_locations.values())) == 2:
+        if len(set(self.all_locations.values())) > 1:
+            if len(set(self.all_locations.values())) == 2:
                 self.coupling['mrna_degradation'] = 0.5*self.coupling['mrna_degradation']
                 self.coupling['mrna_formation'] = 0.5*self.coupling['mrna_formation']
             else:
                 raise ValueError('Have not yet accounted for Non-Canonical Secretion or other synthesis forms in coupling of mrna degradataion to protein synthesis')
 
     def check_gene_information(self):
-        if self.final_locations == None:
+        if self.all_locations == None:
             raise ValueError(self.hgnc_id + ': Must specify a final location for the gene. Use the get_final_locations() method')
         if len(self.ptms) > 0:
-            if self.module == 'Machinery':
+            if self.machinery:
                 # change in the future
                 warnings.warn(self.hgnc_id + ': PTMs are not considered for machinery proteins currently')
                 self.ptms = {}
@@ -344,7 +380,7 @@ class gene_information():
         print('No errors raised')
 
 
-# In[3]:
+# In[10]:
 
 
 ptm_cols = ['DSB', 'GPI', 'NG', 'OG']
@@ -352,8 +388,9 @@ ptm_keys = list(params.allowed_ptms.keys())
 cp_keys = ['alpha_m', 'alpha_p', 'ptr']
 
 def generate(hgnc_id, psim = params.psim_me, machinery_list = mach.metabolic_machinery, 
-                             metabolic_model = params.human_model):
-    '''Generates gene information object from PSIM'''
+                             metabolic_model = params.human_model, nonmachinery_locations = []):
+    '''Generates gene information object from PSIM. Assumes the gene information object being 
+    generated is not for a non-machinery protein.'''
     
     idx = psim[psim.HGNC_ID == hgnc_id].index.tolist()
 
@@ -372,7 +409,7 @@ def generate(hgnc_id, psim = params.psim_me, machinery_list = mach.metabolic_mac
                     n_exons = entries['N_EXONS'], 
                     coupling_params = dict(zip(cp_keys, cp_values)))
     gene_info.get_final_locations(metabolic_model = metabolic_model, 
-                                  final_locations = entries['LOCATION'])
+                                  nonmachinery_locations = nonmachinery_locations)
     gene_info.check_gene_information()
     return gene_info
 

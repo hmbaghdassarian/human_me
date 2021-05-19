@@ -20,12 +20,10 @@ from macromolecules.protein import Protein
 from uniform_processes import biomass
 
 
-# Ubiquitin expression
-
 # In[2]:
 
 
-def express_ubiquitin(compress_mrna = False):
+def express_ubiquitin(compress_mrna):
     # UBC
     ubc_psim = params.psim_me[params.psim_me['HGNC_ID'] == 'HGNC:12468'] # UBC
     ubc_psim['Location'] = 'c'
@@ -34,7 +32,8 @@ def express_ubiquitin(compress_mrna = False):
                                 mrna_seq=ubc_psim['MRNA_SEQ'].values.tolist()[0], 
                                 protein_seq=ubc_psim['PROTEIN_SEQ'].values.tolist()[0],
                                 polyA_length = round(ubc_psim['POLYA_LENGTH'].values.tolist()[0]))
-    ubc_info.get_final_locations(params.human_model, final_locations=['c'])
+    ubc_info.get_final_locations(nonmachinery_locations=['c'])
+    ubc_info = func.convert_gi(ubc_info, non_machinery = dict())
     ubc_mrna_expression_reactions, ubc_transcript_c, ubc_deg_proxy = build_mrna.get_mrna_expression_reactions(ubc_info, compress_mrna = compress_mrna)
 
     # ubiquitin monomer
@@ -63,7 +62,8 @@ def express_ubiquitin(compress_mrna = False):
                                 mrna_seq=ubb_psim['MRNA_SEQ'].values.tolist()[0], 
                                 protein_seq=ubb_psim['PROTEIN_SEQ'].values.tolist()[0],
                                 polyA_length = round(ubb_psim['POLYA_LENGTH'].values.tolist()[0]))
-    ubb_info.get_final_locations(params.human_model, final_locations=['c'])
+    ubb_info.get_final_locations(nonmachinery_locations=['c'])
+    ubb_info = func.convert_gi(ubb_info, non_machinery = dict())
     ubb_mrna_expression_reactions, ubb_transcript_c, ubb_deg_proxy = build_mrna.get_mrna_expression_reactions(ubb_info, compress_mrna = compress_mrna)
 
     ubb_translation_reaction_cytosolic, ubb_c = c_trln.translate_protein_cytosolic(ubb_info, ubb_transcript_c, ubb_deg_proxy)

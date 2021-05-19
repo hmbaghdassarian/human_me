@@ -39,6 +39,21 @@ def flatten_list(t):
     return [item for sublist in t for item in sublist]
 
 
+# In[ ]:
+
+
+def convert_gi(gi, non_machinery):
+    gi.machinery = True
+    gi.all_locations, gi.machinery_locations = gi.nonmachinery_locations.copy(), gi.nonmachinery_locations.copy()
+    gi.nonmachinery_locations = dict()
+    if gi.hgnc_id in non_machinery:
+        gi.non_machinery_locations = gene_information.format_final_locations(
+            final_locations = list(set(non_machinery[hgnc_id]).difference(gene_info.machinery_locations.keys())), 
+        sp = True, hgnc_id = gi.hgnc_id)
+    
+    return gi
+
+
 # In[11]:
 
 

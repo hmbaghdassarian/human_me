@@ -220,7 +220,7 @@ def post_translational_translocation(gene_info, unfolded_protein_c):
     rxn = {unfolded_protein_c: -1, folded_protein_r: 1}
     rxn = func.hydrolyze_atp(rxn, n_atp = 1, compartment = 'c')
     
-    if gene_info.tmd > 0 or 'pm' in gene_info.final_locations.keys(): # membrane secreted protein
+    if gene_info.tmd > 0 or 'pm' in gene_info.all_locations.keys(): # membrane secreted protein
         post_translational_translocation_r = Protein_Expression_Reaction(gene_info.hgnc_id + '_post_TRANSLOC_3A_IMPORTtr', 
                                                                  hgnc_id = gene_info.hgnc_id)
         post_translational_translocation_r.subsytem = 'Protein_Expression'
@@ -483,13 +483,13 @@ def secrete_protein(gene_info, modified_protein_g):
 
     secreted_proteins = list()
     for nc in ['e', 'pm', 'l']:
-        if nc in gene_info.final_locations.keys():
+        if nc in gene_info.all_locations.keys():
             secreted_protein = modified_protein_g.change_compartment(nc)
             secreted_proteins += [secreted_protein]
     
-#     statement1 = 'pm' in gene_info.final_locations.keys()
+#     statement1 = 'pm' in gene_info.all_locations.keys()
 #     lysosomal_degradation_ptm_condition = 'gpi' in gene_info.ptms.keys() and len(gene_info.ptms.keys()) == 1
-#     statment2 = statement2 and ('r' in gene_info.final_locations.keys() or 'g' in gene_info.final_locations.keys())
+#     statment2 = statement2 and ('r' in gene_info.all_locations.keys() or 'g' in gene_info.all_locations.keys())
 #     if statement1 or lysosomal_degradation_ptm_condition:
    
 
@@ -545,51 +545,51 @@ def get_protein_expression_reactions(gene_info, mrna_transcript_c, mrna_deg_prox
     protein_expression_reactions, protein_metabolites = list(), list()
     
     # cytosolic transport: c, n, m, i, x and post-translational translocation
-    if 'Cytosolic Tranport' in gene_info.final_locations.values() or gene_info.L_protein <= params.ptt_length: 
+    if 'Cytosolic Tranport' in gene_info.all_locations.values() or gene_info.L_protein <= params.ptt_length: 
         translation_elongation_c, unfolded_protein_c = c_trln.translate_protein_cytosolic(gene_info, mrna_transcript_c, mrna_deg_proxy)
         protein_expression_reactions.append(translation_elongation_c)
 
-        if 'Cytosolic Tranport' in gene_info.final_locations.values():
-            if 'c' in gene_info.final_locations.keys() or 'x' in gene_info.final_locations.keys() or 'n' in gene_info.final_locations.keys():
+        if 'Cytosolic Tranport' in gene_info.all_locations.values():
+            if 'c' in gene_info.all_locations.keys() or 'x' in gene_info.all_locations.keys() or 'n' in gene_info.all_locations.keys():
                 protein_folding_cytosolic, folded_protein_c = fold_protein_cytosolic(gene_info, unfolded_protein_c)
                 protein_expression_reactions += [protein_folding_cytosolic]
 
 
-                if 'c' in gene_info.final_locations.keys() or 'x' in gene_info.final_locations.keys() or ('n' in gene_info.final_locations.keys() and folded_protein_c.formula_weight/1000 <= params.nuclear_diffusion_limit):
+                if 'c' in gene_info.all_locations.keys() or 'x' in gene_info.all_locations.keys() or ('n' in gene_info.all_locations.keys() and folded_protein_c.formula_weight/1000 <= params.nuclear_diffusion_limit):
                    # cytoplasmic degradation of folded proteins: cytoplasmic proteins, peroxisomal proteins, or nuclear proteins undergoing passive diffusion
                     protein_expression_reactions += degradation.degrade(folded_protein_c, **{'ub_args':ub_args})
 
-                    if 'c' in gene_info.final_locations.keys():
+                    if 'c' in gene_info.all_locations.keys():
                         protein_metabolites += [folded_protein_c]
 
-                    if 'x' in gene_info.final_locations.keys():
+                    if 'x' in gene_info.all_locations.keys():
                         peroxisomal_reactions, folded_protein_x = get_peroxisomal_reactions(gene_info, folded_protein_c)
                         protein_expression_reactions += peroxisomal_reactions
                         protein_metabolites += [folded_protein_x]
 
-                if 'n' in gene_info.final_locations.keys():
+                if 'n' in gene_info.all_locations.keys():
                     nuclear_reactions, folded_protein_n = get_nuclear_reactions(gene_info, folded_protein_c,
                                                                                 ub_args = ub_args)
                     protein_expression_reactions += nuclear_reactions
                     protein_metabolites += [folded_protein_n]
 
 
-            if 'i' in gene_info.final_locations.keys(): # no folding for i, but cytoplasmic degradation
+            if 'i' in gene_info.all_locations.keys(): # no folding for i, but cytoplasmic degradation
                 protein_expression_reactions += degradation.degrade(macromolecule = unfolded_protein_c, 
                                                                              **{'ub_args': ub_args})
             # mitochondrial transport and degradation ('i' and 'm')
-            if ('m' in gene_info.final_locations.keys()) or ('i' in gene_info.final_locations.keys()):
-                if ('m' in gene_info.final_locations.keys()) and ('i' in gene_info.final_locations.keys()):
+            if ('m' in gene_info.all_locations.keys()) or ('i' in gene_info.all_locations.keys()):
+                if ('m' in gene_info.all_locations.keys()) and ('i' in gene_info.all_locations.keys()):
                     mitochondrial_reactions, mitochondrial_protein_metabolites = get_mitochondrial_reactions(gene_info, unfolded_protein_c, compartments = ['m','i'])
-                elif 'm' in gene_info.final_locations.keys():
+                elif 'm' in gene_info.all_locations.keys():
                     mitochondrial_reactions, mitochondrial_protein_metabolites = get_mitochondrial_reactions(gene_info, unfolded_protein_c, compartments = ['m'])
-                elif 'i' in gene_info.final_locations.keys():
+                elif 'i' in gene_info.all_locations.keys():
                     mitochondrial_reactions, mitochondrial_protein_metabolites = get_mitochondrial_reactions(gene_info, unfolded_protein_c, compartments = ['i'])
                 protein_expression_reactions += mitochondrial_reactions
                 protein_metabolites += mitochondrial_protein_metabolites
     
     # SECRETORY PATHWAY: r, g, l, e, pm proteins             
-    if 'Canonical Secretion' in gene_info.final_locations.values():
+    if 'Canonical Secretion' in gene_info.all_locations.values():
         if gene_info.L_protein > params.ptt_length:
             ptt_ = False
         else:
@@ -618,7 +618,7 @@ def get_protein_expression_reactions(gene_info, mrna_transcript_c, mrna_deg_prox
         # lysosomal degradation only imported as part of its degradation pathway
 
 #         lysosomal_degradation_ptm_condition = 'gpi' in gene_info.ptms.keys() and len(gene_info.ptms.keys()) == 1
-        if len(set(['g', 'pm', 'e', 'l']).intersection(gene_info.final_locations.keys())) > 0 or 'og' in gene_info.ptms.keys():# or lysosomal_degradation_ptm_condition:
+        if len(set(['g', 'pm', 'e', 'l']).intersection(gene_info.all_locations.keys())) > 0 or 'og' in gene_info.ptms.keys():# or lysosomal_degradation_ptm_condition:
             golgi_import, protein_g = import_golgi(gene_info, modified_protein_r)
             protein_expression_reactions += [golgi_import]
             
@@ -630,18 +630,18 @@ def get_protein_expression_reactions(gene_info, mrna_transcript_c, mrna_deg_prox
                 modified_protein_g = protein_g
                 
             # transport to plasma membrane, ECM, and lysosome 
-            if len(set(['pm', 'e', 'l']).intersection(gene_info.final_locations.keys())) > 0:# or lysosomal_degradation_ptm_condition:
+            if len(set(['pm', 'e', 'l']).intersection(gene_info.all_locations.keys())) > 0:# or lysosomal_degradation_ptm_condition:
                 secreted_protein_reactions, secreted_proteins = secrete_protein(gene_info, modified_protein_g)
                 protein_expression_reactions += secreted_protein_reactions
                 protein_metabolites += secreted_proteins
                             
             
             # retrograde transport
-            if 'r' in gene_info.final_locations.keys() or 'g' in gene_info.final_locations.keys():# and not lysosomal_degradation_ptm_condition:
+            if 'r' in gene_info.all_locations.keys() or 'g' in gene_info.all_locations.keys():# and not lysosomal_degradation_ptm_condition:
                 # golgi retrograde transport for degradation 
                 retrograde_transport, retro_protein_r = degradation.retrograde_er(modified_protein_g)
                 protein_expression_reactions += [retrograde_transport]
-                if 'g' in gene_info.final_locations.keys():
+                if 'g' in gene_info.all_locations.keys():
                     protein_metabolites += [modified_protein_g]
 
         else:
@@ -649,8 +649,8 @@ def get_protein_expression_reactions(gene_info, mrna_transcript_c, mrna_deg_prox
         
             
         # ERAD: ER and Golgi-resident proteins 
-        if ('r' in gene_info.final_locations.keys() or 'g' in gene_info.final_locations.keys()):# and not lysosomal_degradation_ptm_condition: 
-            if 'r' in gene_info.final_locations.keys():
+        if ('r' in gene_info.all_locations.keys() or 'g' in gene_info.all_locations.keys()):# and not lysosomal_degradation_ptm_condition: 
+            if 'r' in gene_info.all_locations.keys():
                 protein_metabolites += [retro_protein_r]
                 
             rpdr = list()
@@ -658,7 +658,7 @@ def get_protein_expression_reactions(gene_info, mrna_transcript_c, mrna_deg_prox
                 erad_reactions, unfolded_protein_c = degradation.degrade(macromolecule = retro_protein_r, 
                                                      **{'unfolded_protein_c': unfolded_protein_c})
                 rpdr += erad_reactions
-                if 'i' not in gene_info.final_locations.keys(): # this reaction doesn't already exist
+                if 'i' not in gene_info.all_locations.keys(): # this reaction doesn't already exist
                     rpdr += degradation.degrade(unfolded_protein_c, **{'ub_args': ub_args})
             else:
                 erad_reactions, unfolded_protein_c = degradation.degrade(macromolecule = retro_protein_r,
@@ -673,7 +673,7 @@ def get_protein_expression_reactions(gene_info, mrna_transcript_c, mrna_deg_prox
                 rpdr += degradation.degrade(macromolecule = unfolded_protein_c, 
                                                                     **{'ub_args': ub_args})
                 for r in rpdr:
-                    if 'g' in gene_info.final_locations.keys():
+                    if 'g' in gene_info.all_locations.keys():
                         r._update_tracking(modified_protein_g) # not explicitly accounted for for protein monomers
                     r._update_tracking([retro_protein_r, unfolded_protein_c])
                     r._consolidate_macromolecules()    
@@ -684,15 +684,15 @@ def get_protein_expression_reactions(gene_info, mrna_transcript_c, mrna_deg_prox
             
         # PM/L degradation needed
         # endocytosis of plasma membrane proteins
-        if 'l' in gene_info.final_locations.keys() or 'pm' in gene_info.final_locations.keys():
-            if 'l' in gene_info.final_locations.keys():
+        if 'l' in gene_info.all_locations.keys() or 'pm' in gene_info.all_locations.keys():
+            if 'l' in gene_info.all_locations.keys():
                 protein_l = [p for p in secreted_proteins if p.compartment == 'l'][0]
             else: 
                 protein_l = None
             
             # endocytosis
             ppdr = list()
-            if 'pm' in gene_info.final_locations.keys():
+            if 'pm' in gene_info.all_locations.keys():
                 protein_pm = [p for p in secreted_proteins if p.compartment == 'pm'][0]
                 endocytosis_reactions, protein_l = degradation.build_endocytosis_reactions(                                                   macromolecule_pm = protein_pm, 
                                                    **{'ub_args': ub_args, 'macromolecule_l': protein_l})
@@ -702,21 +702,24 @@ def get_protein_expression_reactions(gene_info, mrna_transcript_c, mrna_deg_prox
             # lysosomal degradation
             ppdr += degradation.degrade(macromolecule = protein_l)
             
-            if 'pm' in gene_info.final_locations.keys():
+            if 'pm' in gene_info.all_locations.keys():
                 for r in ppdr:
                     r._update_tracking(protein_pm) # not explicitly accounted for for protein monomers
                     r._consolidate_macromolecules()
             
             protein_expression_reactions += ppdr
 
-    elif 'Non-Canonical Secretion' in gene_info.final_locations.values():
+    elif 'Non-Canonical Secretion' in gene_info.all_locations.values():
         raise ValueError('Model does not currently account for non-canonical secretion')
     
     for r in protein_expression_reactions:
         if r.subsystem != 'Protein_Degradation':
             r.subsystem = 'Protein_Expression'
 
-
+    for m in protein_metabolites:
+        if m.compartment not in gene_info.machinery_locations.keys():
+            m.non_machinery = True
+    
     return protein_expression_reactions, protein_metabolites
 
 

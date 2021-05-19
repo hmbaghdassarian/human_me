@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[22]:
+# In[1]:
 
 
 import cobra
@@ -37,7 +37,7 @@ from expression.protein_expression import build_protein_expression_reactions as 
 
 # # rRNA
 
-# In[23]:
+# In[2]:
 
 
 # rrna sequences
@@ -96,12 +96,14 @@ psim_rib = params.psim_me.copy()
 psim_rib.LOCATION = psim_rib.LOCATION.apply(lambda x: ['n', 'c'])
 exclude = ['POLYUBIQUITINATIONn', 'DEUBIQUITINATIONn', 'DEGRADATIONn']
 
-def cleave_ub(hgnc_id, ub_args, compress_mrna = False):
+
+
+def cleave_ub(hgnc_id, ub_args, compress_mrna):
     '''Generates reactions specific for ubiquitin-protein fusions. RPL40 and RPS27A have ubiquitin fusions.'''
     gene_info = gene_information.generate(hgnc_id = hgnc_id, psim = psim_rib, 
-                    machinery_list = list(), metabolic_model = cobra.Model())
-    gene_info.final_locations = {'n': 'Cytosolic Tranport'}
-    gene_info.module = 'Machinery'
+                    machinery_list = list(), metabolic_model = cobra.Model(), nonmachinery_locations = ['n'])
+    gene_info = func.convert_gi(gene_info, non_machinery = dict())
+
     mrna_expression_reactions, mrna_transcript_c, mrna_deg_proxy = build_mrna.get_mrna_expression_reactions(gene_info, compress_mrna = compress_mrna)
     translation_elongation_c, unfolded_protein_c = build_protein.c_trln.translate_protein_cytosolic(gene_info, mrna_transcript_c, mrna_deg_proxy)
     translation_elongation_c.ubiquitin_biogenesis = True
@@ -109,10 +111,10 @@ def cleave_ub(hgnc_id, ub_args, compress_mrna = False):
     processed_seq = gene_info.protein_seq[:gene_info.protein_seq.index(ub_args['single_ubiquitin_sequence'])] + gene_info.protein_seq[gene_info.protein_seq.index(ub_args['single_ubiquitin_sequence']) + len(ub_args['single_ubiquitin_sequence']):]
     psim_temp = psim_rib.copy()
     psim_temp.loc[psim_temp[psim_temp.HGNC_ID == hgnc_id].index, 'PROTEIN_SEQ'] = processed_seq
-    gene_info = gene_information.generate(hgnc_id = hgnc_id, psim = psim_temp, 
-                    machinery_list = list(), metabolic_model = cobra.Model())
-    gene_info.final_locations = {'n': 'Cytosolic Tranport'}
-    gene_info.module = 'Machinery'
+    gene_info = gene_information.generate(hgnc_id = hgnc_id, psim = psim_rib, 
+                    machinery_list = list(), metabolic_model = cobra.Model(), nonmachinery_locations = ['n'])
+    gene_info = func.convert_gi(gene_info, non_machinery = dict())
+    
     processed_unfolded_protein_c = Protein(id_ = 'processed_unfolded',compartment = 'c', gene_info = gene_info)#Protein(id_ = hgnc_id + '_processed_unfolded',compartment = 'c', amino_acid_counts = gene_info.amino_acid_counts)
     ub_cleavage = Expression_Reaction(id = gene_info.hgnc_id + '_UBIQUITIN_CLEAVAGEc' , hgnc_id = gene_info.hgnc_id,
                                       subsystem = 'Protein_Expression', ribosome_biogenesis = True, ubiquitin_biogenesis = True)
@@ -137,7 +139,7 @@ def cleave_ub(hgnc_id, ub_args, compress_mrna = False):
     
     return to_add, folded_protein_c, folded_protein_n
 
-def build_ribosome_protein_expression_reactions(ub_args, compress_mrna = False):
+def build_ribosome_protein_expression_reactions(ub_args, compress_mrna):
     '''Reactions associated with transcription and translation of ribosomal proteins'''
     
     # small ribosome proteins--------------------------------------------------------------------------------
@@ -147,9 +149,8 @@ def build_ribosome_protein_expression_reactions(ub_args, compress_mrna = False):
     rs_expression_reactions, rs_protein_metabolites = list(), list()
     for i in rs_ids:
         gene_info = gene_information.generate(hgnc_id = i, psim = psim_rib, 
-                    machinery_list = list(), metabolic_model = cobra.Model())
-        gene_info.final_locations = {'c': 'Cytosolic Tranport', 'n': 'Cytosolic Tranport'}
-        gene_info.module = 'Machinery'
+                    machinery_list = list(), metabolic_model = cobra.Model(), nonmachinery_locations = ['n', 'c'])
+        gene_info = func.convert_gi(gene_info, non_machinery = dict())
         mrna_expression_reactions, mrna_transcript_c, mrna_deg_proxy = build_mrna.get_mrna_expression_reactions(gene_info, compress_mrna = compress_mrna)
         protein_expression_reactions, protein_metabolites = build_protein.get_protein_expression_reactions(gene_info, mrna_transcript_c, mrna_deg_proxy, ub_args)
         protein_expression_reactions = [r for r in protein_expression_reactions if r.id.split('_')[-1] not in exclude]# no nuclear degradation
@@ -163,9 +164,8 @@ def build_ribosome_protein_expression_reactions(ub_args, compress_mrna = False):
     rl_expression_reactions, rl_protein_metabolites = list(), list()
     for i in rl_ids:
         gene_info = gene_information.generate(hgnc_id = i, psim = psim_rib, 
-                    machinery_list = list(), metabolic_model = cobra.Model())
-        gene_info.final_locations = {'c': 'Cytosolic Tranport', 'n': 'Cytosolic Tranport'}
-        gene_info.module = 'Machinery'
+                    machinery_list = list(), metabolic_model = cobra.Model(), nonmachinery_locations = ['n', 'c'])
+        gene_info = func.convert_gi(gene_info, non_machinery = dict())
         mrna_expression_reactions, mrna_transcript_c, mrna_deg_proxy = build_mrna.get_mrna_expression_reactions(gene_info, compress_mrna = compress_mrna)
         protein_expression_reactions, protein_metabolites = build_protein.get_protein_expression_reactions(gene_info, mrna_transcript_c, mrna_deg_proxy, ub_args)
         protein_expression_reactions = [r for r in protein_expression_reactions if r.id.split('_')[-1] not in exclude]# no nuclear degradation
@@ -599,7 +599,7 @@ def build_other_rrna_reactions(rrna5s_complex_n, rs_protein_metabolites, rl_prot
 # In[6]:
 
 
-def build_ribosome(ub_args, compress_mrna = True, reversible_complex_formation = False):
+def build_ribosome(ub_args, compress_mrna, reversible_complex_formation):
     with func.HiddenPrints():
         rs_expression_reactions, rs_protein_metabolites, rl_expression_reactions, rl_protein_metabolites = build_ribosome_protein_expression_reactions(ub_args, compress_mrna)
     rpl5_n = [m for m in rl_protein_metabolites if m.id == 'HGNC:10360_folded_protein_n'][0]
