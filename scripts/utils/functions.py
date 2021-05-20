@@ -42,6 +42,30 @@ def flatten_list(t):
 # In[ ]:
 
 
+def create_gene_reaction_map(reactions):
+    '''
+    Parameters
+    ----------
+    reactions: list 
+        each element is a cobra.core.reactions.Reaction object
+    
+    Returns
+    -------
+    gene_reaction_map: dict
+        keys are HGNC ID strings, values are a list of reactions from the reactions input in which the HGNC ID
+        helps catalyze that reaction
+    '''
+    
+    gene_reaction_map = dict()
+    for r in reactions:
+        for g in r.genes:
+            if g.id in gene_reaction_map:
+                gene_reaction_map[g.id] += [r]
+            else:
+                gene_reaction_map[g.id] = [r]
+
+    return gene_reaction_map
+
 def convert_gi(gi, non_machinery):
     gi.machinery = True
     gi.all_locations, gi.machinery_locations = gi.nonmachinery_locations.copy(), gi.nonmachinery_locations.copy()

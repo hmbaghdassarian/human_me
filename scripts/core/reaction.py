@@ -182,7 +182,7 @@ class ME_Reaction(cobra.Reaction):
             md[metabolite.id] -= metabolite.coupling_coefficient[type] # coupling not part of mass balance
             md[metabolite.id] = float(md[metabolite.id])
             for val in [1,0]: 
-                if abs((np.sign(md[metabolite.id])*val) - md[metabolite.id]) < 1e-15:
+                if abs((np.sign(md[metabolite.id])*val) - md[metabolite.id]) < sympy_tol:
                     md[metabolite.id] = np.sign(md[metabolite.id])*val
 
         for m_id, coefficient in iteritems(md):   
@@ -369,6 +369,8 @@ class Protein_Degradation_Reaction(Expression_Reaction):
         self._macromolecules = [] # list of macromolecule ids associated with this degradation reaction
         self._enzymes = None # list of enzyme ids associated with this degradation reaction
         self._ribosomal_degradation = False # see complex_degradation_reaction for details
+        self._non_machinery = False # whether the degradation reaction is associated with degradation of non-machinery protein, can overlap with degradation reactions for machinery proteins
+            
         
     def _update_tracking(self, macromolecules):
         '''Mutual tracking of degradation reactions associated with a macromolecule and vice-versa'''

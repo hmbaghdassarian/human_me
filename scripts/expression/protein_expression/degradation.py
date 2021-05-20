@@ -3,7 +3,7 @@
 
 # This script provides a complete set of specific degradation reactions for complexes, based on their compartment. For proteins, conditional inclusion of various reactions based on gene features, etc is implemented in the build_protein_express_reactions script.
 
-# In[1]:
+# In[2]:
 
 
 import sys
@@ -22,7 +22,7 @@ from macromolecules.complex import add_complex_metabolites
 from core.reaction import Protein_Degradation_Reaction, Complex_Degradation_Reaction
 
 
-# In[2]:
+# In[3]:
 
 
 deg_reaction_map = {'protein': Protein_Degradation_Reaction, 'complex': Complex_Degradation_Reaction}
@@ -30,7 +30,7 @@ deg_reaction_map = {'protein': Protein_Degradation_Reaction, 'complex': Complex_
 
 # # Cytosol and Nucleus
 
-# In[3]:
+# In[4]:
 
 
 def protein_polyubiquitination(macromolecule, **kwargs):
@@ -197,7 +197,7 @@ def degrade_cytosolic_nuclear_protein(macromolecule, **kwargs):
 
 # # Mitochondria and Intermembrane Space
 
-# In[4]:
+# In[5]:
 
 
 def degrade_mitochondrial_protein(macromolecule):
@@ -254,7 +254,7 @@ def degrade_peroxisomal_protein(macromolecule):
 
 # # Secretory Pathway Degradation
 
-# In[5]:
+# In[6]:
 
 
 def unfold_secretory_protein(macromolecule):
@@ -454,7 +454,7 @@ def build_erad_reactions(macromolecule, **kwargs):
         return erad_reactions
 
 
-# In[6]:
+# In[7]:
 
 
 def build_endocytosis_reactions(macromolecule_pm, **kwargs):
@@ -567,7 +567,7 @@ def degrade_lysosomal_pm_protein(macromolecule, **kwargs):
     
 
 
-# In[7]:
+# In[8]:
 
 
 degrade_reaction_map = {'c': degrade_cytosolic_nuclear_protein, 'n': degrade_cytosolic_nuclear_protein, 
@@ -576,7 +576,7 @@ degrade_reaction_map = {'c': degrade_cytosolic_nuclear_protein, 'n': degrade_cyt
                'r': build_erad_reactions, 'g': build_erad_reactions, 
               'l': degrade_lysosomal_pm_protein, 'pm': degrade_lysosomal_pm_protein}
 
-def degrade(macromolecule, **kwargs):
+def degrade(macromolecule, non_machinery = False, **kwargs):
     '''Compartment-specific degradation reactions for proteins or protein-protein complexes'''
     
     if not (macromolecule.type == 'protein' or macromolecule.type == 'complex'):
@@ -588,6 +588,9 @@ def degrade(macromolecule, **kwargs):
     if isinstance(macromolecule, Ribosomal_Complex):
         for r in deg_reactions:
             r.ribosome_biogenesis = True
+    if non_machinery:
+        for r in deg_reactions:
+            r._non_machinery = True
     
     if macromolecule.compartment not in ['r', 'g'] or macromolecule.type == 'complex':
         dr = deg_reactions

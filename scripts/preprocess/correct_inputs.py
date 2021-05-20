@@ -228,7 +228,7 @@ def check_non_machinery(non_machinery = dict()):
     for hgnc_id, compartments in non_machinery.items():
         if not hgnc_id.startswith('HGNC:'):
             raise ValueError('All non-machinery must be in HGNC ID format')
-        non_machinery[hgnc_id] = list(set(compartments).difference(params.compartments.keys()))
+        non_machinery[hgnc_id] = list(set(compartments).difference(compartments_me.keys()))
     
 
     return non_machinery
@@ -411,7 +411,7 @@ def correct_psim(psim_df = input_data_path + 'psim_me.h5', fill_na = 'default',
     missing_cols = sorted(set(all_columns).difference(psim_me.columns))
    
     # check genes are present--------------------------------------------------------------------------
-    proteins = list(set(metabolic_machinery + non_machinery))
+    proteins = list(set(metabolic_machinery + list(non_machinery)))
     psim_me_genes = psim_me.HGNC_ID.tolist()
     psim_gold_genes = psim_gold.HGNC_ID.tolist()
 
@@ -484,21 +484,21 @@ def correct_psim(psim_df = input_data_path + 'psim_me.h5', fill_na = 'default',
     if len(non_machinery) > 0 and 'LOCATION' not in psim_me.columns.tolist():
         psim_me['LOCATION'] = float('nan')
     compartments = ['[c]', '[e]', '[l]', '[m]', '[r]', '[n]', '[g]', '[x]', '[b]', '[i]', '[pm]']
-    temp = psim_me[psim_me.HGNC_ID.isin(non_machinery) & ((psim_me.LOCATION.isna()) | psim_me.LOCATION.apply(lambda x: x not in compartments))]
-    err = False
-    if len(set(temp.HGNC_ID).difference(psim_gold.HGNC_ID)) > 0:
-        raise ValueError('The final location for the following non-machinery must be specified: ' + ', '.join(list(set(temp.HGNC_ID).difference(psim_gold.HGNC_ID))))
-    temp = psim_gold.loc[temp.index, :]
-    if temp.LOCATION.dropna().shape[0] < temp.shape[0]:
-        raise ValueError('The final location for the following non-machinery must be specified: ' + ', '.join(temp[temp.LOCATION.isna()].HGNC_ID.tolist()))
+#     temp = psim_me[psim_me.HGNC_ID.isin(non_machinery) & ((psim_me.LOCATION.isna()) | psim_me.LOCATION.apply(lambda x: x not in compartments))]
+#     err = False
+#     if len(set(temp.HGNC_ID).difference(psim_gold.HGNC_ID)) > 0:
+#         raise ValueError('The final location for the following non-machinery must be specified: ' + ', '.join(list(set(temp.HGNC_ID).difference(psim_gold.HGNC_ID))))
+#     temp = psim_gold.loc[temp.index, :]
+#     if temp.LOCATION.dropna().shape[0] < temp.shape[0]:
+#         raise ValueError('The final location for the following non-machinery must be specified: ' + ', '.join(temp[temp.LOCATION.isna()].HGNC_ID.tolist()))
     
-    revised_genes['non-machinery locations'] = []
-    if temp.shape[0] > 0:
-        psim_me.loc[temp.index, 'LOCATION'] = temp.LOCATION.tolist()
-        revised_genes['non-machinery locations'] = temp.HGNC_ID.tolist()
+#     revised_genes['non-machinery locations'] = []
+#     if temp.shape[0] > 0:
+#         psim_me.loc[temp.index, 'LOCATION'] = temp.LOCATION.tolist()
+#         revised_genes['non-machinery locations'] = temp.HGNC_ID.tolist()
         
     # filter out unecessary gene entries
-    psim_me = psim_me.loc[sorted(set(expression_machinery + metabolic_machinery + non_machinery)), :]
+    psim_me = psim_me.loc[sorted(set(expression_machinery + metabolic_machinery + list(non_machinery))), :]
     psim_me.reset_index(inplace = True, drop = True)
     
     del psim_gold

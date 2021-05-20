@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[4]:
+# In[1]:
 
 
 import pandas as pd
@@ -308,14 +308,14 @@ class gene_information():
             if v.subs(params.mu, 1) <= 0:
                 raise ValueError('The coupling constraint "' + k + '" must be positive for gene ' + self.hgnc_id)
 
-    def get_final_locations(self, metabolic_model = params.human_model, nonmachinery_locations = []):
+    def get_final_locations(self, reactions = None, nonmachinery_locations = []):
         '''Assigns a set of final compartments for the protein. For machinery, extracts this from the input
         cobrapy model. This method helps define necessary transport reactions.
         
         Parameters
         ----------
-        metabolic_model: cobra.core.model.Model
-            a cobra metabolic model, with reactions/GPRs helping define final locations for machinery
+        reactions: list
+            each element is a cobra.core.reactions.Reaction associated with the gene
         nonmachinery_locations: list
             a list of strings of final compartments for non-machinery
         
@@ -333,8 +333,10 @@ class gene_information():
         '''
         self.machinery_locations = list()
         if self.machinery:
-            rxns = list(metabolic_model.genes.get_by_id(self.hgnc_id).reactions)
-            self.machinery_locations = sorted(set([func.get_reaction_compartment(r) for r in rxns])) 
+            if reactions is None:
+                raise ValueError('For machinery, need associated reactions')
+#             rxns = list(metabolic_model.genes.get_by_id(self.hgnc_id).reactions)
+            self.machinery_locations = sorted(set([func.get_reaction_compartment(r) for r in reactions])) 
    
         if not self.machinery and len(nonmachinery_locations) == 0:
                 raise ValueError(self.hgnc_id + ': For non-machinery, must specify the final compartments')
@@ -388,7 +390,7 @@ ptm_keys = list(params.allowed_ptms.keys())
 cp_keys = ['alpha_m', 'alpha_p', 'ptr']
 
 def generate(hgnc_id, psim = params.psim_me, machinery_list = mach.metabolic_machinery, 
-                             metabolic_model = params.human_model, nonmachinery_locations = []):
+                             reactions = None, nonmachinery_locations = []):
     '''Generates gene information object from PSIM. Assumes the gene information object being 
     generated is not for a non-machinery protein.'''
     
@@ -408,7 +410,7 @@ def generate(hgnc_id, psim = params.psim_me, machinery_list = mach.metabolic_mac
                     tmd = entries['TMD'], sp = entries['SP'], polyA_length = entries['POLYA_LENGTH'], 
                     n_exons = entries['N_EXONS'], 
                     coupling_params = dict(zip(cp_keys, cp_values)))
-    gene_info.get_final_locations(metabolic_model = metabolic_model, 
+    gene_info.get_final_locations(reactions = reactions, 
                                   nonmachinery_locations = nonmachinery_locations)
     gene_info.check_gene_information()
     return gene_info

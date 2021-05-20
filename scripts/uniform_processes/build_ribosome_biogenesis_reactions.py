@@ -92,6 +92,14 @@ six_s_index = 1 #https://www.nature.com/articles/s41594-019-0234-x?draft=collect
 # In[3]:
 
 
+compress_mrna = False
+from expression.protein_expression import ubiquitin
+ub_args = ubiquitin.express_ubiquitin(compress_mrna = compress_mrna)
+
+
+# In[3]:
+
+
 psim_rib = params.psim_me.copy()
 psim_rib.LOCATION = psim_rib.LOCATION.apply(lambda x: ['n', 'c'])
 exclude = ['POLYUBIQUITINATIONn', 'DEUBIQUITINATIONn', 'DEGRADATIONn']
@@ -101,7 +109,7 @@ exclude = ['POLYUBIQUITINATIONn', 'DEUBIQUITINATIONn', 'DEGRADATIONn']
 def cleave_ub(hgnc_id, ub_args, compress_mrna):
     '''Generates reactions specific for ubiquitin-protein fusions. RPL40 and RPS27A have ubiquitin fusions.'''
     gene_info = gene_information.generate(hgnc_id = hgnc_id, psim = psim_rib, 
-                    machinery_list = list(), metabolic_model = cobra.Model(), nonmachinery_locations = ['n'])
+                    machinery_list = list(), reactions = None, nonmachinery_locations = ['n'])
     gene_info = func.convert_gi(gene_info, non_machinery = dict())
 
     mrna_expression_reactions, mrna_transcript_c, mrna_deg_proxy = build_mrna.get_mrna_expression_reactions(gene_info, compress_mrna = compress_mrna)
@@ -112,7 +120,7 @@ def cleave_ub(hgnc_id, ub_args, compress_mrna):
     psim_temp = psim_rib.copy()
     psim_temp.loc[psim_temp[psim_temp.HGNC_ID == hgnc_id].index, 'PROTEIN_SEQ'] = processed_seq
     gene_info = gene_information.generate(hgnc_id = hgnc_id, psim = psim_rib, 
-                    machinery_list = list(), metabolic_model = cobra.Model(), nonmachinery_locations = ['n'])
+                    machinery_list = list(), reactions = None, nonmachinery_locations = ['n'])
     gene_info = func.convert_gi(gene_info, non_machinery = dict())
     
     processed_unfolded_protein_c = Protein(id_ = 'processed_unfolded',compartment = 'c', gene_info = gene_info)#Protein(id_ = hgnc_id + '_processed_unfolded',compartment = 'c', amino_acid_counts = gene_info.amino_acid_counts)
@@ -149,7 +157,7 @@ def build_ribosome_protein_expression_reactions(ub_args, compress_mrna):
     rs_expression_reactions, rs_protein_metabolites = list(), list()
     for i in rs_ids:
         gene_info = gene_information.generate(hgnc_id = i, psim = psim_rib, 
-                    machinery_list = list(), metabolic_model = cobra.Model(), nonmachinery_locations = ['n', 'c'])
+                    machinery_list = list(), reactions = None, nonmachinery_locations = ['n', 'c'])
         gene_info = func.convert_gi(gene_info, non_machinery = dict())
         mrna_expression_reactions, mrna_transcript_c, mrna_deg_proxy = build_mrna.get_mrna_expression_reactions(gene_info, compress_mrna = compress_mrna)
         protein_expression_reactions, protein_metabolites = build_protein.get_protein_expression_reactions(gene_info, mrna_transcript_c, mrna_deg_proxy, ub_args)
@@ -164,7 +172,7 @@ def build_ribosome_protein_expression_reactions(ub_args, compress_mrna):
     rl_expression_reactions, rl_protein_metabolites = list(), list()
     for i in rl_ids:
         gene_info = gene_information.generate(hgnc_id = i, psim = psim_rib, 
-                    machinery_list = list(), metabolic_model = cobra.Model(), nonmachinery_locations = ['n', 'c'])
+                    machinery_list = list(), reactions = None, nonmachinery_locations = ['n', 'c'])
         gene_info = func.convert_gi(gene_info, non_machinery = dict())
         mrna_expression_reactions, mrna_transcript_c, mrna_deg_proxy = build_mrna.get_mrna_expression_reactions(gene_info, compress_mrna = compress_mrna)
         protein_expression_reactions, protein_metabolites = build_protein.get_protein_expression_reactions(gene_info, mrna_transcript_c, mrna_deg_proxy, ub_args)
