@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[1]:
+# In[12]:
 
 
 import sys
@@ -20,6 +20,55 @@ from macromolecules.protein import Protein
 from uniform_processes import biomass
 
 
+# In[13]:
+
+
+compress_mrna = True
+
+
+# In[14]:
+
+
+ubc_psim = params.psim_me[params.psim_me['HGNC_ID'] == 'HGNC:12468'] # UBC
+ubc_psim['Location'] = 'c'
+ubc_info = gene_information(hgnc_id = ubc_psim['HGNC_ID'].values.tolist()[0], 
+                         premrna_seq=ubc_psim['PREMRNA_SEQ'].values.tolist()[0], 
+                            mrna_seq=ubc_psim['MRNA_SEQ'].values.tolist()[0], 
+                            protein_seq=ubc_psim['PROTEIN_SEQ'].values.tolist()[0],
+                            polyA_length = round(ubc_psim['POLYA_LENGTH'].values.tolist()[0]))
+
+
+# In[21]:
+
+
+ubc_info = gene_information(hgnc_id = ubc_psim['HGNC_ID'].values.tolist()[0], 
+                            machinery_list = list(),
+                         premrna_seq=ubc_psim['PREMRNA_SEQ'].values.tolist()[0], 
+                            mrna_seq=ubc_psim['MRNA_SEQ'].values.tolist()[0], 
+                            protein_seq=ubc_psim['PROTEIN_SEQ'].values.tolist()[0],
+                            polyA_length = round(ubc_psim['POLYA_LENGTH'].values.tolist()[0]))
+ubc_info.get_final_locations(nonmachinery_locations=['c'])
+ubc_info = func.convert_gi(ubc_info, non_machinery = dict())
+
+
+# In[22]:
+
+
+ubc_info.machinery
+
+
+# In[ ]:
+
+
+
+
+
+# In[ ]:
+
+
+
+
+
 # In[2]:
 
 
@@ -28,6 +77,7 @@ def express_ubiquitin(compress_mrna):
     ubc_psim = params.psim_me[params.psim_me['HGNC_ID'] == 'HGNC:12468'] # UBC
     ubc_psim['Location'] = 'c'
     ubc_info = gene_information(hgnc_id = ubc_psim['HGNC_ID'].values.tolist()[0], 
+                                machinery_list = list(),
                              premrna_seq=ubc_psim['PREMRNA_SEQ'].values.tolist()[0], 
                                 mrna_seq=ubc_psim['MRNA_SEQ'].values.tolist()[0], 
                                 protein_seq=ubc_psim['PROTEIN_SEQ'].values.tolist()[0],
@@ -58,9 +108,9 @@ def express_ubiquitin(compress_mrna):
     ubb_psim = params.psim_me[params.psim_me['HGNC_ID'] == 'HGNC:12463'] # UBB
     ubb_psim['Location'] = 'c'
     ubb_info = gene_information(hgnc_id = ubb_psim['HGNC_ID'].values.tolist()[0], 
-                             premrna_seq=ubb_psim['PREMRNA_SEQ'].values.tolist()[0], 
+                                premrna_seq=ubb_psim['PREMRNA_SEQ'].values.tolist()[0], 
                                 mrna_seq=ubb_psim['MRNA_SEQ'].values.tolist()[0], 
-                                protein_seq=ubb_psim['PROTEIN_SEQ'].values.tolist()[0],
+                                protein_seq=ubb_psim['PROTEIN_SEQ'].values.tolist()[0], machinery_list = list(),
                                 polyA_length = round(ubb_psim['POLYA_LENGTH'].values.tolist()[0]))
     ubb_info.get_final_locations(nonmachinery_locations=['c'])
     ubb_info = func.convert_gi(ubb_info, non_machinery = dict())

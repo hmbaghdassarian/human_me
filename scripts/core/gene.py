@@ -11,13 +11,13 @@ from macromolecules.complex import Complex
 from utils.functions import flatten_list
 
 
-# In[17]:
+# In[2]:
 
 
 ribosomal_genes = {'HGNC:11325', 'HGNC:11740', 'HGNC:10369', 'HGNC:10414', 'HGNC:11326', 'HGNC:10448', 'HGNC:10421', 'HGNC:3300', 'HGNC:10346', 'HGNC:12458', 'HGNC:10304', 'HGNC:10389', 'HGNC:10311', 'HGNC:13631', 'HGNC:11301', 'HGNC:10410', 'HGNC:10312', 'HGNC:10364', 'HGNC:10359', 'HGNC:10759', 'HGNC:10305', 'HGNC:11323', 'HGNC:28962', 'HGNC:10440', 'HGNC:10385', 'HGNC:10313', 'HGNC:10404', 'HGNC:10347', 'HGNC:10371', 'HGNC:17976', 'HGNC:10298', 'HGNC:17094', 'HGNC:10387', 'HGNC:10327', 'HGNC:10416', 'HGNC:10397', 'HGNC:11324', 'HGNC:10328', 'HGNC:11302', 'HGNC:10426', 'HGNC:10384', 'HGNC:10307', 'HGNC:10386', 'HGNC:10360', 'HGNC:21082', 'HGNC:7670', 'HGNC:10377', 'HGNC:10396', 'HGNC:11300', 'HGNC:10372', 'HGNC:10344', 'HGNC:3214', 'HGNC:10442', 'HGNC:23401', 'HGNC:23400', 'HGNC:10301', 'HGNC:10441', 'HGNC:10348', 'HGNC:10325', 'HGNC:20090', 'HGNC:10340', 'HGNC:10331', 'HGNC:10362', 'HGNC:10332', 'HGNC:10345', 'HGNC:26212', 'HGNC:10317', 'HGNC:24624', 'HGNC:11307', 'HGNC:10413', 'HGNC:10363', 'HGNC:10388', 'HGNC:10429', 'HGNC:10419', 'HGNC:10383', 'HGNC:10302', 'HGNC:10333', 'HGNC:10411', 'HGNC:10418', 'HGNC:18276', 'HGNC:11846', 'HGNC:11299', 'HGNC:3208', 'HGNC:10299', 'HGNC:10417', 'HGNC:17718', 'HGNC:3189', 'HGNC:10354', 'HGNC:10401', 'HGNC:10336', 'HGNC:16993', 'HGNC:10330', 'HGNC:10368', 'HGNC:10334', 'HGNC:10329', 'HGNC:18501', 'HGNC:18277', 'HGNC:10353', 'HGNC:10424', 'HGNC:3597', 'HGNC:10425', 'HGNC:11303', 'HGNC:17050', 'HGNC:10316', 'HGNC:18476', 'HGNC:5238', 'HGNC:10315', 'HGNC:10349', 'HGNC:21370', 'HGNC:10409', 'HGNC:10405', 'HGNC:10351', 'HGNC:10420', 'HGNC:16931', 'HGNC:10306', 'HGNC:10402', 'HGNC:10350'}
 
 
-# In[18]:
+# In[47]:
 
 
 # checks work as follows: maximum limits checked within each method, minimum limit checked in .check methods
@@ -49,7 +49,7 @@ class Expressed_Gene():
         self.ribosome_biogenesis = False
         
         self.macromolecules = {'RNA': {'premrna': None, 'mrna': {'coupled': {}, 'other': None}, 'lariat': None}, 
-                              'Protein': {'coupled': {}, 'other': []},
+                              'Protein': {'coupled': {}, 'other': [], 'non-machinery': []},
                               'Complex': {'coupled': {}, 'other': []},
                               'Proxy': {'mrna_degradation': {}, 
                                         'enzyme_degradation': {}}
@@ -245,24 +245,26 @@ class Expressed_Gene():
             self.reactions['Expression_Reactions']['complex']['other'][cplx.id] += [r.id]
                                                    
     def _check_reactions(self):
-        if len(self.reactions['Catalysis_Reactions']['Metabolic_Module']) == 0 and         len(self.reactions['Catalysis_Reactions']['Expression_Module']) == 0 and not self.ubiquitin_biogenesis:
-            raise ValueError('No catalysis reactions associated with this gene')
+        
+        
+        if len(self.reactions['Catalysis_Reactions']['Metabolic_Module']) == 0 and         len(self.reactions['Catalysis_Reactions']['Expression_Module']) == 0 and         not (self.ubiquitin_biogenesis or self._is_non_machinery_only):
+            raise ValueError('No catalysis reactions associated with: ' + self.hgnc_id)
         mrna = self.reactions['Expression_Reactions']['mrna']
         protein = self.reactions['Expression_Reactions']['protein']
         complex_ = self.reactions['Expression_Reactions']['complex']
                 
         if mrna['synthesis'] is None:
-            raise ValueError('No mrna synthesis reactions associated with this gene')
+            raise ValueError('No mrna synthesis reactions associated with: ' + self.hgnc_id)
         if mrna['sink'] is None:
-            raise ValueError('No mrna degradation reactions associated with this gene')
+            raise ValueError('No mrna degradation reactions associated with: ' + self.hgnc_id)
         if len(protein['translation']) == 0:
-            raise ValueError('No protein translation reactions associated with this gene')
-        if len(protein['synthesis']) == 0 and len(complex_['synthesis']) == 0:
-            raise ValueError('No enzyme synthesis reactions associated with this gene')
+            raise ValueError('No protein translation reactions associated with: ' + self.hgnc_id)
+        if len(protein['synthesis']) == 0 and len(complex_['synthesis']) == 0 and not self._is_non_machinery_only:
+            raise ValueError('No enzyme synthesis reactions associated with: ' + self.hgnc_id)
             
         rib_deg_coupling = self.ribosome_biogenesis or self.hgnc_id in ribosomal_genes
         if len(protein['sink']) == 0 and len(complex_['sink']) == 0 and not self.ubiquitin_biogenesis         and self._enzyme_compartments != ['e']         and not rib_deg_coupling: #TEMPORARY - no ribosomal degradation coupling
-            raise ValueError('No enzyme degradation reactions associated with this gene')
+            raise ValueError('No enzyme degradation reactions associated with: ' + self.hgnc_id)
         
         # all proteins have atleast 1 translation reaction
         # appropriate couplings between reactions
@@ -312,7 +314,10 @@ class Expressed_Gene():
                     self.macromolecules['RNA']['mrna']['coupled'][m.id] = cr
         elif m.type == 'protein':
             if m.coupling_coefficient is None: 
-                self.macromolecules['Protein']['other'] += [m.id]
+                if not m.non_machinery:
+                    self.macromolecules['Protein']['other'] += [m.id]
+                else:
+                    self.macromolecules['Protein']['non-machinery'] += [m.id]
             else:
                 if list(m.coupling_coefficient.keys()) != ['catalysis']:
                     raise ValueError('Unexpected coupling type for monomer enzyme associated with ' + self.hgnc_id)
@@ -357,17 +362,17 @@ class Expressed_Gene():
             raise ValueError('No coupled mrna molecule for ' + self.hgnc_id)
         if (len(self.macromolecules['Protein']['coupled']) + len(self.macromolecules['Protein']['other'])) == 0:
             raise ValueError('No protein metabolites associated with ' + self.hgnc_id)
-        if (len(self.macromolecules['Protein']['coupled']) + len(self.macromolecules['Complex']['coupled'])) == 0         and not self.ubiquitin_biogenesis:
+        if (len(self.macromolecules['Protein']['coupled']) + len(self.macromolecules['Complex']['coupled'])) == 0         and not (self.ubiquitin_biogenesis or self._is_non_machinery_only):
             raise ValueError('No coupled enzymes associated with ' + self.hgnc_id)
         if len(self.macromolecules['Proxy']['mrna_degradation']) == 0:
             raise ValueError('No mrna degradation proxy metabolite associated with ' + self.hgnc_id)
             
         rib_deg_coupling = self.ribosome_biogenesis or self.hgnc_id in ribosomal_genes
-        if len(self.macromolecules['Proxy']['enzyme_degradation']) == 0 and not self.ubiquitin_biogenesis         and self._enzyme_compartments != ['e']         and not rib_deg_coupling: # TEMPORARY no rib deg coupling
+        if len(self.macromolecules['Proxy']['enzyme_degradation']) == 0 and         not (self.ubiquitin_biogenesis or self._enzyme_compartments == ['e'] or  self._is_non_machinery_only)         and not rib_deg_coupling: # TEMPORARY no rib deg coupling
             raise ValueError('No enzyme degradation proxy metabolite associated with ' + self.hgnc_id)
     def check(self):
         '''Checks for completeness of self.reactions and self.macromolecules after adding all associated objects'''
-        
+        self._is_non_machinery_only = ((len(self.macromolecules['Protein']['coupled']) == 0) and len(self.macromolecules['Protein']['non-machinery']) > 0)
         self._enzyme_compartments = [e_id.split('_')[-1] for e_id in list(self.macromolecules['Protein']['coupled'].keys()) + list(self.macromolecules['Complex']['coupled'].keys())]
         self._check_reactions()
         self._check_macromolecules()
@@ -376,7 +381,7 @@ class Expressed_Gene():
             
 
 
-# In[5]:
+# In[4]:
 
 
 # import pickle
@@ -390,6 +395,4 @@ class Expressed_Gene():
 # lp_path = '/data2/hratch/human_me/other/test_lp/'
 
 # me_model = load_pickled_model(lp_path + 'working_version_' + str(4) + '.pickle')
-
-
 

@@ -92,14 +92,6 @@ six_s_index = 1 #https://www.nature.com/articles/s41594-019-0234-x?draft=collect
 # In[3]:
 
 
-compress_mrna = False
-from expression.protein_expression import ubiquitin
-ub_args = ubiquitin.express_ubiquitin(compress_mrna = compress_mrna)
-
-
-# In[3]:
-
-
 psim_rib = params.psim_me.copy()
 psim_rib.LOCATION = psim_rib.LOCATION.apply(lambda x: ['n', 'c'])
 exclude = ['POLYUBIQUITINATIONn', 'DEUBIQUITINATIONn', 'DEGRADATIONn']
@@ -119,7 +111,7 @@ def cleave_ub(hgnc_id, ub_args, compress_mrna):
     processed_seq = gene_info.protein_seq[:gene_info.protein_seq.index(ub_args['single_ubiquitin_sequence'])] + gene_info.protein_seq[gene_info.protein_seq.index(ub_args['single_ubiquitin_sequence']) + len(ub_args['single_ubiquitin_sequence']):]
     psim_temp = psim_rib.copy()
     psim_temp.loc[psim_temp[psim_temp.HGNC_ID == hgnc_id].index, 'PROTEIN_SEQ'] = processed_seq
-    gene_info = gene_information.generate(hgnc_id = hgnc_id, psim = psim_rib, 
+    gene_info = gene_information.generate(hgnc_id = hgnc_id, psim = psim_temp, 
                     machinery_list = list(), reactions = None, nonmachinery_locations = ['n'])
     gene_info = func.convert_gi(gene_info, non_machinery = dict())
     

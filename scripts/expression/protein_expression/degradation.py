@@ -576,7 +576,7 @@ degrade_reaction_map = {'c': degrade_cytosolic_nuclear_protein, 'n': degrade_cyt
                'r': build_erad_reactions, 'g': build_erad_reactions, 
               'l': degrade_lysosomal_pm_protein, 'pm': degrade_lysosomal_pm_protein}
 
-def degrade(macromolecule, non_machinery = False, **kwargs):
+def degrade(macromolecule, **kwargs):
     '''Compartment-specific degradation reactions for proteins or protein-protein complexes'''
     
     if not (macromolecule.type == 'protein' or macromolecule.type == 'complex'):
@@ -588,9 +588,6 @@ def degrade(macromolecule, non_machinery = False, **kwargs):
     if isinstance(macromolecule, Ribosomal_Complex):
         for r in deg_reactions:
             r.ribosome_biogenesis = True
-    if non_machinery:
-        for r in deg_reactions:
-            r._non_machinery = True
     
     if macromolecule.compartment not in ['r', 'g'] or macromolecule.type == 'complex':
         dr = deg_reactions

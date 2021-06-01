@@ -320,7 +320,7 @@ class Expression_Reaction(ME_Reaction):
         else:
             self.sink_type = sink_type
             
-        self.ribosome_biogenesis = ribosome_biogenesis
+        self.ribosome_biogenesis = ribosome_biogenesis 
 
 class Protein_Expression_Reaction(Expression_Reaction):
     '''Inherited from Expression_Reaction, specifies the protein expression reactions in the model'''
@@ -354,7 +354,8 @@ class Protein_Expression_Reaction(Expression_Reaction):
                          sink = False, sink_type = None, subsystem='Protein_Expression')
         self.translation = translation
         
-        
+        # self is needed for expressing the associated protein metabolites in the these compartments:
+        self._final_compartments = list() 
 
 
 class Protein_Degradation_Reaction(Expression_Reaction):
@@ -368,10 +369,8 @@ class Protein_Degradation_Reaction(Expression_Reaction):
                          name=name, lower_bound=lower_bound, upper_bound=upper_bound, hgnc_id = hgnc_id)
         self._macromolecules = [] # list of macromolecule ids associated with this degradation reaction
         self._enzymes = None # list of enzyme ids associated with this degradation reaction
-        self._ribosomal_degradation = False # see complex_degradation_reaction for details
-        self._non_machinery = False # whether the degradation reaction is associated with degradation of non-machinery protein, can overlap with degradation reactions for machinery proteins
-            
-        
+        self._ribosomal_degradation = False # see complex_degradation_reaction for details            
+        self._final_compartments = list()  # self is needed for expressing the associated protein metabolites in the these compartments:
     def _update_tracking(self, macromolecules):
         '''Mutual tracking of degradation reactions associated with a macromolecule and vice-versa'''
         if type(macromolecules) != list:

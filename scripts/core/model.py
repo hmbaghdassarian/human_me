@@ -64,16 +64,6 @@ def load_pickled_model(file_name):
     me_model.correct_object_tracking() # lost in pickling/loadings 
     return me_model
 
-# def create_expressed_gene(hgnc_id, relat_objects, me_model):
-#     g = Expressed_Gene(hgnc_id)
-#     for m in relat_objects['macromolecules']:
-#         g.add_macromolecule(me_model.metabolites.get_by_id(m))
-#     for r in relat_objects['reactions']:
-#         g.add_reaction(me_model.reactions.get_by_id(r))
-#     g.check()
-
-#     return g
-
 def create_expressed_gene(hgnc_id, relat_objects):
     g = Expressed_Gene(hgnc_id)
     for m in relat_objects['macromolecules']:
@@ -90,7 +80,8 @@ def create_expressed_gene(hgnc_id, relat_objects):
 
 class ME_Model(cobra.Model):
 # rewritten methods------------------------------------------------------------------------------------------------
-    def __init__(self,  id_or_model, name = None, m_model = None, n_cores = os.cpu_count()):
+    def __init__(self,  id_or_model, name = None, m_model = None, n_cores = os.cpu_count(), 
+                non_machinery = None, knock_out = None, additional_ko = None):
         '''
         A simple object with an identifier
     
@@ -102,6 +93,20 @@ class ME_Model(cobra.Model):
             the identifier to associate with the object
         n_cores: int
             # of cores to parallelize on; defaults to all available cores
+        knock_out: list
+            each element is a string representing a gene expressed in the model which should be knocked out
+            
+            *Note: you may want to knock-out during building if setting minimal_proteome = True and knocking out a 
+            gene that participates in a OR GPR rule(in case it is the one that is selected); otherwise 
+            me_model.knock_out() method should suffice
+        non_machinery: dictionary
+            keys are HGNC IDs, values are a list of strings, each element of which represents a compartment
+            within the metabolic model for the gene to be expressed. 
+            Exceptions are ubiquitin genes (HGNC:12468, HGNC:12463) and ribosomal genes
+        additional_ko: list
+            a list of HGNC IDs for genes that were not explicitly knocked-out, but were only involved in catalysis of 
+            reactions catalyzed by a complex which contains another gene that was knocked-out
+            this list is generated in build_me_model/me_builder
         
         Returns
         -------
@@ -112,11 +117,8 @@ class ME_Model(cobra.Model):
             model stoichiometric matrix
         self.solver_:
             the LP solver for the model
-        self.orphan: list
-            a list of reactions that remain orphaned when dummy is being incorporated (added by builder class)
-        self.deorphaned: list
-            a list of reactions that are deoprhaned whend dummy protein is being incorporated (added by builder class)
-            
+        self.reaction_types: dict
+            keys are category of the reaction, values are the reaction ID
         '''
         
         super().__init__(id_or_model, name)
@@ -129,6 +131,28 @@ class ME_Model(cobra.Model):
         self.solver_ = None
         self.reaction_types = dict()
         self.n_cores = n_cores
+        if self.n_cores in [0,1,None]:
+            self._par = False
+        else:
+            self._par = True
+
+        
+        if knock_out is None:
+            self.knock_out = list()
+        else:
+            self.knock_out = knock_out
+
+        if additional_ko is None:
+            self.additional_ko = list()
+        else:
+            self.additional_ko = additional_ko
+
+        if non_machinery is None:
+            self.non_machinery = dict()
+        else:
+            self.non_machinery = non_machinery
+            
+       
         
 
     def _add_reactions(self, reaction_list):
@@ -667,33 +691,14 @@ class ME_Model(cobra.Model):
         if len(hgnc_id_metabs)>0:
             raise ValueError('Some macromolecules did not get an HGNC ID assigned')
             
-    def _check_coupling(self, orphan = None, knock_out = list(), additional_ko = list()):
-        '''Checks that all reactions have received appropriate machinery (compares coupled metabolites to GPR)
-        
-        Parameters
-        ----------
-        orphan: list
-            List of reaction IDs in model for reactions that are not expected to have any machinery
-            Defaults to self.reaction_types['orphan']
-        knock_out: list
-            List of HGNC IDs of knocked out genes
-        additional_ko: list
-             a list of HGNC IDs for genes that were not explicitly knocked-out, but were only involved in catalysis of 
-            reactions catalyzed by a complex which contains another gene that was knocked-out
-            this list is generated in build_me_model/me_builder
-        
-        '''
+    def _check_coupling(self):
+        '''Checks that all reactions have received appropriate machinery (compares coupled metabolites to GPR)'''
         print('Make sure all reactions received correct coupled machinery')
         
         # set arguments
-        if orphan is None:
-            if not 'orphan' in self.reaction_types:
-                raise ValueError('Must specify a list of orphan reaction IDs')
-            orphan = [self.reactions.get_by_id(r_id) for r_id in self.reaction_types['orphan']]
-        if knock_out is None:
-            knock_out = list()
-        if additional_ko is None:
-            additional_ko = list()
+        if not 'orphan' in self.reaction_types:
+            raise ValueError('Must specify a list of orphan reaction IDs')
+        orphan = [self.reactions.get_by_id(r_id) for r_id in self.reaction_types['orphan']]
         
         # define list of ribosomal protein hgnc ids
         rbps = ['HGNC:10404', 'HGNC:10420', 'HGNC:10421', 'HGNC:10424', 'HGNC:10425', 'HGNC:18501', 'HGNC:10426', 
@@ -711,7 +716,7 @@ class ME_Model(cobra.Model):
         'HGNC:10353']
 
 
-        test_reactions = [r for r in self.reactions if not r.id in orphan]
+        test_reactions = [r for r in self.reactions if not (r.id in orphan) and not isinstance(r, Biomass_Reaction)]
         for r in tqdm(test_reactions):
             if isinstance(r, Metabolic_Reaction):
                 r_ = self.m_model.reactions.get_by_id(r.cobra_id).copy()
@@ -736,7 +741,7 @@ class ME_Model(cobra.Model):
                 else:
                     expected_machinery2.append(em)
 
-            if len(set(expected_machinery2).difference(knock_out + additional_ko)) == 0:
+            if len(set(expected_machinery2).difference(self.knock_out + self.additional_ko)) == 0:
                 ko = True
 
             if (not hasattr(r, 'coupled_metabolites') or 'catalysis' not in r.coupled_metabolites.values()) and not ko:
@@ -775,7 +780,7 @@ class ME_Model(cobra.Model):
                                 if cplx and sorted(rm) == actual_machinery:
                                     err = False
                         if err:
-                            if expected_machinery != knock_out:
+                            if expected_machinery != self.knock_out:
                                 raise ValueError('Machinery mismatch for ' + r.id)
                     else:
                         if len(actual_machinery) > 1 or not actual_machinery[0].dummy: # dummy
@@ -798,20 +803,9 @@ class ME_Model(cobra.Model):
                         raise ValueError('Incorrect machinery for translation: ' + r.id)
                 else:
                     raise ValueError('Unaccounted for reaction criteria')
-    
 
-
-
-    def check_enzymes(self, _additional_ko = list()):
-        '''Makes sure all genes being expressed participate in a catalysis reaction (no unecessary expression reactions)
-        
-        Paramaters
-        ----------
-        additional_ko: list
-            a list of HGNC IDs for genes that were not explicitly knocked-out, but were only involved in catalysis of 
-            reactions catalyzed by a complex which contains another gene that was knocked-out
-            this list is generated in build_me_model/me_builder
-        '''
+    def check_enzymes(self):
+        '''Makes sure all genes being expressed participate in a catalysis reaction (no unecessary expression reactions)'''
 
         proteins, complexes = [], []
         active_proteins, active_complexes = [], []
@@ -836,10 +830,11 @@ class ME_Model(cobra.Model):
         active_proteins = list(set([i.split('_')[0] if i.startswith('HGNC') else i for i in active_proteins]))
         proteins = set([i.split('_')[0] if 'HGNC' in i else i for i in proteins])
         proteins = [i for i in proteins if 'ubiquitin' not in i]
-        if len(set(proteins).difference(active_proteins + _additional_ko).difference({'HGNC:12463', 'HGNC:12468'}))>0:
+        ub_genes = ['HGNC:12463', 'HGNC:12468']
+        if len(set(proteins).difference(active_proteins + self.additional_ko + ub_genes + list(self.non_machinery.keys())))>0:
             raise ValueError('Unexpected inclusion of inactive protein monomers')
     
-    def check(self, orphan = None, knock_out = list(), _additional_ko = list()):
+    def check(self):
         '''Check reaction coupling and mass balance
         
         Parameters
@@ -847,18 +842,13 @@ class ME_Model(cobra.Model):
         orphan: list
             List of reaction IDs in model for reactions that are not expected to have any machinery
             Defaults to self.reaction_types['orphan']
-        knock_out: list
-            List of HGNC IDs of knocked out genes
-        additional_ko: list
-             a list of HGNC IDs for genes that were not explicitly knocked-out, but were only involved in catalysis of 
-            reactions catalyzed by a complex which contains another gene that was knocked-out
-            this list is generated in build_me_model/me_builder
+
         '''
         self._check_complete_reactions()
         self._check_hgncs()
         self.check_me_mass_balance()
-        self._check_coupling(orphan = orphan, knock_out = knock_out, additional_ko = _additional_ko)
-        self.check_enzymes(_additional_ko = _additional_ko)
+        self._check_coupling()
+        self.check_enzymes()
     
     def _generate_expressed_genes(self):
         
@@ -887,22 +877,25 @@ class ME_Model(cobra.Model):
             v['macromolecules'] = [self.metabolites.get_by_id(m_id) for m_id in v['macromolecules']]
             v['reactions'] = [self.reactions.get_by_id(r_id) for r_id in v['reactions']]
         
-            
-        pool = multiprocessing.Pool(processes = self.n_cores)
-        try:
-            expressed_genes = pool.starmap(create_expressed_gene, 
-                                           zip(hgnc_ids.keys(), hgnc_ids.values()))
-            pool.close()
-            pool.join()
-            gc.collect()
-            self.expressed_genes = {g.hgnc_id: g for g in expressed_genes}
-        except:
-            pool.close()
-            pool.join()
-            gc.collect()
-            raise ValueError('Parallelization failed while generating expressed genes list') 
+        print('Add gene objects')
+        if self._par:    
+            pool = multiprocessing.Pool(processes = self.n_cores)
+            try:
+                expressed_genes = pool.starmap(create_expressed_gene, 
+                                               zip(hgnc_ids.keys(), hgnc_ids.values()))
+                pool.close()
+                pool.join()
+                gc.collect()
+                self.expressed_genes = {g.hgnc_id: g for g in expressed_genes}
+            except:
+                pool.close()
+                pool.join()
+                gc.collect()
+                raise ValueError('Parallelization failed while generating expressed genes list') 
+        else:
+            self.expressed_genes = {hgnc_id: create_expressed_gene(hgnc_id, relat_objects) for                                    hgnc_id, relat_objects in tqdm(hgnc_ids.items())}
     
-    def knock_out(self, hgnc_id, inplace = False):
+    def knock_out_gene(self, hgnc_id, inplace = False):
         '''Knocks out a gene by blocking flux through synthesis of the associated mRNA molecule
         
         Parameters
@@ -916,7 +909,7 @@ class ME_Model(cobra.Model):
         
         if hgnc_id not in self.expressed_genes:
             raise ValueError('The specified hgnc_id is not present in the ME Model')
-            
+        self.knock_out.append(hgnc_id)    
         r_id = self.expressed_genes[hgnc_id].reactions['Expression_Reactions']['mrna']['synthesis']
         
         if inplace:
