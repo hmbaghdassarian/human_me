@@ -58,10 +58,22 @@ def protein_polyubiquitination(macromolecule, **kwargs):
         polyub_macromolecule._ptms = macromolecule._ptms
         polyub_macromolecule.hgnc_id = macromolecule.hgnc_id
         
-        elements = polyub_macromolecule.elements
-        if 'dsb' in polyub_macromolecule._ptms:
-            elements['H'] -= 2*polyub_macromolecule._ptms['dsb']
-        polyub_macromolecule.elements = elements
+        # deal with PTMs - mass balance elements appropriately, macromlecule input has the PTMs, 
+        # and they are removed in proceeding reactions, but polyub_macromolecule needs to have the appropriate ptms
+        if macromolecule.compartment == 'pm' and len(polyub_macromolecule._ptms) > 0:
+            elements = polyub_macromolecule.elements
+            if 'dsb' in polyub_macromolecule._ptms:
+                elements['H'] -= 2*polyub_macromolecule._ptms['dsb']
+            if 'og' in macromolecule._ptms.keys():
+                number_Oglycans = macromolecule._ptms['og']
+                balance_og = {'C': (8 + 6 + 8)*number_Oglycans, # each 1/3 entry is for each 1/3 reactions in Jahir's model, in case want to separate in the future 
+                              'H': (13 + 10 + 13)*number_Oglycans, 
+                              'N': (1 + 0 + 1)*number_Oglycans, 
+                              'O': (5 + 5 + 5)*number_Oglycans}
+                for e,c in balance_og.items():
+                    elements[e] += c
+
+            polyub_macromolecule.elements = elements
         
         if macromolecule.compartment == 'pm':
             polyub_macromolecule = polyub_macromolecule.change_compartment('pm')
@@ -481,37 +493,13 @@ def build_endocytosis_reactions(macromolecule_pm, **kwargs):
     ##endocytosis--------------------------------------------------------------------------
     # combine dequbiquitination with endocytosis https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3987138/
     if macromolecule_l == None:
-        print('wooo')
         macromolecule_l = macromolecule_pm.change_compartment('l')
     else:
         if macromolecule_l.length != macromolecule_pm.length:
-            raise ValueError('Endocytosis: lysosomal and plasma membrane protein lengths disagree')
-    
-#     elements = macromolecule_l.elements.copy()
-#     if 'dsb' in macromolecule_pm._ptms:
-#         elements['H'] += 2*macromolecule_pm._ptms['dsb']
-#     macromolecule_l.elements = elements    
+            raise ValueError('Endocytosis: lysosomal and plasma membrane protein lengths disagree')  
 
     endocytosis = deg_reaction_map[macromolecule_pm.type](macromolecule_pm._deg_id + '_CLATHRIN_ENDOCYTOSIS', 
                                                          hgnc_id = macromolecule_pm.hgnc_id)    
-    
-#     unfold_mach = list()
-#     if polyub_macromolecule.type == 'protein' and polyub_macromolecule.compartment == 'pm' and \
-#     len(polyub_macromolecule._ptms) > 0:
-# #         elements = polyub_macromolecule.elements.copy()
-#         if 'dsb' in polyub_macromolecule._ptms.keys():
-#             polyub_macromolecule.id = polyub_macromolecule.id.replace('_DSB', '')
-#             number_DSB = macromolecule._ptms['dsb']
-# #             elements['H'] += 2*number_DSB # don't need to do since creating polyub based on assuming no PTMs present
-#             rxn[metab.o2_c], rxn[metab.h2o2_c] = number_DSB, -number_DSB
-#             unfold_mach += mach.ERDJ5
-
-# #         polyub_macromolecule.elements = elements
-    
-#     rxn[polyub_macromolecule] = 1    
-#     polyubiquitinate_protein.add_metabolites(rxn)
-    
-    
     rxn = {polyub_macromolecule_pm: -1, macromolecule_l: 1, metab.h2o_c: -1, ub_args['polyub_c']: 1}
     
     # gtp hydrolysis for vesicle scission
