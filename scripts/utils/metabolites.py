@@ -6,11 +6,10 @@
 
 import sys
 sys.path.insert(1, '../../scripts/') # comment out in python script
-# from utils.load_environmental_variables import *
 from utils.parameters import human_model
 
 
-# In[4]:
+# In[2]:
 
 
 atp_n = human_model.metabolites.get_by_id('atp_n')
@@ -50,6 +49,10 @@ gdp_n = human_model.metabolites.get_by_id('gdp_n')
 # secretory pathway------------------------------------------------------------
 o2_r = human_model.metabolites.get_by_id('o2_r')
 h2o2_r = human_model.metabolites.get_by_id('h2o2_r')
+
+o2_c = human_model.metabolites.get_by_id('o2_c')
+h2o2_c = human_model.metabolites.get_by_id('h2o2_c')
+
 hdca_r = human_model.metabolites.get_by_id('hdca_r')
 gpi_hs_r = human_model.metabolites.get_by_id('gpi_hs_r')
 # balanced_gpi = {'N': 6,'O': 42,'S': 1,'P': 5, 'C': 58, 'I': 2,'F': 1,'H': 107}
@@ -79,7 +82,7 @@ udpacgal_l = human_model.metabolites.get_by_id('udpacgal_l')
 udp_l = human_model.metabolites.get_by_id('udp_l')
 
 
-# In[10]:
+# In[3]:
 
 
 # mrna expression
@@ -155,7 +158,7 @@ seq_amino_acid_map_compartments = {'c': seq_amino_acid_map_c, 'x': seq_amino_aci
                                   'm': seq_amino_acid_map_m, 'n': seq_amino_acid_map_n, 'l': seq_amino_acid_map_l}
 
 
-# In[11]:
+# In[4]:
 
 
 
@@ -193,7 +196,7 @@ pi_compartments = {'c': pi_c, 'm': pi_m, 'i': pi_m, 'x': pi_x, 'n': pi_n, 'r': p
 h_compartments = {'c': h_c, 'm': h_m, 'i': h_i, 'x': h_x, 'n': h_n, 'r': h_r, 'l': h_l}
 
 
-# In[12]:
+# In[5]:
 
 
 # biomass
@@ -218,7 +221,7 @@ ps_hs_c = human_model.metabolites.get_by_id('ps_hs_c')
 sphmyln_hs_c = human_model.metabolites.get_by_id('sphmyln_hs_c')
 
 
-# In[13]:
+# In[6]:
 
 
 # h2o = {'r': h2o_r, 'c': h2o_c, 'l': h2o_l, 'm': h2o_m, 'n': h2o_n, 'x': h2o_x}

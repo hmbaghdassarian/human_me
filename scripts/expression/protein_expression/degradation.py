@@ -44,7 +44,7 @@ def protein_polyubiquitination(macromolecule, **kwargs):
     cmap = {'n': 'n', 'c': 'c', 'pm': 'c'}
     if macromolecule.compartment not in cmap.keys():
         raise ValueError(macromolecule.id + ': Current compartment, ' + macromolecule.compartment + ' does not have polyubiquitination reactions available')
-    
+
     if macromolecule.type == 'protein':
         polyu_protein_aa_counts = macromolecule._amino_acid_counts.copy()
         for aa_code,aa_counts in ub_args['monoub_aa_counts'].items():
@@ -55,7 +55,14 @@ def protein_polyubiquitination(macromolecule, **kwargs):
         polyub_macromolecule = Protein(id_ = '_'.join(macromolecule.id.split('_')[:-1]) + '_polyub', 
                                        compartment = cmap[macromolecule.compartment],
                            amino_acid_counts = polyu_protein_aa_counts)
+        polyub_macromolecule._ptms = macromolecule._ptms
         polyub_macromolecule.hgnc_id = macromolecule.hgnc_id
+        
+        elements = polyub_macromolecule.elements
+        if 'dsb' in polyub_macromolecule._ptms:
+            elements['H'] -= 2*polyub_macromolecule._ptms['dsb']
+        polyub_macromolecule.elements = elements
+        
         if macromolecule.compartment == 'pm':
             polyub_macromolecule = polyub_macromolecule.change_compartment('pm')
     else:
@@ -73,11 +80,10 @@ def protein_polyubiquitination(macromolecule, **kwargs):
                                 complex_id = macromolecule.temp_id + '_polyub')
 
     rxn = {macromolecule: -1, ub_args['ub_' + cmap[macromolecule.compartment]]: -params.n_ub, 
-           polyub_macromolecule:1, metab.h2o_compartments[cmap[macromolecule.compartment]]: params.n_ub}
+           polyub_macromolecule: 1, metab.h2o_compartments[cmap[macromolecule.compartment]]: params.n_ub}
     # 1 ATP hydrolysis per ubiquitin monomer added (https://link.springer.com/article/10.1007/s10637-020-00894-6)
     rxn = func.hydrolyze_atp(rxn, n_atp = params.n_ub, compartment = cmap[macromolecule.compartment])
     polyubiquitinate_protein.add_metabolites(rxn)
-
     if macromolecule.compartment in ['c', 'n']:
         polyubiquitinate_protein.gene_reaction_rule = ' and '.join(mach.UB_ligases[macromolecule.compartment])
     else:
@@ -465,7 +471,7 @@ def build_endocytosis_reactions(macromolecule_pm, **kwargs):
             raise ValueError(macromolecule_l.id + ': Unexpected provision of lysosomal complex in endocytosis (internal)')
     else:
         macromolecule_l = None    
-    
+
     ##polyubiquitination for lysosomal targetting-------------------------------------
     polyubiquitinate_protein, polyub_macromolecule_pm = protein_polyubiquitination(macromolecule = macromolecule_pm, 
                                                                                          ub_args = ub_args)
@@ -475,14 +481,36 @@ def build_endocytosis_reactions(macromolecule_pm, **kwargs):
     ##endocytosis--------------------------------------------------------------------------
     # combine dequbiquitination with endocytosis https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3987138/
     if macromolecule_l == None:
+        print('wooo')
         macromolecule_l = macromolecule_pm.change_compartment('l')
     else:
         if macromolecule_l.length != macromolecule_pm.length:
             raise ValueError('Endocytosis: lysosomal and plasma membrane protein lengths disagree')
-        
+    
+#     elements = macromolecule_l.elements.copy()
+#     if 'dsb' in macromolecule_pm._ptms:
+#         elements['H'] += 2*macromolecule_pm._ptms['dsb']
+#     macromolecule_l.elements = elements    
 
     endocytosis = deg_reaction_map[macromolecule_pm.type](macromolecule_pm._deg_id + '_CLATHRIN_ENDOCYTOSIS', 
                                                          hgnc_id = macromolecule_pm.hgnc_id)    
+    
+#     unfold_mach = list()
+#     if polyub_macromolecule.type == 'protein' and polyub_macromolecule.compartment == 'pm' and \
+#     len(polyub_macromolecule._ptms) > 0:
+# #         elements = polyub_macromolecule.elements.copy()
+#         if 'dsb' in polyub_macromolecule._ptms.keys():
+#             polyub_macromolecule.id = polyub_macromolecule.id.replace('_DSB', '')
+#             number_DSB = macromolecule._ptms['dsb']
+# #             elements['H'] += 2*number_DSB # don't need to do since creating polyub based on assuming no PTMs present
+#             rxn[metab.o2_c], rxn[metab.h2o2_c] = number_DSB, -number_DSB
+#             unfold_mach += mach.ERDJ5
+
+# #         polyub_macromolecule.elements = elements
+    
+#     rxn[polyub_macromolecule] = 1    
+#     polyubiquitinate_protein.add_metabolites(rxn)
+    
     
     rxn = {polyub_macromolecule_pm: -1, macromolecule_l: 1, metab.h2o_c: -1, ub_args['polyub_c']: 1}
     
@@ -599,8 +627,8 @@ def degrade(macromolecule, **kwargs):
         r._consolidate_macromolecules()    
         if len(r.check_mass_balance()) > 0:
             err = True
-    if err:
-        raise ValueError(macromolecule.id + ': Degradation reactions are unbalanced')
+#     if err:
+#         raise ValueError(macromolecule.id + ': Degradation reactions are unbalanced')
     return deg_reactions
 
 
