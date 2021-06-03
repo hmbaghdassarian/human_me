@@ -85,9 +85,12 @@ class qminos_solver():
             optimal basis (see qminospy.solver.QMINOS)
         '''
 
-        if len(set(objective.values()).difference([1,-1]))>0:
-            raise ValueError('Objective dictionary values must either be 1 for maximization or -1 for minimization')
-
+        # normalize objective to be 1
+        if not all([np.sign(v) == 1 for v in objective.values()]) or all([np.sign(v) == -1 for v in objective.values()]):
+            raise ValueError('Current version can only maximize or minimize combinations of objectives, not do both')
+        tot = abs(sum(objective.values()))
+        objective = {k: v/tot for k,v in objective.items()}
+        
         # get stoichiometric matrix at mu_val
         S = me_model.create_stoichiometric_matrix(mu_val = mu_val, array_type = 'numpy', inplace = False)
 
@@ -470,6 +473,18 @@ class qminos_solver():
 
 
 # test_model.solve_lp(mu_val = 1e10, objective = {'rA': 1})
+
+
+# In[18]:
+
+
+objective = {1: -2, 3: -4}
+
+
+# In[19]:
+
+
+
 
 
 # In[ ]:
