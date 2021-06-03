@@ -335,29 +335,26 @@ def form_disulfide_bond(gene_info, folded_protein_r):
 
 def form_gpi(gene_info, modified_protein_r):
     gpi_formation = Protein_Expression_Reaction(gene_info.hgnc_id + '_GPIr', hgnc_id = gene_info.hgnc_id)
-    modified_protein_gpi_r = modified_protein_r.copy(), 
+    modified_protein_gpi_r = modified_protein_r.copy() 
     modified_protein_gpi_r.id = modified_protein_gpi_r.id.replace('folded', 'folded_GPI')
-    
-#     # need to figure this out correctly!!
-#     elements = modified_protein_r.elements.copy()
-#     for e,c in metab.balanced_gpi.items():
-#         if e in elements.keys():
-#             elements[e] += c
-#         else:
-#             elements[e] = c
-            
-#     modified_protein_gpi_r.elements = elements
 
-#     rxn = metab.M4ATAer.copy() # need these additional metabolties to get mass balance with gpi_sig[r]
+    # need to figure this out correctly!!
+    elements = modified_protein_r.elements.copy()
+    for e,c in metab.balanced_gpi.items():
+        if e in elements.keys():
+            elements[e] += c
+        else:
+            elements[e] = c
+    modified_protein_gpi_r.elements = elements
+
     rxn = dict()
+#     rxn[metab.hdca_r], rxn[metab.gpi_hs_r], rxn[metab.h_r], rxn[metab.h2o_r], rxn[metab.gpi_sig_r] = 1,-1,1,-1,1
     rxn[metab.hdca_r], rxn[metab.gpi_hs_r], rxn[metab.h_r], rxn[metab.h2o_r] = 1,-1,1,-1
-    rxn[modified_protein_r], rxn[modified_protein_gpi_r]= -1, 1
+    rxn[modified_protein_r], rxn[modified_protein_gpi_r] = -1, 1
 
     gpi_formation.add_metabolites(rxn)
     gpi_formation.gene_reaction_rule = ' and '.join(mach.gpi_machinery)
-    
-    raise ValueError('This reaction is not balanced, must fix')
-    
+        
     return gpi_formation, modified_protein_gpi_r
 
 def glycosylate_n_linked(gene_info, modified_protein_r):
@@ -648,7 +645,8 @@ def get_protein_expression_reactions(gene_info, mrna_transcript_c, mrna_deg_prox
             # golgi ptms
             if 'og' in gene_info.ptms.keys():
                 modification_golgi_reactions, modified_protein_g = modify_protein_golgi(gene_info, protein_g)
-                modification_golgi_reactions._final_compartments += fc
+                for r in modification_golgi_reactions:
+                    r._final_compartments += fc
                 protein_expression_reactions += modification_golgi_reactions
             else: 
                 modified_protein_g = protein_g
@@ -767,40 +765,7 @@ def get_protein_expression_reactions(gene_info, mrna_transcript_c, mrna_deg_prox
     return protein_expression_reactions, protein_metabolites
 
 
-# In[16]:
-
-
-# import random
-# import cobra
-# import pandas as pd
-# from expression.gene_information import gene_information
-# import expression.build_mrna_expression_reactions as build_mrna
-# from expression.protein_expression import ubiquitin
-
-# psim_toy = pd.DataFrame(columns = ['HGNC_ID', 'PREMRNA_SEQ', 'MRNA_SEQ', 'PROTEIN_SEQ', 'POLYA_LENGTH', 'TMD', 
-#                                'SP', 'n_exons', 'DSB', 'GPI', 'OG', 'LOCATION'])
-
-# hgnc_id, premrna_seq = 'HGNC:TOY', ''.join(random.choices(['U', 'C', 'G', 'A'], k = 100))
-# mrna_seq = premrna_seq[25:75]
-# # note that there is no check that the protein_sequence corresponds to the mrna_sequence beyond checking for the length
-# protein_seq = ''.join(random.choices(params.amino_acids, k = int(len(mrna_seq)/3)))
-# polyA_length, tmd, sp, n_exons, dsb, gpi, og  = None, 1, True, None, 2, 2, 2
-# ub_args = ubiquitin.express_ubiquitin(compress_mrna = False)
-
-# location = ['c']
-# psim_toy.loc[0,:] = [hgnc_id, premrna_seq, mrna_seq, protein_seq, polyA_length, tmd, sp, n_exons, dsb, gpi, og, location]
-# gene_info = gene_information(hgnc_id, premrna_seq, mrna_seq, protein_seq,
-#                  ptms = {}, tmd = tmd, sp = sp, polyA_length = polyA_length, 
-#                  n_exons = n_exons) 
-# gene_info.get_final_locations(reactions = None, nonmachinery_locations = location)
-# # gene_info.machinery_locations = {'c': 'Cytoplasmic Transport'}
-# transcription_reactions, mrna_transcript_c, mrna_deg_proxy = build_mrna.get_mrna_expression_reactions(gene_info)
-# protein_expression_reactions, protein_metabolites = get_protein_expression_reactions(gene_info, 
-#                                                  mrna_transcript_c, mrna_deg_proxy, 
-#                                                 ub_args = ub_args)
-
-
-# In[17]:
+# In[ ]:
 
 
 # import random
@@ -835,11 +800,5 @@ def get_protein_expression_reactions(gene_info, mrna_transcript_c, mrna_deg_prox
 #                                                      mrna_transcript_c, mrna_deg_proxy, 
 #                                                     ub_args = ub_args)
 #     reactions += protein_expression_reactions
-
-
-
-# In[ ]:
-
-
 
 

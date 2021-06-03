@@ -50,17 +50,10 @@ gdp_n = human_model.metabolites.get_by_id('gdp_n')
 o2_r = human_model.metabolites.get_by_id('o2_r')
 h2o2_r = human_model.metabolites.get_by_id('h2o2_r')
 
-o2_c = human_model.metabolites.get_by_id('o2_c')
-h2o2_c = human_model.metabolites.get_by_id('h2o2_c')
-
 hdca_r = human_model.metabolites.get_by_id('hdca_r')
 gpi_hs_r = human_model.metabolites.get_by_id('gpi_hs_r')
-# balanced_gpi = {'N': 6,'O': 42,'S': 1,'P': 5, 'C': 58, 'I': 2,'F': 1,'H': 107}
-# m4ataer_0 = human_model.metabolites.get_by_id('gpi_sig_r')
-# m4ataer_1 = human_model.metabolites.get_by_id('m_em_3gacpail_hs_r')
-# m4ataer_2 = human_model.metabolites.get_by_id('m_em_3gacpail_prot_hs_r')
-# m4ataer_3 = human_model.metabolites.get_by_id('pre_prot_r')
-# M4ATAer = {m4ataer_0:1,m4ataer_1:-1,m4ataer_2:1, m4ataer_3:-1}
+balanced_gpi = {'C': 71, 'H': 138, 'N': 4, 'O': 41, 'P': 4} # == dgpi_prot_hs_r.elements
+
 udpacgal_g = human_model.metabolites.get_by_id('udpacgal_g')
 udpgal_g = human_model.metabolites.get_by_id('udpgal_g')
 uacgam_g = human_model.metabolites.get_by_id('uacgam_g')

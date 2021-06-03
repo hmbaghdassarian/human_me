@@ -72,6 +72,12 @@ def protein_polyubiquitination(macromolecule, **kwargs):
                               'O': (5 + 5 + 5)*number_Oglycans}
                 for e,c in balance_og.items():
                     elements[e] += c
+            if 'gpi' in macromolecule._ptms.keys():
+                for e,c in metab.balanced_gpi.items():
+                    if e in elements:
+                        elements[e] += c
+                    else:
+                        elements[e] = c
 
             polyub_macromolecule.elements = elements
         
@@ -308,11 +314,10 @@ def unfold_secretory_protein(macromolecule):
 #         raise ValueError('GPI-anchored proteins with no other ptms should be degraded via lysosomal pathway')
     if 'gpi' in macromolecule._ptms.keys():
         unfolded_protein.id = unfolded_protein.id.replace('_GPI', '')
-#         for e,c in metab.balanced_gpi.items():
-#             elements[e] -= c
-        
-#         for m,s in metab.M4ATAer.copy().items(): # no lysosomal compartment metabolites
-#             rxn[m] = -s
+
+        for e,c in metab.balanced_gpi.items():
+            elements[e] -= c
+
         rxn[metab.gpi_hs_r] = 1
         if macromolecule.compartment == 'r':
             rxn[metab.hdca_r], rxn[metab.h_r], rxn[metab.h2o_r] = -1,-1,1
@@ -615,8 +620,8 @@ def degrade(macromolecule, **kwargs):
         r._consolidate_macromolecules()    
         if len(r.check_mass_balance()) > 0:
             err = True
-#     if err:
-#         raise ValueError(macromolecule.id + ': Degradation reactions are unbalanced')
+    if err:
+        raise ValueError(macromolecule.id + ': Degradation reactions are unbalanced')
     return deg_reactions
 
 
