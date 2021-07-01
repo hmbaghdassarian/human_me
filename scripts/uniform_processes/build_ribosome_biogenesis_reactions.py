@@ -8,6 +8,7 @@ import cobra
 
 import pandas as pd
 import numpy as np
+import random
 
 from Bio.Seq import Seq
 from Bio import SeqIO
@@ -98,10 +99,11 @@ exclude = ['POLYUBIQUITINATIONn', 'DEUBIQUITINATIONn', 'DEGRADATIONn']
 
 
 
-def cleave_ub(hgnc_id, ub_args, compress_mrna):
+def cleave_ub(hgnc_id, ub_args, compress_mrna, stochastic, seeds):
     '''Generates reactions specific for ubiquitin-protein fusions. RPL40 and RPS27A have ubiquitin fusions.'''
-    gene_info = gene_information.generate(hgnc_id = hgnc_id, psim = psim_rib, 
-                    machinery_list = list(), reactions = None, nonmachinery_locations = ['n'])
+    gene_info = gene_information.generate_from_psim(hgnc_id = hgnc_id, psim = psim_rib, 
+                    machinery_list = list(), reactions = None, nonmachinery_locations = ['n'], 
+                    stochastic = stochastic, seed = seeds[0])
     gene_info = func.convert_gi(gene_info, non_machinery = dict())
 
     mrna_expression_reactions, mrna_transcript_c, mrna_deg_proxy = build_mrna.get_mrna_expression_reactions(gene_info, compress_mrna = compress_mrna)
@@ -111,8 +113,8 @@ def cleave_ub(hgnc_id, ub_args, compress_mrna):
     processed_seq = gene_info.protein_seq[:gene_info.protein_seq.index(ub_args['single_ubiquitin_sequence'])] + gene_info.protein_seq[gene_info.protein_seq.index(ub_args['single_ubiquitin_sequence']) + len(ub_args['single_ubiquitin_sequence']):]
     psim_temp = psim_rib.copy()
     psim_temp.loc[psim_temp[psim_temp.HGNC_ID == hgnc_id].index, 'PROTEIN_SEQ'] = processed_seq
-    gene_info = gene_information.generate(hgnc_id = hgnc_id, psim = psim_temp, 
-                    machinery_list = list(), reactions = None, nonmachinery_locations = ['n'])
+    gene_info = gene_information.generate_from_psim(hgnc_id = hgnc_id, psim = psim_temp, 
+                    machinery_list = list(), reactions = None, nonmachinery_locations = ['n'], stochastic = stochastic, seed = seeds[1])
     gene_info = func.convert_gi(gene_info, non_machinery = dict())
     
     processed_unfolded_protein_c = Protein(id_ = 'processed_unfolded',compartment = 'c', gene_info = gene_info)#Protein(id_ = hgnc_id + '_processed_unfolded',compartment = 'c', amino_acid_counts = gene_info.amino_acid_counts)
@@ -139,7 +141,7 @@ def cleave_ub(hgnc_id, ub_args, compress_mrna):
     
     return to_add, folded_protein_c, folded_protein_n
 
-def build_ribosome_protein_expression_reactions(ub_args, compress_mrna):
+def build_ribosome_protein_expression_reactions(ub_args, compress_mrna, stochastic, seeds):
     '''Reactions associated with transcription and translation of ribosomal proteins'''
     
     # small ribosome proteins--------------------------------------------------------------------------------
@@ -147,15 +149,18 @@ def build_ribosome_protein_expression_reactions(ub_args, compress_mrna):
     RPS27A_HGNC = 'HGNC:10417'
     rs_ids.remove(RPS27A_HGNC) # RPS27A contains a ubiquitin monomer
     rs_expression_reactions, rs_protein_metabolites = list(), list()
+    seed_idx = 0
     for i in rs_ids:
-        gene_info = gene_information.generate(hgnc_id = i, psim = psim_rib, 
-                    machinery_list = list(), reactions = None, nonmachinery_locations = ['n', 'c'])
+        gene_info = gene_information.generate_from_psim(hgnc_id = i, psim = psim_rib, 
+                    machinery_list = list(), reactions = None, nonmachinery_locations = ['n', 'c'], 
+                                                       stochastic = stochastic, seed = seeds[seed_idx])
         gene_info = func.convert_gi(gene_info, non_machinery = dict())
         mrna_expression_reactions, mrna_transcript_c, mrna_deg_proxy = build_mrna.get_mrna_expression_reactions(gene_info, compress_mrna = compress_mrna)
         protein_expression_reactions, protein_metabolites = build_protein.get_protein_expression_reactions(gene_info, mrna_transcript_c, mrna_deg_proxy, ub_args)
         protein_expression_reactions = [r for r in protein_expression_reactions if r.id.split('_')[-1] not in exclude]# no nuclear degradation
         rs_expression_reactions += mrna_expression_reactions + protein_expression_reactions
         rs_protein_metabolites += protein_metabolites
+        seed_idx += 1
     
     # large ribosome proteins--------------------------------------------------------------------------------
     rl_ids = mach.rl['HGNC ID (gene)'].tolist()
@@ -163,24 +168,27 @@ def build_ribosome_protein_expression_reactions(ub_args, compress_mrna):
     rl_ids.remove(RPL40_HGNC) # RPL40 contains a ubiquitin monomer
     rl_expression_reactions, rl_protein_metabolites = list(), list()
     for i in rl_ids:
-        gene_info = gene_information.generate(hgnc_id = i, psim = psim_rib, 
-                    machinery_list = list(), reactions = None, nonmachinery_locations = ['n', 'c'])
+        gene_info = gene_information.generate_from_psim(hgnc_id = i, psim = psim_rib, 
+                    machinery_list = list(), reactions = None, nonmachinery_locations = ['n', 'c'], 
+                                                       stochastic = stochastic, seed = seeds[seed_idx])
         gene_info = func.convert_gi(gene_info, non_machinery = dict())
         mrna_expression_reactions, mrna_transcript_c, mrna_deg_proxy = build_mrna.get_mrna_expression_reactions(gene_info, compress_mrna = compress_mrna)
         protein_expression_reactions, protein_metabolites = build_protein.get_protein_expression_reactions(gene_info, mrna_transcript_c, mrna_deg_proxy, ub_args)
         protein_expression_reactions = [r for r in protein_expression_reactions if r.id.split('_')[-1] not in exclude]# no nuclear degradation
         rl_expression_reactions += mrna_expression_reactions + protein_expression_reactions
         rl_protein_metabolites += protein_metabolites
+        seed_idx += 1
     
     # ubiquitin fusions--------------------------------------------------------------------------------------
     # RPS27A
     to_add, folded_protein_c, folded_protein_n = cleave_ub(hgnc_id = RPS27A_HGNC, ub_args = ub_args, 
-                                                           compress_mrna = compress_mrna)
+                                                           compress_mrna = compress_mrna, stochastic = stochastic, seeds = seeds[seed_idx: seed_idx+2])
+    seed_idx += 2
     rs_expression_reactions += to_add
     rs_protein_metabolites += [folded_protein_c, folded_protein_n]
     # RPL40
     to_add, folded_protein_c, folded_protein_n = cleave_ub(hgnc_id = RPL40_HGNC, ub_args = ub_args, 
-                                                           compress_mrna = compress_mrna)
+                                                           compress_mrna = compress_mrna, stochastic = stochastic, seeds = seeds[seed_idx: seed_idx+2])
     rl_expression_reactions += to_add
     for r in rl_expression_reactions + rs_expression_reactions:
         r.ribosome_biogenesis = True
@@ -212,7 +220,7 @@ def build_rrna5s_reactions(rpl5_n, rpl11_n):
     for k,v in metab.nmp_map_n.items():
         rxn[v] = deg_base_counts[k]
 
-    rrna5s_complex_n = Ribosomal_Complex([rrna5s_n, rpl5_n, rpl11_n])
+    rrna5s_complex_n = Ribosomal_Complex(metabolites = [rrna5s_n, rpl5_n, rpl11_n], complex_id = 'rrna5s')
 
     rxn[pre_rrna5s_n], rxn[rpl5_n], rxn[rpl11_n]  = -1, -1, -1
     rxn[rrna5s_complex_n] = 1
@@ -599,9 +607,12 @@ def build_other_rrna_reactions(rrna5s_complex_n, rs_protein_metabolites, rl_prot
 # In[6]:
 
 
-def build_ribosome(ub_args, compress_mrna, reversible_complex_formation):
+def build_ribosome(ub_args, compress_mrna, reversible_complex_formation, stochastic, seed):
     with func.HiddenPrints():
-        rs_expression_reactions, rs_protein_metabolites, rl_expression_reactions, rl_protein_metabolites = build_ribosome_protein_expression_reactions(ub_args, compress_mrna)
+        random.seed(seed)
+        seeds = random.sample(range(0, int((2**32 - 1 ))), k = 87)
+        rs_expression_reactions, rs_protein_metabolites, rl_expression_reactions,         rl_protein_metabolites = build_ribosome_protein_expression_reactions(ub_args = ub_args, compress_mrna = compress_mrna, 
+                                                                             stochastic = stochastic, seeds = seeds)
     rpl5_n = [m for m in rl_protein_metabolites if m.id == 'HGNC:10360_folded_protein_n'][0]
     rpl11_n = [m for m in rl_protein_metabolites if m.id == 'HGNC:10301_folded_protein_n'][0]
     rrna5s_reactions, rrna5s_complex_n, rrna5s_c = build_rrna5s_reactions(rpl5_n, rpl11_n)
@@ -613,7 +624,7 @@ def build_ribosome(ub_args, compress_mrna, reversible_complex_formation):
     ribosome_complex_c = Ribosomal_Complex(metabolites = mature_ribosomal_precomplexes, complex_id = 'mature_ribosome')
     ribosome_complex_formation = ribosome_complex_c.form_complex(reversible = reversible_complex_formation)
     # add a gtp hydrolysis to the complex formation: https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5861459/
-    rxn = ribosome_complex_formation.metabolites.copy()
+    rxn = dict()
     rxn[metab.ntp_map_c['G']], rxn[metab.h2o_c], rxn[metab.ndp_map_c['G']], rxn[metab.pi_c], rxn[metab.h_c]  = -1, -1, 1, 1, 1
     ribosome_complex_formation.add_metabolites(rxn)
 
@@ -637,11 +648,15 @@ def build_ribosome(ub_args, compress_mrna, reversible_complex_formation):
     return  all_reactions, ribosome_complex_c
 
 
-# In[ ]:
+# In[16]:
 
 
 # compress_mrna = False
 # from expression.protein_expression import ubiquitin
 # ub_args = ubiquitin.express_ubiquitin(compress_mrna = compress_mrna)
-# all_reactions, ribosome_complex_c = build_ribosome(ub_args, compress_mrna = compress_mrna)
+# stochastic = False
+# seed = 888
+# reversible_complex_formation = False
+# all_reactions, ribosome_complex_c = build_ribosome(ub_args, compress_mrna, 
+#                                                    reversible_complex_formation, stochastic, seed)
 

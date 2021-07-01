@@ -1,13 +1,16 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[2]:
+# In[46]:
 
 
 import itertools
 import collections
+from collections import OrderedDict
 import uuid
 import numpy as np
+import random
+from faker import Faker
 
 import sys
 sys.path.insert(1, '../../scripts/')
@@ -31,7 +34,7 @@ def flatten_list(list_):
 
 class Complex(Macromolecule):
     '''Complexes formed by non-covalent interactions between macromolecules'''
-    def __init__(self, metabolites, complex_id = None, ignore_compartment = False):
+    def __init__(self, metabolites, complex_id = None, ignore_compartment = False, seed = None):
         '''
         Parameters
         ----------
@@ -41,6 +44,8 @@ class Complex(Macromolecule):
             the id of the complex metabolite; if None, will generate a random id
         ignore_compartment: bool 
             whether to ignore the metabolite compartments, mainly for internal use
+        seed: int
+            A seed for generating the complex ID if it is None
         
         Returns
         ----------
@@ -64,8 +69,11 @@ class Complex(Macromolecule):
             raise ValueError('Metabolites forming a complex must all be in the same compartment')
 
         # parse metabolite id
+        self._seed = seed
         if complex_id == None:
-            self.temp_id = str(uuid.uuid4().fields[0])
+            Faker.seed(self._seed)
+            f1 = Faker()
+            self.temp_id = f1.uuid4().split('-')[0]
         else: 
             self.temp_id = complex_id
         
@@ -94,7 +102,9 @@ class Complex(Macromolecule):
         if self.reaction_id is not None:
             raise ValueError('Reaction and complex IDs will be consistent since you are updating the id after forming the reaction.')
         if new_id is None:
-            self.temp_id = str(uuid.uuid4().fields[0])
+            Faker.seed(self._seed)
+            f1 = Faker()
+            self.temp_id = f1.uuid4().split('-')[0]
         else:
             self.temp_id = new_id
         self.id = self.temp_id + '_complex_' + self.compartment
@@ -143,12 +153,24 @@ class Complex(Macromolecule):
             decomposed_complex = Complex(metabolites = all_metab, complex_id = 'ignore')
         
         if 'complex' not in [m.type for m in decomposed_complex.components.keys()]:
-            return decomposed_complex.components
+#             return decomposed_complex.components
+            # order the metabolites to avoid precision issues, e.g. in .get_complex_biomass
+            dc = decomposed_complex.components
+            dc_map = {m.id: m for m in dc}
+            return OrderedDict({dc_map[m_id]: dc[dc_map[m_id]] for m_id in sorted(dc_map)})
         else:
             metabolites_ = flatten_list([[m]*count for m, count in decomposed_complex.components.items() if m.type != 'complex'])
             metabolites_ += flatten_list(flatten_list([[[m_]*count_ for m_, count_ in m.components.items()]*count for m, count in decomposed_complex.components.items() if m.type == 'complex']))
             return self.decompose_complex(decomposed_complex = Complex(metabolites = metabolites_, complex_id = 'ignore'))
-
+    
+#     def decompose_complex(self):
+#         '''Recursive method to get the complex by its individual components, including nested complexes
+#         Orders metabolites by ID, to avoid any precision issues due to ordering, e.g., in .get_complex_biomass()""
+#         '''
+#         dc = self._decompose_complex()
+#         dc_map = {m.id: m for m in dc}
+#         return OrderedDict({dc_map[m_id]: dc[dc_map[m_id]] for m_id in sorted(dc_map)})
+    
     def get_complex_biomass(self):
         '''Returns a dictionary of the complex biomass by its individual component types'''
 
@@ -233,7 +255,7 @@ class Complex(Macromolecule):
 class Ribosomal_Complex(Complex):
     '''Complexes specifically associated with ribosome biogenesis, which has RNA-protein complexes and 
     multiple compartments'''
-    def __init__(self, metabolites, complex_id = None, ignore_compartment = False):
+    def __init__(self, metabolites, complex_id = None, ignore_compartment = False, seed = None):
         '''
         Parameters
         ----------
@@ -243,6 +265,8 @@ class Ribosomal_Complex(Complex):
             the id of the complex metabolite; if None, will generate a random id
         ignore_compartment: bool 
             whether to ignore the metabolite compartments, mainly for internal use
+        seed: int
+            A seed for generating the complex ID if it is None
         
         Returns
         ----------
@@ -273,8 +297,11 @@ class Ribosomal_Complex(Complex):
             raise ValueError('Metabolites forming a complex must all be in the same compartment')
         
         # parse metabolite id
+        self._seed = seed
         if complex_id == None:
-            self.temp_id = str(uuid.uuid4().fields[0])
+            Faker.seed(self._seed)
+            f1 = Faker()
+            self.temp_id = f1.uuid4().split('-')[0]
         else: 
             self.temp_id = complex_id
         
@@ -304,7 +331,11 @@ class Ribosomal_Complex(Complex):
             decomposed_complex = Ribosomal_Complex(metabolites = all_metab, complex_id = 'ignore')
         
         if 'complex' not in [m.type for m in decomposed_complex.components.keys()]:
-            return decomposed_complex.components
+#             return decomposed_complex.components
+            # order the metabolites to avoid precision issues, e.g. in .get_complex_biomass
+            dc = decomposed_complex.components
+            dc_map = {m.id: m for m in dc}
+            return OrderedDict({dc_map[m_id]: dc[dc_map[m_id]] for m_id in sorted(dc_map)})
         else:
             metabolites_ = flatten_list([[m]*count for m, count in decomposed_complex.components.items() if m.type != 'complex'])
             metabolites_ += flatten_list(flatten_list([[[m_]*count_ for m_, count_ in m.components.items()]*count for m, count in decomposed_complex.components.items() if m.type == 'complex']))
@@ -398,30 +429,6 @@ class Ribosomal_Complex(Complex):
             if self._deg_initialized:
                 new_complex._initialize_deg_params()
             return new_complex
-#     def get_k_deg(self):
-#         self.k_deg = params.ribosomal_degradation_rate
-
-#     def _change_compartment_and_components(self, new_compartment):
-#         '''Returns a copy of the complex metabolite, but in new compartment. 
-#         Recursive to change all components (nested complexes and their components)'''
-
-#         if new_compartment == self.compartment:
-#             raise ValueError('The macromolecule is already in this compartment')
-#         if new_compartment not in params.compartments.keys():
-#             err = 'Specified compartment is not considered in the ME Model. Please input one of the following: ' 
-#             err += ', '.join(list(params.compartments.keys()))
-
-#         metabolites = list()
-#         for m,c in self.components.items():
-#             if m.type != 'complex':
-#                 metabolites += [m.change_compartment(new_compartment)]*c
-#             else:
-#                 metabolites += [m._change_compartment_and_components(new_compartment)]*c
-
-#         new_complex = Ribosomal_Complex(metabolites = metabolites, complex_id = self.temp_id)
-#         if self._deg_initialized:
-#             new_complex._initialize_deg_params()
-#         return new_complex
 
 
 # In[ ]:

@@ -350,9 +350,9 @@ class qminos_solver():
         predicted = pd.DataFrame(data = {'growth': np.arange(0,mu_max + mu_max/1000, mu_max/(1000-1))})
         predicted[obj_label] = predicted.growth.apply(lambda x: interp_fit(x).item()).values.tolist()
         
-        if list(objective.values())[0] == 1:
+        if np.sign(list(objective.values())[0]) == 1:
             optimal_val = predicted[obj_label].max()
-        elif list(objective.values())[0] == -1:
+        elif np.sign(list(objective.values())[0]) == -1:
             optimal_val = predicted[obj_label].min()
           
         optimal_val_growth = predicted[predicted[obj_label] == optimal_val].growth.values.tolist()[0]

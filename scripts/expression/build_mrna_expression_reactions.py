@@ -18,7 +18,7 @@ from utils import machinery as mach
 from utils import parameters as params
 from utils import metabolites as metab
 from utils import functions as func
-from utils.polyA_statistics import calculate_polyA_length
+from utils.polyA_statistics import calculate_polyA_length, polyA_params
 
 from core.reaction import Expression_Reaction
 from macromolecules.RNA import RNA_fragment, pre_mRNA, mRNA
@@ -47,8 +47,10 @@ class express_mrna():
         # combine in to one to not create too many reactions (capping itself is 4 reactions)
         # make mrna_n metabolite
         self.mrna_n = mRNA(self.gene_info, compartment = 'n')
-        self.polyA_length = int(calculate_polyA_length(self.gene_info.polyA_length))
-        self.polyA_length = 100 # GET RID OF THIS
+        
+        
+        self.polyA_length = calculate_polyA_length(self.gene_info.polyA_length, self.gene_info.stochastic, self.gene_info.seed)
+       
         self.mrna_n.update_metabolite(seq = ''.join(['A']*self.polyA_length), 
                                      append = True, append_to = '3_primed')
         

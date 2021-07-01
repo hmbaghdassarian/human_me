@@ -7,6 +7,7 @@
 import pandas as pd
 import numpy as np
 import itertools
+import random
 
 import os
 import sys
@@ -81,9 +82,24 @@ def convert_gi(gi, non_machinery):
 # In[11]:
 
 
-def get_reaction_compartment(reaction):
-    '''Input is a cobra.Reaction, output is a singular compartment. This function maps reactions to a particular 
-    compartment according to some rules'''
+def get_reaction_compartment(reaction, stochastic = False, seed = None):
+    '''This function maps reactions to a particular compartment according to some rules, informing the 
+    compartment the enzyme catalyzing the reaction should be in 
+    
+    Parameters
+    ----------
+    reaction: cobra.Reaction 
+    stochastic: bool
+        In the presence of multiple compartments for a single reaction, whether one should randomly be chosen
+    seed: int
+        A seed for if stochastic is set to True
+    
+    Returns
+    ----------
+    compartment: str
+        a singular compartment representing the location of the enzyme catalyzing the reaction
+    
+    '''
     
     # only include metabolites with assigned compartments that are not a coupling metabolite
     compartments_ = list(set([m.compartment for m in reaction.metabolites.keys() if m.compartment is not None and not (hasattr(m, 'coupling_coefficient') and m.coupling_coefficient is not None)]))
@@ -95,7 +111,14 @@ def get_reaction_compartment(reaction):
             if 'c' in compartments_: # remove cytoplasmic compartment as a choice in multi-machinery
                 compartments_.remove('c')
             if len(set(compartments_)) > 1:
-                compartments_ = [max(sorted(compartments_), key = compartments_.count)]
+                if not stochastic:
+                    seed = 888
+#                     compartments_ = [max(sorted(compartments_), key = compartments_.count)]
+#                 else:
+                max_ = max([compartments_.count(i) for i in compartments_])
+                compartments_ = list(set([i for i in compartments_ if compartments_.count(i) == max_]))
+                random.seed(seed)
+                compartments_ = [random.choice(compartments_)]
     
 #     compartments_ = sorted(set(compartments_))
     if len(compartments_) != 1:

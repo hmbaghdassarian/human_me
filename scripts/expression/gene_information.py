@@ -21,7 +21,7 @@ from utils import parameters as params
 from utils import functions as func
 
 
-# In[5]:
+# In[2]:
 
 
 def format_final_locations(final_locations, sp, hgnc_id):
@@ -93,7 +93,7 @@ class gene_information():
     def __init__(self, hgnc_id, premrna_seq, mrna_seq, protein_seq,
                  machinery_list = mach.metabolic_machinery,
                  ptms = {}, tmd = 0, sp = False, polyA_length = None, n_exons = None, 
-                coupling_params = None):
+                coupling_params = None, stochastic = False, seed = None):
         '''Initialize object
         
         Parameters
@@ -139,8 +139,15 @@ class gene_information():
                         str tissue options: ['Median', Adrenal', 'Appendices', 'Brain', 'Colon', 'Duodenum', 'Endometrium', 'Esophagus', 'Fallopiantube', 'Fat', 'Gallbladder', 'Heart', 
                                         'Kidney', 'Liver', 'Lung', 'Lymphnode', 'Ovary', 'Pancreas', 'Placenta', 'Prostate', 'Rectum', 'Salivarygland', 'Smallintestine', 'Smoothmuscle', 
                                         'Spleen', 'Stomach', 'Testis', 'Thyroid', 'Tonsil', 'Urinarybladder']
+        stochastic: bool
+            Whether a potentially stochastic output should be stochastic, or choose a default behavior instead
+        seed: int
+            A seed for if stochastic is set to True
               
         '''
+        self.stochastic = stochastic
+        self.seed = seed
+        random.seed(seed)
         
         self.hgnc_id = hgnc_id
         
@@ -157,10 +164,17 @@ class gene_information():
             raise ValueError(self.hgnc_id + ': All of the sequence types (premrna, mrna, protein) must be provided')
         if 'N' in mrna_seq:
             warnings.warn(self.hgnc_id + ': The letter N is in the mrna sequence. Replacing with a random nucleotide')
-            mrna_seq = mrna_seq.replace('N', 'U')#mrna_seq.replace('N', random.choice(['A', 'U', 'G', 'C']))
+            if not self.stochastic:
+                mrna_seq = mrna_seq.replace('N', 'U')
+            else:
+                mrna_seq = mrna_seq.replace('N', random.choice(['A', 'U', 'G', 'C']))
         if 'N' in premrna_seq:
             warnings.warn(self.hgnc_id + ': The letter N is in the premrna sequence. Replacing with a random nucleotide')
-            premrna_seq = premrna_seq.replace('N', 'C')#('N', random.choice(['A', 'U', 'G', 'C']))
+            if not self.stochastic:
+                premrna_seq = premrna_seq.replace('N', 'U')
+            else:
+                premrna_seq = premrna_seq.replace('N', random.choice(['A', 'U', 'G', 'C']))
+                
         if len(set(premrna_seq).difference(['A', 'U', 'G', 'C'])) > 0:
             raise ValueError(self.hgnc_id + ': The premrna sequence contains bases which are not allowed')
         if len(set(mrna_seq).difference(['A', 'U', 'G', 'C'])) > 0:
@@ -168,7 +182,11 @@ class gene_information():
         
         if 'X' in protein_seq:
             warnings.warn(self.hgnc_id + ': The letter X is in the protein sequence. Replacing with a random amino acid')
-            protein_seq = protein_seq.replace('X', 'A')#('X', random.choice(params.amino_acids))
+            if not self.stochastic:
+                protein_seq = protein_seq.replace('X', 'L') 
+            else:
+                protein_seq = protein_seq.replace('X', random.choice(params.amino_acids))
+            
         if 'U' in protein_seq:
             warnings.warn(self.hgnc_id + ': Selenocysteine not currently considered by model, replacing with cysteine')
             protein_seq = protein_seq.replace('U', 'C')
@@ -315,7 +333,7 @@ class gene_information():
         Parameters
         ----------
         reactions: list
-            each element is a cobra.core.reactions.Reaction associated with the gene
+            each element is an instance of cobra.core.reactions.Reaction associated with the gene
         nonmachinery_locations: list
             a list of strings of final compartments for non-machinery
         
@@ -335,8 +353,18 @@ class gene_information():
         if self.machinery:
             if reactions is None:
                 raise ValueError('For machinery, need associated reactions')
-#             rxns = list(metabolic_model.genes.get_by_id(self.hgnc_id).reactions)
-            self.machinery_locations = sorted(set([func.get_reaction_compartment(r) for r in reactions])) 
+            
+            for r in reactions:
+                if not hasattr(r, '_compartment_seed'): # same reaction for a compartment, if multiple genes associated
+                    if self.stochastic:
+                        r._compartment_seed = self.seed # allows stochasticity
+                    else:
+                        r._compartment_seed = 888 # consistently same output 
+                if not hasattr(r, 'enzyme_compartment'): # same reaction for a compartment, even if seed is None - stochastic = F, seed = None
+                    r.enzyme_compartment = func.get_reaction_compartment(r, self.stochastic, r._compartment_seed)
+                self.machinery_locations.append(r.enzyme_compartment)
+        self.machinery_locations = sorted(set(self.machinery_locations))
+            
    
         if not self.machinery and len(nonmachinery_locations) == 0:
                 raise ValueError(self.hgnc_id + ': For non-machinery, must specify the final compartments')
@@ -389,8 +417,8 @@ ptm_cols = ['DSB', 'GPI', 'NG', 'OG']
 ptm_keys = list(params.allowed_ptms.keys())
 cp_keys = ['alpha_m', 'alpha_p', 'ptr']
 
-def generate(hgnc_id, psim = params.psim_me, machinery_list = mach.metabolic_machinery, 
-                             reactions = None, nonmachinery_locations = []):
+def generate_from_psim(hgnc_id, psim = params.psim_me, machinery_list = mach.metabolic_machinery, 
+                             reactions = None, nonmachinery_locations = [], stochastic = False, seed = None):
     '''Generates gene information object from PSIM. Assumes the gene information object being 
     generated is not for a non-machinery protein.'''
     
@@ -409,7 +437,7 @@ def generate(hgnc_id, psim = params.psim_me, machinery_list = mach.metabolic_mac
                     ptms = dict(zip(['dsb', 'og', 'gpi'],[entries['DSB'], entries['OG'], entries['GPI']])),
                     tmd = entries['TMD'], sp = entries['SP'], polyA_length = entries['POLYA_LENGTH'], 
                     n_exons = entries['N_EXONS'], 
-                    coupling_params = dict(zip(cp_keys, cp_values)))
+                    coupling_params = dict(zip(cp_keys, cp_values)), stochastic = stochastic, seed = seed)
     gene_info.get_final_locations(reactions = reactions, 
                                   nonmachinery_locations = nonmachinery_locations)
     gene_info.check_gene_information()

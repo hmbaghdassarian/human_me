@@ -1,11 +1,12 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[1]:
+# In[ ]:
 
 
 import cobra
 from sympy.parsing.sympy_parser import parse_expr
+from collections import OrderedDict
 
 import sys
 sys.path.insert(1, '../../scripts/') # comment out in python script
@@ -154,10 +155,13 @@ def add_biomass_change(reaction, inplace = True):
     
     '''
     biomass_change = dict()
-    md = reaction._metabolites.copy()
+#     md = reaction._metabolites.copy()
+    # must order for precision (order of adding masses effects final sum)
+    md_ = reaction._metabolites.copy()
+    md_map = {m.id: m for m in md_}
+    md = OrderedDict({md_map[m_id]: md_[md_map[m_id]] for m_id in sorted(md_map)})
     
-    # coupling does not contribute to biomass change - subtract from stoichiometry
-#     if reaction.coupled_metabolites is not None:
+    
     reaction._map_coupled_metabolites()
     for metabolite, type in reaction.coupled_metabolites.items():
         md[metabolite] -= metabolite.coupling_coefficient[type] # coupling not part of mass balance
