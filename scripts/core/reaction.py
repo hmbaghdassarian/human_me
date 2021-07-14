@@ -262,7 +262,7 @@ class Expression_Reaction(ME_Reaction):
     def __init__(self,  id, subsystem, name='', lower_bound=0.0, upper_bound=None, 
                 hgnc_id = None, 
                  synthesis = False, synthesis_type = None, sink = False, sink_type = None,
-                 ubiquitin_biogenesis = False, ribosome_biogenesis = False):
+                 ubiquitin_biogenesis = False, ribosome_biogenesis = False, trna_charging = False):
         '''
         
         Parameters
@@ -294,6 +294,8 @@ class Expression_Reaction(ME_Reaction):
             whether the Expression_Reaction is part of ubiquitin_biogenesis reactions, only used to ignore hgnc_id is None
         ribosome_biogenesis: bool
             whether the Expression_Reaction is part of ribosome_biogenesis reactions, only used to ignore hgnc_id is None
+        trna_charging: bool
+            specifies that the Expression_Reaction is a trna charging reaction (True), for use with calculating biomass change
         '''
         
         if subsystem not in ['tRNA_Biogenesis', 'rRNA_expression', 'mRNA_expression', 'Protein_Expression', 
@@ -321,6 +323,7 @@ class Expression_Reaction(ME_Reaction):
             self.sink_type = sink_type
             
         self.ribosome_biogenesis = ribosome_biogenesis 
+        self.trna_charging = trna_charging
 
 class Protein_Expression_Reaction(Expression_Reaction):
     '''Inherited from Expression_Reaction, specifies the protein expression reactions in the model'''

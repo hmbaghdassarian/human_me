@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[ ]:
+# In[1]:
 
 
 import cobra
@@ -173,20 +173,21 @@ def add_biomass_change(reaction, inplace = True):
         if m.compartment != 'e':
             if isinstance(m, Macromolecule):# and not isinstance(count, sympy.Expr):
                 if m.type != 'complex': # includes ribosomes
-                    if not(m.type == 'trna' and (reaction.id.startswith('CHARGING_TRNA_') or (isinstance(reaction, Expression_Reaction) and reaction.synthesis_type == 'protein'))):
-                        # above line exclude trna charging/unchraging from change in trna biomass
-                        # this removes tradeoffs between generating protein biomass and maintaining
-                        # trna biomass
-                        if m.type in biomass_change:
-                            biomass_change[m.type] += (count*m.formula_weight/1000)
-                        else:
-                            biomass_change[m.type] = (count*m.formula_weight/1000)
+                    if m.type in biomass_change:
+                        biomass_change[m.type] += (count*m.formula_weight/1000)
+                    else:
+                        biomass_change[m.type] = (count*m.formula_weight/1000)
                 else:
                     for type_, mass_ in m.get_complex_biomass().items():
                         if type_ in biomass_change:
                             biomass_change[type_] += (count*mass_)
                         else:
                             biomass_change[type_] = (count*mass_)
+    
+    # exclude trna charging/unchraging from change in trna biomass
+    # this removes tradeoffs between generating protein biomass and maintaining trna biomass
+    if (hasattr(reaction, 'trna_charging') and reaction.trna_charging) or (hasattr(reaction, 'translation') and reaction.translation):
+        del biomass_change['trna']
     
     # proxy metabolites do not contribute to bimoass
     if 'proxy' in biomass_change:

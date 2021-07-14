@@ -325,6 +325,7 @@ def form_disulfide_bond(gene_info, folded_protein_r):
     elements = folded_protein_r.elements.copy()
     elements['H'] -= 2*number_DSB
     modified_protein_dsb_r.elements = elements
+    modified_protein_dsb_r._ptms['dsb'] = number_DSB
     # diagram https://www.google.com/url?sa=i&url=https%3A%2F%2Fen.wikipedia.org%2Fwiki%2FProtein_disulfide-isomerase&psig=AOvVaw0bGpff4XX1eYEF61H1RJKw&ust=1597273135069000&source=images&cd=vfe&ved=0CAIQjRxqFwoTCJi6l6GglOsCFQAAAAAdAAAAABAJ
     # incorporate exchange with PDI in future versions
     rxn = {folded_protein_r: -1, modified_protein_dsb_r: 1, metab.o2_r: -number_DSB, metab.h2o2_r: number_DSB}
@@ -346,6 +347,7 @@ def form_gpi(gene_info, modified_protein_r):
         else:
             elements[e] = c
     modified_protein_gpi_r.elements = elements
+    modified_protein_gpi_r._ptms['gpi'] = 1
 
     rxn = dict()
 #     rxn[metab.hdca_r], rxn[metab.gpi_hs_r], rxn[metab.h_r], rxn[metab.h2o_r], rxn[metab.gpi_sig_r] = 1,-1,1,-1,1
@@ -433,6 +435,7 @@ def glycosylate_o_linked(gene_info, protein_g):
     # metabolites
     modified_protein_og_g = protein_g.copy()
     modified_protein_og_g.id = modified_protein_og_g.id.replace('folded', 'folded_OG')
+    modified_protein_og_g._ptms['og'] = number_Oglycans
 
     balance_og = {'C': (8 + 6 + 8)*number_Oglycans, # each 1/3 entry is for each 1/3 reactions in Jahir's model, in case want to separate in the future 
                   'H': (13 + 10 + 13)*number_Oglycans, 
@@ -662,18 +665,24 @@ def get_protein_expression_reactions(gene_info, mrna_transcript_c, mrna_deg_prox
                             
             
             # retrograde transport
-            if 'r' in gene_info.all_locations or 'g' in gene_info.all_locations:# and not lysosomal_degradation_ptm_condition:
-                # golgi retrograde transport for degradation 
-                retrograde_transport, retro_protein_r = degradation.retrograde_er(modified_protein_g)
-                retrograde_transport._final_compartments += list(set(gene_info.all_locations).intersection(['r', 'g']))
+            if 'r' in gene_info.all_locations or 'g' in gene_info.all_locations:
+                # golgi retrograde transport for degradation or delivery to ER
+                if not ('r' in gene_info.all_locations and 'og' in gene_info.ptms):
+                    retrograde_transport, retro_protein_r = degradation.retrograde_er(modified_protein_g, modified_protein_r)
+                else:
+                    retrograde_transport, retro_protein_r = degradation.retrograde_er(modified_protein_g)
+                if 'g' in gene_info.all_locations:
+                    retrograde_transport._final_compartments.append('g')
+                if 'r' in gene_info.all_locations and 'og' in gene_info.ptms:
+                    retrograde_transport._final_compartments.append('r')
                 protein_expression_reactions += [retrograde_transport]
                 if 'g' in gene_info.all_locations.keys():
                     protein_metabolites += [modified_protein_g]
 
         else:
             retro_protein_r = modified_protein_r # for ER resident proteins with no O-glycosylation, they are not transported to Golgi and retrograde transported
-        
-            
+
+
         # ERAD: ER and Golgi-resident proteins 
         if ('r' in gene_info.all_locations or 'g' in gene_info.all_locations):# and not lysosomal_degradation_ptm_condition: 
             if 'r' in gene_info.all_locations.keys():
@@ -765,7 +774,7 @@ def get_protein_expression_reactions(gene_info, mrna_transcript_c, mrna_deg_prox
     return protein_expression_reactions, protein_metabolites
 
 
-# In[ ]:
+# In[12]:
 
 
 # import random
@@ -783,7 +792,7 @@ def get_protein_expression_reactions(gene_info, mrna_transcript_c, mrna_deg_prox
 # # note that there is no check that the protein_sequence corresponds to the mrna_sequence beyond checking for the length
 # protein_seq = ''.join(random.choices(params.amino_acids, k = int(len(mrna_seq)/3)))
 # polyA_length, tmd, sp, n_exons, dsb, gpi, og  = None, 1, True, None, 2, 2, 2
-# ub_args = ubiquitin.express_ubiquitin(compress_mrna = False)
+# ub_args = ubiquitin.express_ubiquitin(compress_mrna = True)
 
 # import itertools
 # reactions = list()

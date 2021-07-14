@@ -307,7 +307,7 @@ def unfold_secretory_protein(macromolecule):
     elements = unfolded_protein.elements.copy()
 #     lysosomal_degradation_ptm_condition = 'gpi' in macromolecule._ptms.keys() and len(macromolecule._ptms.keys()) == 1
 
-    # PTM removals HERE #YOU ARE HERE 
+    # PTM removals HERE 
     if 'ng' in macromolecule._ptms.keys():
         raise ValueError('N-glycosylation not yet incorporated')
 #     if lysosomal_degradation_ptm_condition:
@@ -361,7 +361,7 @@ def unfold_secretory_protein(macromolecule):
                 rxn[metab.h_l] = -3*number_Oglycans
 
     ###########
-    
+    unfolded_protein._ptms = dict()
     unfolded_protein.elements = elements
     rxn[unfolded_protein] = 1
         
@@ -391,14 +391,15 @@ def unfold_secretory_protein(macromolecule):
     
     return unfold_protein, unmodified_protein
 
-def retrograde_er(macromolecule):
+def retrograde_er(macromolecule, retro_protein_r = None):
     if macromolecule.compartment != 'g':
         raise ValueError('ER retrograde transport can only occur for Golgi macromolecules')
         
     V = macromolecule.formula_weight/1000 * 1.21 / 1000.0 # Protein Volume in nm^3
     copi_coeff = int(round(143793.19 * params.Kv / V))
-
-    retro_protein_r = macromolecule.change_compartment('r')
+    
+    if retro_protein_r is None:
+        retro_protein_r = macromolecule.change_compartment('r')
 
     rxn = {macromolecule: -copi_coeff, retro_protein_r: copi_coeff}
     # gtp hydrolysis

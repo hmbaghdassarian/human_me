@@ -207,7 +207,7 @@ class express_trna():
     def primary_export_trna(self):
         self.trna_c = self.modified_trna_n.change_compartment('c')
 
-        trna_primary_export = Expression_Reaction(self.trna_info.id + 'PRIMARY_EXPORTtn', subsystem = 'tRNA_Biogenesis')
+        trna_primary_export = Expression_Reaction(self.trna_info.id + '_PRIMARY_EXPORTtn', subsystem = 'tRNA_Biogenesis')
         trna_primary_export.subsytem = 'tRNA_Biogenesis'
         trna_primary_export.name = 'trna nuclear export'
 
@@ -267,10 +267,12 @@ class express_trna():
             # +1 for loss of negative charge on oxygen of amino acid
             charged_trna_c.charge = self.modified_trna_c.charge + aa.charge + 1 
 
-            trna_charging = Expression_Reaction('CHARGING_TRNA_' + self.trna_info.id + '_' + code, subsystem = 'tRNA_Biogenesis')
+            trna_charging = Expression_Reaction('CHARGING_TRNA_' + self.trna_info.id + '_' + code, subsystem = 'tRNA_Biogenesis', 
+                                               trna_charging = True)
             rxn = {self.modified_trna_c: -1, aa: -1, charged_trna_c: 1, metab.atp_c: -1, metab.ppi_c: 1, 
                    metab.amp_c: 1}
-            trna_charging.add_metabolites(rxn)
+            trna_charging.add_metabolites(rxn)            
+            
             # add gprs
             genes = mach.seq_synthetase_map[code]
             if len(genes) == 1:
