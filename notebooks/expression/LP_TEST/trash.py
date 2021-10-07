@@ -66,11 +66,12 @@ def par_sinks(m_id):
     with open(fn, 'a+') as f:
         f.write(m_id + '\t' + str(stat.max()) + '\n')
 
-m_ids = list(set([m.id for m in tme0.metabolites if 'biomass' not in m.id             and hasattr(m, 'type') and m.type == 'protein' and not m.enzyme])) 
+m_ids = list(set([m.id for m in tme0.metabolites if (not hasattr(m, 'type')) and ('biomass' not in m.id)]))
+ 
 
 import multiprocessing
 import gc
-n_cores = 17
+n_cores = 18
 
 print('Start parallelization')
 pool = multiprocessing.Pool(processes = n_cores)

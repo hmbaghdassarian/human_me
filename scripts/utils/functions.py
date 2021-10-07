@@ -71,7 +71,7 @@ def convert_gi(gi, non_machinery):
     gi.machinery = True
     gi.all_locations, gi.machinery_locations = gi.nonmachinery_locations.copy(), gi.nonmachinery_locations.copy()
     gi.nonmachinery_locations = dict()
-    if gi.hgnc_id in non_machinery:
+    if gi.hgnc_id in non_machinery:create_gene_reaction_map
         gi.non_machinery_locations = gene_information.format_final_locations(
             final_locations = list(set(non_machinery[hgnc_id]).difference(gene_info.machinery_locations.keys())), 
         sp = True, hgnc_id = gi.hgnc_id)
@@ -363,4 +363,42 @@ def average_protein_features(psim_me, protein_ids, context_specific = True):
         dummy_psim[col] = val    
         
     return dummy_psim
+
+
+# In[ ]:
+
+
+def determine_transport(r):
+    '''
+    Parameters
+    ----------
+    r: cobra.core.reactions.Reaction
+
+    Returns
+    ----------
+    actual_transport_m: list
+        a list of metabolites that are actually transported across compartments
+        each element is a string of the metabolite id without the compartment ('_compartment' ending)
+    
+    
+    '''
+    
+    sm_reactants = dict()
+    sm_prod = dict()
+    for m in r.reactants:
+        m_id = m.id.split('_')[:-1][0]
+        if m_id not in sm_reactants:
+            sm_reactants[m_id] = [m.id.split('_')[-1]]
+        else: 
+            sm_reactants[m_id] += [m.id.split('_')[-1]]
+    for m in r.products:
+        m_id = m.id.split('_')[:-1][0]
+        if m_id not in sm_prod:
+            sm_prod[m_id] = [m.id.split('_')[-1]]
+        else: 
+            sm_prod[m_id] += [m.id.split('_')[-1]]
+    potential_transport_m = set(sm_prod).intersection(sm_reactants)
+    actual_transport_m = [m for m in potential_transport_m if len(set(sm_reactants[m]).intersection(sm_prod[m])) == 0  
+                         and (sm_reactants[m] + sm_prod[m] != ['e', 'b'])] # this accounts for LParen_EParen reactions
+    return actual_transport_m
 
