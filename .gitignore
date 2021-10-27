@@ -9,6 +9,7 @@ project_files/
 data/
 notebooks/.pybiomart.sqlite
 **/__pycache__/
+test_code/
 me_env/
 MammalianSecretoryRecon/
 **/*.pyc
