@@ -26,7 +26,7 @@ Legend:
 * additional information<sup>5</sup>: not used in pipeline, but additional metadata associated with each gene - specific to Recon2.2 and gold-standard PSIM. User provided PSIM does not need these columns. 
 
 
-The PSIM is read into the pipeline using the preprocess.correct_inputs.correct_psim function, which will check that all values make sense. If the fill_na argument is set to 'select', all NaN values in the user-provided PSIM are filled with values from the gold-standard PSIM when available, otherwise default. If the fill_na argument is set to 'default', all NaN values are replaced with a default value according to the expression.gene_information.gene_information class. 
+The PSIM is read into the pipeline using the preprocess.correct_inputs.correct_psim function, which will check that all values make sense. If the fill_na argument is set to 'select', all NaN values in the user-provided PSIM are filled with values from the gold-standard PSIM when available, otherwise default. If the fill_na argument is set to 'default', all NaN values are replaced with a default value according to the expression.gene_expression.gene_information.GeneInformation class. 
 
 Columns:
 * HGNC_ID<sup>0</sup>: The gene ID in HGNC format (HGNC:####). There should be an entry for all genes that are included in the M_Model GPR and in non-machinery. 

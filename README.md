@@ -13,9 +13,9 @@ pip install -r path/to/human_me/requirements.txt
 
 Note: Conda environments do not work well with solvemepy. 
 
-2. With the environment activated, setup the QMINOS solver as specified in the installation instructions for [solvemepy](https://github.com/SBRG/solvemepy). For step 2, you must first clone solvemepy. The QMINOS solver can be obtained for academic use from Prof. Michael Saunders at Stanford University. Make sure gfortran is available to your system, as it is needed for running the solver. 
+2. With the environment activated, setup the QMINOS solver as specified in the installation instructions for [solvemepy](https://github.com/SBRG/solvemepy). The QMINOS solver can be obtained for academic use from Prof. Michael Saunders at Stanford University. Make sure gfortran is available to your system, as it is needed for running the solver. 
 
-Note: Disregard the requirements that are delineated in solvmepy's README, with the exception of gfortran (#4). The remainder should have been appropriately installed with the requirements.txt file or are unecessary. 
+Note: Disregard the requirements that are delineated in solvmepy's README, with the exception of gfortran (#4). The remainder should have been appropriately installed with the requirements.txt file or are unecessary for human_me. 
 
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Step 2a: Untar the QMINOS solver and follow Step 1 of solveme installation guide:
 
@@ -32,10 +32,10 @@ make clean
 make
 ```
 
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Step 2b: Having exitted the qminos directory, clone the solveme github and follow Step 2-3 of the solveme installation guide: 
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Step 2b: Having exited the qminos directory, clone the solveme github and follow Step 2-3 of the solveme installation guide: 
 
 ```console
-git clone https://github.com/SBRG/solvemepy.git #@0d0ebca585c61ed0f4a559a11ef38706620d7c22
+git clone https://github.com/SBRG/solvemepy.git #@2a2c9c098d5bad957ef41637955fe338a31bac4c
 cd solvemepy
 cp path/to/qminos/minos56/lib/libminos.a ./
 cp path/to/qminos/qminos56/lib/libqminos.a ./

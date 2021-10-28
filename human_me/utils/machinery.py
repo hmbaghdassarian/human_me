@@ -1,40 +1,28 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[1]:
-
-
 import pandas as pd
-import utils_machinery_extract 
 
-import sys
-sys.path.insert(1, '../../scripts/') # comment out in python script
 from human_me.utils.load_environmental_variables import build_files_path
+from human_me.utils.parameters import human_model
 
-
-# In[2]:
-
-
-# define necessary variables 
-rs = pd.read_csv(build_files_path + 'machinery/small_ribosomal_protein.csv', index_col = None, skiprows = [0])
-rl = pd.read_csv(build_files_path + 'machinery/large_ribosomal_protein.csv', index_col = None, skiprows = [0])
-
-
-# In[24]:
-
-
+# define necessary variables
+rs = pd.read_csv(build_files_path + 'machinery/small_ribosomal_protein.csv', index_col=None, skiprows=[0])
+rl = pd.read_csv(build_files_path + 'machinery/large_ribosomal_protein.csv', index_col=None, skiprows=[0])
+rbps = sorted(set(rs['HGNC ID (gene)'].tolist() + rl['HGNC ID (gene)'].tolist()))
 # mrna expression
 
 # elongation machinery------------------------------------------------------------
-rnap = pd.read_csv(build_files_path + 'machinery/RNAP_HUGO.csv', index_col = None, skiprows = [0])
+rnap = pd.read_csv(build_files_path + 'machinery/RNAP_HUGO.csv', index_col=None, skiprows=[0])
 rnap2 = rnap[rnap['Approved name'].isin([i for i in rnap['Approved name'] if ' II ' in i])]
 
 tfiis, tfiif, ell = ['HGNC:11612', 'HGNC:11614'], ['HGNC:4652', 'HGNC:4653'], ['HGNC:23114', 'HGNC:17064', 'HGNC:23113']
-elongin = pd.read_csv(build_files_path + 'machinery/elongin.csv', index_col = None, skiprows = [0])
-elongin.drop(index = elongin[elongin['HGNC ID (gene)'].isin(['HGNC:24617', 'HGNC:31007', 'HGNC:33511'])].index, inplace = True)
-elongin.reset_index(inplace = True, drop = True)
+elongin = pd.read_csv(build_files_path + 'machinery/elongin.csv', index_col=None, skiprows=[0])
+elongin.drop(index=elongin[elongin['HGNC ID (gene)'].isin(['HGNC:24617', 'HGNC:31007', 'HGNC:33511'])].index,
+             inplace=True)
+elongin.reset_index(inplace=True, drop=True)
 
-elongator = pd.read_csv(build_files_path + 'machinery/elongator.csv', index_col = None, skiprows = [0])
+elongator = pd.read_csv(build_files_path + 'machinery/elongator.csv', index_col=None, skiprows=[0])
 fact = ['HGNC:11327', 'HGNC:11465']
 ec = rnap2['HGNC ID (gene)'].tolist() + elongin['HGNC ID (gene)'].tolist() + elongator['HGNC ID (gene)'].tolist()
 ec += tfiis + tfiif + ell + fact
@@ -47,56 +35,52 @@ polyA = cpsf + cstf + cfim + cfiim
 
 nelf = ['HGNC:12768', 'HGNC:24324', 'HGNC:15934', 'HGNC:13974']
 capping = nelf + ['HGNC:10073', 'HGNC:10075', 'HGNC:21077', 'HGNC:7658', 'HGNC:7659', 'HGNC:11467', 'HGNC:11469',
-                 'HGNC:29200', 'HGNC:17970']
+                  'HGNC:29200', 'HGNC:17970']
 
 # ignore snRNA for now, can change in the future
-spliceosome = pd.read_csv(build_files_path + 'machinery/spliceosome.txt', index_col = None, sep = '\t')
+spliceosome = pd.read_csv(build_files_path + 'machinery/spliceosome.txt', index_col=None, sep='\t')
 spliceosome = spliceosome[spliceosome['Locus type'] != 'RNA, small nuclear']
 spliceosome = sorted(set(spliceosome['HGNC ID'].tolist()))
 
-
 # lariat degradataion------------------------------------------------------------
-exosome = pd.read_csv(build_files_path + 'machinery/exosome.csv', index_col = None, skiprows = [0])
-lariat_machinery = {'Linearization': ['HGNC:15594'] ,
-                    "5' Degradation": ['HGNC:12836'], 
-               "Exosome": exosome.loc[:, 'HGNC ID (gene)'].tolist() + ['HGNC:29911'], 
-               'NEXT Complex': ['HGNC:18734', 'HGNC:9904', 'HGNC:25265']}
+exosome = pd.read_csv(build_files_path + 'machinery/exosome.csv', index_col=None, skiprows=[0])
+lariat_machinery = {'Linearization': ['HGNC:15594'],
+                    "5' Degradation": ['HGNC:12836'],
+                    "Exosome": exosome.loc[:, 'HGNC ID (gene)'].tolist() + ['HGNC:29911'],
+                    'NEXT Complex': ['HGNC:18734', 'HGNC:9904', 'HGNC:25265']}
 lm1 = ' and '.join(lariat_machinery['Linearization'] + lariat_machinery["5' Degradation"])
 lm2 = ' and '.join(lariat_machinery['Linearization'] + lariat_machinery["Exosome"] + lariat_machinery["NEXT Complex"])
 lm_rule = '({})'.format(lm1) + ' or ' + '({})'.format(lm2)
 
 # mrna export------------------------------------------------------------
-tho = pd.read_csv(build_files_path + 'machinery/tho.csv', index_col = None, skiprows = [0])
+tho = pd.read_csv(build_files_path + 'machinery/tho.csv', index_col=None, skiprows=[0])
 trex = tho.loc[:, 'HGNC ID (gene)'].tolist() + ['HGNC:17821', 'HGNC:25407', 'HGNC:24971', 'HGNC:24511', 'HGNC:24432',
-                                               'HGNC:23782', 'HGNC:29093', 'HGNC:3447', 'HGNC:8071', 'HGNC:15913',
-                                               'HGNC:25091', 'HGNC:24101', 'HGNC:7658']
+                                                'HGNC:23782', 'HGNC:29093', 'HGNC:3447', 'HGNC:8071', 'HGNC:15913',
+                                                'HGNC:25091', 'HGNC:24101', 'HGNC:7658']
 
 # mrna degradation------------------------------------------------------------
-ccr4_not = pd.read_csv(build_files_path + 'machinery/CCR4_NOT.csv', index_col = None, skiprows = [0])
+ccr4_not = pd.read_csv(build_files_path + 'machinery/CCR4_NOT.csv', index_col=None, skiprows=[0])
 # pabp3 isoform not included
-deadenylation_machinery = {'CCR4_NOT Deadenylation': ccr4_not.loc[:, 'HGNC ID (gene)'].tolist(), 
-                'PARN Deadenylation': ['HGNC:8609'], 
-               'PABP Deadenylation': ['HGNC:20074', 'HGNC:29991', 'HGNC:8554']}
+deadenylation_machinery = {'CCR4_NOT Deadenylation': ccr4_not.loc[:, 'HGNC ID (gene)'].tolist(),
+                           'PARN Deadenylation': ['HGNC:8609'],
+                           'PABP Deadenylation': ['HGNC:20074', 'HGNC:29991', 'HGNC:8554']}
 deadenylation_machinery = [item for sublist in [v for v in deadenylation_machinery.values()] for item in sublist]
 
-
-mrna_degradation_machinery_1 = {"Exosome": exosome.loc[:, 'HGNC ID (gene)'].tolist(), 
-               'Cap_Degradation': ['HGNC:29812']}
-mrna_degradation_machinery_1 = [item for sublist in [v for v in mrna_degradation_machinery_1.values()] for item in sublist]
+mrna_degradation_machinery_1 = {"Exosome": exosome.loc[:, 'HGNC ID (gene)'].tolist(),
+                                'Cap_Degradation': ['HGNC:29812']}
+mrna_degradation_machinery_1 = [item for sublist in [v for v in mrna_degradation_machinery_1.values()] for item in
+                                sublist]
 XRN1 = ['HGNC:30654']
-decapping_degradation_machinery = {'LSM1-7 Complex': ['HGNC:20472', 'HGNC:13940', 'HGNC:17874', 'HGNC:17259', 
-                                   'HGNC:17162', 'HGNC:17017', 'HGNC:20470'],
-                'Decapping': ['HGNC:18714', 'HGNC:24451', 'HGNC:24452', 'HGNC:17157'], 
-               "5' Exonuclease": XRN1}
-decapping_degradation_machinery = [item for sublist in [v for v in decapping_degradation_machinery.values()] for item in sublist]
+decapping_degradation_machinery = {'LSM1-7 Complex': ['HGNC:20472', 'HGNC:13940', 'HGNC:17874', 'HGNC:17259',
+                                                      'HGNC:17162', 'HGNC:17017', 'HGNC:20470'],
+                                   'Decapping': ['HGNC:18714', 'HGNC:24451', 'HGNC:24452', 'HGNC:17157'],
+                                   "5' Exonuclease": XRN1}
+decapping_degradation_machinery = [item for sublist in [v for v in decapping_degradation_machinery.values()] for item in
+                                   sublist]
 degradation_rule1 = ' and '.join(deadenylation_machinery + mrna_degradation_machinery_1)
 decapping_rule = ' and '.join(deadenylation_machinery + decapping_degradation_machinery)
 
-
-# In[10]:
-
-
-#rrna expression
+# rrna expression
 # 5s rrna
 rnap3 = rnap[rnap['Approved name'].isin([i for i in rnap['Approved name'] if ' III ' in i])]
 tfiiia, tfiiib = ['HGNC:4662'], ['HGNC:13652', 'HGNC:11551', 'HGNC:11588']
@@ -110,12 +94,12 @@ rnap1 = rnap[rnap['Approved name'].isin([i for i in rnap['Approved name'] if ' I
 taf = ['HGNC:11532', 'HGNC:11533', 'HGNC:11534']
 ubf = ['HGNC:12511']
 rnap1_tfs = taf + ubf
-UTP10 = ['HGNC:25517'] # a' cleavage
-RNASEN = ['HGNC:17904'] # assumed site 02 endonucleolytic cleavage
+UTP10 = ['HGNC:25517']  # a' cleavage
+RNASEN = ['HGNC:17904']  # assumed site 02 endonucleolytic cleavage
 UTP23 = ['HGNC:28224']
 UTP24 = ['HGNC:20220']
 PARN = ['HGNC:8609']
-PAPD5 = ['HGNC:30758'] #TENT4B
+PAPD5 = ['HGNC:30758']  # TENT4B
 NOB1 = ['HGNC:29540']
 LAS1 = ['HGNC:25726']
 DIS3 = ['HGNC:20604']
@@ -124,36 +108,35 @@ ERI1 = ['HGNC:23994']
 RAN = ['HGNC:9846']
 XPO1 = ['HGNC:12825']
 
-
-# In[11]:
-
-
 # trna expression
 TRNT1 = ['HGNC:17341']
 RNASEP = ['HGNC:30129', 'HGNC:30329', 'HGNC:30081', 'HGNC:17689', 'HGNC:19949', 'HGNC:21300',
-         'HGNC:17688', 'HGNC:20992', 'HGNC:30361', 'HGNC:30327']
+          'HGNC:17688', 'HGNC:20992', 'HGNC:30361', 'HGNC:30327']
 RNASEZ = ['HGNC:14198']
 trna_splicing_machinery = ['HGNC:28422', 'HGNC:16791', 'HGNC:15506', 'HGNC:27561']
-XPOT = ['HGNC:12826'] # nuclear export of trna
+XPOT = ['HGNC:12826']  # nuclear export of trna
 
-classI_synthetase = pd.read_csv(build_files_path + 'machinery/classI_aa_trna_synthetases.csv', index_col = None, 
-                                skiprows = [0])
-classII_synthetase = pd.read_csv(build_files_path + 'machinery/classII_aa_trna_synthetases.csv', index_col = None, 
-                                 skiprows = [0])
-trna_synthetase = pd.concat([classI_synthetase, classII_synthetase], axis = 0)
-trna_synthetase.reset_index(inplace = True, drop = True)
-drop_idx = [i for i in trna_synthetase.index if ('mitochondria' in trna_synthetase.loc[i, 'Approved name']) or ('2' in trna_synthetase.loc[i, 'Approved name'])]
-trna_synthetase.drop(index = drop_idx, inplace = True)
-trna_synthetase.drop_duplicates(keep='first', inplace = True)
-trna_synthetase.reset_index(inplace = True, drop = True)
+classI_synthetase = pd.read_csv(build_files_path + 'machinery/classI_aa_trna_synthetases.csv', index_col=None,
+                                skiprows=[0])
+classII_synthetase = pd.read_csv(build_files_path + 'machinery/classII_aa_trna_synthetases.csv', index_col=None,
+                                 skiprows=[0])
+trna_synthetase = pd.concat([classI_synthetase, classII_synthetase], axis=0)
+trna_synthetase.reset_index(inplace=True, drop=True)
+drop_idx = [i for i in trna_synthetase.index if ('mitochondria' in trna_synthetase.loc[i, 'Approved name']) or (
+            '2' in trna_synthetase.loc[i, 'Approved name'])]
+trna_synthetase.drop(index=drop_idx, inplace=True)
+trna_synthetase.drop_duplicates(keep='first', inplace=True)
+trna_synthetase.reset_index(inplace=True, drop=True)
 
 seq_synthetase_map = {
     'A': trna_synthetase[trna_synthetase['Approved name'] == 'alanyl-tRNA synthetase 1']['HGNC ID (gene)'].tolist(),
     'R': trna_synthetase[trna_synthetase['Approved name'] == 'arginyl-tRNA synthetase 1']['HGNC ID (gene)'].tolist(),
-    'N': trna_synthetase[trna_synthetase['Approved name'] == 'asparaginyl-tRNA synthetase 1']['HGNC ID (gene)'].tolist(),
+    'N': trna_synthetase[trna_synthetase['Approved name'] == 'asparaginyl-tRNA synthetase 1'][
+        'HGNC ID (gene)'].tolist(),
     'D': trna_synthetase[trna_synthetase['Approved name'] == 'aspartyl-tRNA synthetase 1']['HGNC ID (gene)'].tolist(),
     'C': trna_synthetase[trna_synthetase['Approved name'] == 'cysteinyl-tRNA synthetase 1']['HGNC ID (gene)'].tolist(),
-    'E': trna_synthetase[trna_synthetase['Approved name'] == 'glutamyl-prolyl-tRNA synthetase 1']['HGNC ID (gene)'].tolist(),
+    'E': trna_synthetase[trna_synthetase['Approved name'] == 'glutamyl-prolyl-tRNA synthetase 1'][
+        'HGNC ID (gene)'].tolist(),
     'Q': trna_synthetase[trna_synthetase['Approved name'] == 'glutaminyl-tRNA synthetase 1']['HGNC ID (gene)'].tolist(),
     'G': trna_synthetase[trna_synthetase['Approved name'] == 'glycyl-tRNA synthetase 1']['HGNC ID (gene)'].tolist(),
     'H': trna_synthetase[trna_synthetase['Approved name'] == 'histidyl-tRNA synthetase 1']['HGNC ID (gene)'].tolist(),
@@ -161,22 +144,22 @@ seq_synthetase_map = {
     'L': trna_synthetase[trna_synthetase['Approved name'] == 'leucyl-tRNA synthetase 1']['HGNC ID (gene)'].tolist(),
     'K': trna_synthetase[trna_synthetase['Approved name'] == 'lysyl-tRNA synthetase 1']['HGNC ID (gene)'].tolist(),
     'M': trna_synthetase[trna_synthetase['Approved name'] == 'methionyl-tRNA synthetase 1']['HGNC ID (gene)'].tolist(),
-    'F': trna_synthetase[trna_synthetase['Approved name'] == 'phenylalanyl-tRNA synthetase subunit alpha']['HGNC ID (gene)'].tolist() + trna_synthetase[trna_synthetase['Approved name'] == 'phenylalanyl-tRNA synthetase subunit beta']['HGNC ID (gene)'].tolist(),
-    'P': trna_synthetase[trna_synthetase['Approved name'] == 'glutamyl-prolyl-tRNA synthetase 1']['HGNC ID (gene)'].tolist(),
+    'F': trna_synthetase[trna_synthetase['Approved name'] == 'phenylalanyl-tRNA synthetase subunit alpha'][
+             'HGNC ID (gene)'].tolist() +
+         trna_synthetase[trna_synthetase['Approved name'] == 'phenylalanyl-tRNA synthetase subunit beta'][
+             'HGNC ID (gene)'].tolist(),
+    'P': trna_synthetase[trna_synthetase['Approved name'] == 'glutamyl-prolyl-tRNA synthetase 1'][
+        'HGNC ID (gene)'].tolist(),
     'S': trna_synthetase[trna_synthetase['Approved name'] == 'seryl-tRNA synthetase 1']['HGNC ID (gene)'].tolist(),
     'T': trna_synthetase[trna_synthetase['Approved name'] == 'threonyl-tRNA synthetase 1']['HGNC ID (gene)'].tolist(),
-    'W': trna_synthetase[trna_synthetase['Approved name'] == 'tryptophanyl-tRNA synthetase 1']['HGNC ID (gene)'].tolist(),
+    'W': trna_synthetase[trna_synthetase['Approved name'] == 'tryptophanyl-tRNA synthetase 1'][
+        'HGNC ID (gene)'].tolist(),
     'Y': trna_synthetase[trna_synthetase['Approved name'] == 'tyrosyl-tRNA synthetase 1']['HGNC ID (gene)'].tolist(),
     'V': trna_synthetase[trna_synthetase['Approved name'] == 'valyl-tRNA synthetase 1']['HGNC ID (gene)'].tolist()
 }
 
-
-# In[12]:
-
-
 # cytoplasmic transport
 translation_efs = ['HGNC:3189', 'HGNC:3214', 'HGNC:3208', 'HGNC:3300']
-
 
 # # DON'T DELETE------------------------------------------------
 # import pandas as pd
@@ -216,105 +199,104 @@ USP5, UBA1, UBE2D3, STUB1 = ['HGNC:12628'], ['HGNC:12469'], ['HGNC:12476'], ['HG
 RNF181, UB2EV1 = ['HGNC:28037'], ['HGNC:12494']
 UB_ligases_c = UBA1 + UBE2D3 + STUB1
 UB_ligases_n = UBA1 + UB2EV1 + RNF181
+UB_ligases = {'c': UB_ligases_c, 'n': UB_ligases_n}
 
 proteasome_structural = ['HGNC:9554', 'HGNC:9560', 'HGNC:9557', 'HGNC:9556', 'HGNC:9564', 'HGNC:9565', 'HGNC:9558',
-                        'HGNC:9566', 'HGNC:9567']
+                         'HGNC:9566', 'HGNC:9567']
 proteasome_ubiquitin = ['HGNC:9559', 'HGNC:15759', 'HGNC:16889', 'HGNC:9561', 'HGNC:12612', 'HGNC:19678']
 proteasome_atpase = ['HGNC:9548', 'HGNC:9547', 'HGNC:9551', 'HGNC:9553', 'HGNC:9549', 'HGNC:9552']
 proteasome_machinery = proteasome_structural + proteasome_ubiquitin + proteasome_atpase
-
-
 
 # mitochondria
 
 TOM = ['HGNC:31369', 'HGNC:34528', 'HGNC:21648', 'HGNC:20947', 'HGNC:18002', 'HGNC:18001', 'HGNC:11985']
 # HGNC's tim23 already contains PAM
-TIM23_PAM = pd.read_csv(build_files_path + 'machinery/tim23_complex.csv',  index_col = None, skiprows = [0])['HGNC ID (gene)'].tolist()
-HSP70_m = ['HGNC:5244'] # mitocondrial version
-OXA = ['HGNC:8526'] # inner membrane transport
+TIM23_PAM = pd.read_csv(build_files_path + 'machinery/tim23_complex.csv', index_col=None, skiprows=[0])[
+    'HGNC ID (gene)'].tolist()
+HSP70_m = ['HGNC:5244']  # mitocondrial version
+OXA = ['HGNC:8526']  # inner membrane transport
 
-mLON, iAAA   = ['HGNC:9479'], ['HGNC:12843']# mitochondrial proteases
-#mAAA =  ['HGNC:315', 'HGNC:11237'] 
-HSP70_c, HSP40_c  = ['HGNC:5233'], ['HGNC:5229']
+mLON, iAAA = ['HGNC:9479'], ['HGNC:12843']  # mitochondrial proteases
+# mAAA =  ['HGNC:315', 'HGNC:11237']
+HSP70_c, HSP40_c = ['HGNC:5233'], ['HGNC:5229']
 
 # peroxisome
-PEX5, L_PEX5 = ['HGNC:9719'], 639 # Uniprot and PSIM_ME agree on this number
+PEX5, L_PEX5 = ['HGNC:9719'], 639  # Uniprot and PSIM_ME agree on this number
 peroxins = ['HGNC:22965', 'HGNC:8859', 'HGNC:8850', 'HGNC:8856', 'HGNC:8855'] + PEX5
 AWP1 = ['HGNC:30164']
 LONP2 = ['HGNC:20598']
 
-
-
 # nucleus
 importins = ['HGNC:6400', 'HGNC:6394']
 
-
-# In[13]:
+# In[8]:
 
 
 # ribosome biogenesis
 UCHL3 = ['HGNC:12515']
-RMRP = ['HGNC:10031']
+# RMRP = ['HGNC:10031'] # disregarded for now bc ribozyme
 pre40s_rbfs = ['HGNC:25542', 'HGNC:21173', 'HGNC:32790', 'HGNC:29100']
 pre60s_rbfs = ['HGNC:18477', 'HGNC:25789', 'HGNC:19440', 'HGNC:20870', 'HGNC:17083', 'HGNC:4333']
 
 eif1, eif2 = ['HGNC:3249', 'HGNC:3250'], ['HGNC:3265', 'HGNC:3266', 'HGNC:3267']
-eif3 = pd.read_csv(build_files_path + 'machinery/eif3.csv', index_col = None, skiprows = [0])['HGNC ID (gene)'].tolist()
+eif3 = pd.read_csv(build_files_path + 'machinery/eif3.csv', index_col=None, skiprows=[0])['HGNC ID (gene)'].tolist()
 eif4f = ['HGNC:3282', 'HGNC:3284', 'HGNC:3287', 'HGNC:3296']
 eif5 = ['HGNC:3299', 'HGNC:30793']
 eifs = eif1 + eif2 + eif3 + eif4f + eif5 + ['HGNC:8554']
 
-
-# In[14]:
+# In[9]:
 
 
 # secretory pathway
 
-ASNA1, WRB  = ['HGNC:752'], ['HGNC:12790']
-ptnm = ['HGNC:20090', 'HGNC:5238', 'HGNC:7670', 'HGNC:18276', 'HGNC:16993', 
-                            'HGNC:18277', 'HGNC:11846', 'HGNC:21082', 'HGNC:10759', 'HGNC:11323', 'HGNC:11324', 
-                            'HGNC:11325', 'HGNC:11326'] + ASNA1
-ctnm = ['HGNC:20090', 'HGNC:5238', 'HGNC:16931', 'HGNC:7670', 'HGNC:10448', 'HGNC:17718', 'HGNC:23400', 
-        'HGNC:18276', 'HGNC:16993', 'HGNC:18277', 'HGNC:11846', 'HGNC:21082', 'HGNC:10759', 'HGNC:24624', 
-        'HGNC:23401', 'HGNC:28962', 'HGNC:26212', 'HGNC:11299', 'HGNC:11300', 'HGNC:11301', 'HGNC:11302', 
+ASNA1, WRB = ['HGNC:752'], ['HGNC:12790']
+ptnm = ['HGNC:20090', 'HGNC:5238', 'HGNC:7670', 'HGNC:18276', 'HGNC:16993',
+        'HGNC:18277', 'HGNC:11846', 'HGNC:21082', 'HGNC:10759', 'HGNC:11323', 'HGNC:11324',
+        'HGNC:11325', 'HGNC:11326'] + ASNA1
+ctnm = ['HGNC:20090', 'HGNC:5238', 'HGNC:16931', 'HGNC:7670', 'HGNC:10448', 'HGNC:17718', 'HGNC:23400',
+        'HGNC:18276', 'HGNC:16993', 'HGNC:18277', 'HGNC:11846', 'HGNC:21082', 'HGNC:10759', 'HGNC:24624',
+        'HGNC:23401', 'HGNC:28962', 'HGNC:26212', 'HGNC:11299', 'HGNC:11300', 'HGNC:11301', 'HGNC:11302',
         'HGNC:11303', 'HGNC:11307', 'HGNC:11323', 'HGNC:11324', 'HGNC:11325', 'HGNC:11326', 'HGNC:11740']
-sp_map = {'5682': 'HGNC:9530', '5683': 'HGNC:9531', '5684': 'HGNC:9532', '5685': 'HGNC:9533', '5686': 'HGNC:9534', 
-          '5688': 'HGNC:9536', '143471': 'HGNC:22985', '5689': 'HGNC:9537', '5690': 'HGNC:9539', 
-          '5691': 'HGNC:9540', '5692': 'HGNC:9541', '5693': 'HGNC:9542', '5694': 'HGNC:9543', '5695': 'HGNC:9544', 
-          '5696': 'HGNC:9545', '5698': 'HGNC:9546', '5699': 'HGNC:9538', '122706': 'HGNC:31963', 
-          '5707': 'HGNC:9554', '5708': 'HGNC:9559', '5710': 'HGNC:9561', '5711': 'HGNC:9563', '9861': 'HGNC:9564', 
-          '5713': 'HGNC:9565', '5714': 'HGNC:9566', '5715': 'HGNC:9567', '5716': 'HGNC:9555', '5717': 'HGNC:9556', 
-          '5718': 'HGNC:9557', '5719': 'HGNC:9558', '10213': 'HGNC:16889', '8624': 'HGNC:3043', 
+sp_map = {'5682': 'HGNC:9530', '5683': 'HGNC:9531', '5684': 'HGNC:9532', '5685': 'HGNC:9533', '5686': 'HGNC:9534',
+          '5688': 'HGNC:9536', '143471': 'HGNC:22985', '5689': 'HGNC:9537', '5690': 'HGNC:9539',
+          '5691': 'HGNC:9540', '5692': 'HGNC:9541', '5693': 'HGNC:9542', '5694': 'HGNC:9543', '5695': 'HGNC:9544',
+          '5696': 'HGNC:9545', '5698': 'HGNC:9546', '5699': 'HGNC:9538', '122706': 'HGNC:31963',
+          '5707': 'HGNC:9554', '5708': 'HGNC:9559', '5710': 'HGNC:9561', '5711': 'HGNC:9563', '9861': 'HGNC:9564',
+          '5713': 'HGNC:9565', '5714': 'HGNC:9566', '5715': 'HGNC:9567', '5716': 'HGNC:9555', '5717': 'HGNC:9556',
+          '5718': 'HGNC:9557', '5719': 'HGNC:9558', '10213': 'HGNC:16889', '8624': 'HGNC:3043',
           '56984': 'HGNC:24929', '84262': 'HGNC:22420', '389362': 'HGNC:21108'}
 sp_rule = '((5682) or (5683) or (5684) or (5685) or (5686) or (5688) or (143471)) and ((5689) or (5690) or (5691) or (5692) or (5693) or (5694) or (5695) or (5696) or (5698) or (5699) or (122706)) and (8624) and (56984) and (84262) and (389362) and (5707) and (5708) and (5711) and (5710) and (9861) and (5713) and (5714) and (5715) and (5716) and (5717) and (5718) and (5719) and (10213)'
-for k,v in sp_map.items():
+for k, v in sp_map.items():
     if k != '5698':
-        sp_rule = sp_rule.replace(k,v)
+        sp_rule = sp_rule.replace(k, v)
 sp_rule = sp_rule.replace('5698', 'HGNC:9546')
 
 P4HB = ['HGNC:8548']
 gpi_machinery = ['HGNC:4446', 'HGNC:25712', 'HGNC:8965', 'HGNC:14937', 'HGNC:14938', 'HGNC:15791']
 
-copii_r_m = ['HGNC:14562', 'HGNC:4430', 'HGNC:6632', 'HGNC:9758', 'HGNC:10535', 'HGNC:10697', 'HGNC:29006', 
+copii_r_m = ['HGNC:14562', 'HGNC:4430', 'HGNC:6632', 'HGNC:9758', 'HGNC:10535', 'HGNC:10697', 'HGNC:29006',
              'HGNC:10700', 'HGNC:10701', 'HGNC:10703', 'HGNC:17052', 'HGNC:11440']
-copii_gpi_m = ['HGNC:14562', 'HGNC:4430', 'HGNC:9758', 'HGNC:10535', 'HGNC:10697', 'HGNC:29006', 'HGNC:10700', 
+copii_gpi_m = ['HGNC:14562', 'HGNC:4430', 'HGNC:9758', 'HGNC:10535', 'HGNC:10697', 'HGNC:29006', 'HGNC:10700',
                'HGNC:10701', 'HGNC:10703', 'HGNC:17052', 'HGNC:11440']
 
-
 og_rule = '(HGNC:16347 or HGNC:19873 or HGNC:4124 or HGNC:4127 or HGNC:4131 or HGNC:4125 or HGNC:4129 or HGNC:19875 or HGNC:4128 or HGNC:23242 or HGNC:4123 or HGNC:4130 or HGNC:4126) and HGNC:24337 and HGNC:24338 and HGNC:4205'
-copi_m = ['HGNC:649', 'HGNC:14562', 'HGNC:2230', 'HGNC:2231', 'HGNC:2232', 'HGNC:2234', 'HGNC:2236', 'HGNC:2243', 'HGNC:19356', 
+copi_m = ['HGNC:649', 'HGNC:14562', 'HGNC:2230', 'HGNC:2231', 'HGNC:2232', 'HGNC:2234', 'HGNC:2236', 'HGNC:2243',
+          'HGNC:19356',
           'HGNC:9758', 'HGNC:10700', 'HGNC:11443', 'HGNC:15942', 'HGNC:25847']
-clathrin_m = ['HGNC:652', 'HGNC:2090', 'HGNC:2091', 'HGNC:2092', 'HGNC:17842', 'HGNC:16064', 'HGNC:17079', 
+clathrin_m = ['HGNC:652', 'HGNC:2090', 'HGNC:2091', 'HGNC:2092', 'HGNC:17842', 'HGNC:16064', 'HGNC:17079',
               'HGNC:14902', 'HGNC:11441', 'HGNC:11442', 'HGNC:11430']
 
-retro_mach_glyco = ['HGNC:16695', 'HGNC:28454', 'HGNC:14236', 'HGNC:18261', 'HGNC:10717', 'HGNC:30396', 'HGNC:20738', 
-           'HGNC:12520', 'HGNC:12666']
+retro_mach_glyco = ['HGNC:16695', 'HGNC:28454', 'HGNC:14236', 'HGNC:18261', 'HGNC:10717', 'HGNC:30396', 'HGNC:20738',
+                    'HGNC:12520', 'HGNC:12666']
 ERDJ5 = ['HGNC:24637']
 
 HSP90AB1 = ['HGNC:5258']
-escrt = pd.read_csv(build_files_path + 'machinery/escrt_complexes.txt', sep = '\t')['HGNC ID'].tolist()
+escrt = pd.read_csv(build_files_path + 'machinery/escrt_complexes.txt', sep='\t')['HGNC ID'].tolist()
 eps = ['HGNC:3419', 'HGNC:21604']
 endocytic_machinery = sorted(set(proteasome_ubiquitin + escrt + eps + clathrin_m))
 
 cathepsins = ['HGNC:2527', 'HGNC:2529', 'HGNC:9251']
 
+metabolic_machinery = sorted([g.id for g in human_model.genes])
+expression_machinery = sorted(open(build_files_path + 'expression_machinery.txt').read().splitlines())
+all_machinery = sorted(set(metabolic_machinery + expression_machinery))
