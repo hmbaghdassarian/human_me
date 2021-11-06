@@ -400,6 +400,23 @@ def correct_psim(psim_df=input_data_path + 'psim_me.h5', fill_na: str = 'default
         psim_me[col] = float('nan')
     psim_me = psim_me[all_columns]  # filter out excess columns and order
 
+    # make sure RPL40 and RPS27A are ubiquitin fusions
+    ub_psim = psim_gold[psim_gold.HGNC_ID == 'HGNC:12468']
+    single_ubiquitin_sequence = ub_psim['PROTEIN_SEQ'].iloc[0,][:76]
+
+    rbp_ubs = ['HGNC:10417', 'HGNC:12458']
+    for ru in rbp_ubs:
+        if ru not in missing_genes:
+            rui = psim_me[psim_me.HGNC_ID == ru]
+            if rui.PROTEIN_SEQ.iloc[0,][:len(single_ubiquitin_sequence)] != single_ubiquitin_sequence:
+                msg = 'Provided sequence for ribosomal protein ' + ru + ' must contain specific ubiquitin fusion.'
+                msg += 'Replacing with correct sequences.'
+                warnings.warn(msg)
+                psim_me.loc[rui.index, ['PREMRNA_SEQ', 'MRNA_SEQ', 'PROTEIN_SEQ']] = \
+                    ub_psim.loc[:, ['PREMRNA_SEQ', 'MRNA_SEQ', 'PROTEIN_SEQ']]
+
+
+    # initialize missing genes
     for gene in missing_genes:
         psim_me.loc[psim_me.shape[0], :] = [gene] + ([float('nan')] * (psim_me.shape[1] - 1))
 
