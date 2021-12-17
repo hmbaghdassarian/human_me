@@ -1,9 +1,27 @@
+import os, sys
 import cobra
 import numpy as np
 import pandas as pd
 from sympy.parsing.sympy_parser import parse_expr
 
 from human_me.utils.load_environmental_variables import processed_data_path, build_files_path
+
+import logging
+logging.basicConfig()
+logger = logging.getLogger(cobra.__name__)
+logger.setLevel(logging.CRITICAL)
+
+class HiddenPrints:
+    def __enter__(self):
+        self._original_stdout = sys.stdout
+        sys.stdout = open(os.devnull, 'w')
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        sys.stdout.close()
+        sys.stdout = self._original_stdout
+
+with HiddenPrints():
+    human_model = cobra.io.read_sbml_model(processed_data_path + 'corrected_model.xml')
 
 psim_me = pd.read_hdf(processed_data_path + 'corrected_psim.h5', key='corrected')
 
