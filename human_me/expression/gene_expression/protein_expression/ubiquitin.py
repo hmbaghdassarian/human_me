@@ -30,10 +30,11 @@ def express_ubiquitin(compress_mrna):
                                                                                                               compress_mrna=compress_mrna)
 
     # ubiquitin monomer
-    single_ubiquitin_sequence = ubc_info.protein_seq[:76]
-    monoub_aa_counts = {k: single_ubiquitin_sequence.count(k) for k in params.amino_acids}
-    L_monoub = len(single_ubiquitin_sequence)
-    n_ub_monomers = ubc_info.protein_seq.count(single_ubiquitin_sequence)
+    if ubc_info.protein_seq[:76] != params.single_ubiquitin_sequence:
+        raise ValueError('Unexpected mismatch in ubiquitin monomer sequence')
+    monoub_aa_counts = {k: params.single_ubiquitin_sequence.count(k) for k in params.amino_acids}
+    L_monoub = len(params.single_ubiquitin_sequence)
+    n_ub_monomers = ubc_info.protein_seq.count(params.single_ubiquitin_sequence)
     ub_c = Protein(compartment='c', id_='ubiquitin_monomer', amino_acid_counts=monoub_aa_counts)
 
     ubc_translation_reaction_cytosolic, ubc_c = c_trln.translate_protein_cytosolic(ubc_info, ubc_transcript_c,
@@ -65,7 +66,7 @@ def express_ubiquitin(compress_mrna):
                                                                                    ubb_deg_proxy)
 
     # monomerization from ubb polyub
-    n_ub_monomers = ubb_info.protein_seq.count(single_ubiquitin_sequence)
+    n_ub_monomers = ubb_info.protein_seq.count(params.single_ubiquitin_sequence)
     ubiquitin_monomerization_ubb = ExpressionReaction(ubb_info.hgnc_id + '_MONOMERIZATIONc',
                                                       subsystem='Protein_Expression', ubiquitin_biogenesis=True,
                                                       hgnc_id=ubb_info.hgnc_id, synthesis=True,
@@ -129,6 +130,6 @@ def express_ubiquitin(compress_mrna):
 
     ub_args = {'ub_reactions': ub_reactions, 'ub_c': ub_c, 'ub_n': ub_n, 'polyub_c': polyub_c,
                'polyub_n': polyub_n, 'monoub_aa_counts': monoub_aa_counts, 'L_monoub': L_monoub,
-               'single_ubiquitin_sequence': single_ubiquitin_sequence}
+               'params.single_ubiquitin_sequence': params.single_ubiquitin_sequence}
 
     return ub_args

@@ -68,6 +68,7 @@ turnover = {'alpha_m': alpha_m, 'alpha_p': alpha_p,
 
 # ribosome
 rrna_degradation_constant = np.log(2) / 72  # bioid 108025
+single_ubiquitin_sequence = 'MQIFVKTLTGKTITLEVEPSDTIENVKAKIQDKEGIPPDQQRLIFAGKQLEDGRTLSDYNIQKESTLHLVLRLRGG'
 # ribosomal_degradation_rate = np.log(2)/300 #bioid 110053 # unused
 
 # biomass
