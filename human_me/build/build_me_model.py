@@ -42,7 +42,8 @@ with warnings.catch_warnings():
 
 
 class me_builder:
-    def __init__(self, n_cores=os.cpu_count(), compress_mrna=False, dummy_protein=True,
+    def __init__(self, n_cores=os.cpu_count(), compress_mrna=False,
+                 dummy_protein: bool = True, context_specific_dummy: bool = False,
                  deg_args={'couple': True, 'reversible_complex_formation': False, 'nonenzyme_degradation': False,
                            'complex_degradation': True}, check_all=True, knock_out=None, non_machinery=dict(),
                  psim_me=params.psim_me, m_model=params.human_model, stochastic=False, seed=888):
@@ -63,7 +64,11 @@ class me_builder:
             If true, will merge the 3 linear mrna reactions--transcription, processing, and nuclear export--for each
             gene into a single reaction
         dummy_protein: bool [True]
-            whether to add a representative dummy protein to catalyze orphan reactions 
+            whether to add a representative dummy protein (average of gene features) to catalyze orphan reactions
+            Note: only takes average of metabolic enzymes, since these form the majority of orphan reactions
+        context_specific_dummy: bool [False]
+            whether the representative dummy protein is calculated for only genes in the user-provided context specific model from
+            the user provided PSIM (True) or for all recon2.2 machinery proteins in the gold-standard PSIM (False)
         deg_args: dict
             A number of options related to protein and complex degradation. Becomes important in slow growth conditions.
             Note the default values focus on coupling fluxes and degrading the specific enzymes associated with 
@@ -178,6 +183,7 @@ class me_builder:
                                                                       stochastic=self.stochastic, seed=rib_seed)
 
         self.dummy_protein = dummy_protein
+        self.context_specific_dummy = context_specific_dummy
 
         self.deorphaned = None
         self.orphan = None
@@ -192,7 +198,6 @@ class me_builder:
 
         self.id_reactions_map = dict()
         self.complex_reactions_map = dict()
-
         self.check_all = check_all
 
     def express_metabolic_enzymes(self):
@@ -452,7 +457,7 @@ class me_builder:
         if self.dummy_protein:
             print('Express dummy protein')
             dummy_psim = func.average_protein_features(psim_me=self.psim_me,
-                                                       context_specific=True)
+                                                       context_specific=self.context_specific_dummy)
 
             dummy_reactions, dm = get_all_expression_reactions(hgnc_id='HGNC:DUMMY', psim=dummy_psim, machinery_list=[],
                                                                reactions=None, compress_mrna=self.compress_mrna,
@@ -1078,6 +1083,7 @@ class me_builder:
                 enzymeless_reactions += [r for r in self.complex_degradation_reactions if len(r.genes) == 0]
             boundary_ids = [r.id for r in self.m_model.exchanges + self.m_model.demands]
 
+
             if len(set([r.id for r in enzymeless_reactions]).intersection([r.id for r in self.final_reactions])) > 0:
                 raise ValueError('Incorrect parsing of reaction lists for dummy protein')
             ## if exclude is None
@@ -1125,16 +1131,33 @@ class me_builder:
 
             # do not deorphan transport reactions for small molecules (can passively diffuse)
             transport = [r for r in enzymeless_reactions if len(r.compartments) > 1 and r not in self.orphan]
+
+            # # DEPRECATED (inaccurate groups ) -- include reactions listed in transport groups
+            # m_transport = list(set(func.flatten_list([[group_rxn.id for group_rxn in group._members] for \
+            #                                           group in self.m_model.groups if g.id.startswith('Transport')])))
+            # transport = [r for r in enzymeless_reactions if len(r.compartments) > 1 or \
+            #              (hasattr(r, 'cobra_id') and r.cobra_id in m_transport)] # not all of these are transport
+            # transport = [r for r in transport if r not in self.orphan]
+
             # note using [g._members for g in model.groups if 'Transport' in g.name] results in some reations that are incorrectly classified as trasnport
             remove_idx = list()
+            # exclude reactions stated as "diffusion" by the reaction name
+            diffusion_reactions = [r.id for r in self.m_model.reactions if 'via diffusion' in r.name]
             for r in transport:
                 # filter for molecules that are actually transported (in reactants and products) and check 
-                # if they are over the diffusion limit or charged
+                # if they are over the diffusion limit or charged, or annotated as diffusion in reaction name
+                diffusion_reaction = False
+                if hasattr(r, 'cobra_id') and r.cobra_id in diffusion_reactions:
+                    diffusion_reaction = True
+
+
                 actual_transport_m = func.determine_transport(r)
                 sm_transport = [m for m in r.reactants if (m.id.split('_')[:-1][0] in actual_transport_m) and (
                             (m.formula_weight is not None and m.formula_weight > params.membrane_diffusion_limit) or (
                                 m.charge != 0))]
                 if len(sm_transport) == 0:  # if all transported metabolites are under diffusion limit and uncharged,:
+                    diffusion_reaction = True
+                if diffusion_reaction:
                     self.orphan.append(r)
 
             #                 # V2
@@ -1325,7 +1348,8 @@ class me_builder:
         return me_model
 
 
-def build_me(minimal_proteome=True, compress_mrna=True, dummy_protein=True,
+def build_me(minimal_proteome=True, compress_mrna=True,
+             dummy_protein: bool = True, context_specific_dummy: bool = False,
              deg_args={'couple': True, 'reversible_complex_formation': False, 'nonenzyme_degradation': False,
                        'complex_degradation': True}, check_all=True, non_machinery=None,
              model_id='HUMAN_ME_MODEL', knock_out=None, n_cores=os.cpu_count(),
@@ -1344,7 +1368,10 @@ def build_me(minimal_proteome=True, compress_mrna=True, dummy_protein=True,
         If true, will merge the 3 linear mrna reactions--transcription, processing, and nuclear export--for each
         gene into a single reaction
     dummy_protein: bool [True]
-        whether to add a representative dummy protein to catalyze orphan reactions 
+        whether to add a representative dummy protein to catalyze orphan reactions
+    context_specific_dummy: bool [False]
+        whether the representative dummy protein is calculated for only genes in the user-provided context specific model from
+        the user provided PSIM (True) or for all recon2.2 machinery proteins in the gold-standard PSIM (False)
     deg_args: dict
         A number of options related to protein and complex degradation. Becomes important in slow growth conditions.
         Note the default values focus on coupling fluxes and degrading the specific enzymes associated with 
@@ -1392,7 +1419,8 @@ def build_me(minimal_proteome=True, compress_mrna=True, dummy_protein=True,
 
     start = time.time()
     builder = me_builder(compress_mrna=compress_mrna,
-                         dummy_protein=dummy_protein, deg_args=deg_args, check_all=check_all,
+                         dummy_protein=dummy_protein, context_specific_dummy = context_specific_dummy,
+                         deg_args=deg_args, check_all=check_all,
                          knock_out=knock_out, non_machinery=non_machinery, n_cores=n_cores,
                          stochastic=stochastic, seed=seed)
     builder.express_metabolic_enzymes()

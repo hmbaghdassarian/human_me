@@ -130,6 +130,6 @@ def express_ubiquitin(compress_mrna):
 
     ub_args = {'ub_reactions': ub_reactions, 'ub_c': ub_c, 'ub_n': ub_n, 'polyub_c': polyub_c,
                'polyub_n': polyub_n, 'monoub_aa_counts': monoub_aa_counts, 'L_monoub': L_monoub,
-               'params.single_ubiquitin_sequence': params.single_ubiquitin_sequence}
+               'single_ubiquitin_sequence': params.single_ubiquitin_sequence}
 
     return ub_args

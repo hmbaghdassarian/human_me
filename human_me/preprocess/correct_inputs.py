@@ -303,7 +303,7 @@ def correct_psim(psim_df=input_data_path + 'psim_me.h5', fill_na: str = 'default
         if default: will fill incomplete values with default values (see PSIM_README for details)
         if select: will fill incomplete values with the gold standard PSIM when available, otherwise with default
 
-        Note: this will not deal with user-provided incorrected values for optional columns, those will revert to default in the GeneInformation class
+        Note: this will not deal with user-provided incorrect values for optional columns, those will revert to default in the GeneInformation class
 
         Exceptions:
             for required columns, if incorrect in input psim, will fill with  the gold standard PSIM. required columns include *_SEQ and LOCATION for non-machinery
@@ -319,7 +319,7 @@ def correct_psim(psim_df=input_data_path + 'psim_me.h5', fill_na: str = 'default
         'sequences' key is a superset of added, includes all genes with adjusted sequences
         'non-machinery locations' is for genes in non-machinery that did not have an appropriately specified location
 
-    Also writes corrected PSIM to outdir/corrected_psim_me.h5 (specified in preprocess.create_environment)
+    Also writes corrected PSIM to 'outdir/corrected_psim_me.h5' (specified in preprocess.create_environment)
     """
     # run basic non-machinery check
     non_machinery = check_non_machinery(non_machinery=non_machinery)

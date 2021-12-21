@@ -67,7 +67,7 @@ keff_median = 3.983 * 3600  # units: hr^-1 (3.983 in s^-1)
 
 # central dogma
 alpha_m_median = 0.06108233261605428  # units: hours (Gregersen et al ) median value
-alpha_p_median = 0.018342530808268292  # units: hours ^-1 (Cambridge et al 2011) median value
+alpha_p_median = 0.019808138247250934  # units: hours ^-1 (Cambridge et al 2011 + Li et al 2021) median value
 ptr_median = 65162.83940608428  # (Eraslan et al 2019) median value
 
 ptr = pd.read_csv(build_files_path + 'PTR_Gagneur_processed.tsv', sep='\t', index_col=0)
@@ -76,7 +76,7 @@ ptr.drop(columns=['ENSG_ID'], inplace=True)
 ptr.columns = pd.Series(ptr.columns).apply(lambda x: x.split('_')[0] if '_PTR' in x else x).tolist()
 
 alpha_p = pd.read_csv(build_files_path + 'protein_turnover.csv', index_col=0)
-alpha_p = alpha_p.groupby(alpha_p.HGNC_ID).median().kdeg  # have true median stored above
+alpha_p = alpha_p.groupby(alpha_p.HGNC_ID).median().kdeg  # get median across cell lines
 
 alpha_m = pd.read_csv(build_files_path + 'Gregersen_mrna_turnover_processed.tsv', sep='\t', index_col=0)
 alpha_m = alpha_m.groupby(alpha_m.HGNC_ID).median().median_turnover  # have true median stored above

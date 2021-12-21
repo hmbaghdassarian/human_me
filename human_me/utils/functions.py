@@ -9,6 +9,7 @@ import os
 import sys
 import human_me.utils.metabolites as metab
 import human_me.utils.parameters as params
+import human_me.utils.machinery as mach
 from human_me.utils.load_environmental_variables import build_files_path
 
 
@@ -229,14 +230,15 @@ def SASA(mw):
 
 def average_protein_features(psim_me, context_specific: bool = True):
     """Function to get the average protein features from the proteins used in a specific ME model being generated.
-    This is explicitly written to help generate the dummy protein.
+    *Note, we filter for metabolic enzymes only, because most orphan reactions come from the metabolic sector.
 
     Parameters
     ----------
     psim_me: pd.DataFrame
         protein specific information matrix, same as corrected input file (see preprocessing output)
     context_specific: bool, default True
-        whether to use the use provided input M-model and PSIM, or get an average dummy representative of the whole proteome
+            whether the representative dummy protein is calculated for only genes in the user-provided context specific model from
+            the user provided PSIM (True) or for all recon2.2 machinery proteins in the gold-standard PSIM (False)
 
 
     Returns
@@ -246,8 +248,9 @@ def average_protein_features(psim_me, context_specific: bool = True):
     """
     if context_specific:
         psim = psim_me.copy()
+        psim = psim[psim.HGNC_ID.isin(mach.metabolic_machinery)] # filter for metabolic machinery only
     else:
-        psim = pd.read_csv(build_files_path + 'psim_recon2_2.csv')
+        psim = pd.read_csv(build_files_path + 'recon2_2_only_psim.csv') # load recon2.2 metabolic machinery gold standard PSIM
 
     res = pd.DataFrame()
     res['premrna_counts'] = psim.PREMRNA_SEQ.dropna().apply(lambda x: {ntp: x.count(ntp) for ntp in set(x)})
