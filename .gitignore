@@ -1,6 +1,8 @@
 # Byte-compiled / optimized / DLL files
 *.env
 .env_template
+.flake8
+.pylintrc
 *.json
 **/fort.11
 **/fort.8
