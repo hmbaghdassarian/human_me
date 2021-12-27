@@ -1,22 +1,24 @@
-# Byte-compiled / optimized / DLL files
-*.env
-.env_template
-.flake8
-.pylintrc
-*.json
+**/*.json
+**/*.pyc
+
+**/__pycache__/
+**/.ipynb_checkpoints/
+
 **/fort.11
 **/fort.8
 **/fort.9
+**/.flake8
+**/.pylintrc
+
+*.env
+.env_template
+
 project_files/
 data/
 notebooks/.pybiomart.sqlite
-**/__pycache__/
 test_code/
 me_env/
 MammalianSecretoryRecon/
-**/*.pyc
 
 
-# Jupyter NB Checkpoints
-**/.ipynb_checkpoints/
 
