@@ -9,10 +9,12 @@
 **/fort.9
 
 # config files
-**/.flake8
-**/.pylintrc
-**/.isort.cfg
-**/.pydocstyle
+**/setup.cfg
+# **/.mypy.ini
+# **/.flake8
+# **/.pylintrc
+# **/.isort.cfg
+# **/.pydocstyle
 
 *.env
 .env_template

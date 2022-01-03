@@ -192,7 +192,7 @@ def correct_model(model_file=input_data_path + 'recon2_2.xml'):
             else:
                 m_model.add_boundary(metabolite=new_metab, type='exchange')
 
-    cm_2 = m_model.copy()  # metabolic model with incorrect GPRs corrected and ME-Model required metabolite transport added
+    cm_2 = m_model.copy() # metabolic model with incorrect GPRs corrected and ME-Model required metabolite transport added
     # remove biomass        
     metabolites_1 = [m.id for m in m_model.metabolites]
     try:
