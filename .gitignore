@@ -7,8 +7,11 @@
 **/fort.11
 **/fort.8
 **/fort.9
+
+# config files
 **/.flake8
 **/.pylintrc
+**/.isort.cfg
 
 *.env
 .env_template
