@@ -12,6 +12,7 @@
 **/.flake8
 **/.pylintrc
 **/.isort.cfg
+**/.pydocstyle
 
 *.env
 .env_template

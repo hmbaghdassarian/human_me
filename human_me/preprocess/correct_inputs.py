@@ -3,11 +3,7 @@
 
 import cobra
 import cobra.manipulation.delete as c_del
-
 import pandas as pd
-import warnings
-import json
-import itertools
 
 import logging
 
