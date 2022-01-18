@@ -49,7 +49,7 @@ class RNA(Macromolecule):
         self.length = len(self.sequence)
         self.get_base_counts_and_elements()
 
-        Macromolecule.__init__(self, id = rna_id, compartment=compartment, charge = -self.length, elements = self.elements,
+        super().__init__(id = rna_id, compartment=compartment, charge = -self.length, elements = self.elements,
                                hgnc_id = hgnc_id)
         if triphosphate:
             self.charge -= 3
@@ -210,6 +210,8 @@ class RNA(Macromolecule):
 class pre_mRNA(RNA):
     """premRNA macromolecule object representation."""
 
+    type = 'premrna'
+
     def __init__(self, gene_info, compartment: str = 'n', triphosphate: bool = True):
         """Init method for pre_mRNA.
 
@@ -225,15 +227,17 @@ class pre_mRNA(RNA):
         if compartment != 'n':
             raise ValueError("Premrna's outside of the nucleus are not currently considered")
 
-        RNA.__init__(self, metabolite_name=gene_info.hgnc_id, seq=gene_info.premrna_seq,
+        super().__init__(metabolite_name=gene_info.hgnc_id, seq=gene_info.premrna_seq,
                      compartment=compartment, triphosphate=triphosphate, hgnc_id=gene_info.hgnc_id)
-        self.type = 'premrna'
+
         self.id = self.id.replace('RNA', self.type)
         self.hgnc_id = gene_info.hgnc_id
 
 
 class mRNA(RNA):
     """mRNA macromolecule object representation."""
+
+    type = 'mrna'
 
     def __init__(self, gene_info, compartment: str = 'n', triphosphate: bool = True):
         """Init method for mRNA.
@@ -250,9 +254,8 @@ class mRNA(RNA):
         if compartment not in ['n', 'c']:
             raise ValueError('mRNA must either be in nucleus or cytosol')
 
-        RNA.__init__(self, metabolite_name=gene_info.hgnc_id, seq=gene_info.mrna_seq,
+        super().__init__(metabolite_name=gene_info.hgnc_id, seq=gene_info.mrna_seq,
                      compartment=compartment, triphosphate=triphosphate, hgnc_id=gene_info.hgnc_id)
-        self.type = 'mrna'
         self.id = self.id.replace('RNA', self.type)
         self.hgnc_id = gene_info.hgnc_id
 
@@ -264,29 +267,34 @@ class mRNA(RNA):
 class tRNA(RNA):
     """tRNA macromolecule object representation."""
 
+    type = 'trna'
+
     def __init__(self, metabolite_name, seq, compartment='n', triphosphate=True):
         """See RNA.__init__ for parameter information"""
-        RNA.__init__(self, metabolite_name=metabolite_name, seq=seq, compartment=compartment,
+        super().__init__(metabolite_name=metabolite_name, seq=seq, compartment=compartment,
                      triphosphate=triphosphate)
 
-        self.type = 'trna'
         self.id = self.id.replace('RNA', self.type)
 
 
 class rRNA(RNA):
     """rRNA macromolecule object representation."""
 
+    type = 'rrna'
+
     def __init__(self, metabolite_name, seq, compartment='n', triphosphate=True):
         """See RNA.__init__ for parameter information"""
-        RNA.__init__(self, metabolite_name=metabolite_name, seq=seq, compartment=compartment,
+        super().__init__(metabolite_name=metabolite_name, seq=seq, compartment=compartment,
                      triphosphate=triphosphate)
 
-        self.type = 'rrna'
         self.id = self.id.replace('RNA', self.type)
         self.k_deg = params.RNA_DEGRADATION_CONSTANT
 
 class RNA_fragment(RNA):
     """object representation of fragmented RNA such as lariats and other excised sequences"""
+
+    type = 'fragment_rna'
+
     def __init__(self, metabolite_name: str, seq: str, fragment_type: str, compartment: str = 'n', triphosphate: bool = True,
                  hgnc_id: Optional[str] = None):
         """Init method for RNA_fragment.
@@ -313,10 +321,9 @@ class RNA_fragment(RNA):
         if compartment not in ['n', 'c']:
             raise ValueError('Only nuclear or cytosolic RNA fragments are incorporated for now')
 
-        RNA.__init__(self, metabolite_name = metabolite_name, seq = seq, compartment = compartment,
+        super().__init__(metabolite_name = metabolite_name, seq = seq, compartment = compartment,
                      triphosphate = triphosphate, hgnc_id = hgnc_id)
 
-        self.type='fragment_rna'
         self.fragment_type=fragment_type
         if self.fragment_type == 'lariat' and hgnc_id is None:
             raise ValueError('Must specify hgnc ID for lariats')

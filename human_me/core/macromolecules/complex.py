@@ -20,6 +20,8 @@ cotransloc_ids = set([mid + '_folded_protein_r' for mid in mach.ctnm + mach.tran
 class Complex(Macromolecule):
     """Complexes formed by non-covalent interactions between macromolecules."""
 
+    type = 'complex' 
+
     def __init__(self, metabolites: List[Macromolecule], complex_id: Optional[str] = None, seed: Optional[int] = None):
         """Init method for Complex
 
@@ -39,7 +41,6 @@ class Complex(Macromolecule):
         if len([m for m in metabolites if not isinstance(m, Macromolecule)]) > 0:
             raise ValueError('Generic cobra.Metabolite cannot form complexes with macromolecules currently')
 
-        self.type = 'complex'
         self.components = {m: metabolites.count(m) for m in metabolites}
         # parse compartment
         compartments = list(set([m.compartment for m in self.components]))
@@ -66,7 +67,7 @@ class Complex(Macromolecule):
                     elements[k] = v * count
 
         # make the metabolite
-        Macromolecule.__init__(self, id=self.temp_id + '_complex_' + compartment, compartment=compartment,
+        super().__init__(id=self.temp_id + '_complex_' + compartment, compartment=compartment,
                                charge=sum([m.charge * count for m, count in self.components.items()]),
                                elements=elements)
 
@@ -245,6 +246,8 @@ class RibosomalComplex(Complex):
     """Complexes specifically associated with ribosome biogenesis, which has RNA-protein complexes and
     multiple compartments"""
 
+    type = 'complex' 
+
     def __init__(self, metabolites: List[Macromolecule], complex_id: Optional[str] = None, ignore_compartment: bool = False, seed: Optional[int] = None):
         """Init method for RibosomalComplex
 
@@ -267,7 +270,6 @@ class RibosomalComplex(Complex):
         if len([m for m in metabolites if not isinstance(m, Macromolecule)]) > 0:
             raise ValueError('Generic cobra.Metabolite cannot form complexes with macromolecules currently')
 
-        self.type = 'complex'
         self.components = {m: metabolites.count(m) for m in metabolites}
         # parse compartment
         compartments = list(set([m.compartment for m in self.components]))

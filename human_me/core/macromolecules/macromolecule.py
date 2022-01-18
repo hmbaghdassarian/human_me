@@ -37,7 +37,7 @@ class Macromolecule(cobra.Metabolite):
             err += ', '.join(list(params.compartments))
             raise ValueError(err)
 
-        cobra.Metabolite.__init__(self, id=id, charge=charge, compartment=compartment, formula=formula, name=name)
+        super().__init__(id=id, charge=charge, compartment=compartment, formula=formula, name=name)
 
         if elements is not None:
             self.elements = elements
@@ -109,6 +109,8 @@ class Macromolecule(cobra.Metabolite):
 class Proxy(Macromolecule):
     """Proxy macromolecules for c2/c4 coupling of degradation"""
 
+    type = 'proxy'
+
     def __init__(self, associated_macromolecule: Macromolecule):
         """Init method for Proxy.
 
@@ -123,12 +125,9 @@ class Proxy(Macromolecule):
                       'complex': 'enzyme_degradation'}
 
         id_ = associated_macromolecule.hgnc_id if associated_macromolecule.type == 'mrna' else associated_macromolecule._deg_id
-        Macromolecule.__init__(self, id='_'.join([id_,
-                                                  key_mapper[associated_macromolecule.type], 'proxy',
-                                                  associated_macromolecule.compartment]),
-                               compartment=associated_macromolecule.compartment,
-                               hgnc_id=associated_macromolecule.hgnc_id)
-        self.type = 'proxy'
+        super().__init__(id='_'.join([id_, key_mapper[associated_macromolecule.type], 'proxy', associated_macromolecule.compartment]),
+                        compartment=associated_macromolecule.compartment,
+                        hgnc_id=associated_macromolecule.hgnc_id)
         self.associated_macromolecule = associated_macromolecule.id
         self._amt = associated_macromolecule.type
         # only for complexes, used in ExpressedGene class

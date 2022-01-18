@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 from collections import OrderedDict
-from typing import Dict, Union
+from typing import Dict, Optional, Union
 
 import cobra
 
@@ -14,8 +14,8 @@ from human_me.core.macromolecules.macromolecule import Macromolecule
 class Biomass(cobra.Metabolite):
     """An object of type Biomass inherited from cobra.Metabolite"""
 
-    def __init__(self, id=None, compartment = None):
-        cobra.Metabolite.__init__(self, id=id, compartment=compartment)
+    def __init__(self, id: str = None, compartment: Optional[str] = None):
+        super().__init__(id=id, compartment=compartment)
 
 
 # make the biomass metabolites

@@ -59,7 +59,7 @@ class ExpressedGene:
                                'Proxy': {'mrna_degradation': {},
                                          'enzyme_degradation': {}}
                                }
-
+        self._summarized = False # for __repre__ method
     # REACTIONS--------------------------------------------------------------------------------
     def add_reaction(self, r: Union[MetabolicReaction, ExpressionReaction]):
         """Organizes ME_Model reaction into self.reactions attribute.
@@ -409,3 +409,20 @@ class ExpressedGene:
                                          self.macromolecules['Complex']['coupled'].keys())]
         self._check_reactions()
         self._check_macromolecules()
+    
+    def __repr__(self):
+
+        if not self._summarized:
+            n_mr = len(self.reactions['Catalysis_Reactions']['Metabolic_Module'])
+            n_er = len(self.reactions['Catalysis_Reactions']['Expression_Module'])
+            
+            self._summ = self.hgnc_id + ' catalyzes '
+            if n_mr > 0:
+                self._summ += '{} metabolic reactions'.format(n_mr)
+                if n_er > 0:
+                    self._summ += ' and '
+            if n_er > 0:
+                self._summ += '{} expression reactions'.format(n_er)
+        self._summarized = True
+
+        return self._summ

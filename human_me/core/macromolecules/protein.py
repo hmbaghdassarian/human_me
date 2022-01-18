@@ -9,6 +9,8 @@ from human_me.core.macromolecules.macromolecule import Macromolecule, Proxy
 
 class Protein(Macromolecule):
     """Protein macromolecule object representation."""
+    
+    type = 'protein'
 
     def __init__(self, compartment: str, id_: str, gene_info = None,
                 amino_acid_counts: Optional[Dict[str,int]] = None, dummy: bool = False,
@@ -73,10 +75,9 @@ class Protein(Macromolecule):
         elements['H'] -= 2 * (self.length - 1)
         elements['O'] -= 1 * (self.length - 1)
 
-        Macromolecule.__init__(self, id=id_, compartment=compartment, charge=charge, elements=elements,
+        super().__init__(id=id_, compartment=compartment, charge=charge, elements=elements,
                                hgnc_id=self.hgnc_id)
 
-        self.type = 'protein'
         self.dummy = dummy
         self.enzyme = False  # whether the protein is involved in catalysis of a reaction
         self.keff = None

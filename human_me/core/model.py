@@ -22,11 +22,12 @@ from sympy import lambdify
 from tqdm import tqdm
 
 from human_me.core.gene import ExpressedGene
+from human_me.core.biomass import Biomass
 from human_me.core.macromolecules.complex import Complex, RibosomalComplex
 from human_me.core.macromolecules.macromolecule import Macromolecule
 from human_me.core.reaction import (BiomassReaction,
                                     ComplexDegradationReaction,
-                                    ExpressionReaction, MetabolicReaction)
+                                    ExpressionReaction, ME_Reaction, MetabolicReaction)
 from human_me.me_solver import solve_me
 from human_me.preprocess import parse_complex
 from human_me.utils import parameters as params
@@ -37,11 +38,11 @@ logger = logging.getLogger(__name__)
 
 
 class ME_Model(cobra.Model):
-    # rewritten methods------------------------------------------------------------------------------------------------
+    # overriden methods------------------------------------------------------------------------------------------------
     def __init__(self, id_or_model, name: Optional[str] = None, m_model: Optional[cobra.Model] = None,
                  n_cores: int = os.cpu_count(),
                  non_machinery: Dict[str, List[str]] = None, knock_out: Optional[List[str]] = None, additional_ko: List[str] = None):
-        """[summary]
+        """Initialization method for ME_Model class.
 
         Parameters
         ----------
@@ -932,3 +933,20 @@ class ME_Model(cobra.Model):
 
     def copy(self):
         return copy.deepcopy(self)
+    
+    def __repr__(self):
+        n_mr, n_er = 0,0
+        for r in self.reactions:
+            if isinstance(r, MetabolicReaction):
+                n_mr += 1
+            elif isinstance(r, ExpressionReaction):
+                n_er += 1
+            # else:
+            #     n_br += 1
+
+        n_sm = len([m for m in self.metabolites if not (isinstance(m, Macromolecule) or isinstance(m, Biomass))])
+
+        summ_df = pd.DataFrame(index = ['ID', 'Small Molecules', 'Expressed Genes', 'Metabolic Reactions', 'Expression Reactions'])
+        summ_df[''] = [self.id, n_sm, len(self.expressed_genes), n_mr, n_er]
+        print(summ_df.to_string())
+        return ''
