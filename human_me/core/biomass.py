@@ -1,8 +1,9 @@
 #!/usr/bin/env python
 # coding: utf-8
+from collections import OrderedDict
+from typing import Dict, Union
 
 import cobra
-from collections import OrderedDict
 
 from human_me.utils import parameters as params
 from human_me.utils import metabolites as metab
@@ -11,8 +12,10 @@ from human_me.core.macromolecules.macromolecule import Macromolecule
 
 
 class Biomass(cobra.Metabolite):
-    def __init__(self, id=None, formula=None, name="", charge=None, compartment=None, elements=None):
-        cobra.Metabolite.__init__(self, id=id, charge=charge, compartment=compartment)
+    """An object of type Biomass inherited from cobra.Metabolite"""
+
+    def __init__(self, id=None, compartment = None):
+        cobra.Metabolite.__init__(self, id=id, compartment=compartment)
 
 
 # make the biomass metabolites
@@ -51,7 +54,7 @@ for bm in biomass_metabolites:
     reaction_.add_metabolites({bm: -1, biomass_: 1})
     biomass_reactions.append(reaction_)
 
-# # protein biomass with unmodeled protein 
+# # protein biomass with unmodeled protein
 upb_reaction = biomass_reactions.pop(len(biomass_reactions) - 1)
 # pb_reaction = cobra.Reaction('protein_biomass_to_biomass')
 # pb_reaction.add_metabolites({protein_: -1, biomass_: 1})
@@ -60,7 +63,7 @@ upb_reaction = biomass_reactions.pop(len(biomass_reactions) - 1)
 # The following reactions convert the biomass components which are a constant proportion from the metabolic model formulation to the ME model formulation. Briefly, the coefficients of the precursor reactions must be scaled by their molecular weight, and the product must be equal to the constant proportion of that class of biomass, bounded by growth (flux through reaction = growth rate).
 
 # constant biomass reactions
-
+# TODO: make *_coef variables customizable by user
 
 # DNA------------------------------------------------------
 dna_reaction = BiomassReaction('DNA_biomass_formation')
@@ -76,7 +79,7 @@ rxn = {metab.datp_n: -datp_coef * metab.datp_n.formula_weight / 1000,
        metab.dctp_n: -dctp_coef * metab.dctp_n.formula_weight / 1000,
        metab.dgtp_n: -dgtp_coef * metab.dgtp_n.formula_weight / 1000,
        metab.dttp_n: -dttp_coef * metab.dttp_n.formula_weight / 1000,
-       dna_: params.dna_frac}
+       dna_: params.DNA_FRAC}
 dna_reaction.add_metabolites(rxn)
 dna_reaction._lower_bound, dna_reaction._upper_bound = params.mu, params.mu
 
@@ -84,7 +87,7 @@ dna_reaction._lower_bound, dna_reaction._upper_bound = params.mu, params.mu
 g6p_coef = 3.87591549295775
 carbohydrate_reaction = BiomassReaction('carbohydrate_biomass_formation')
 rxn = {metab.g6p_c: -g6p_coef * metab.g6p_c.formula_weight / 1000,
-       carb_: params.carb_frac}
+       carb_: params.CARB_FRAC}
 carbohydrate_reaction.add_metabolites(rxn)
 carbohydrate_reaction._lower_bound, carbohydrate_reaction._upper_bound = params.mu, params.mu
 
@@ -98,40 +101,47 @@ pglyc_hs_coef = 0.0300412371134021
 ps_hs_coef = 0.0600927835051546
 sphmyln_hs_coef = 0.180268041237113
 
-clpn_hs_c_mw = 508.21930 / 1000  # ChEBI 28494
-pail_hs_c_mw = 387.211 / 1000  # ChEBI 57880
-pchol_hs_c_mw = 311.226 / 1000  # ChEBI 64482
-pe_hs_c_mw = 269.146 / 1000  # ChEBI 16038
-pglyc_hs_c_mw = 299.14860 / 1000  # ChEB 60523
-ps_hs_c_mw = 312.14740 / 1000  # ChEBI 58436
-sphmyln_hs_c_mw = 492.630  # ChEBI 62490
+CLPN_HS_C_MW = 508.21930 / 1000  # ChEBI 28494
+PAIL_HS_C_MW = 387.211 / 1000  # ChEBI 57880
+PCHOL_HS_C_MW = 311.226 / 1000  # ChEBI 64482
+PE_HS_C_MW = 269.146 / 1000  # ChEBI 16038
+PGLYC_HS_C_MW = 299.14860 / 1000  # ChEB 60523
+PS_HS_C_MW = 312.14740 / 1000  # ChEBI 58436
+SPHMYLN_HS_C_MW = 492.630  # ChEBI 62490
 
 lipid_reaction = BiomassReaction('lipid_biomass_formation')
 rxn = {metab.chsterol_c: -chsterol_coef * metab.chsterol_c.formula_weight / 1000,
-       metab.clpn_hs_c: -clpn_hs_coef * clpn_hs_c_mw,
-       metab.pail_hs_c: -pail_hs_coef * pail_hs_c_mw,
-       metab.pchol_hs_c: -pchol_hs_coef * pchol_hs_c_mw,
-       metab.pe_hs_c: -pe_hs_coef * pe_hs_c_mw,
-       metab.pglyc_hs_c: -pglyc_hs_coef * pglyc_hs_c_mw,
-       metab.ps_hs_c: -ps_hs_coef * ps_hs_c_mw,
-       metab.sphmyln_hs_c: -sphmyln_hs_coef * sphmyln_hs_c_mw,
-       lipid_: params.lipid_frac}
+       metab.clpn_hs_c: -clpn_hs_coef * CLPN_HS_C_MW,
+       metab.pail_hs_c: -pail_hs_coef * PAIL_HS_C_MW,
+       metab.pchol_hs_c: -pchol_hs_coef * PCHOL_HS_C_MW,
+       metab.pe_hs_c: -pe_hs_coef * PE_HS_C_MW,
+       metab.pglyc_hs_c: -pglyc_hs_coef * PGLYC_HS_C_MW,
+       metab.ps_hs_c: -ps_hs_coef * PS_HS_C_MW,
+       metab.sphmyln_hs_c: -sphmyln_hs_coef * SPHMYLN_HS_C_MW,
+       lipid_: params.LIPID_FRAC}
 lipid_reaction.add_metabolites(rxn)
 lipid_reaction._lower_bound, lipid_reaction._upper_bound = params.mu, params.mu
 
 biomass_reactions += [dna_reaction, carbohydrate_reaction, lipid_reaction]
 
+def add_biomass_change(reaction: cobra.Reaction, inplace: bool = True) -> Union[None, Dict[str, float]]:
+    """Calculate net biomass change in a reaction.
 
-# In[6]:
+    Parameters
+    ----------
+    reaction : cobra.Reaction
+        reaction uponw which to calculate biomass change
+    inplace : bool, optional
+        whether to modify the reaction (True) or return a dictionary representation of th new reaction.metabolites, by default True
 
-
-def add_biomass_change(reaction, inplace=True):
+    Returns
+    -------
+    None
+        if inplace is True, updates the input reaction
+    Dict[str, float]
+        if inplace is False, the new reaction.metabolites representation is returned
     """
 
-    Input: instance of cobra.Reaction
-    Output: nothing, but adds the change in biomass for each macromolecule type to the reaction
-
-    """
     biomass_change = dict()
     #     md = reaction._metabolites.copy()
     # must order for precision (order of adding masses effects final sum)
@@ -154,7 +164,7 @@ def add_biomass_change(reaction, inplace=True):
                         biomass_change[m.type] += (count * m.formula_weight / 1000)
                     else:
                         biomass_change[m.type] = (count * m.formula_weight / 1000)
-                else: # complexes
+                else:  # complexes
                     for type_, mass_ in m.get_complex_biomass().items():
                         if type_ in biomass_change:
                             biomass_change[type_] += (count * mass_)

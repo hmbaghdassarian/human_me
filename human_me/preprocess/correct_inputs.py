@@ -1,39 +1,49 @@
 #!/usr/bin/env python
 # coding: utf-8
+import itertools
+import json
+import logging
+import os
+import warnings
+from typing import Optional, Tuple, Union, Dict, List
 
 import cobra
 import cobra.manipulation.delete as c_del
 import pandas as pd
-
-import logging
+# make sure the creat_environment function from the preprocesss script is run before this
+from human_me.preprocess import parse_complex
+from human_me.utils.load_environmental_variables import (build_files_path,
+                                                         input_data_path,
+                                                         processed_data_path)
 
 logging.basicConfig()
 logger = logging.getLogger(cobra.__name__)
 logger.setLevel(logging.ERROR)
-
-# make sure the creat_environment function from the preprocesss script is run before thise
-from human_me.preprocess import parse_complex
-from human_me.utils.load_environmental_variables import *
 
 compartments_me = {'c': 'cytosol', 'l': 'lysosome', 'm': 'mitochondria', 'r': 'endoplasmic reticulum',
                    'e': 'extracellular space', 'x': 'peroxisome/glyoxysome', 'n': 'nucleus', 'g': 'golgi apparatus',
                    'i': 'inner mitochondrial compartment', 'pm': 'plasma membrane', 'b': 'boundary'}
 
 
-def bool_metabolite(m_id: str, compartment: str, m_model: cobra.core.model):
-    '''Checks if a metabolite is in the model
+def bool_metabolite(m_id: str, compartment: str, m_model: cobra.core.model) -> Tuple[bool, cobra.core.metabolite]:
+    """Checks if a metabolite is in the model.
 
     Parameters
     ----------
-    m_id: str
-        the metabolite id, without the compartment ending
-    compartment: str
+    m_id : str
+        the metabolite id, without the "_compartment" at the end
+    compartment : str
         one letter compartment code
-    m_model: cobra.core.model
+    m_model : cobra.core.model
         a Cobra Metabolic Model
 
-
-    '''
+    Returns
+    -------
+    bool
+        whether the metabolite in that compartment is present in the model
+    cobra.core.metabolite
+        cobra metabolite in the m_model, if it is present
+    """
     try:
         m_id = '_'.join(m_id.split('_')[:-1])
         m = m_model.metabolites.get_by_id(m_id + '_' + compartment)
@@ -42,9 +52,8 @@ def bool_metabolite(m_id: str, compartment: str, m_model: cobra.core.model):
         return False, None
 
 
-def correct_model(model_file=input_data_path + 'recon2_2.xml'):
-    """Makes necessary changes to cobrapy model, largely based on issues encountered with Recon2.2
-
+def correct_model(model_file: Union[cobra.core.model, str] = input_data_path + 'recon2_2.xml') -> Tuple[cobra.core.model]:
+    """Makes necessary changes to cobrapy model, largely based on issues encountered with Recon2.2.    
     *Note that because the ME Model will create a new objective function, the input model's biomass objective function
     is removed. The returned models cm_1 and cm_2 allow the user to compare corrected metabolic models with intact
     biomass objective functions with the output ME Model from human_me.build.build_me_model.build_me. We recommend
@@ -52,29 +61,27 @@ def correct_model(model_file=input_data_path + 'recon2_2.xml'):
 
     Parameters
     ----------
-    model_file: str or cobra.core.Model
-        string must be 'full/path/to/input_model.xml'
+    model_file : Union[cobra.core.model, str], optional
+        string must be 'full/path/to/input_model.xml', by default input_data_path +'recon2_2.xml'
 
     Returns
-    ----------
-    cm_1: cobra.core.Model
+    -------
+    cm_1 : cobra.core.Model
         Cobra model with GPRs corrected (according to observed problems with Recon2.2 GPRs) and biomass objective intact
-    cm_2: cobra.core.Model
+    cm_2 : cobra.core.Model
         Cobra model with GPRs corrected, metabolite transport reactions needed for ME Model incorporated,
         and biomass objective intact
-    cm_3: cobra.core.Model
+    cm_3 : cobra.core.Model
         Cobra model with GPRs corrected, metabolite transport reactions needed for ME Model incorporated,
         and removed biomass objective. Used as input to building the ME Model.
-
     """
-
     required_metabolites = json.load(open(build_files_path + "required_metabolic_model_metabolites.json"))
     rmd = pd.read_csv(build_files_path + 'required_metabolic_model_metabolites.csv', index_col=0)
 
     if isinstance(model_file, str):
         if not os.path.isfile(model_file):
             raise ValueError('Specified file does not exist')
-        elif os.path.splitext(model_file)[1] != '.xml':
+        if os.path.splitext(model_file)[1] != '.xml':
             raise ValueError('Specified file must be an sbml model with extentsion ".xml"')
         m_model = cobra.io.read_sbml_model(model_file)
     elif isinstance(model_file, cobra.Model):
@@ -97,7 +104,7 @@ def correct_model(model_file=input_data_path + 'recon2_2.xml'):
 
             idx = list(itertools.combinations(range(len(machinery_final)), 2))
 
-            rm = list()
+            rm = []
             for i in idx:
                 if machinery_final[i[0]] == machinery_final[i[1]]:
                     rm.append(i[1])
@@ -179,7 +186,7 @@ def correct_model(model_file=input_data_path + 'recon2_2.xml'):
             warnings.warn(wrn)
 
             new_metab = cobra.Metabolite(m_id)
-            info = rmd.loc[core_id,]
+            info = rmd.loc[core_id, ]
 
             new_metab.name = info['name']
             new_metab.compartment = nc
@@ -192,8 +199,8 @@ def correct_model(model_file=input_data_path + 'recon2_2.xml'):
             else:
                 m_model.add_boundary(metabolite=new_metab, type='exchange')
 
-    cm_2 = m_model.copy() # metabolic model with incorrect GPRs corrected and ME-Model required metabolite transport added
-    # remove biomass        
+    cm_2 = m_model.copy()  # metabolic model with incorrect GPRs corrected and ME-Model required metabolite transport added
+    # remove biomass
     metabolites_1 = [m.id for m in m_model.metabolites]
     try:
         biomass_reaction = m_model.reactions.get_by_id('biomass_reaction')
@@ -230,16 +237,20 @@ def correct_model(model_file=input_data_path + 'recon2_2.xml'):
     return cm_1, cm_2, cm_3
 
 
-def check_non_machinery(non_machinery: dict = None):
-    """Runs checks on non-machinery input list. Non-machinery are categorized as any proteins
-    to express in the ME-Model that are not catalyzed in the reaction.
+def check_non_machinery(non_machinery: Optional[Dict[str, List[str]]] = None) -> Dict[str, List[str]]:
+    """Runs checks on non-machinery input list. Non-machinery are categorized as any proteins to express in the ME-Model
+     that are not catalyzed in the reaction.
 
     Parameters
     ----------
-    non_machinery: dictionary
-        keys are HGNC IDs, values are a list of strings, each element of which represents a compartment
-        within the metabolic model for the gene to be expressed
+    non_machinery : Dict[str, List[str]], optional
+        keys are HGNC IDs, values are a list of strings, each element of which represents a compartment within the 
+        metabolic model for the gene to be expressed, by default None
 
+    Returns
+    -------
+    non_machinery : Dict[str, List[str]]
+        removes any non-machinery that would not have worked with model
     """
     if non_machinery is None:
         non_machinery = dict()
@@ -252,7 +263,7 @@ def check_non_machinery(non_machinery: dict = None):
     return non_machinery
 
 
-def get_status(psim_me):
+def get_status(psim_me: pd.DataFrame) -> pd.DataFrame:
     """Checks sequence columns for validity"""
     psim = psim_me.copy()
     psim['Status'] = 1
@@ -282,20 +293,20 @@ def get_status(psim_me):
     return psim
 
 
-def correct_psim(psim_df=input_data_path + 'psim_me.h5', fill_na: str = 'default',
-                 non_machinery: dict = None):
+def correct_psim(psim_df: Union[pd.DataFrame, str] = input_data_path + 'psim_me.h5',
+                 fill_na: str = 'default',
+                 non_machinery: Optional[dict] = None) -> Tuple[Dict[str, List[str]]]:
     """Makes sure PSIM has all necessary correct information to build ME Model
 
     *Note, the default psim_file, build/psim_me.h5, is a PSIM generated from MANE/RefSeq Select isoforms.
-    We refer to this as the gold standard.
+    We refer to this as the gold standard "psim_gold".
 
     Parameters
     ----------
-    psim_df: pd.DataFrame or str, defaults to 'input_path/psim_me.h5'
-        See PSIM_README for details on format of psim
-        str: full/path/to/psim.csv or psim.h5
-    fill_na: str
-        options ['default', 'select']
+    psim_df : Union[pd.DataFrame, str], optional
+        See PSIM_README for details on format of psim, by default input_data_path +'psim_me.h5'
+    fill_na : str, optional
+        options ['default', 'select'], by default 'default'
         if default: will fill incomplete values with default values (see PSIM_README for details)
         if select: will fill incomplete values with the gold standard PSIM when available, otherwise with default
 
@@ -305,12 +316,15 @@ def correct_psim(psim_df=input_data_path + 'psim_me.h5', fill_na: str = 'default
             for required columns, if incorrect in input psim, will fill with  the gold standard PSIM. required columns include *_SEQ and LOCATION for non-machinery
             if PTR is present in input PSIM and a tissue is specified most often in that column (ignoring NaN), all nan values in that column will default to that tissue
             if non-machinery do not specify an appropriate LOCATION, will fill with  the gold standard PSIM
-    non_machinery: dictionary
+    non_machinery : dict, optional
         keys are HGNC IDs, values are a list of strings, each element of which represents a compartment
-        within the metabolic model for the gene to be expressed
+        within the metabolic model for the gene to be expressed, by default None
+
     Returns
-    ----------
-    revised_genes: dict
+    -------
+    non_machinery : Dict[str, List[str]]
+        removes any non-machinery that would not have worked with model
+    revised_genes : Dict[str, List[str]]
         'added' is a list of genes missing (relative to m_model and non-machinery genes) in PSIM that were added
         'sequences' key is a superset of added, includes all genes with adjusted sequences
         'non-machinery locations' is for genes in non-machinery that did not have an appropriately specified location
@@ -386,10 +400,10 @@ def correct_psim(psim_df=input_data_path + 'psim_me.h5', fill_na: str = 'default
         raise ValueError(
             'The following specified genes are not present in the provided psim or build/psim_me.h5: ' + ', '.join(
                 missing_genes))
-    else:  # add expression machinery to lists
-        proteins = sorted(set(proteins + expression_machinery))
-        revised_genes = {'missing': missing_genes}
-        missing_genes = sorted(set(proteins).difference(psim_me_genes))
+    # add expression machinery to lists
+    proteins = sorted(set(proteins + expression_machinery))
+    revised_genes = {'missing': missing_genes}
+    missing_genes = sorted(set(proteins).difference(psim_me_genes))
 
     # initialize missing columns and genes----------------------------------------------------------------
     for col in missing_cols:
@@ -399,19 +413,18 @@ def correct_psim(psim_df=input_data_path + 'psim_me.h5', fill_na: str = 'default
     # make sure RPL40 and RPS27A are ubiquitin fusions
     rbp_ubs = ['HGNC:10417', 'HGNC:12458']
     ub_psim = psim_gold[psim_gold.HGNC_ID.isin(rbp_ubs)]
-    single_ubiquitin_sequence = ub_psim['PROTEIN_SEQ'].iloc[0,][:76]
+    SINGLE_UB_SEQ = ub_psim['PROTEIN_SEQ'].iloc[0, ][:76]
 
     for ru in rbp_ubs:
         if ru not in missing_genes:
             rui = psim_me[psim_me.HGNC_ID == ru]
-            if rui.PROTEIN_SEQ.iloc[0,][:len(single_ubiquitin_sequence)] != single_ubiquitin_sequence:
+            if rui.PROTEIN_SEQ.iloc[0, ][:len(SINGLE_UB_SEQ)] != SINGLE_UB_SEQ:
                 msg = 'Provided sequence for ribosomal protein ' + ru + ' must contain specific ubiquitin fusion.'
                 msg += 'Replacing with correct sequences.'
                 warnings.warn(msg)
                 ui = ub_psim[ub_psim.HGNC_ID == ru]
                 psim_me.loc[rui.index, ['PREMRNA_SEQ', 'MRNA_SEQ', 'PROTEIN_SEQ']] = \
                     ub_psim.loc[ui.index, ['PREMRNA_SEQ', 'MRNA_SEQ', 'PROTEIN_SEQ']]
-
 
     # initialize missing genes
     for gene in missing_genes:
@@ -468,7 +481,7 @@ def correct_psim(psim_df=input_data_path + 'psim_me.h5', fill_na: str = 'default
     # deal with non_machinery location---------------------------------------------------------------
     if len(non_machinery) > 0 and 'LOCATION' not in psim_me.columns.tolist():
         psim_me['LOCATION'] = float('nan')
-    compartments = ['[c]', '[e]', '[l]', '[m]', '[r]', '[n]', '[g]', '[x]', '[b]', '[i]', '[pm]']
+    # compartments = ['[c]', '[e]', '[l]', '[m]', '[r]', '[n]', '[g]', '[x]', '[b]', '[i]', '[pm]']
     #     temp = psim_me[psim_me.HGNC_ID.isin(non_machinery) & ((psim_me.LOCATION.isna()) | psim_me.LOCATION.apply(lambda x: x not in compartments))]
     #     err = False
     #     if len(set(temp.HGNC_ID).difference(psim_gold.HGNC_ID)) > 0:

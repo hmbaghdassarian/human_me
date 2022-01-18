@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 # coding: utf-8
+from typing import List, Tuple
 
 from human_me.utils import machinery as mach
 from human_me.utils import metabolites as metab
@@ -10,13 +11,23 @@ from human_me.core.reaction import ExpressionReaction
 from human_me.core.macromolecules.RNA import RNA_fragment, pre_mRNA, mRNA
 
 
-class Express_mRNA:
-    def __init__(self, gene_info):
+class ExpressMrna:
+    '''Gene-specific mRNA expression.'''
+
+    def __init__(self, gene_info) -> None:
+        """Init method for ExpressMrna
+
+        Parameters
+        ----------
+        gene_info : gene_information.GeneInformation
+            GeneInformation object of gene to be expressed
+        """
         self.reactions = []
         self.lariat = None
         self.gene_info = gene_info
 
-    def transcribe_premrna(self):
+    def transcribe_premrna(self) -> None:
+        """Elongation reaction."""
         # elongation reaction
         # https://www.google.com/search?q=rna+polymerization+reaction&source=lnms&tbm=isch&sa=X&ved=2ahUKEwiN_73Vk7rqAhXOsJ4KHW5lB4UQ_AUoAXoECA4QAw&biw=1920&bih=1001#imgrc=w7XH4mHmJglCuM
 
@@ -24,7 +35,7 @@ class Express_mRNA:
         self.transcript_elongation = self.premrna.synthesize(id_=self.gene_info.hgnc_id + '_TRANSCRIPTION_ELONGATION')
         self.reactions.append(self.transcript_elongation)
 
-    def process_mrna(self):
+    def process_mrna(self) -> None:
         """Processing includes capping, splicing, and polyA tail."""
         # combine in to one to not create too many reactions (capping itself is 4 reactions)
         # make mrna_n metabolite
@@ -59,7 +70,7 @@ class Express_mRNA:
             #             processed_elements[element] += (self.polyA_length* metab.seq_element_map['A'][element]) # polyA tail
             processed_elements[element] += metab.gp[element]  # 5' cap rxn2 - addition of Gp
 
-        # 5' cap 
+        # 5' cap
         processed_elements['P'] -= 1  # rxn 1: lost of third triphosphate by RTPase
         processed_elements['O'] -= 4  # rxn 1: loss of third triophosphate by RTPase
         processed_elements['C'] += 2  # rxn 3-4: methyltransferase - cap0 and cap1 structure
@@ -95,22 +106,23 @@ class Express_mRNA:
             lariat_degradation.gene_reaction_rule = mach.lm_rule
             if list(lariat_degradation.compartments) != ['n']:
                 raise ValueError('Lariat degradation must be confined to nuclear compartment')
-            else:
-                self.reactions.append(lariat_degradation)
+            self.reactions.append(lariat_degradation)
         else:
             lariat_degradation = None
 
         transcript_processing.add_metabolites(rxn)
         transcript_processing.gene_reaction_rule = ' and '.join(mach.polyA + mach.capping + mach.spliceosome)
+
         if len(transcript_processing.check_mass_balance()) > 0:
             raise ValueError('Transcript processing for ' + self.gene_info.hgnc_id + ' is unbalanced')
-        elif list(transcript_processing.compartments) != ['n']:
+        if list(transcript_processing.compartments) != ['n']:
             raise ValueError('Transcript processing must be confined to nuclear compartment')
-        else:
-            self.transcript_processing = transcript_processing
-            self.reactions.append(transcript_processing)
 
-    def export_mrna(self):
+        self.transcript_processing = transcript_processing
+        self.reactions.append(transcript_processing)
+
+    def export_mrna(self) -> None:
+        """Nuclear export of mRNA."""
         # make the cytosolic mrna metabolite
         self.mrna_c = self.mrna_n.change_compartment('c')
 
@@ -131,16 +143,21 @@ class Express_mRNA:
 
         if len(mrna_export.check_mass_balance()) > 0:
             raise ValueError('mRNA export for ' + self.gene_info.hgnc_id + ' is unbalanced')
-        else:
-            self.mrna_export = mrna_export
-            self.reactions.append(mrna_export)
 
-    def degrade_mrna(self, decapping=True, three_to_five=False):
-        """
+        self.mrna_export = mrna_export
+        self.reactions.append(mrna_export)
 
-        Right now, only one of the two degradation pathways is included. We assume the 5' to 3' pathway is present.
+    def degrade_mrna(self, decapping: bool = True, three_to_five: bool = False) -> None:
+        """Currently, only one of the two degradation pathways is included. We assume the 5' to 3' pathway is present.
         This is simply to limit the total number of reactions
 
+
+        Parameters
+        ----------
+        decapping : bool, optional
+            whether mRNA needs to have a decapping reaction prior to degradation, by default True
+        three_to_five : bool, optional
+            whether the 5' to 3' (False) or 3' to 5' (True) mRNA degradation pathway is used, by default False
         """
 
         rxn = self.mrna_c.exonucleolytic_degradation(reaction_name='', balanced=False)
@@ -174,10 +191,10 @@ class Express_mRNA:
 
             if len(transcript_degradation_1.check_mass_balance()) > 0:
                 raise ValueError('3 primed to 5 primed degradation for ' + self.gene_info.hgnc_id + ' is unbalanced')
-            elif list(transcript_degradation_1.compartments) != ['c']:
+            if list(transcript_degradation_1.compartments) != ['c']:
                 raise ValueError('Transcript degradation must be confined to cytosolic compartment')
-            else:
-                self.reactions.append(transcript_degradation_1)
+
+            self.reactions.append(transcript_degradation_1)
         if decapping:
             transcript_degradation_2_decapping = ExpressionReaction(
                 self.gene_info.hgnc_id + "_DECAPPING_mRNA_DEGRADATIONc",
@@ -195,18 +212,18 @@ class Express_mRNA:
             transcript_degradation_2_decapping.gene_reaction_rule = mach.decapping_rule
             if len(transcript_degradation_2_decapping.check_mass_balance()) > 0:
                 raise ValueError('Decapping degradation for ' + self.gene_info.hgnc_id + ' is unbalanced')
-            elif list(transcript_degradation_2_decapping.compartments) != ['c']:
+            if list(transcript_degradation_2_decapping.compartments) != ['c']:
                 raise ValueError('Transcript degradation must be confined to cytosolic compartment')
-            else:
-                self.reactions.append(transcript_degradation_2_decapping)
+            self.reactions.append(transcript_degradation_2_decapping)
 
     def compress_mrna_module(self):
+        """Condense elongation, processing, and nuclear export reactions into a single reaction."""
         rxns_to_remove = [self.transcript_elongation, self.transcript_processing, self.mrna_export]
         rxn = dict()
         rxn_map = dict()
         for r in rxns_to_remove:
             for met, coeff in r.metabolites.items():
-                if met.id in rxn.keys():
+                if met.id in rxn:
                     rxn[met.id] += coeff
                 else:
                     rxn[met.id] = coeff
@@ -229,19 +246,26 @@ class Express_mRNA:
         self.reactions.append(transcription)
 
 
-# In[3]:
+def get_mrna_expression_reactions(gene_info, compress_mrna: bool = False):
+    """Generates reactions and macromolecules associated with transcription of a gene.
 
+    Parameters
+    ----------
+    gene_info : GeneInformation
+        representation of gene to be expressed
+    compress_mrna : bool, optional
+        whether to condense elongation, processing, and nuclear export reactions into a single reaction, by default False
 
-def get_mrna_expression_reactions(gene_info, compress_mrna=False):
+    Returns
+    -------
+    em.reactions : List[ExpressionReaction]
+        the reactions to express em.mrna_c
+    em.mrna_c : mRNA
+        the final, cytosolic mRNA transcript
+    em.mrna_deg_proxy : core.macromolecules.macromolecule.Proxy
+        proxy metabolite generated in mRNA degradation reaction for coupling
     """
-    gene_info is an object of the GeneInformation class. Returns all reactions associated with mRNA
-    expression and necessary metabolites for other modules in the ME model. 
-    
-    compress_mrna is a boolean. If True, will make the transcription, processing, and export reactions one 
-    single reaction
-    
-    """
-    em = Express_mRNA(gene_info)
+    em = ExpressMrna(gene_info)
     em.transcribe_premrna()
     em.process_mrna()
     em.export_mrna()

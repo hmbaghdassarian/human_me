@@ -1,17 +1,36 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[4]:
+from typing import Tuple
 
+from human_me.core.macromolecules.macromolecule import Proxy
+from human_me.core.macromolecules.protein import Protein
+from human_me.core.reaction import ProteinExpressionReaction
+from human_me.expression.build_trna_expression_reactions import (
+    charged_trna_map, modified_trna_transcript_c)
 from human_me.utils import machinery as mach
 from human_me.utils import metabolites as metab
-from human_me.core.reaction import ProteinExpressionReaction
-from human_me.expression.build_trna_expression_reactions import modified_trna_transcript_c, charged_trna_map
-
-from human_me.core.macromolecules.protein import Protein
 
 
-def translate_protein_cytosolic(gene_info, mrna_transcript_c, mrna_deg_proxy):
+def translate_protein_cytosolic(gene_info, mrna_transcript_c, mrna_deg_proxy: Proxy) -> Tuple[ProteinExpressionReaction, Protein]:
+    """Generate cytosolic translation reaction
+
+    Parameters
+    ----------
+    gene_info : GeneInformation
+        representation of gene to be expressed
+    mrna_transcript_c : mRNA
+        the final, cytosolic mRNA transcript
+    mrna_deg_proxy : Proxy
+        proxy metabolite generated in mRNA degradation reaction for coupling
+
+    Returns
+    -------
+    translation_elongation: ProteinExpressionReaction
+        translation elongation reaction
+    unfolded_protein_c: ProteinExpressionReaction
+        cytosolic translation product
+    """
     # peptide bond formation: https://d1j63owfs0b5j3.cloudfront.net/pop-quiz/answerImage/Amino-Acid-1-popquiz.png
     # tRNA amino acide release: https://rnajournal.cshlp.org/content/14/8/1526/F1.expansion.html
 

@@ -1,6 +1,9 @@
 #!/usr/bin/env python
 # coding: utf-8
+
+from typing import Dict, List, Optional, Tuple
 import warnings
+
 import pandas as pd
 
 from human_me.utils.load_environmental_variables import build_files_path
@@ -12,27 +15,31 @@ from human_me.core.reaction import ExpressionReaction
 
 
 # -To change to individual tRNA molecules rather than a generic one, start with the charge_trna function and also change the trna_biogenesis function
-# 
+#
 # -To add modifications, will need to change the allowed_trna_modifications dictionary in utils, and edit the following functions: 1) modify_trna_nuclear, 2) modify_trna_cytosolic, 3) degrade_trna
 
 # # TRNA Information Class
 
-# In[2]:
+class TrnaInformation:
+    def __init__(self, maturetrna_sequence: str, id_: str, three_trailer_seq: Optional[str] = None, five_leader_seq: Optional[str] = None,
+                 modifications: Optional[Dict[str, int]] = None, intron_sequences: Optional[List[str]] = None):
+        """init method for trna information class
 
-
-class tRNA_Information:
-    def __init__(self, maturetrna_sequence, id_, three_trailer_seq=None, five_leader_seq=None,
-                 modifications=None, intron_sequences: list = None):
-        """
-        1) Mature trna sequence is the RNA sequence of the final processed tRNA, represented as a string from 5'
-        to 3' end, including CCA.
-        2) id_ should be map to isodecoder somehow
-        2-3) five_leader_seq and three_trailer_seq are the RNA sequences of the 5' leader and 3' trailer sequences that are
-        excised. Represented as a string from 5' to 3' end.
-        5) Modifications is a dictionary with keys as possible modifications (string) and values as the
-        number of modifications that occur (integer). See allowed_trna_modifications for all trna modifications
-        incorporated in this model.
-        6) Intron sequences is a list of RNA sequence corresponding to each intron.
+        Parameters
+        ----------
+        maturetrna_sequence : str
+            RNA sequence of the final processed tRNA, represented as a string from 5' to 3' end, including CCA.
+        id_ : str
+            map to isodecoder somehow
+        three_trailer_seq : Optional[str], optional
+            RNA sequences of the 3' trailer sequence that are excised. Represented as a string from 5' to 3' end, by default None
+        five_leader_seq : Optional[str], optional
+            RNA sequences of the 5' leader sequence that are excised. Represented as a string from 5' to 3' end, by default None
+        modifications : Optional[Dict[str, int]], optional
+            keys as possible modifications (string) and values as the number of modifications that occur (integer). 
+            See allowed_trna_modifications for all trna modifications incorporated in this model, by default None
+        intron_sequences : Optional[List[str]], optional
+            a list of RNA sequences corresponding to each intron, by default None
         """
 
         if maturetrna_sequence[-3:] != 'CCA':
@@ -51,7 +58,7 @@ class tRNA_Information:
         if len(set(modifications.keys()).difference(params.allowed_trna_modifications)) > 0:
             warning_ = 'At least one of the listed modifications is not currently considered in this model'
             warnings.warn(warning_)
-            modifications = {k: v for k, v in modifications.items() if k in params.allowed_trna_modifications.keys()}
+            modifications = {k: v for k, v in modifications.items() if k in params.allowed_trna_modifications}
 
         if intron_sequences is not None and type(intron_sequences) != list:
             raise ValueError('intron_sequences must be a list of sequences, one for each intron')
@@ -76,7 +83,7 @@ class tRNA_Information:
             self.pretrna_sequence += self.three_trailer_seq
 
         pretrna_base_counts, trna_base_counts = dict(), dict()
-        for base_letter in metab.seq_element_map.keys():
+        for base_letter in metab.seq_element_map:
             pretrna_base_counts[base_letter] = self.pretrna_sequence.count(base_letter)
             trna_base_counts[base_letter] = self.maturetrna_sequence.count(base_letter)
         for k, v in trna_base_counts.items():
@@ -88,12 +95,8 @@ class tRNA_Information:
 
 
 # # Reactions
-
-# In[3]:
-
-
 class ExpressTrna:
-    def __init__(self, trna_info):
+    def __init__(self, trna_info: TrnaInformation):
         self.trna_info = trna_info
         self.reactions = []
 
@@ -105,11 +108,9 @@ class ExpressTrna:
 
     def process_trna(self):
         """
-
         This reaction processes pre-tRNA into mature tRNA in the nucleus.
         This includes: CCA synthesis, 5' leader and 3' trailer cleavage (and degradation as separate reactions),
         and splicing (and intron degradation as a separate reactions for each intron).
-
         """
 
         rxn = {self.pretrna_n: -1}
@@ -164,9 +165,9 @@ class ExpressTrna:
             trna_processing_machinery += mach.trna_splicing_machinery
 
             # trna_introns_n = dict()
-            for i in range(len(self.trna_info.intron_sequences)):
+            for i, intron_seq in enumerate(self.trna_info.intron_sequences):
                 trna_intron_n = RNA_fragment(metabolite_name=self.trna_info.id + '_' + str(i),
-                                             seq=self.trna_info.intron_sequences[i], fragment_type='trna_intron',
+                                             seq=intron_seq, fragment_type='trna_intron',
                                              compartment='n', triphosphate=False)
 
                 rxn[trna_intron_n] = 1
@@ -184,10 +185,10 @@ class ExpressTrna:
 
         if len(trna_processing.check_mass_balance()) > 0:
             raise ValueError('tRNA processing for ' + self.trna_info.id + ' is unbalanced')
-        elif list(trna_processing.compartments) != ['n']:
+        if list(trna_processing.compartments) != ['n']:
             raise ValueError('tRNA processing must be confined to nuclear compartment')
-        else:
-            self.reactions.append(trna_processing)
+
+        self.reactions.append(trna_processing)
 
     def modify_trna_nuclear(self):
         # TODO: trna modifications
@@ -217,15 +218,16 @@ class ExpressTrna:
         self.reactions.append(trna_primary_export)
 
     def modify_trna_cytosolic(self):
-        """Add to the if statement in the future. This is for cytosolic modifications"""
+        """This is for cytosolic modifications"""
         if len(self.trna_info.modifications) > 0:
+            # TODO: add trna modifications
             raise ValueError('Modifications are not currently considered')
         else:
             # trna_modifications_cytosolic = None
             self.modified_trna_c = self.trna_c
 
     def degrade_trna(self):
-        # currently built on the assumption that there are no post-transcriptional modifications on trna 
+        # currently built on the assumption that there are no post-transcriptional modifications on trna
 
         # if self.trna_info.five_leader_seq is not None:  # if there is a 5' leader sequence
         #     tp = False
@@ -240,9 +242,7 @@ class ExpressTrna:
     def charge_trna(self):
         """tRNA charging reaction combines the activation and charging steps into one reaction."""
 
-        # in the future, this should take into account anticodon sequence, which should be in
-        # trna_info id
-
+        # TODO: in the future, this should take into account anticodon sequence, which should be in trna_info id
         # now, since just a generic charging reaction, will create one for each amino acid (for loop)
 
         # diagram: https://www.researchgate.net/figure/The-reaction-scheme-for-the-two-steps-of-aminoacylation-reaction-at-the-active-site-of_fig4_231225238
@@ -281,20 +281,29 @@ class ExpressTrna:
 
             if len(trna_charging.check_mass_balance()) > 0:
                 raise ValueError('tRNA charging for ' + self.trna_info.id + '_' + code + ' is unbalanced')
-            elif list(trna_charging.compartments) != ['c']:
+            if list(trna_charging.compartments) != ['c']:
                 raise ValueError('tRNA charging must be confined to cytosolic compartment')
-            else:
-                trna_charging_reactions.append(trna_charging)
-                charged_trna_metabolites.append(charged_trna_c)
+
+            trna_charging_reactions.append(trna_charging)
+            charged_trna_metabolites.append(charged_trna_c)
 
         self.reactions += trna_charging_reactions
         self.charged_trna_metabolites = charged_trna_metabolites
 
 
-# In[4]:
+def trna_biogenesis(trna_info: TrnaInformation) -> Tuple[List[ExpressionReaction], List[tRNA]]:
+    """trna biogenesis reactions
 
+    Parameters
+    ----------
+    trna_info : TrnaInformation
+        Associated sequence information for trna
 
-def trna_biogenesis(trna_info):
+    Returns
+    -------
+    Tuple[List[ExpressionReaction], List[tRNA]]
+        Resultant reactions and tRNA products
+    """
     tb = ExpressTrna(trna_info)
     tb.transcribe_pretrna()
     tb.process_trna()
@@ -308,16 +317,13 @@ def trna_biogenesis(trna_info):
 
 
 # # Consensus Sequences
-# 
+#
 # positionally-independent (position won't effect .elements of cobra.Metabolite in ExpressionReaction)
-
-# In[5]:
-
 
 def get_base_frequency(seq_col, t_length):
     base_counts = {'T': 0, 'C': 0, 'G': 0, 'A': 0}
     for seq in trna_data[seq_col]:
-        for base in base_counts.keys():
+        for base in base_counts:
             base_counts[base] += seq.count(base)
     total = sum(base_counts.values())
     base_frequencies = {base: (counts / total) for base, counts in base_counts.items()}
@@ -370,12 +376,9 @@ for base in base_counts.keys():
 mature_seq += 'CCA'
 
 # # Generate reactions
-
-# In[6]:
-
-
-trna_info = tRNA_Information(maturetrna_sequence=mature_seq, id_='generic', three_trailer_seq=trailer_seq,
-                             five_leader_seq=leader_seq, modifications={},
-                             intron_sequences=None)
+# TODO: in the future, this should be generalizable to more tRNA modifications, sequences, and user inputs
+trna_info = TrnaInformation(maturetrna_sequence=mature_seq, id_='generic', three_trailer_seq=trailer_seq,
+                            five_leader_seq=leader_seq, modifications={},
+                            intron_sequences=None)
 trna_biogenesis_reactions, charged_trna_metabolites, modified_trna_transcript_c = trna_biogenesis(trna_info)
 charged_trna_map = {v.id.split('_')[2]: v for v in charged_trna_metabolites}

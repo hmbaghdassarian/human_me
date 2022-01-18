@@ -1,17 +1,21 @@
-import os, sys
+import logging
+import os
+import sys
+
 import cobra
 import numpy as np
 import pandas as pd
 from sympy.parsing.sympy_parser import parse_expr
 
-from human_me.utils.load_environmental_variables import processed_data_path, build_files_path
+from human_me.utils.load_environmental_variables import (build_files_path,
+                                                         processed_data_path)
 
-import logging
 logging.basicConfig()
 logger = logging.getLogger(cobra.__name__)
 logger.setLevel(logging.CRITICAL)
 
 class HiddenPrints:
+    '''Supress package print messages.'''
     def __enter__(self):
         self._original_stdout = sys.stdout
         sys.stdout = open(os.devnull, 'w')
@@ -40,35 +44,35 @@ allowed_ptms = {'dsb': 'disulfide bond formation', 'gpi': 'GPI Anchor', 'og': 'O
 
 amino_acids = ['A', 'R', 'N', 'D', 'C', 'E', 'Q', 'G', 'H', 'I', 'L', 'K', 'M', 'F', 'P', 'S', 'T', 'W', 'Y', 'V']
 
-allowed_trna_modifications = {}
+allowed_trna_modifications = {} 
 # number_BiP = len(gene_info.protein_seq)/40
 
 # universal variables and inputs
 
-rate_intron = 10 / 67000  # 10 introns / 67 kbp (https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5199132/)
+RATE_INTRON = 10 / 67000  # 10 introns / 67 kbp (https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5199132/)
 # L_polyA_n = 250 # https://www.nature.com/articles/s41592-019-0503-y
-n_ub = 4  # see this - no. of ubiquitins to add to protein
+N_UB = 4  # see this - no. of ubiquitins to add to protein
 
-transport_translocation_atp_cost = 0.5  # 1 ATP/2 residues
-proteolysis_translocation_atp_cost = 0.5  # 1 ATP/2 residues
+TRANSPORT_TRANSLOCATION_ATP_COST = 0.5  # 1 ATP/2 residues
+PROTEOLYSIS_TRANSLOCATION_ATP_COST = 0.5  # 1 ATP/2 residues
 
-ptt_length = 160  # amino acid length greater than which co-translatioanl translocatoin occurs rather than
+PTT_LENGTH = 160  # amino acid length greater than which co-translatioanl translocatoin occurs rather than
 # post-translational
-nuclear_diffusion_limit = 40  # 40 kDA and less proteins diffuse through nucleus
-L_sp = 22  # secretory pathway signal peptide degradation
-Kv = 0.7  # secretory pathway vesicle coat coefficients
+NUCLEAR_DIFFUSION_LIMIT = 40  # 40 kDA and less proteins diffuse through nucleus
+L_SP = 22  # secretory pathway signal peptide degradation
+K_V = 0.7  # secretory pathway vesicle coat coefficients
 
-membrane_diffusion_limit = 504  # 504 Da includes ATP, uncharged molecules at this diffusion limit are passive, no dummy
+MEMBRANE_DIFFUSION_LIMIT = 504  # 504 Da includes ATP, uncharged molecules at this diffusion limit are passive, no dummy
 
 # coupling parameters
 
 # enzyme
-keff_median = 3.983 * 3600  # units: hr^-1 (3.983 in s^-1)
+KEFF_MEDIAN = 3.983 * 3600  # units: hr^-1 (3.983 in s^-1)
 
 # central dogma
-alpha_m_median = 0.06108233261605428  # units: hours (Gregersen et al ) median value
-alpha_p_median = 0.019808138247250934  # units: hours ^-1 (Cambridge et al 2011 + Li et al 2021) median value
-ptr_median = 65162.83940608428  # (Eraslan et al 2019) median value
+ALPHA_M_MEDIAN = 0.06108233261605428  # units: hours (Gregersen et al ) median value
+ALPHA_P_MEDIAN = 0.019808138247250934  # units: hours ^-1 (Cambridge et al 2011 + Li et al 2021) median value
+PTR_MEDIAN = 65162.83940608428  # (Eraslan et al 2019) median value
 
 ptr = pd.read_csv(build_files_path + 'PTR_Gagneur_processed.tsv', sep='\t', index_col=0)
 # don't groupby hgnc ID median, because if tissue option is used, can include unmapped ids in calculation
@@ -82,19 +86,19 @@ alpha_m = pd.read_csv(build_files_path + 'Gregersen_mrna_turnover_processed.tsv'
 alpha_m = alpha_m.groupby(alpha_m.HGNC_ID).median().median_turnover  # have true median stored above
 
 turnover = {'alpha_m': alpha_m, 'alpha_p': alpha_p,
-            'alpha_m_median': alpha_m_median, 'alpha_p_median': alpha_p_median}
+            'alpha_m_median': ALPHA_M_MEDIAN, 'alpha_p_median': ALPHA_P_MEDIAN}
 
 # ribosome
-rrna_degradation_constant = np.log(2) / 72  # bioid 108025
-single_ubiquitin_sequence = 'MQIFVKTLTGKTITLEVEPSDTIENVKAKIQDKEGIPPDQQRLIFAGKQLEDGRTLSDYNIQKESTLHLVLRLRGG'
+RNA_DEGRADATION_CONSTANT = np.log(2) / 72  # bioid 108025
+SINGLE_UB_SEQ = 'MQIFVKTLTGKTITLEVEPSDTIENVKAKIQDKEGIPPDQQRLIFAGKQLEDGRTLSDYNIQKESTLHLVLRLRGG'
 # ribosomal_degradation_rate = np.log(2)/300 #bioid 110053 # unused
 
 # biomass
 
 # constant fractions
-dna_frac = 0.014
-carb_frac = 0.071
-lipid_frac = 0.097
+DNA_FRAC = 0.014
+CARB_FRAC = 0.071
+LIPID_FRAC = 0.097
 # other_frac = 0.054
 
-unmodeled_protein_frac = 1 - 0.12041534186261499
+UNMODELED_PROTEIN_FRAC = 1 - 0.12041534186261499

@@ -64,18 +64,18 @@ ccr4_not = pd.read_csv(build_files_path + 'machinery/CCR4_NOT.csv', index_col=No
 deadenylation_machinery = {'CCR4_NOT Deadenylation': ccr4_not.loc[:, 'HGNC ID (gene)'].tolist(),
                            'PARN Deadenylation': ['HGNC:8609'],
                            'PABP Deadenylation': ['HGNC:20074', 'HGNC:29991', 'HGNC:8554']}
-deadenylation_machinery = [item for sublist in [v for v in deadenylation_machinery.values()] for item in sublist]
+deadenylation_machinery = [item for sublist in list(deadenylation_machinery.values()) for item in sublist]
 
 mrna_degradation_machinery_1 = {"Exosome": exosome.loc[:, 'HGNC ID (gene)'].tolist(),
                                 'Cap_Degradation': ['HGNC:29812']}
-mrna_degradation_machinery_1 = [item for sublist in [v for v in mrna_degradation_machinery_1.values()] for item in
+mrna_degradation_machinery_1 = [item for sublist in list(mrna_degradation_machinery_1.values()) for item in
                                 sublist]
 XRN1 = ['HGNC:30654']
 decapping_degradation_machinery = {'LSM1-7 Complex': ['HGNC:20472', 'HGNC:13940', 'HGNC:17874', 'HGNC:17259',
                                                       'HGNC:17162', 'HGNC:17017', 'HGNC:20470'],
                                    'Decapping': ['HGNC:18714', 'HGNC:24451', 'HGNC:24452', 'HGNC:17157'],
                                    "5' Exonuclease": XRN1}
-decapping_degradation_machinery = [item for sublist in [v for v in decapping_degradation_machinery.values()] for item in
+decapping_degradation_machinery = [item for sublist in list(decapping_degradation_machinery.values()) for item in
                                    sublist]
 degradation_rule1 = ' and '.join(deadenylation_machinery + mrna_degradation_machinery_1)
 decapping_rule = ' and '.join(deadenylation_machinery + decapping_degradation_machinery)
@@ -145,9 +145,9 @@ seq_synthetase_map = {
     'K': trna_synthetase[trna_synthetase['Approved name'] == 'lysyl-tRNA synthetase 1']['HGNC ID (gene)'].tolist(),
     'M': trna_synthetase[trna_synthetase['Approved name'] == 'methionyl-tRNA synthetase 1']['HGNC ID (gene)'].tolist(),
     'F': trna_synthetase[trna_synthetase['Approved name'] == 'phenylalanyl-tRNA synthetase subunit alpha'][
-             'HGNC ID (gene)'].tolist() +
-         trna_synthetase[trna_synthetase['Approved name'] == 'phenylalanyl-tRNA synthetase subunit beta'][
-             'HGNC ID (gene)'].tolist(),
+        'HGNC ID (gene)'].tolist() +
+    trna_synthetase[trna_synthetase['Approved name'] == 'phenylalanyl-tRNA synthetase subunit beta'][
+        'HGNC ID (gene)'].tolist(),
     'P': trna_synthetase[trna_synthetase['Approved name'] == 'glutamyl-prolyl-tRNA synthetase 1'][
         'HGNC ID (gene)'].tolist(),
     'S': trna_synthetase[trna_synthetase['Approved name'] == 'seryl-tRNA synthetase 1']['HGNC ID (gene)'].tolist(),
@@ -243,8 +243,6 @@ eif3 = pd.read_csv(build_files_path + 'machinery/eif3.csv', index_col=None, skip
 eif4f = ['HGNC:3282', 'HGNC:3284', 'HGNC:3287', 'HGNC:3296']
 eif5 = ['HGNC:3299', 'HGNC:30793']
 eifs = eif1 + eif2 + eif3 + eif4f + eif5 + ['HGNC:8554']
-
-# In[9]:
 
 
 # secretory pathway

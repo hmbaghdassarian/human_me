@@ -1,48 +1,41 @@
 #!/usr/bin/env python
 # coding: utf-8
+import copy
+from collections import defaultdict
+from operator import attrgetter
+from typing import Dict, List, Optional, SupportsFloat, Union
 
 import cobra
-
-import sympy
-from operator import attrgetter
-from collections import defaultdict
 import numpy as np
+import sympy
 from six import iteritems
-import copy
 
-from human_me.utils import parameters as params
 from human_me.utils import machinery as mach
+from human_me.utils import parameters as params
 
 
 class ME_Reaction(cobra.Reaction):
-    """Inherited from cobra.Reaction. Allows stochiometric coefficient to be a function of mu.
-
-    """
+    """Allows stochiometric coefficient to be a function of mu."""
 
     def __init__(self, id, name='', subsystem='', lower_bound=0.0, upper_bound=None):
-
-        """
-        Helps distinguish between these reactions, which have mu in bounds, and coupling reactions, which
-        have mu in stochiometric coefficient.
-        """
+        """Helps distinguish between these reactions, which have mu in bounds, and coupling reactions, which
+        have mu in stochiometric coefficient."""
 
         super().__init__(id, name, subsystem, lower_bound, upper_bound)
         self.coupled_metabolites = dict()
         self._protein_deg_proxy = False
 
-    def _couple(self, metabolite, type):
-        """Add coupling coefficient and associated metadata to reaction for a coupled metabolite
+    def _couple(self, metabolite, type: str):
+        """Add coupling coefficient and associated metadata to reaction for a coupled metabolite.
 
         Parameters
         ----------
-        metabolite: macromolecules.macromolecule.Macromolecule
+        metabolite : Macromolecule
             a macromolecule with an associated coupling coefficient
-        type: str
+        type : str
             the type of reactions that are being coupled (one of ['mrna_degradation', 'mrna_formation', 'catalysis',
             'enzyme_degradation'])
-
         """
-
         if metabolite.coupling_coefficient is None:
             raise ValueError(
                 'Cannot add coupling metadata to reaction for a metabolite without coupling coefficient metadata')
@@ -76,16 +69,16 @@ class ME_Reaction(cobra.Reaction):
         else:
             self.coupled_metabolites[metabolite] = type
 
-    def couple(self, metabolites, types):
-        """Add coupling coefficient and associated metadata to reaction for a coupled metabolites
+    def couple(self, metabolites, types: Union[List[str], str]):
+        """Add coupling coefficient and associated metadata to reaction for a coupled metabolite.
 
         Parameters
         ----------
-        metabolites: macromolecules.macromolecule.Macromolecule or list
-            list of macromolecules or single macromolecule with associated coupling coefficients
-        types: str or list
-            the type of reactions that are being coupled (options: ['mrna_degradation', 'mrna_formation', 'catalysis'])
-
+        metabolites : Union[List[Macromolecule], Macromolecule]
+            macromolecules with an associated coupling coefficient
+        types : Union[List[str], str]
+            the type of reactions that are being coupled (one of ['mrna_degradation', 'mrna_formation', 'catalysis',
+            'enzyme_degradation'])
         """
 
         if isinstance(metabolites, list):
@@ -94,12 +87,13 @@ class ME_Reaction(cobra.Reaction):
         else:
             self._couple(metabolites, types)
 
-    def _check_me_bounds(self, lb, ub):
+    @staticmethod
+    def _check_me_bounds(lb, ub):
         if isinstance(lb, sympy.Expr) or isinstance(ub, sympy.Expr):
             raise ValueError('Reaction bounds can only be a function of mu for reactions of type biomass')
 
-    def build_reaction_string(self, use_metabolite_names=False):
-        """Generate a human readable reaction string"""
+    def build_reaction_string(self, use_metabolite_names: bool = False):
+        """Generate a human readable reaction string."""
 
         def format(number):
             return "" if number == 1 else str(number).rstrip(".") + " "
@@ -139,22 +133,26 @@ class ME_Reaction(cobra.Reaction):
         mmap = {m.id: m for m in self.metabolites}
         cm = dict()
         for md, type_ in self.coupled_metabolites.items():
-            #             mmap[md.id].coupling_coefficient = md.coupling_coefficient
             cm[mmap[md.id]] = type_
         self.coupled_metabolites = cm
 
-    def check_mass_balance(self, tol=0, sympy_tol=1e-15):
+    def check_mass_balance(self, tol: SupportsFloat = 0, sympy_tol: SupportsFloat = 1e-15) -> Dict[str, float]:
         """Compute mass and charge balance for the reaction
 
-        returns a dict of {element: amount} for unbalanced elements.
-        "charge" is treated as an element in this dict
-        This should be empty for balanced reactions.
-        
-        sympy_tol: float
-            sympy.expr conversions may result in some error, account for this when getting rid of the 
-            coupling coefficient values
-        """
+        Parameters
+        ----------
+        tol : SupportsFloat, optional
+            precision tolerance for categorizing an element as unbalanced, by default 0
+        sympy_tol : SupportsFloat, optional
+            sympy.Expr conversions may result in some error, account for this when getting rid of the 
+            coupling coefficient value, by default 1e-15
 
+        Returns
+        -------
+        Dict[str, float]
+            dict of {element: amount} for unbalanced elements. "charge" is treated as an element in this dict. 
+            This should be empty for balanced reactions.
+        """
         reaction_element_dict = defaultdict(int)
         mmap = {m.id: m for m in self._metabolites}
 
@@ -182,8 +180,17 @@ class ME_Reaction(cobra.Reaction):
 
         return {k: v for k, v in iteritems(reaction_element_dict) if abs(v) > tol}
 
-    def replace_coefficient_mu(self, mu_val, inplace=True):
-        if not (mu_val > 0):
+    def replace_coefficient_mu(self, mu_val: SupportsFloat, inplace: bool = True):
+        """Replace mu coefficients with an actual value
+
+        Parameters
+        ----------
+        mu_val : SupportsFloat
+            value to replace mu with
+        inplace : bool, optional
+            whether to update value in place or return a copy of the reaction with updated value (False), by default True
+        """
+        if not mu_val > 0:
             raise ValueError('Mu must be > 0')
 
         new_rxn = self.metabolites.copy()
@@ -224,7 +231,13 @@ class ME_Reaction(cobra.Reaction):
         return products_
 
     def _add_protein_deg_proxy(self, protein_deg_proxy):
-        """Proxy metabolite for protein degradation"""
+        """Proxy metabolite for protein degradation
+
+        Parameters
+        ----------
+        protein_deg_proxy : Proxy
+            proxy metabolite for coupling protein degradation 
+        """
         if not protein_deg_proxy.type == 'proxy':
             raise ValueError('Expected proxy macromolecule')
         if self._protein_deg_proxy:
@@ -236,9 +249,9 @@ class ME_Reaction(cobra.Reaction):
 
 
 class MetabolicReaction(ME_Reaction):
-    """Inherited from ME_Reaction, specifies the metabolic reactions in the model"""
+    """Inherited from ME_Reaction, specifies the metabolic reactions in the model."""
 
-    def __init__(self, id, cobra_id, name='', subsystem='', lower_bound=0.0, upper_bound=None):
+    def __init__(self, id, cobra_id: str, name='', subsystem='', lower_bound=0.0, upper_bound=None):
         """cobra_id specifies the original reaction name in the M-Model"""
 
         super().__init__(id, name, subsystem, lower_bound, upper_bound)
@@ -248,27 +261,37 @@ class MetabolicReaction(ME_Reaction):
 class ExpressionReaction(ME_Reaction):
     """Inherited from ME_Reaction, specifies the expression reactions in the model"""
 
-    def __init__(self, id, subsystem, name='', lower_bound=0.0, upper_bound=None,
-                 hgnc_id=None,
-                 synthesis=False, synthesis_type=None, sink=False, sink_type=None,
-                 ubiquitin_biogenesis=False, ribosome_biogenesis=False, trna_charging=False):
-        """
+    def __init__(self, id: str, subsystem: str, name: str = '', lower_bound: SupportsFloat = 0.0, upper_bound: Optional[SupportsFloat] = None,
+                 hgnc_id: Optional[str] = None,
+                 synthesis: bool = False, synthesis_type: Optional[str] = None, sink: bool = False, sink_type: Optional[str] = None,
+                 ubiquitin_biogenesis: bool = False, ribosome_biogenesis: bool = False, trna_charging: bool = False):
+        """Initialize the Expression reaction
 
         Parameters
         ----------
-        subsystem: str
-            one of 'tRNA_Biogenesis', 'rRNA_expression', 'mRNA_expression', 'Protein_Expression', 'Protein_Degradation', 'Complex_Formation', 'Complex_Degradation'
-        synthesis: bool
-            whether the reaction represents the "main" synthesis/production for the macromolecule
-            intended for use with genes (reactions with an associated hgnc id, and complexes)
-        synthesis_type: str
-            one of ['mRNA', 'protein', 'complex']
+        id : str
+            reaction id
+        subsystem : str
+            one of ['tRNA_Biogenesis', 'rRNA_expression', 'mRNA_expression', 'Protein_Expression', 'Protein_Degradation', 'Complex_Formation', 'Complex_Degradation']
+        name : str, optional
+            reaction name, by default ''
+        lower_bound : SupportsFloat, optional
+            lower flux bound constraint, by default 0.0
+        upper_bound : Optional[SupportsFloat], optional
+            upper flux bound constraint, by default None
+        hgnc_id : Optional[str], optional
+            HGNC ID of gene being synthesized, by default None
+        synthesis : bool, optional
+            whether the reaction represents the "main" synthesis/production for the macromolecule (used for appropriate mapping of coupling)
+            intended for use with genes (reactions with an associated hgnc id, and complexes), by default False
+        synthesis_type : Optional[str], optional
+            one of ['mRNA', 'protein', 'complex'], by default None
             if synthesis is True, the type of macromolecule being synthesized should also be specified
                 *for mRNA, the synthesis reaction is coupled to its respective protein translation reaction
                 *for proteins and complexes, the synthesis reaction is the final reaction producing the enzyme which
                 will be coupled to the metabolic catalysis reaction
-        sink: bool
-            whether the reaction represents the "main" sink/degradation for the macromolecule
+        sink : bool, optional
+            whether the reaction represents the "main" sink/degradation for the macromolecule, by default False
             intended for use with genes (reactions with an associated hgnc id, and complexes)
 
                 *for mRNA, the degradation reaction will be coupled to the protein translation reaction
@@ -276,17 +299,16 @@ class ExpressionReaction(ME_Reaction):
                 metabolic catalysis reaction
                 *exceptions are synthesis and sink of reactions in ubiquitin_biogenesis (True); these are
                 assigned as synthesis and sink to track ubiquitin, but are not themselves coupled to anything
-        sink_type: str
-            one of ['mRNA', 'protein', 'complex']
+        sink_type : Optional[str], optional
+            one of ['mRNA', 'protein', 'complex'], by default None
             if sink True, the type of macromolecule being degraded should also be specified
-        ubiquitin_biogenesis: bool
-            whether the ExpressionReaction is part of ubiquitin_biogenesis reactions, only used to ignore hgnc_id is None
-        ribosome_biogenesis: bool
-            whether the ExpressionReaction is part of ribosome_biogenesis reactions, only used to ignore hgnc_id is None
-        trna_charging: bool
-            specifies that the ExpressionReaction is a trna charging reaction (True), for use with calculating biomass change
+        ubiquitin_biogenesis : bool, optional
+            whether the ExpressionReaction is part of ubiquitin_biogenesis reactions, only used to ignore hgnc_id is None, by default False
+        ribosome_biogenesis : bool, optional
+            whether the ExpressionReaction is part of ribosome_biogenesis reactions, only used to ignore hgnc_id is None, by default False
+        trna_charging : bool, optional
+            specifies that the ExpressionReaction is a trna charging reaction (True), for use with calculating biomass change, by default False
         """
-
         if subsystem not in ['tRNA_Biogenesis', 'rRNA_expression', 'mRNA_expression', 'Protein_Expression',
                              'Protein_Degradation', 'Complex_Formation', 'Complex_Degradation']:
             raise ValueError('Must specify an appropriate expression subsystem')
@@ -302,14 +324,12 @@ class ExpressionReaction(ME_Reaction):
         self.synthesis = synthesis
         if self.synthesis and synthesis_type not in ['mRNA', 'protein', 'complex']:
             raise ValueError('The synthesis type must be specified')
-        else:
-            self.synthesis_type = synthesis_type
+        self.synthesis_type = synthesis_type
 
         self.sink = sink
         if self.sink and sink_type not in ['mRNA', 'protein', 'complex']:
             raise ValueError('The synthesis type must be specified')
-        else:
-            self.sink_type = sink_type
+        self.sink_type = sink_type
 
         self.ribosome_biogenesis = ribosome_biogenesis
         self.trna_charging = trna_charging
@@ -318,23 +338,34 @@ class ExpressionReaction(ME_Reaction):
 class ProteinExpressionReaction(ExpressionReaction):
     """Inherited from ExpressionReaction, specifies the protein expression reactions in the model"""
 
-    def __init__(self, id, name='', lower_bound=0.0, upper_bound=None,
-                 hgnc_id=None, translation=False, synthesis=False,
-                 ubiquitin_biogenesis=False, ribosome_biogenesis=False):
-        """
+    def __init__(self, id: str, name='', lower_bound: SupportsFloat = 0.0, upper_bound: Optional[SupportsFloat] = None,
+                 hgnc_id: Optional[str] = None, translation: bool = False, synthesis: bool = False,
+                 ubiquitin_biogenesis: bool = False, ribosome_biogenesis: bool = False):
+        """Initialize ProteinExpressionReaction 
+
 
         Parameters
         ----------
-        translation: bool
-            whether the reaction represents the "main" synthesis/production for the protein
+        id : str
+            reaction id
+        name : str, optional
+            reaction name, by default ''
+        lower_bound : SupportsFloat, optional
+            lower flux bound constraint, by default 0.0
+        upper_bound : Optional[SupportsFloat], optional
+            upper flux bound constraint, by default None
+        hgnc_id : [type], optional
+            HGNC ID of protein being synthesized, by default None
+        translation : bool, optional
+            whether the reaction represents the "main" synthesis/production for the protein, by default False
             represents coupling of initial protein product to mRNA (mRNA-->protein coupling)
-        synthesis: bool
-            whether the reaction represents the "main" synthesis/production of an enzyme
-            that will be coupled to a metabolic reaction as a monomer
-        ubiquitin_biogenesis: bool
-            whether the ExpressionReaction is part of ubiquitin_biogenesis reactions, only used to ignore hgnc_id is None
-        ribosome_biogenesis: bool
-            whether the ExpressionReaction is part of ribosome_biogenesis reactions, only used to ignore hgnc_id is None
+        synthesis : bool, optional
+            whether the reaction represents the "main" synthesis/production for the macromolecule (used for appropriate mapping of coupling)
+            intended for use with genes (reactions with an associated hgnc id, and complexes), by default False
+        ubiquitin_biogenesis : bool, optional
+            whether the ExpressionReaction is part of ubiquitin_biogenesis reactions, only used to ignore hgnc_id is None, by default False
+        ribosome_biogenesis : bool, optional
+            whether the ExpressionReaction is part of ribosome_biogenesis reactions, only used to ignore hgnc_id is None, by default False
         """
 
         synthesis_type = None
@@ -352,11 +383,10 @@ class ProteinExpressionReaction(ExpressionReaction):
 
 
 class ProteinDegradationReaction(ExpressionReaction):
-    def __init__(self, id, hgnc_id, sink=False, sink_type=None, name='', lower_bound=0.0, upper_bound=None):
+    def __init__(self, id: str, hgnc_id: str, sink: bool = False, sink_type: Optional[str] = None,
+                 name: str = '', lower_bound: SupportsFloat = 0.0, upper_bound: Optional[SupportsFloat] = None):
         """
-        sink: bool
-            whether the reaction represents the "main" sink/degradation for the macromolecule
-            intended for use with genes (reactions with an associated hgnc id, and complexes)
+        See ExpressionReaction for parameter details
         """
         super().__init__(id=id, subsystem='Protein_Degradation', sink=sink, sink_type=sink_type,
                          name=name, lower_bound=lower_bound, upper_bound=upper_bound, hgnc_id=hgnc_id)
@@ -366,7 +396,13 @@ class ProteinDegradationReaction(ExpressionReaction):
         self._final_compartments = list()  # self is needed for expressing the associated protein metabolites in the these compartments:
 
     def _update_tracking(self, macromolecules):
-        """Mutual tracking of degradation reactions associated with a macromolecule and vice-versa"""
+        """Mutual tracking of degradation reactions associated with a macromolecule and vice-versa.
+
+        Parameters
+        ----------
+        macromolecules : Union[Macromolecule, List[Macromolecule]]
+            marcomolecule to be tracked
+        """
         if type(macromolecules) != list:
             macromolecules._degradation_reactions.append(self.id)
             self._macromolecules.append(macromolecules)
@@ -395,13 +431,10 @@ class ProteinDegradationReaction(ExpressionReaction):
 
 
 class ComplexDegradationReaction(ExpressionReaction):
-    def __init__(self, id=None, sink=False, sink_type=None,
-                 name='', lower_bound=0.0, upper_bound=None, hgnc_id=None):
+    def __init__(self, id: Optional[str] = None, sink: bool = False, sink_type: Optional[str] = None,
+                 name: str = '', lower_bound: SupportsFloat = 0.0, upper_bound: Optional[SupportsFloat] = None, hgnc_id: Optional[str] = None):
         """
-
-        sink: bool
-            whether the reaction represents the "main" sink/degradation for the macromolecule
-            intended for use with genes (reactions with an associated hgnc id, and complexes)
+        See ExpressionReaction for parameter details
         hgnc_id: None
             always None, for internal use with expression/protein_expression/degradation script
         """
@@ -434,14 +467,14 @@ class ComplexDegradationReaction(ExpressionReaction):
             if self.id not in m._degradation_reactions:
                 raise ValueError('Improper tracking of degradation reactions and associated macromolecules')
 
-    def _set_proteasomal_degradation(self, macromolecule, ribosomal_complex):
+    def _set_proteasomal_degradation(self, macromolecule, ribosomal_complex: bool):
         """Quick addition of attribute for build_me script, since current format has the machinery for
-        the proteosomal degradation different than standard complexes (to degrad rRNAs as well).
+        the proteosomal degradation different than standard complexes (to degrade rRNAs as well).
         Change in machinery hard-coded into degradation.degrade script and double-checked in build_me script.
 
-        macromolecule: Protein or Complex instance
-        ribosomal_complex: bool
-            whether or not the macromolecule is a ribosomal complex
+        macromolecule : Union[Protein, Complex]
+        ribosomal_complex : bool
+            whether the macromolecule is a ribosomal complex (True) or not (False)
         """
 
         if not ribosomal_complex:
@@ -477,11 +510,21 @@ class ComplexDegradationReaction(ExpressionReaction):
         self.gene_reaction_rule = ' and '.join(machinery_)
 
 
-# In[3]:
+def to_metabolic_reaction(reaction: cobra.Reaction, id: Optional[str] = None) -> MetabolicReaction:
+    """Convert reaction type
 
+    Parameters
+    ----------
+    reaction : cobra.Reaction
+        cobra reaction to be converted
+    id : str, optional
+        reaction id (defaults to reaction.id), by default None
 
-def to_metabolic_reaction(reaction, id=None):
-    """Convert from cobra.Reaction to human_me.core.MetabolicReaction"""
+    Returns
+    -------
+    MetabolicReaction
+        Converted reaction
+    """
 
     if id is None:
         id = reaction.id
@@ -494,13 +537,11 @@ def to_metabolic_reaction(reaction, id=None):
     return rxn
 
 
-# In[4]:
-
-
 class BiomassReaction(cobra.Reaction):
     """Specifies biomass reactions in the model, allowing reaction bounds to be a function of mu"""
 
-    def __init__(self, id, name='', subsystem='', lower_bound=0.0, upper_bound=None):
+    def __init__(self, id: str, name: str = '', subsystem: str = '',
+                 lower_bound: Union[SupportsFloat, sympy.Expr] = 0.0, upper_bound: Optional[Union[SupportsFloat, sympy.Expr]] = None):
         super().__init__(id, name, subsystem, lower_bound, upper_bound)
 
     @staticmethod
@@ -510,25 +551,21 @@ class BiomassReaction(cobra.Reaction):
                 raise ValueError(
                     'Currently, if reaction bounds are a function of mu, they must be for both the upper and lower bound')
 
-    def replace_bound_mu(self, mu_val=1, values=None, inplace=False, _=True):
-        """
-        Assumes growth is always > 0. Gives numeric values to bounds for certain methods.
+    def replace_bound_mu(self, mu_val: SupportsFloat = 1, values: Optional[List[sympy.Expr]] = None, inplace: bool = False, _ub: bool = True):
+        """Gives numeric values to bounds. Assums growth is always > 0. 
 
         Parameters
         ----------
-        mu_val: float
-            The value for mu to replace the bounds that contain a mu expression with
-        values: list or None
-            Each entry is an expression containing mu to be replaced by mu_val; inplace must be False
-        inplace: bool; default False
-            Whether to replace the bounds inplace on the reaction object (True), or return the bounds
-        _: bool
-            internal use, whether to use cobra.Reaction._upper_bound or cobra.Reaction.upper_bound
-
-
+        mu_val : SupportsFloat, optional
+            The value for mu to replace the bounds that contain a mu expression with, by default 1
+        values : Optional[List[sympy.Expr]], optional
+            Each entry is an expression containing mu to be replaced by mu_val; inplace must be False, by default None
+        inplace : bool, optional
+            Whether to replace the bounds inplace on the reaction object (True), or return the bounds, by default False
+        _ub : bool, optional
+            internal use, whether to use cobra.Reaction._upper_bound or cobra.Reaction.upper_bound, by default True
         """
-
-        if _:
+        if _ub:
             lb, ub = copy.copy(self._lower_bound), copy.copy(self._upper_bound)
         else:
             lb, ub = copy.copy(self.lower_bound), copy.copy(self.upper_bound)
@@ -544,22 +581,20 @@ class BiomassReaction(cobra.Reaction):
         if values is None:
             if not inplace:
                 return lb, ub
-            else:
-                self._lower_bound, self._upper_bound = lb, ub
+            self._lower_bound, self._upper_bound = lb, ub
         else:
             if not isinstance(values, list):
                 raise TypeError('values must a list')
 
-            for i in range(len(values)):
-                if isinstance(values[i], sympy.Expr):  # assumes the sympy expression always contains mu
-                    values[i] = float(values[i].subs(params.mu, mu_val))
+            for i, value in enumerate(values):
+                if isinstance(value, sympy.Expr):  # assumes the sympy expression always contains params.mu
+                    values[i] = float(value.subs(params.mu, mu_val))
             if not inplace:
                 return lb, ub, values
-            else:
-                raise ValueError('Either values must be None or inplace False')
+            raise ValueError('Either values must be None or inplace False')
 
     @property
-    def reversibility(self):
+    def reversibility(self) -> bool:
         """
         Whether the reaction can proceed in both directions (reversible)
 
@@ -569,7 +604,7 @@ class BiomassReaction(cobra.Reaction):
         lb, ub = self.replace_bound_mu()
         return lb < 0 < ub
 
-    def build_reaction_string(self, use_metabolite_names=False):
+    def build_reaction_string(self, use_metabolite_names: bool = False):
         """Generate a human readable reaction string"""
 
         def format(number):
@@ -590,7 +625,7 @@ class BiomassReaction(cobra.Reaction):
 
         reaction_string = ' + '.join(reactant_bits)
         if not self.reversibility:
-            lb, ub = self.replace_bound_mu(_=False)
+            lb, ub = self.replace_bound_mu(_ub=False)
             if lb < 0 and ub <= 0:
                 reaction_string += ' <-- '
             else:

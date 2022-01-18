@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 # coding: utf-8
 
+from typing import Union, SupportsFloat
+
 from human_me.core.reaction import MetabolicReaction, ExpressionReaction
 from human_me.core.macromolecules.complex import Complex
 from human_me.utils.functions import flatten_list
@@ -27,19 +29,17 @@ ribosomal_genes = {'HGNC:11325', 'HGNC:11740', 'HGNC:10369', 'HGNC:10414', 'HGNC
 # checks work as follows: maximum limits checked within each method, minimum limit checked in .check methods
 class ExpressedGene:
     """Tracks all reactions and macromolecules associated with a ME Model gene.
-    
+
     Designed to be used after building the full ME_Model
     """
 
-    def __init__(self, hgnc_id):
-        """
-        Init method
+    def __init__(self, hgnc_id: str):
+        """Init method for ExpressedGene.
 
         Parameters
         ----------
-        hgnc_id: str
+        hgnc_id:  str
             the gene HGNC ID
-
         """
         if not hgnc_id.startswith('HGNC:'):
             raise ValueError('Currently all genes must be in standard HGNC ID format')
@@ -61,12 +61,12 @@ class ExpressedGene:
                                }
 
     # REACTIONS--------------------------------------------------------------------------------
-    def add_reaction(self, r):
-        """Organizes ME_Model reaction into self.reactions attribute
+    def add_reaction(self, r: Union[MetabolicReaction, ExpressionReaction]):
+        """Organizes ME_Model reaction into self.reactions attribute.
 
         Parameters
         ----------
-        r: MetabolicReaction or ExpressionReaction
+        r: Union[MetabolicReaction, ExpressionReaction]
         """
         catalysis = self.is_catalyzing(r)
         if catalysis:
@@ -82,20 +82,19 @@ class ExpressedGene:
         if not catalysis and not expression:
             raise ValueError('The reaction ' + r.id + ' does not appear to be associated with the gene ' + self.hgnc_id)
 
-    def is_catalyzing(self, r):
-        """Determines whether the gene is involved in catalysis of the reaction
+    def is_catalyzing(self, r) -> bool:
+        """"Determines whether the gene is involved in catalysis of the reaction.
 
         Parameters
         ----------
-        r: human_me.core.reaction.ME_Reaction
+        r : ME_Reaction
+            [description]
 
         Returns
-        ----------
-        catalysis: bool
+        -------
+        catalysis : bool
             True if the gene is involved in catalyzing the reaction, False otherwise
-
         """
-
         catalysis = True
         if not hasattr(r, '_ribosomal_degradation') or not (r._ribosomal_degradation and r.sink):
             assoc_macro = {t: m for m, t in r.coupled_metabolites.items()}
@@ -112,24 +111,25 @@ class ExpressedGene:
             else:
                 catalysis = False
         else:
-            if self.hgnc_id in set(flatten_list([[p.hgnc_id for p in cplx.decompose_complex()] for cplx in
+            if self.hgnc_id not in set(flatten_list([[p.hgnc_id for p in cplx.decompose_complex()] for cplx in
                                                  [m for m, t in r.coupled_metabolites.items() if t == 'catalysis']])):
-                catalyis = True
-            else:
                 catalysis = False
         return catalysis
 
-    def _add_catalysis_reaction(self, r):
-        """
-        Adds reactions that the gene catalyzes, splitting by whether it is catalyzing a metabolic or
+    def _add_catalysis_reaction(self, r: Union[MetabolicReaction, ExpressionReaction]):
+        """Adds reactions that the gene catalyzes, splitting by whether it is catalyzing a metabolic or
         expression module reaction.
 
-        Hierarchy is organized as follows: {reaction_id: {catalysis: enzyme_id, deg_proxy: proxy_id}}
+        Hierarchy is organized as follows: {reaction_id: {catalysis: enzyme_id, deg_proxy: proxy_id}}. 
 
         Where catalysis: enzyme_id represents the macromolecules enzyme that is coupled to the reaction for
         protein synthesis to reaction catalysis and deg_proxy: proxy_id represents the proxy macromolecule that couples
         protein degradation to reaction catalysis.
 
+        Parameters
+        ----------
+        r : Union[MetabolicReaction, ExpressionReaction]
+            catalysis reaction being added
         """
 
         if isinstance(r, MetabolicReaction):
@@ -157,13 +157,12 @@ class ExpressedGene:
         if r.ribosome_biogenesis:
             self.ribosome_biogenesis = True
 
-    def _add_expression_reaction(self, r, tol=1e-17):
-        """
-        Reactions involving expression of a gene (not catalysis, even if it is catalysis of an expression-module reaction)
+    def _add_expression_reaction(self, r, tol: SupportsFloat = 1e-17):
+        """ Reactions involving expression of a gene (not catalysis, even if it is catalysis of an expression-module reaction).
 
         Parameters
         ----------
-        tol: float
+        tol : SupportsFloat
             tolerance threshold for determining whether a complex is self-catalysing the reaction (exceptional cases)
         """
         expression = True
@@ -212,7 +211,7 @@ class ExpressedGene:
                 if isinstance(cplx, Complex):
                     if self.hgnc_id in [m.hgnc_id for m in cplx.decompose_complex()]:
                         if cplx in r.coupled_metabolites:  # account for self-catalysis
-                            # note that the two internal abs() shouldn't need to be there, but in case of 
+                            # note that the two internal abs() shouldn't need to be there, but in case of
                             # inconsistent formatting of coupling coefficient values
                             if abs(r.metabolites[cplx] - cplx.coupling_coefficient[r.coupled_metabolites[cplx]]) > tol:
                                 complexes += [cplx]
@@ -288,11 +287,11 @@ class ExpressedGene:
 
     # MACROMOLECULES--------------------------------------------------------------------------------
     def add_macromolecule(self, m):
-        """Updates self.macromolecules with m
+        """Updates self.macromolecules with m.
 
         Parameters
         ----------
-        m: human_me.core.macromolecules.Macromolecule
+        m: Macromolecule
         """
         if m.type not in ['complex', 'proxy']:
             if not hasattr(m, 'hgnc_id') or m.hgnc_id is None or m.hgnc_id != self.hgnc_id:
@@ -322,18 +321,17 @@ class ExpressedGene:
             else:
                 if m.id in self.macromolecules['RNA']['mrna']['coupled']:
                     raise ValueError('Multiple reactions coupled to' + 'mrna' + ' for ' + self.hgnc_id)
-                else:
-                    if len(self.macromolecules['RNA']['mrna']['coupled']) > 0:
-                        raise ValueError('Multiple coupled' + 'mrna' + ' assigned to ' + self.hgnc_id)
-                    if list(m.coupling_coefficient.keys()) != ['mrna_formation']:
-                        raise ValueError('Unexpected coupling type for mrna associated with ' + self.hgnc_id)
+                if len(self.macromolecules['RNA']['mrna']['coupled']) > 0:
+                    raise ValueError('Multiple coupled' + 'mrna' + ' assigned to ' + self.hgnc_id)
+                if list(m.coupling_coefficient.keys()) != ['mrna_formation']:
+                    raise ValueError('Unexpected coupling type for mrna associated with ' + self.hgnc_id)
 
-                    cr = [r.id for r in m.reactions if m in r.coupled_metabolites]
+                cr = [r.id for r in m.reactions if m in r.coupled_metabolites]
 
-                    if len(cr) > 2:
-                        raise ValueError(
-                            'Unexpected mrna coupling to multiple reactions associated with ' + self.hgnc_id)
-                    self.macromolecules['RNA']['mrna']['coupled'][m.id] = cr
+                if len(cr) > 2:
+                    raise ValueError(
+                        'Unexpected mrna coupling to multiple reactions associated with ' + self.hgnc_id)
+                self.macromolecules['RNA']['mrna']['coupled'][m.id] = cr
         elif m.type == 'protein':
             if m.coupling_coefficient is None:
                 if not m.non_machinery:
@@ -370,12 +368,11 @@ class ExpressedGene:
             if proxy_type == 'mrna_degradation':
                 if len(self.macromolecules['Proxy']['mrna_degradation'].keys()) > 0:
                     raise ValueError('Multiple mrna degradation proxies associated with ' + self.hgnc_id)
-                else:
-                    cr = [r.id for r in m.reactions if
-                          m in r.coupled_metabolites and r.coupled_metabolites[m] == 'mrna_degradation']
-                    if len(cr) > 2:
-                        raise ValueError('mRNA degradation proxy is coupled to more than 2 protein synthesis reactions')
-                    self.macromolecules['Proxy']['mrna_degradation'] = {m.id: cr}
+                cr = [r.id for r in m.reactions if
+                        m in r.coupled_metabolites and r.coupled_metabolites[m] == 'mrna_degradation']
+                if len(cr) > 2:
+                    raise ValueError('mRNA degradation proxy is coupled to more than 2 protein synthesis reactions')
+                self.macromolecules['Proxy']['mrna_degradation'] = {m.id: cr}
             elif proxy_type == 'enzyme_degradation':
                 cr = [r.id for r in m.reactions if
                       m in r.coupled_metabolites and r.coupled_metabolites[m] == 'enzyme_degradation']

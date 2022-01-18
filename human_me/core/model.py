@@ -1,105 +1,70 @@
 #!/usr/bin/env python
 # coding: utf-8
 
+import copy
+import gc
 import logging
-import pickle
+import math
+import multiprocessing
 import os
 import pathlib
-import multiprocessing
-import gc
+import pickle
+from typing import Dict, List, Optional, SupportsFloat, Tuple, Union
+import warnings
 
 import cobra
-from cobra.core.dictlist import DictList
-from six import iteritems, string_types
-
-import sympy
-from sympy import lambdify
 import numpy as np
 import pandas as pd
-import warnings
-import copy
-import math
+import sympy
+from cobra.core.dictlist import DictList
+from six import iteritems, string_types
+from sympy import lambdify
 from tqdm import tqdm
 
+from human_me.core.gene import ExpressedGene
+from human_me.core.macromolecules.complex import Complex, RibosomalComplex
+from human_me.core.macromolecules.macromolecule import Macromolecule
+from human_me.core.reaction import (BiomassReaction,
+                                    ComplexDegradationReaction,
+                                    ExpressionReaction, MetabolicReaction)
+from human_me.me_solver import solve_me
 from human_me.preprocess import parse_complex
 from human_me.utils import parameters as params
 from human_me.utils.functions import flatten_list
 from human_me.utils.machinery import rbps
-from human_me.core.macromolecules.macromolecule import Macromolecule
-from human_me.core.macromolecules.complex import Complex
-from human_me.core.macromolecules.complex import RibosomalComplex
-
-from human_me.core.reaction import BiomassReaction, ExpressionReaction, MetabolicReaction, ComplexDegradationReaction
-from human_me.core.gene import ExpressedGene
-
-from human_me.me_solver import solve_me
 
 logger = logging.getLogger(__name__)
 
 
-def load_pickled_model(file_name):
-    """
-    Loads a pickled me_model
-
-    Parameters
-    ----------
-    file_name: str
-        'full/path/to/me_model.pickle'
-
-    Returns
-    ----------
-    me_model: ME_Model
-
-    """
-
-    with open(file_name, 'rb') as handle:
-        me_model = pickle.load(handle)
-    me_model.correct_object_tracking()  # lost in pickling/loadings
-    return me_model
-
-
-def create_expressed_gene(hgnc_id, relat_objects):
-    g = ExpressedGene(hgnc_id)
-    for m in relat_objects['macromolecules']:
-        g.add_macromolecule(m)
-    for r in relat_objects['reactions']:
-        g.add_reaction(r)
-    g.check()
-
-    return g
-
-
-# In[2]:
-
-
 class ME_Model(cobra.Model):
     # rewritten methods------------------------------------------------------------------------------------------------
-    def __init__(self, id_or_model, name=None, m_model=None, n_cores=os.cpu_count(),
-                 non_machinery=None, knock_out=None, additional_ko=None):
-        """
-        A simple object with an identifier
+    def __init__(self, id_or_model, name: Optional[str] = None, m_model: Optional[cobra.Model] = None,
+                 n_cores: int = os.cpu_count(),
+                 non_machinery: Dict[str, List[str]] = None, knock_out: Optional[List[str]] = None, additional_ko: List[str] = None):
+        """[summary]
 
         Parameters
         ----------
-        m_model: cobra.Model
-            The cobrapy model object that the ME_Model was built from. Only needed for checking model (.check_model)
-        id_or_model: None or a string
-            the identifier to associate with the object
-        n_cores: int
-            # of cores to parallelize on; defaults to all available cores
-        knock_out: list
-            each element is a string representing a gene expressed in the model which should be knocked out
-
-            *Note: you may want to knock-out during building if setting minimal_proteome = True and knocking out a
-            gene that participates in a OR GPR rule(in case it is the one that is selected); otherwise
-            me_model.knock_out() method should suffice
-        non_machinery: dictionary
-            keys are HGNC IDs, values are a list of strings, each element of which represents a compartment
-            within the metabolic model for the gene to be expressed.
+        id_or_model : [type]
+            [description]
+        name : str, optional
+            model name, by default None
+        m_model : cobra.Model, optional
+            The cobrapy model object that the ME_Model was built from. Only needed for checking model (.check_model), by default None
+        n_cores : int, optional
+            # of cores to parallelize on, by default os.cpu_count()
+        non_machinery : Dict[str, List[str]], optional
+            keys are HGNC IDs for non-machinery genes to be expressed, values are a list of compartments within the model for the gene to be transported to, by default None
             Exceptions are ubiquitin genes (HGNC:12468, HGNC:12463) and ribosomal genes
-        additional_ko: list
+        knock_out : List[str], optional
+            each element is the HGNC ID of a gene expressed in the model which should be knocked out
+
+            *Note: you may want to instead knock-out during building if setting minimal_proteome = True and knocking out a
+            gene that participates in a OR GPR rule (in case it is the one that is selected); otherwise
+            me_model.knock_out() method should suffice, by default None
+        additional_ko : List[str], optional
             a list of HGNC IDs for genes that were not explicitly knocked-out, but were only involved in catalysis of
-            reactions catalyzed by a complex which contains another gene that was knocked-out
+            reactions catalyzed by a complex which contains another gene that was knocked-out, by default None
             this list is generated in build_me_model/me_builder
 
         Returns
@@ -107,14 +72,14 @@ class ME_Model(cobra.Model):
         Nothing, but initializes the following variables for use later:
         self.m_model: cobra.Model
             the metabolic model from which the ME Model was built (added by builder class)
-        self.S:
+        self.S: Union[pd.DataFrame, np.array]
             model stoichiometric matrix
-        self.solver_:
+        self.solver_
             the LP solver for the model
-        self.reaction_types: dict
+        self.reaction_types: Dict[str, str]
             keys are category of the reaction, values are the reaction ID
-        """
 
+        """
         super().__init__(id_or_model, name)
         if m_model is not None:
             if type(m_model) == cobra.Model:
@@ -145,16 +110,15 @@ class ME_Model(cobra.Model):
         else:
             self.non_machinery = non_machinery
 
-    def _add_reactions(self, reaction_list):
-        """Add reactions to the model.
-
+    def _add_reactions(self, reaction_list: List[cobra.Reaction]):
+        """Add reactions to the model
         Reactions with identifiers identical to a reaction already in the
         model are ignored.
 
         Parameters
         ----------
-        reaction_list : list
-            A list of `cobra.Reaction` objects
+        reaction_list : List[cobra.Reaction]
+            List of reactions to add
         """
 
         def existing_filter(rxn):
@@ -240,8 +204,14 @@ class ME_Model(cobra.Model):
         self.reaction_types['coupled'] = [r.id for r in self.reactions if
                                           hasattr(r, 'coupled_metabolites') and r.coupled_metabolites != dict()]
 
-    def _get_enzymes(self, reaction_list):
-        """Run before _add_reactions, track all .enzyme attributes"""
+    def _get_enzymes(self, reaction_list: List[cobra.Reaction]):
+        """Track all .enzyme attributes. Run before _add_reactions.
+
+        Parameters
+        ----------
+        reaction_list : List[cobra.Reaction]
+            List of reactions to add
+        """
         self._enzymes = list()
         for r in reaction_list:
             for m in r.metabolites:
@@ -320,23 +290,28 @@ class ME_Model(cobra.Model):
         self._map_reaction_metabolites()
         self._map_coupled_metabolites()
 
-    def add_reactions(self, reaction_list):
+    def add_reactions(self, reaction_list: List[cobra.Reaction]):
+        """Add reactions to the model
+
+        Parameters
+        ----------
+        reaction_list : List[cobra.Reaction]
+            List of reactions to add
+        """
         self._get_enzymes(reaction_list)
         self._add_reactions(reaction_list)
         self.correct_object_tracking()
         self._assign_reaction_types()
 
-    def remove_reactions(self, reactions, remove_orphans=True):
+    def remove_reactions(self, reactions: List[Union[cobra.Reaction, str]], remove_orphans: bool = True):
         """Remove reactions from the model.
 
         Parameters
         ----------
-        reactions : list
+        reactions : List[cobra.Reaction, str]
             A list with reactions (`cobra.Reaction`), or their id's, to remove
-
-        remove_orphans : bool, default True
-            Remove orphaned genes and metabolites from the model as well
-
+        remove_orphans : bool
+            Remove orphaned genes and metabolites from the model as well, , by default True
         """
         if isinstance(reactions, string_types) or hasattr(reactions, "id"):
             warnings.warn("need to pass in a list")
@@ -372,32 +347,29 @@ class ME_Model(cobra.Model):
 
     # new methods------------------------------------------------------------------------------------------------
 
-    def create_stoichiometric_matrix(self, array_type='numpy', mu_val=None, inplace=True):
-
-        """
-        Adapted from cobra.util.array.create_stoichiometric_matrix to take in sympy.Expr objects
-
-        Return a stoichiometric array representation of the given model.
-
-        The the columns represent the reactions and rows represent
-        metabolites. S[i,j] therefore contains the quantity of metabolite `i`
-        produced (negative for consumed) by reaction `j`.
+    def create_stoichiometric_matrix(self, array_type: str = 'numpy', mu_val: Optional[SupportsFloat] = None, inplace: bool = True):
+        """Generate a stoichiometric array representation of the model.
+        Adapted from cobra.util.array.create_stoichiometric_matrix to handle sympy.Expr objects.
 
         Parameters
-        -------
-        array_type: one of ['numpy', 'pandas', 'sympy']
-            Specifies the type of the stoichiometric matrix to be return
-        mu_val: float
-            A value for mu to replace in generating stoichiometric matrix. If None, will use sympy expressions
+        ----------
+        array_type : str, optional
+            Specifies the type of the stoichiometric matrix to be return (options ['numpy', 'pandas', 'sympy']), by default 'numpy'
+        mu_val : Optional[SupportsFloat], optional
+             A value for mu to replace in generating stoichiometric matrix. If None, will use sympy expressions, by default None
+        inplace : bool, optional
+            whether to update self.S (True) or return a new array (False), by default True
 
         Returns
         -------
-        matrix of class `sympy.matrices.dense.MutableDenseMatrix` by default
-            The stoichiometric matrix for the given model.
+        Union[pd.DataFrame, np.array, sympy.matrices.dense.MutableDenseMatrix]
+            The the columns represent the reactions and rows represent
+            metabolites. S[i,j] therefore contains the quantity of metabolite `i`
+            produced (negative for consumed) by reaction `j`.
         """
 
         if array_type not in ['sympy', 'numpy', 'pandas']:
-            raise ValueError('Incorrect array type specified')
+            raise TypeError('Incorrect array type specified')
         if array_type != 'sympy' and mu_val is None:
             raise ValueError('Must specify a mu_val for non-sympy matrices')
         if array_type == 'sympy' and mu_val is not None:
@@ -440,14 +412,13 @@ class ME_Model(cobra.Model):
         else:
             return array
 
-    def initialize_solver(self, solver_type='qminos', precision='quad'):
+    def initialize_solver(self, solver_type: str = 'qminos', precision: str = 'quad'):
         """Initialize the ME Model solver
 
-        solver_type: string, default "qminos"
-            The solver to use for the linear programs (no other options currently )
-        precision: string, default "quad"
-            The precision for the qminos solver (options ['double', 'quad', 'dq', 'dqq'])
-
+        solver_type : str
+            The solver to use for the linear programs (options ['qminos']), by default "qminos"
+        precision: str
+            The precision for the qminos solver (options ['double', 'quad', 'dq', 'dqq']), by default 'quad'
         """
 
         if solver_type == 'qminos':
@@ -457,37 +428,35 @@ class ME_Model(cobra.Model):
         else:
             raise ValueError('Only the qMINOS solver is currently implemented')
 
-    def solve_lp(self, mu_val, objective=None, tolerance=0):
-        """Solves the linear program for a specified objective at a specified growth rate
+    def solve_lp(self, mu_val: SupportsFloat, objective: Optional[Dict[str, int]] = None, tolerance: SupportsFloat = 0) -> Tuple[np.array, int]:
+        """Solves the linear program for a specified objective at a specified growth rate.
 
-        Parameters
-        ----------
-        mu_val: float
-            The growth value for which to solve the linear program
-        objective: dict, default {'bimoass_dilution': 1}
-            The objective function to optimize. Dictionary represent a linear combination of reactions to optimize,
-            with reaction ids as keys and the coefficient of the lin. comb. as the values.
-            Values must either be 1 for maximization or -1 for minimization.
+         Parameters
+         ----------
+         mu_val : SupportsFloat
+             The growth value for which to solve the linear program [hr^-1]
+         objective : Dict[str, int], optional
+             The objective function to optimize. Dictionary represent a linear combination of reactions to optimize,
+             with reaction ids as keys and the coefficient of the linear combination as the values.
+             Values must either be 1 for maximization or -1 for minimization, by default {'biomass_dilution': 1}
+         tolerance : float, optional
+             Threshold below which expected sensitivity of solver is too low to detect infeasibility, by default 0
 
-            Example: simplest case, to maximize reaction with id 'A', objective = {'A': 1}
-        tolerance: float; default 0
-            Threshold below which expected sensitivity of solver is too low to detect infeasibility
-
-        Returns
-        ----------
-        sln: 1D np.array
-            the vector of fluxes in the optimal solution
-        stat:
-            the solver status
-                0     Optimal solution found.
-                1     The problem is infeasible.
-                2     The problem is unbounded (or badly scaled).
-                3     Too many iterations.
-                4     Apparent stall.  The solution has not changed
-                      for a large number of iterations (e.g. 1000).
-        hsq:
-            optimal basis (see qminospy.solver.QMINOS)
-        """
+         Returns
+         -------
+         sln: np.array
+             1D vector of fluxes in the optimal solution
+         stat: int
+             the solver status
+                 0     Optimal solution found.
+                 1     The problem is infeasible.
+                 2     The problem is unbounded (or badly scaled).
+                 3     Too many iterations.
+                 4     Apparent stall.  The solution has not changed
+                       for a large number of iterations (e.g. 1000).
+         hsq:
+             optimal basis (see qminospy.solver.QMINOS)
+         """
         if objective is None:
             objective = {'biomass_dilution': 1}
         if self.solver_ is None:
@@ -500,30 +469,33 @@ class ME_Model(cobra.Model):
         sln, stat, hs = self.solver_.solve_lp(me_model=self, mu_val=mu_val, objective=objective, tolerance=tolerance)
         return sln, stat, hs
 
-    def maximize_growth(self, min_mu=0, max_mu=0.05, mu_accuracy=1e-10, increment=0.02,
-                        tolerance=0, verbose=True):
-
-        """Binary search to find the maximum feasible growth rate
+    def maximize_growth(self, min_mu: SupportsFloat = 0, max_mu: SupportsFloat = 0.05,
+                        mu_accuracy: SupportsFloat = 1e-10, increment: SupportsFloat = 0.02,
+                        tolerance: SupportsFloat = 0, verbose: bool = True):
+        """Binary search to find the maximum feasible growth rate.
 
         Parameters
         ----------
-        min_mu: float, default 0
-            Expected minimum feasible growth rate (~0)
-        max_mu: float, default 0.05
-            Expected minimum infeasible growth rate (i.e., just above expected maximum feasible growth rate)
-        mu_accuracy: float, default 1e-4
-            The maximum error in mu after the binary search
-        increment: float, default 1
-            The amount to increase growth by when searching for maximum infeasible growth rate from max_mu
-        verbose: bool, default True
-            Prints information about each linear program iteration
-
+        me_model : human_me.core.model.ME_Model
+            ME Model to solve
+        min_mu : SupportsFloat, optional
+            Expected minimum feasible growth rate, by default 0
+        max_mu : SupportsFloat, optional
+            Expected minimum infeasible growth rate (i.e., just above expected maximum feasible growth rate), by default 0.05
+        mu_accuracy : SupportsFloat, optional
+            The maximum error in mu after the binary search, by default 1e-10
+        increment : SupportsFloat, optional
+            The amount to increase growth by when searching for maximum infeasible growth rate from max_mu, by default 0.02
+        tolerance : SupportsFloat, optional
+            Threshold below which expected sensitivity of solver is too low to detect infeasibility, by default 0
+        verbose : bool, optional
+            Prints information about each linear program iteration, by default True
 
         Returns
-        ----------
+        -------
         mu_max: int
             the maximum feasible growth value (in hours)
-        res: dict
+        res: Dict[float, Tuple[np.array, int]]]
             keys are all attempted growth values, values are dictionaries with keys as output from self.solve_lp
         """
         if self.solver_ is None:
@@ -540,43 +512,43 @@ class ME_Model(cobra.Model):
                                                    verbose=verbose)
         return mu_max, res
 
-    def optimize(self, objective, mu_max, n_points=10,
-                 tolerance=0, n_cores=None, graph=True, fig_name=None):
+    def optimize(self, objective: Dict[str, int], mu_max: SupportsFloat, n_points: int = 10,
+                 tolerance: SupportsFloat = 0, n_cores: Optional[int] = None, visualize: bool = True, fig_name: str = None):
         """General optimization of any non-growth objective
 
         Parameters
         ----------
-        objective: dict
+        objective : Dict[str, int]
             The objective function to optimize. Dictionary represent a linear combination of reactions to optimize,
-            with reaction ids as keys and the coefficient of the lin. comb. as the values.
-            Values can only be all 1 for maximization, or all -1 for minimization.
-
-            Example: simplest case, to maximize reaction with id 'A', objective = {'A': 1}
-        mu_max: float
-            the maximum growth value at which the model is feasible; use .maximize_growth() method to identify
-            (should be <= mu_max output of .maxmimize_growth() method)
-        tolerance: float; default 0
-            Threshold below which expected sensitivity of solver is too low to detect infeasibility
-        n_cores: int, default None
-            the number of workers to use for parallelization
-        graph: bool; default True
-            plot the relationship between growth and the objective function of interest
-        fig_name: str; default None
-            save the plotted figure to
+            with reaction ids as keys and the coefficient of the linear combination as the values.
+            Values must either be 1 for maximization or -1 for minimization.
+        mu_max : SupportsFloat
+            the maximum growth value at which the model is feasible [hr^-1]; use .maximize_growth() method to identify (should be <= mu_max output)
+            if using an experimental value, make sure it is feasible using the .solve_lp() method 
+        n_points : int, optional
+            # of growth values to consider between 0 and mu_max, by default 10
+        tolerance : SupportsFloat, optional
+            Threshold below which expected sensitivity of solver is too low to detect infeasibility, by default 0
+        n_cores : Optional[int], optional
+            the number of workers to use for parallelization, by default None
+        visualize : bool, optional
+            plot the relationship between growth and the objective function of interest, by default True
+        fig_name : Optional[str], optional
+            save the plotted figure to 'path/to/filename.ext', by default None
 
         Returns
         ----------
-        sln: tuple
+        sln: Tuple[float]
             first element is the growth value at which the non-growth objective is optimized
             second element is the optimized non-growth objective value
-        predicted: pd.DataFrame
+        predicted: pandas.DataFrame
             1000 growth values between 0 and mu_max, with corresponding interpolated objective values
-        interp_fit: output of scipy.interpolate.interp1d
+        interp_fit: scipy.interpolate.interp1d
             a function to interpolate objective values from growth values, used to generated predicted
         optimal_vals: collections.OrderedDict
             keys are n_points growth values between 0 and mu_max, values are the objective value optimized at
             the corresponding growth value
-        res: dict
+        res: Dict[float, Tuple[Any]]
             keys are n_points growth values between 0 and mu_max, values are the output of .solve_lp at
             corresponding growth values with the objective set to the non-growth objective input
         """
@@ -591,25 +563,25 @@ class ME_Model(cobra.Model):
         sln, predicted, interp_fit, optimal_vals, res = self.solver_.optimize(me_model=self, objective=objective,
                                                                               mu_max=mu_max, n_points=n_points,
                                                                               tolerance=tolerance,
-                                                                              n_cores=n_cores, graph=graph,
+                                                                              n_cores=n_cores, visualize=visualize,
                                                                               fig_name=fig_name)
         return sln, predicted, interp_fit, optimal_vals, res
 
-    def infeasible_reactions(self, mu_val, sln, stat, tolerance=1e-19):
+    def infeasible_reactions(self, mu_val: SupportsFloat, sln, stat, tolerance: SupportsFloat = 1e-19) -> Dict[str, SupportsFloat]:
         """Binary search to find the maximum feasible growth rate
 
         Parameters
         ----------
-        mu_val: float
+        mu_val : SupportsFloat
             input growth value to ME_Model.solve_lp
-        sln, stat: outputs of ME_Model.solve_lp
+        sln, stat : outputs of ME_Model.solve_lp
             Expected minimum feasible growth rate (~0)
-        tolerance: float
+        tolerance : SupportsFloat
             Threshold below which expected sensitivity of solver is too low to detect infeasibility
 
         Returns
         ----------
-        ir: dict
+        ir : Dict[str, SupportsFloat]
             for reactions that cause infeasibility, keys are reaction ids for infeasible reactions and values are
             difference by which reaction flux is infeasible
         """
@@ -647,7 +619,7 @@ class ME_Model(cobra.Model):
         for r in self.reactions:
             if len(r.check_mass_balance()) > 0:
 
-                # account for instances when the original metabolic reaction is unbalances 
+                # account for instances when the original metabolic reaction is unbalances
                 bool1 = isinstance(r, MetabolicReaction)
                 if bool1:
                     # account for instances when the ME_Reaction version of reversible reactions
@@ -675,13 +647,12 @@ class ME_Model(cobra.Model):
         """Checks that all reactions and macromolecules that are expected to have an assigned hgnc_id, do"""
 
         # reactions
-        bool1 = len([r for r in self.reactions if not hasattr(r, 'hgnc_id') and not (
-                isinstance(r, BiomassReaction) or isinstance(r, MetabolicReaction))]) > 0
+        bool1 = len([r for r in self.reactions if not hasattr(r, 'hgnc_id') and not (isinstance(r, (BiomassReaction, MetabolicReaction)))]) > 0
 
         no_hgnc = [r for r in self.reactions if type(r) == ExpressionReaction and r.hgnc_id is None]
         no_hgnc = [r for r in no_hgnc if (r.subsystem not in ['tRNA_Biogenesis', 'rRNA_expression', 'Complex_Formation',
                                                               'Complex_Degradation']) and (
-                           hasattr(r, 'ubiquitin_biogenesis') and not r.ubiquitin_biogenesis)]
+            hasattr(r, 'ubiquitin_biogenesis') and not r.ubiquitin_biogenesis)]
         bool2 = len(no_hgnc) > 0
 
         if bool1 or bool2:
@@ -756,8 +727,7 @@ class ME_Model(cobra.Model):
                         for p in actual_machinery[0].decompose_complex():
                             if p.type != 'protein':
                                 raise ValueError('Non-proteins in complex machinery for ' + r.id)
-                            else:
-                                am.append(p.id.split('_')[0])
+                            am.append(p.id.split('_')[0])
                         actual_machinery = sorted(am)
 
                     # check that machinery matches
@@ -782,8 +752,7 @@ class ME_Model(cobra.Model):
                         for p in am_.decompose_complex():
                             if p.type != 'protein':
                                 raise ValueError('Non-proteins in complex machinery for ' + r.id)
-                            else:
-                                am.append(p.id.split('_')[0])
+                            am.append(p.id.split('_')[0])
                     actual_machinery = sorted(am)
                     if sorted(expected_machinery[0]) != actual_machinery:
                         raise ValueError('Incorrect machinery for ribosomal degradation: ' + r.id)
@@ -811,9 +780,9 @@ class ME_Model(cobra.Model):
                     complexes.append(m)
                     if m.enzyme:
                         active_complexes.append(m)
-        # check complexes                
+        # check complexes
         complexes = [m for m in complexes if not (
-                isinstance(m, RibosomalComplex) or '_polyub_complex_' in m.id or np.all(
+            isinstance(m, RibosomalComplex) or '_polyub_complex_' in m.id or np.all(
                     [isinstance(r_, ComplexDegradationReaction) for r_ in m.reactions]))]
         if len(list(set(complexes).difference(active_complexes))) > 0:
             raise ValueError('Unexpected inclusion of inactive complexes')
@@ -837,6 +806,17 @@ class ME_Model(cobra.Model):
         self.check_me_mass_balance()
         self._check_coupling()
         self.check_enzymes()
+
+    @staticmethod
+    def create_expressed_gene(hgnc_id: str, relat_objects) -> ExpressedGene:
+        g = ExpressedGene(hgnc_id)
+        for m in relat_objects['macromolecules']:
+            g.add_macromolecule(m)
+        for r in relat_objects['reactions']:
+            g.add_reaction(r)
+        g.check()
+
+        return g
 
     def _generate_expressed_genes(self):
 
@@ -871,7 +851,7 @@ class ME_Model(cobra.Model):
         if self._par:
             pool = multiprocessing.Pool(processes=self.n_cores)
             try:
-                expressed_genes = pool.starmap(create_expressed_gene,
+                expressed_genes = pool.starmap(self.create_expressed_gene,
                                                zip(hgnc_ids.keys(), hgnc_ids.values()))
                 pool.close()
                 pool.join()
@@ -883,19 +863,19 @@ class ME_Model(cobra.Model):
                 gc.collect()
                 raise ValueError('Parallelization failed while generating expressed genes list')
         else:
-            self.expressed_genes = {hgnc_id: create_expressed_gene(hgnc_id, relat_objects) for hgnc_id, relat_objects in
+            self.expressed_genes = {hgnc_id: self.create_expressed_gene(hgnc_id, relat_objects) for hgnc_id, relat_objects in
                                     tqdm(hgnc_ids.items())}
 
-    def knock_out_gene(self, hgnc_id, inplace=False):
+    def knock_out_gene(self, hgnc_id: str, inplace: bool = False):
         """Knocks out a gene by blocking flux through synthesis of the associated mRNA molecule
 
         Parameters
         ----------
-        hgnc_id: str
+        hgnc_id : str
             gene id in HGNC format (HGNC:####); must be present in the model
-        inplace: bool
+        inplace : bool
             whether to return a separate model object with the knocked out reaction (False) or to
-            change the reaction bounds in change
+            change the reaction bounds in change, by default False
         """
 
         if hgnc_id not in self.expressed_genes:
@@ -917,8 +897,8 @@ class ME_Model(cobra.Model):
 
         Parameters
         ----------
-        file: str, default saves to current directory
-            will save to file = "full/path/to/filename.pickle"
+        file: str 
+            will save to file = "full/path/to/filename.pickle", default './me_model.pickle'
 
         """
         if '.' in file:
@@ -929,6 +909,26 @@ class ME_Model(cobra.Model):
             file = file + '.pickle'
         with open(file, 'wb') as handle:
             pickle.dump(self, handle)
+
+    @staticmethod
+    def load_pickled_model(file_name: str):
+        """Loads a pickled me_model. Saved from me_model.pickle
+
+        Parameters
+        ----------
+        file_name : str
+            'full/path/to/me_model.pickle'
+
+        Returns
+        -------
+        ME_Model
+            ME model object
+        """
+
+        with open(file_name, 'rb') as handle:
+            me_model = pickle.load(handle)
+        me_model.correct_object_tracking()  # lost in pickling/loadings
+        return me_model
 
     def copy(self):
         return copy.deepcopy(self)

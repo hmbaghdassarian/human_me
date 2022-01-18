@@ -1,69 +1,64 @@
 #!/usr/bin/env python
 # coding: utf-8
 
+import copy
+import gc
 import os
 import time
-import copy
 import warnings
-from tqdm import tqdm
-
-from pathos.multiprocessing import ProcessingPool as Pool
-import gc
-
-import matplotlib.pyplot as plt
-import matplotlib.patches as mpatches
-import seaborn as sns
-
-import pandas as pd
-import numpy as np
-import scipy
 from collections import OrderedDict
+from typing import Any, Dict, List, Optional, Tuple, SupportsFloat
 
+import matplotlib.patches as mpatches
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import scipy
+import seaborn as sns
+from pathos.multiprocessing import ProcessingPool as Pool
 from qminospy.solver import QMINOS  # need solveME (https://github.com/SBRG/solvemepy) installed and working
+from tqdm import tqdm
 
 from human_me.core.reaction import BiomassReaction
 from human_me.utils import functions as func
 
 
 class qminosSolver:
-    def __init__(self, precision='quad'):
-        """Initializer for solving with qMINOS
+    """Solving human ME Model with qMINOS."""
+    def __init__(self, precision: str = 'quad') -> None:
+        """"Initializer for solving with qMINOS
 
         Parameters
         ----------
-        precision: string, default "quad"
-            The precision for the qminos solver (options ['double', 'quad', 'dq', 'dqq'])
-
+        precision : str, optional
+            The precision for the qminos solver (options ['double', 'quad', 'dq', 'dqq']), by default 'quad'
         """
-
         self.precision = precision
 
-    def solve_lp(self, me_model, mu_val, objective: dict = None, tolerance=0,
-                 close_biomass_dilution=True):
-        """Solves the linear program for a specified objective at a specified growth rate
+    def solve_lp(self, me_model, mu_val: SupportsFloat, objective: Optional[Dict[str, int]] = None,
+                 tolerance: SupportsFloat = 0, close_biomass_dilution: bool = True):
+        """Solves the linear program for a specified objective at a specified growth rate.
 
         Parameters
         ----------
-        me_model: human_me.core.model.ME_Model
+        me_model : human_me.core.model.ME_Model
             ME Model to solve
-        mu_val: float
-            The growth value for which to solve the linear program
-        objective: dict, default {'bimoass_dilution': 1}
+        mu_val : SupportsFloat
+            The growth value for which to solve the linear program [hr^-1]
+        objective : Dict[str, int], optional
             The objective function to optimize. Dictionary represent a linear combination of reactions to optimize,
-            with reaction ids as keys and the coefficient of the lin. comb. as the values.
-            Values must either be 1 for maximization or -1 for minimization.
-
-            Example: simplest case, to maximize reaction with id 'A', objective = {'A': 1}
-        tolerance: float; default 0
-            Threshold below which expected sensitivity of solver is too low to detect infeasibility
-        close_biomass_dilution: bool, default True
-            Internal use only, whether to constrain the biomass_dilution reaction bounds by mu
+            with reaction ids as keys and the coefficient of the linear combination as the values.
+            Values must either be 1 for maximization or -1 for minimization, by default {'biomass_dilution': 1}
+        tolerance : SupportsFloat, optional
+            Threshold below which expected sensitivity of solver is too low to detect infeasibility, by default 0
+        close_biomass_dilution : bool, optional
+            Internal use only, whether to constrain the biomass_dilution reaction bounds by mu, by default True
 
         Returns
-        ----------
+        -------
         sln: 1D np.array
             the vector of fluxes in the optimal solution
-        stat:
+        stat: int
             the solver status
                 0     Optimal solution found.
                 1     The problem is infeasible.
@@ -108,8 +103,8 @@ class qminosSolver:
                 inequality_index.append(counter)
             counter += 1
 
-        E = S[equality_index,]
-        I = S[inequality_index,]
+        E = S[equality_index, ]
+        I = S[inequality_index, ]
 
         A = scipy.sparse.dok_matrix(np.concatenate([E, I, I]))  # E, L, G
         b = np.array(b_equal + b_less + b_greater)
@@ -129,7 +124,7 @@ class qminosSolver:
         xl[:], xu[:] = np.nan, np.nan
         counter = 0
         for r in me_model.reactions:
-            if not (isinstance(r, BiomassReaction)):
+            if not isinstance(r, BiomassReaction):
                 xl[counter] = copy.copy(r.lower_bound) - tolerance
                 xu[counter] = copy.copy(r.upper_bound) + tolerance
             else:
@@ -163,32 +158,61 @@ class qminosSolver:
 
         return sln, stat, hsq
 
-    def maximize_growth(self, me_model, min_mu=0, max_mu=0.05, mu_accuracy=1e-10, increment=0.02,
-                        tolerance=0, verbose=True):
-        """Binary search to find the maximum feasible growth rate
+    @staticmethod
+    def _try_mu(mu_val, objective, tolerance, 
+                res: Dict[SupportsFloat, Dict[str, Any]], feasible_mu: List[SupportsFloat], infeasible_mu: List[SupportsFloat]):
+        """To be used with maximize_growth method"""
+        with func.HiddenPrints():
+            sln, stat, hsq = self.solve_lp(me_model, mu_val, objective=objective, tolerance = tolerance)
+        if stat.max() == 1 and mu_val < 1e-9:
+            warnings.warn('Model is infeasible at mu = 0. Trying mu = 1e-9 instead')
+            mu_val = 1e-9
+            with func.HiddenPrints():
+                sln, stat, hsq = self.solve_lp(me_model, mu_val, objective=objective, tolerance = tolerance)
+            if stat.max() == 1:
+                raise ValueError('Provided minimum mu is infeasible')
+
+        res[mu_val] = {'solution': sln, 'status': stat.max(), 'basis': hsq}
+
+        if stat.max() == 0:  # "optimal":
+            if verbose:
+                print('The problem has an optimal solution at mu = {} (hrs)'.format(mu_val))
+            feasible_mu.append(mu_val)
+            return True, sln, stat, hsq, res, feasible_mu, infeasible_mu
+        if stat.max() == 1:
+            infeasible_mu.append(mu_val)
+            if verbose:
+                print('The problem is infeasible at mu = {} (hrs)'.format(mu_val))
+            return False, None, None, None, res, feasible_mu, infeasible_mu
+        raise ValueError('The problem returned with stat: {}'.format(stat.max()))
+    
+    def maximize_growth(self, me_model, min_mu: SupportsFloat = 0, max_mu: SupportsFloat = 0.05,
+                        mu_accuracy: SupportsFloat = 1e-10, increment: SupportsFloat = 0.02, tolerance: SupportsFloat = 0,
+                        verbose: bool = True):
+        """Binary search to find the maximum feasible growth rate.
 
         Parameters
         ----------
-        me_model: human_me.core.model.ME_Model
+        me_model : human_me.core.model.ME_Model
             ME Model to solve
-        min_mu: float, default 0
-            Expected minimum feasible growth rate (~0)
-        max_mu: float, default 0.05
-            Expected minimum infeasible growth rate (i.e., just above expected maximum feasible growth rate)
-        mu_accuracy: float, default 1e-4
-            The maximum error in mu after the binary search
-        increment: float, default 1
-            The amount to increase growth by when searching for maximum infeasible growth rate from max_mu
-        tolerance: float; default 0
-            Threshold below which expected sensitivity of solver is too low to detect infeasibility
-        verbose: bool, default True
-            Prints information about each linear program iteration
+        min_mu : SupportsFloat, optional
+            Expected minimum feasible growth rate, by default 0
+        max_mu : SupportsFloat, optional
+            Expected minimum infeasible growth rate (i.e., just above expected maximum feasible growth rate), by default 0.05
+        mu_accuracy : SupportsFloat, optional
+            The maximum error in mu after the binary search, by default 1e-10
+        increment : SupportsFloat, optional
+            The amount to increase growth by when searching for maximum infeasible growth rate from max_mu, by default 0.02
+        tolerance : SupportsFloat, optional
+            Threshold below which expected sensitivity of solver is too low to detect infeasibility, by default 0
+        verbose : bool, optional
+            Prints information about each linear program iteration, by default True
 
         Returns
-        ----------
+        -------
         mu_max: int
             the maximum feasible growth value (in hours)
-        res: dict
+        res: Dict[float, Tuple[np.array, int]]]
             keys are all attempted growth values, values are dictionaries with keys as output from self.solve_lp
         """
 
@@ -197,92 +221,73 @@ class qminosSolver:
         infeasible_mu = []
         res = dict()
 
-        def try_mu(mu_val):
-            with func.HiddenPrints():
-                sln, stat, hsq = self.solve_lp(me_model, mu_val, objective=objective)
-            if stat.max() == 1 and mu_val < 1e-9:
-                warnings.warn('Model is infeasible at mu = 0. Trying mu = 1e-9 instead')
-                mu_val = 1e-9
-                with func.HiddenPrints():
-                    sln, stat, hsq = self.solve_lp(me_model, mu_val, objective=objective)
-                if stat.max() == 1:
-                    raise ValueError('Provided minimum mu is infeasible')
-
-            res[mu_val] = {'solution': sln, 'status': stat.max(), 'basis': hsq}
-
-            if stat.max() == 0:  # "optimal":
-                if verbose:
-                    print('The problem has an optimal solution at mu = {} (hrs)'.format(mu_val))
-                feasible_mu.append(mu_val)
-                return True, sln, stat, hsq
-            elif stat.max() == 1:
-                infeasible_mu.append(mu_val)
-                if verbose:
-                    print('The problem is infeasible at mu = {} (hrs)'.format(mu_val))
-                return False, None, None, None
-            else:
-                raise ValueError('The problem returned with stat: {}'.format(stat.max()))
-
         start = time.time()
 
         if verbose:
             print('Trying mu: {}'.format(min_mu))
-        bool_, sln, stat, hsq = try_mu(min_mu)  # start with minimal
-        while try_mu(max_mu)[0]:  # If max_mu was feasible, keep increasing
+        bool_, sln, stat, hsq, res, feasible_mu, infeasible_mu = self._try_mu(min_mu, objective = objective, tolerance = tolerance, res = res, feasible_mu = feasible_mu, infeasible_mu = infeasible_mu)  # start with minimal
+
+
+        bool_max, sln, stat, hsq, res, feasible_mu, infeasible_mu = self._try_mu(max_mu, objective = objective, tolerance = tolerance, res = res, feasible_mu = feasible_mu, infeasible_mu = infeasible_mu)
+        while bool_max:  # If max_mu was feasible, keep increasing
             max_mu += increment
             if verbose:
                 print('Trying mu: {}'.format(max_mu))
+            bool_max, sln, stat, hsq, res, feasible_mu, infeasible_mu = self._try_mu(max_mu, objective = objective, tolerance = tolerance, res = res, feasible_mu = feasible_mu, infeasible_mu = infeasible_mu)
         while (infeasible_mu[-1] - feasible_mu[-1]) > mu_accuracy:
             if verbose:
                 print('Trying mu: {}'.format((infeasible_mu[-1] - feasible_mu[-1]) * 0.5))
-            bool_, sln, stat, hsq = try_mu((infeasible_mu[-1] + feasible_mu[-1]) * 0.5)
-
+            bool_, sln, stat, hsq, res, feasible_mu, infeasible_mu = self._try_mu((infeasible_mu[-1] + feasible_mu[-1]) * 0.5, 
+                                                    objective = objective, tolerance = tolerance, res = res)
         if verbose:
             tot = ((time.time() - start) / 3600)
             print("completed in {:.2f} hours and {} iterations".format(tot, len(feasible_mu + infeasible_mu)))
 
         mu_max = np.max(feasible_mu)
         res_ = OrderedDict({k: res[k] for k in sorted(list(res.keys()))})
+
         return mu_max, res_
 
-    def optimize(self, me_model, objective, mu_max, n_points=10,
-                 tolerance=0, n_cores=None, graph=True, fig_name=None):
+    def optimize(self, me_model, objective: Dict[str, int], mu_max: SupportsFloat,
+                 n_points: int = 10, tolerance: SupportsFloat = 0, n_cores: Optional[int] = None,
+                 visualize: bool = True, fig_name: Optional[str] = None):
         """General optimization of any non-growth objective
 
         Parameters
         ----------
-        me_model: human_me.core.model.ME_Model
+        me_model : human_me.core.model.ME_Model
             ME Model to solve
-        objective: dict
+        objective : Dict[str, int]
             The objective function to optimize. Dictionary represent a linear combination of reactions to optimize,
-            with reaction ids as keys and the coefficient of the lin. comb. as the values.
-            Values can only be all 1 for maximization, or all -1 for minimization.
-
-            Example: simplest case, to maximize reaction with id 'A', objective = {'A': 1}
-        mu_max: float
-            the maximum growth value at which the model is feasible; use .maximize_growth() method to identify (should be <= mu_max output of .maxmimize_growth() method)
-        tolerance: float; default 0
-            Threshold below which expected sensitivity of solver is too low to detect infeasibility
-        n_cores: int, default None
-            the number of workers to use for parallelization
-        graph: bool; default True
-            plot the relationship between growth and the objective function of interest
-        fig_name: str; default None
-            save the plotted figure to
+            with reaction ids as keys and the coefficient of the linear combination as the values.
+            Values must either be 1 for maximization or -1 for minimization.
+        mu_max : SupportsFloat
+            the maximum growth value at which the model is feasible [hr^-1]; use .maximize_growth() method to identify (should be <= mu_max output)
+            if using an experimental value, make sure it is feasible using the .solve_lp() method 
+        n_points : int, optional
+            # of growth values to consider between 0 and mu_max, by default 10
+        tolerance : SupportsFloat, optional
+            Threshold below which expected sensitivity of solver is too low to detect infeasibility, by default 0
+        n_cores : Optional[int], optional
+            the number of workers to use for parallelization, by default None
+        visualize : bool, optional
+            plot the relationship between growth and the objective function of interest, by default True
+        fig_name : Optional[str], optional
+            save the plotted figure to 'path/to/filename.ext', by default None
 
         Returns
-        ----------
-        sln: tuple
+        -------
+        sln: Tuple[float]
             first element is the growth value at which the non-growth objective is optimized
             second element is the optimized non-growth objective value
-        predicted: pd.DataFrame
+        predicted: pandas.DataFrame
             1000 growth values between 0 and mu_max, with corresponding interpolated objective values
-        interp_fit: output of scipy.interpolate.interp1d
+        interp_fit: scipy.interpolate.interp1d
             a function to interpolate objective values from growth values, used to generated predicted
         optimal_vals: collections.OrderedDict
             keys are n_points growth values between 0 and mu_max, values are the objective value optimized at
             the corresponding growth value
-        res: dict
+        res: Dict[float, Tuple[np.array, int]]
             keys are n_points growth values between 0 and mu_max, values are the output of .solve_lp at
             corresponding growth values with the objective set to the non-growth objective input
         """
@@ -290,7 +295,7 @@ class qminosSolver:
         obj_keys = list(objective.keys())
         if len(obj_keys) == 1 and obj_keys[0] == 'biomass_dilution':
             raise ValueError('To optimize for growth, use the .maximize_growth() method')
-        elif len(set(list(objective.values()))) != 1:
+        if len(set(list(objective.values()))) != 1:
             raise ValueError(
                 'Currently, NLP objectives must be either only maximization or minimization (only all 1s or only all -1s in objective dictionary values)')
 
@@ -305,12 +310,12 @@ class qminosSolver:
         else:
             # TODO: fix qminos solver parralelization
             # msg: Currently, parallelization errors out at /data2/hratch/Software/qminosSolver/solvemepy/qminospy/solver.py
-            # at line 241-243. for some reason, parallelization doesn't recognize the self.precision = 'quad' as == 'quad'. 
+            # at line 241-243. for some reason, parallelization doesn't recognize the self.precision = 'quad' as == 'quad'.
             # This does not occur in the serial loop. hard-coding the commented lines 244-250 (same as line 193-199)
-            # fixes this issue, but is only a temporary solution. 
+            # fixes this issue, but is only a temporary solution.
             #             raise ValueError('me_solver/solve_me .optimize() method, see message above for error')
             n_cores = min([n_cores, n_points])
-            #         args_ = zip([me_model]*n_points, list(growth_vals), [objective]*n_points, [tolerance]*n_points, 
+            #         args_ = zip([me_model]*n_points, list(growth_vals), [objective]*n_points, [tolerance]*n_points,
             #                    [True]*n_points)
             pool = Pool(n_cores)
             try:
@@ -352,7 +357,7 @@ class qminosSolver:
         optimal_val_growth = predicted[predicted[obj_label] == optimal_val].growth.values.tolist()[0]
         sln = (optimal_val_growth, optimal_val)
 
-        if graph:
+        if visualize:
             fig, ax = plt.subplots(figsize=(5, 5))
             sns.lineplot(x='growth', y=obj_label, data=predicted, ax=ax)
             sns.scatterplot(x=list(optimal_vals.keys()), y=list(optimal_vals.values()), color='black', ax=ax)

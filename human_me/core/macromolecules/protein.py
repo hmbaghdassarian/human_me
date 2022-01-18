@@ -1,46 +1,40 @@
 #!/usr/bin/env python
 # coding: utf-8
 
+from typing import Dict, Optional
+
 from human_me.utils import metabolites as metab
 from human_me.core.macromolecules.macromolecule import Macromolecule, Proxy
 
 
 class Protein(Macromolecule):
-    def __init__(self, compartment, id_, gene_info=None, amino_acid_counts: dict = None, dummy=False,
-                 non_machinery=False):
-        """
+    """Protein macromolecule object representation."""
 
-        Generates a Macromolecule in the compartment for a protein with either 1) gene_info (GeneInformation object) or all of
-        2) id (string)and amino_acid_counts (dictionary, keys as 1-letter amino acide code values as number of
-        occurences in the protein).
+    def __init__(self, compartment: str, id_: str, gene_info = None,
+                amino_acid_counts: Optional[Dict[str,int]] = None, dummy: bool = False,
+                 non_machinery: bool = False):
+        """Generates a Macromolecule in the compartment for a protein. Generated either from gene_info or id_ and amino_acid_counts.
 
-
-
-        If gene_info and id_ are both not None, will concatenate the two strings.
-
-
-
-        Inheritcs from Macromolecule. Class for Protein objects in ME-Model
 
         Parameters
         ----------
-        compartment: str
-            same as cobra.Metabolite.__init__
-        id_: str
-            same as cobra.Metabolite.__init__ (id)
-        gene_info: GeneInformation object
-        amino_acid_counts: dict
-            keys are amino acids, values are the number of occurences in the protein sequence
-        dummy: bool, default False
-            whether the protein is a dummy protein for the unmodeled protein fraction of the ME-Model
-        non_machinery: bool, default False
-            whether the protein metabolite is non_machinery. *Note, applies to final protein product but
-            not intermediates
-
+        compartment : str
+            protein subcellular location (one-letter code)
+        id_ : str
+            protein identifier
+        gene_info : GeneInformation, optional
+            gene's associated GeneInformation object, by default None
+        amino_acid_counts : Dict[str, int], optional
+            keys are one-letter amino acid codes, values are the number of occurences of that amino acid in the protein sequence, by default None
+        dummy : bool, optional
+             whether the protein is a dummy protein for the unmodeled protein fraction of the ME-Model, by default False
+        non_machinery : bool, optional
+            whether the protein metabolite is non_machinery, by default False
+            *Note, applies to final protein product but not intermediates
         """
         if gene_info is not None and (amino_acid_counts is not None):
             raise ValueError('Please specify either gene_info only or amino_acid_counts only')
-        elif gene_info is None and ((id_ is None) or (amino_acid_counts is None)):
+        if gene_info is None and ((id_ is None) or (amino_acid_counts is None)):
             raise ValueError('Please specify either gene_info or id_/amino_acid_counts')
         if id_ is None:
             raise ValueError('Unaccounted for condition in protein id naming')
@@ -67,7 +61,7 @@ class Protein(Macromolecule):
              self._amino_acid_counts.items()])
 
         elements = {'C': 0, 'H': 0, 'N': 0, 'O': 0, 'S': 0}
-        if compartment in metab.seq_amino_acid_map_compartments.keys():
+        if compartment in metab.seq_amino_acid_map_compartments:
             for aa_code, aa_count in self._amino_acid_counts.items():
                 aa_elements = metab.seq_amino_acid_map_compartments[compartment][aa_code].elements
                 for element in aa_elements:

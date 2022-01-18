@@ -1,26 +1,25 @@
 #!/usr/bin/env python
 # coding: utf-8
+import random
+from typing import Any, Dict, List
 
 import numpy as np
-import random
 from Bio import SeqIO
 
-from human_me.utils.load_environmental_variables import build_files_path
-from human_me.utils import machinery as mach
-from human_me.utils import parameters as params
-from human_me.utils import metabolites as metab
-from human_me.utils import functions as func
-
-from human_me.core.reaction import ExpressionReaction
-
-from human_me.core.macromolecules.complex import RibosomalComplex
-from human_me.core.macromolecules.RNA import rRNA, RNA_fragment
-from human_me.core.macromolecules.protein import Protein
-
 import human_me.expression.gene_expression.build_mrna_expression_reactions as build_mrna
+from human_me.core.macromolecules.complex import RibosomalComplex
+from human_me.core.macromolecules.protein import Protein
+from human_me.core.macromolecules.RNA import RNA_fragment, rRNA
+from human_me.core.reaction import ExpressionReaction
 from human_me.expression.gene_expression import gene_information
+from human_me.expression.gene_expression.protein_expression import \
+    build_protein_expression_reactions as build_protein
 from human_me.expression.gene_expression.protein_expression import degradation
-from human_me.expression.gene_expression.protein_expression import build_protein_expression_reactions as build_protein
+from human_me.utils import functions as func
+from human_me.utils import machinery as mach
+from human_me.utils import metabolites as metab
+from human_me.utils import parameters as params
+from human_me.utils.load_environmental_variables import build_files_path
 
 # # rRNA
 
@@ -46,15 +45,15 @@ A_prime_index = int(round(np.median([414, 420]) * len(ets_5_seq) / 3657))  # loc
 A_0_index = int(round(1642 * len(ets_5_seq) / 3657)) - A_prime_index  # how far to the right of 45s is the A_0 site
 site_2_index = int(round((6470 - 5527) * len(its_1_seq) / (6623 - 5527)))  # how far right of end of 18s
 site_4_index = int(round((7570 - 6779) * (len(its_2_seq) / (
-            7935 - 6779))))  # how far to the right of the end of 5.8s/how far into ITS2 is the site 4 cut location
+    7935 - 6779))))  # how far to the right of the end of 5.8s/how far into ITS2 is the site 4 cut location
 e_index = int(round(
     (np.median([5606, 5609]) - 5527) * len(its_1_seq) / (6623 - 5527)))  # bp to right of end of 18s/start of its_1
 conserved_stall_idx = int(round((np.median([6117, 6192]) - 5527) * len(its_1_seq) / (
-            6623 - 5527)))  # how far right of end of 18s does RRP6 stall to form 21S-C
+    6623 - 5527)))  # how far right of end of 18s does RRP6 stall to form 21S-C
 # Fig. 6b https://www.sciencedirect.com/science/article/pii/S1097276513005844?via%3Dihub
-seven_s_idx = 190
-five_eight_plus_forty_idx = 40
-six_s_index = 1  # https://www.nature.com/articles/s41594-019-0234-x?draft=collection
+SEVEN_S_IDX = 190
+FIVE_EIGHT_PLUS_FORTY_IDX = 40
+SIX_S_IDX = 1  # https://www.nature.com/articles/s41594-019-0234-x?draft=collection
 
 # # original: from 2+ difference soures
 # # 420 and numerator from figure 3A https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3964915/
@@ -62,7 +61,7 @@ six_s_index = 1  # https://www.nature.com/articles/s41594-019-0234-x?draft=colle
 # # Fig1D: https://www.researchgate.net/figure/Mapping-the-cleavages-in-human-ITS1-A-Alternative-processing-pathways-of-human-rRNA_fig1_235729322
 # site_2_index = int(round(np.median([6396 -5520,6508-5520]) *(len(its_1_seq)/(6603-5520))))
 # #https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3964915/
-# A_0_index = round(1800*(len(ets_5_frag2_seq)/(1800 + 2000)))  
+# A_0_index = round(1800*(len(ets_5_frag2_seq)/(1800 + 2000)))
 # # supplementary Fig. 2 https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3632142/
 # conserved_stall_idx = int(round(np.median([590, 635])))
 # # Fig1D: https://www.researchgate.net/figure/Mapping-the-cleavages-in-human-ITS1-A-Alternative-processing-pathways-of-human-rRNA_fig1_235729322
@@ -70,7 +69,7 @@ six_s_index = 1  # https://www.nature.com/articles/s41594-019-0234-x?draft=colle
 # e_index = 80 # fig 3c:https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3632142/
 # yeast_its2_length = 420 # https://www.microbiologyresearch.org/docserver/fulltext/jmm/66/2/126_jmm000426.pdf?expires=1594927728&id=id&accname=guest&checksum=7C6B2DF6CE3C3080E28605D15B99DF1E
 # yeast_c2 = 140 # https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4361047/
-# seven_s_idx = int(round((yeast_c2/yeast_its2_length)*len(its_2_seq))) # how far to the right of 5.8s does sequence extend to form the 7s rrrna
+# SEVEN_S_IDX = int(round((yeast_c2/yeast_its2_length)*len(its_2_seq))) # how far to the right of 5.8s does sequence extend to form the 7s rrrna
 
 
 # In[3]:
@@ -81,8 +80,22 @@ psim_rib.LOCATION = psim_rib.LOCATION.apply(lambda x: ['n', 'c'])
 exclude = ['POLYUBIQUITINATIONn', 'DEUBIQUITINATIONn', 'DEGRADATIONn']
 
 
-def cleave_ub(hgnc_id, ub_args, compress_mrna, stochastic, seeds):
-    """Generates reactions specific for ubiquitin-protein fusions. RPL40 and RPS27A have ubiquitin fusions."""
+def cleave_ub(hgnc_id: str, ub_args: Dict[str, Any], compress_mrna: bool, stochastic: bool, seeds: List[int]):
+    """Generates reactions specific for ubiquitin-protein fusions. RPL40 and RPS27A have ubiquitin fusions.
+
+    Parameters
+    ----------
+    hgnc_id : str
+        Gene HGNC ID
+    ub_args : Dict[str, Any]
+        set of variables generated by this ubiquitin.express_ubiquitin to be used throughout model building
+    compress_mrna : bool
+        whether to condense elongation, processing, and nuclear export reactions into a single reaction
+    stochastic : bool
+        Whether a potentially stochastic output should be stochastic, or choose a default behavior instead
+    seeds : List[int]
+        A list of seeds for if stochastic is set to True
+    """
     gene_info = gene_information.generate_from_psim(hgnc_id=hgnc_id, psim=psim_rib,
                                                     machinery_list=list(), reactions=None, nonmachinery_locations=['n'],
                                                     stochastic=stochastic, seed=seeds[0])
@@ -96,12 +109,12 @@ def cleave_ub(hgnc_id, ub_args, compress_mrna, stochastic, seeds):
     translation_elongation_c.ubiquitin_biogenesis = True
     # cleaved protein sequence, gene_info object, and cobra.Metabolite
     processed_seq = gene_info.protein_seq[
-                    :gene_info.protein_seq.index(ub_args['single_ubiquitin_sequence'])] + gene_info.protein_seq[
-                                                                                          gene_info.protein_seq.index(
-                                                                                              ub_args[
-                                                                                                  'single_ubiquitin_sequence']) + len(
-                                                                                              ub_args[
-                                                                                                  'single_ubiquitin_sequence']):]
+        :gene_info.protein_seq.index(ub_args['SINGLE_UB_SEQ'])] + gene_info.protein_seq[
+        gene_info.protein_seq.index(
+            ub_args[
+                'SINGLE_UB_SEQ']) + len(
+            ub_args[
+                'SINGLE_UB_SEQ']):]
     psim_temp = psim_rib.copy()
     psim_temp.loc[psim_temp[psim_temp.HGNC_ID == hgnc_id].index, 'PROTEIN_SEQ'] = processed_seq
     gene_info = gene_information.generate_from_psim(hgnc_id=hgnc_id, psim=psim_temp,
@@ -137,8 +150,20 @@ def cleave_ub(hgnc_id, ub_args, compress_mrna, stochastic, seeds):
     return to_add, folded_protein_c, folded_protein_n
 
 
-def build_ribosome_protein_expression_reactions(ub_args, compress_mrna, stochastic, seeds):
-    """Reactions associated with transcription and translation of ribosomal proteins"""
+def build_ribosome_protein_expression_reactions(ub_args: Dict[str, Any], compress_mrna: bool, stochastic: bool, seeds: List[int]):
+    """Reactions associated with transcription and translation of ribosomal proteins
+
+    Parameters
+    ----------
+    ub_args : Dict[str, Any]
+        set of variables generated by this ubiquitin.express_ubiquitin to be used throughout model building
+    compress_mrna : bool
+        whether to condense elongation, processing, and nuclear export reactions into a single reaction
+    stochastic : bool
+        Whether a potentially stochastic output should be stochastic, or choose a default behavior instead
+    seeds : List[int]
+        A list of seeds for if stochastic is set to True
+    """
 
     # small ribosome proteins--------------------------------------------------------------------------------
     rs_ids = mach.rs['HGNC ID (gene)'].tolist()
@@ -205,12 +230,6 @@ def build_ribosome_protein_expression_reactions(ub_args, compress_mrna, stochast
     rl_protein_metabolites += [folded_protein_c, folded_protein_n]
 
     return rs_expression_reactions, rs_protein_metabolites, rl_expression_reactions, rl_protein_metabolites
-
-
-# In[ ]:
-
-
-# In[4]:
 
 
 def build_rrna5s_reactions(rpl5_n, rpl11_n):
@@ -504,8 +523,8 @@ def build_other_rrna_reactions(rrna5s_complex_n, rs_protein_metabolites, rl_prot
     rrna_28s_formation.gene_reaction_rule = mach.lariat_machinery["5' Degradation"][0]
 
     # 7s formation------------------------------------------------------------------------------------
-    deg_seq = its_2_seq[seven_s_idx: site_4_index]
-    rrna_7s_seq = rrna_5_8s_seq + its_2_seq[:seven_s_idx]
+    deg_seq = its_2_seq[SEVEN_S_IDX: site_4_index]
+    rrna_7s_seq = rrna_5_8s_seq + its_2_seq[:SEVEN_S_IDX]
     rrna_7s_n = rRNA('7s', seq=rrna_7s_seq, compartment='n', triphosphate=False)
     base_counts_deg, elements_deg = func.get_base_counts_and_elements(deg_seq)
 
@@ -524,8 +543,8 @@ def build_other_rrna_reactions(rrna5s_complex_n, rs_protein_metabolites, rl_prot
     rrna_7s_formation.gene_reaction_rule = ' and '.join(mach.DIS3 + mach.ISG20L2)
 
     # 5.8s+40 formation------------------------------------------------------------------------------------
-    deg_seq = its_2_seq[five_eight_plus_forty_idx: seven_s_idx]
-    rrna_5_8s_plus_40_seq = rrna_5_8s_seq + its_2_seq[:five_eight_plus_forty_idx]
+    deg_seq = its_2_seq[FIVE_EIGHT_PLUS_FORTY_IDX: SEVEN_S_IDX]
+    rrna_5_8s_plus_40_seq = rrna_5_8s_seq + its_2_seq[:FIVE_EIGHT_PLUS_FORTY_IDX]
     rrna_5_8s_plus_40_n = rRNA('5_8s_plus_40', seq=rrna_5_8s_plus_40_seq, compartment='n', triphosphate=False)
     base_counts_deg, elements_deg = func.get_base_counts_and_elements(deg_seq)
 
@@ -545,8 +564,8 @@ def build_other_rrna_reactions(rrna5s_complex_n, rs_protein_metabolites, rl_prot
 
     # 6s formation------------------------------------------------------------------------------------
 
-    deg_seq = its_2_seq[six_s_index: five_eight_plus_forty_idx]
-    rrna_6s_seq = rrna_5_8s_seq + its_2_seq[:six_s_index]
+    deg_seq = its_2_seq[SIX_S_IDX: FIVE_EIGHT_PLUS_FORTY_IDX]
+    rrna_6s_seq = rrna_5_8s_seq + its_2_seq[:SIX_S_IDX]
     rrna_6s_n = rRNA('6s', seq=rrna_6s_seq, compartment='n', triphosphate=False)
     base_counts_deg, elements_deg = func.get_base_counts_and_elements(deg_seq)
 
@@ -593,7 +612,7 @@ def build_other_rrna_reactions(rrna5s_complex_n, rs_protein_metabolites, rl_prot
     pre60s_transport.gene_reaction_rule = ' and '.join(mach.tfiiia + mach.RAN + mach.XPO1)
 
     # 5.8s/mature 60s formation------------------------------------------------------------------------------------
-    deg_seq = its_2_seq[:six_s_index]
+    deg_seq = its_2_seq[:SIX_S_IDX]
     rrna_5_8s_c = rRNA('5_8s', seq=rrna_5_8s_seq, compartment='c', triphosphate=False)
     base_counts_deg, elements_deg = func.get_base_counts_and_elements(deg_seq)
 
@@ -634,10 +653,22 @@ def build_other_rrna_reactions(rrna5s_complex_n, rs_protein_metabolites, rl_prot
     return all_reactions, mature_ribosomal_precomplexes, mature_rrna_metabolites
 
 
-# In[6]:
+def build_ribosome(ub_args: Dict[str, Any], compress_mrna: bool, reversible_complex_formation: bool, stochastic: bool, seed: int):
+    """Generate all ribosome biogenesis reactions
 
-
-def build_ribosome(ub_args, compress_mrna, reversible_complex_formation, stochastic, seed):
+    Parameters
+    ----------
+    ub_args : Dict[str, Any]
+        set of variables generated by this ubiquitin.express_ubiquitin to be used throughout model building
+    compress_mrna : bool
+        whether to condense elongation, processing, and nuclear export reactions into a single reaction
+    reversible_complex_formation : bool
+        whether complex formation reactions are reversible
+    stochastic : bool
+        Whether a potentially stochastic output should be stochastic, or choose a default behavior instead
+    seed : int
+        A seed for if stochastic is set to True
+    """
     with func.HiddenPrints():
         random.seed(seed)
         seeds = random.sample(range(0, int((2 ** 32 - 1))), k=87)

@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 # coding: utf-8
 
+from typing import Optional
+
 from human_me.utils import metabolites as metab
 from human_me.utils import machinery as mach
 from human_me.utils import functions as func
@@ -22,14 +24,23 @@ subsystem_map = dict(zip(molecule_type, ['mRNA_expression', 'rRNA_expression', '
                                          'mRNA_expression']))
 rb_map = dict(zip(molecule_type, [False, True, False, False]))
 
+
 class RNA(Macromolecule):
-    def __init__(self, metabolite_name, seq, compartment='n', triphosphate=True, hgnc_id=None):
-        """
+    def __init__(self, metabolite_name: str, seq: str, compartment: str = 'n', triphosphate: bool = True, hgnc_id: Optional[str] = None):
+        """Generates an RNA metabolite.
 
-        Generates an RNA metabolite. Seq is a string of the mrna sequence, triphosphate indicates
-        the presence (True) or absence (False) of a triphosphate on the 5' end of the molecule. Otherwise,
-        assumes a monophosphate.
-
+        Parameters
+        ----------
+        metabolite_name : str
+            descriptive name to be incorporated into self.id
+        seq : str
+            the rna sequenc
+        compartment : str, optional
+            RNA subcellular location, by default 'n'
+        triphosphate : bool, optional
+            the presence of a triphosphate (True) or monophosphate (False) on the 5' end of the molecule, by default True
+        hgnc_id : str, optional
+            gene HGNC ID, by default None
         """
         rna_id = metabolite_name + '_RNA_' + compartment
 
@@ -38,31 +49,29 @@ class RNA(Macromolecule):
         self.length = len(self.sequence)
         self.get_base_counts_and_elements()
 
-        Macromolecule.__init__(self, id=rna_id, compartment=compartment, charge=-self.length, elements=self.elements,
-                               hgnc_id=hgnc_id)
+        Macromolecule.__init__(self, id = rna_id, compartment=compartment, charge = -self.length, elements = self.elements,
+                               hgnc_id = hgnc_id)
         if triphosphate:
             self.charge -= 3
 
     def get_base_counts_and_elements(self):
-        """
-        Updates RNA metabolite to have appropriate formula according to sequence
-
-        """
+        """Updates RNA metabolite to have appropriate formula according to sequence."""
         self.base_counts, self.elements = func.get_base_counts_and_elements(seq=self.sequence,
                                                                             triphosphate=self.triphosphate)
 
-    def synthesize(self, id_):
-        """
-        Generates a reaction for transcription of an RNA molecule (NTPs-->RNA).
-        Inputs:
-        1) self is an object of type RNA representing the rna molecule to be degraded.
-        2) id_ is a string representing the name you want to give the reaction
-        hgnc_id: str
-            HGNC ID of the gene for which this reaction is being generated
+    def synthesize(self, id_: str) -> ExpressionReaction:
+        """Generates a reaction for transcription of an RNA molecule (NTPs-->RNA).
 
-        Output: a degradation reaction of type ExpressionReaction
-        """
+        Parameters
+        ----------
+        id_ : str
+            reaction id
 
+        Returns
+        -------
+        ExpressionReaction
+            a transcription reaction
+        """
         if self.type not in ['premrna', 'rrna', 'trna']:
             raise ValueError('Only premrna, rrna, or trna can be synthesized')
 
@@ -83,26 +92,26 @@ class RNA(Macromolecule):
 
         if len(rna_synthesis.check_mass_balance()) > 0:
             raise ValueError('RNA synthesis for ' + id_ + ' is unbalanced')
-        elif list(rna_synthesis.compartments) != ['n']:
+        if list(rna_synthesis.compartments) != ['n']:
             raise ValueError('RNA synthesis must be confined to nuclear compartment')
-        else:
-            return rna_synthesis
+        return rna_synthesis
 
-    def exonucleolytic_degradation(self, reaction_name, balanced=True, update=False):
-        """
+    def exonucleolytic_degradation(self, reaction_name: str, balanced: bool = True, update: bool = False) -> ExpressionReaction:
+        """Generates a reaction for exonucleolytic cleavage of an RNA molecule (RNA-->NMPs).
 
-        Generates a reaction for exonucleolytic cleavage of an RNA molecule (RNA-->NMPs).
-        Inputs:
-        1) self is an object of type RNA representing the rna molecule to be degraded.
-        2) reaction_name is a string representing the name you want to give the reaction
-        hgnc_id: str
-            HGNC ID of the gene for which this reaction is being generated
-        3) balanced is a boolean indicating whether to check for mass balance
-        4) update is a boolean indicating whether to update degradation reaction with subsystem and machinery
+        Parameters
+        ----------
+        reaction_name : str
+            the reaction name
+        balanced : bool, optional
+            check reaction mass balance (True) or not (False), by default True
+        update : bool, optional
+            update degradation reaction with subsystem and machinery (True), by default False
 
-        Output: a degradation reaction of type ExpressionReaction
-        no GPRs or subsystems added to reaction
-
+        Returns
+        -------
+        ExpressionReaction
+            RNA degradation reaction (no GPRs or subsystems added to reaction)
         """
         # exonucleolytic cleavage of RNA reaction
         if self.type in molecule_type:
@@ -157,10 +166,18 @@ class RNA(Macromolecule):
             raise ValueError('RNA degradation is not mass balanced')
         return rna_degradation
 
-    def update_metabolite(self, seq, append=False, append_to=None):
-        """Updates the RNA metabolite information according to an input sequence string. If add is True,
-        assumes string is being added, else, assumes string is being removed."""
+    def update_metabolite(self, seq: str, append: bool = False, append_to: Optional[str] = None):
+        """Updates the RNA metabolite information according to an input sequence string.
 
+        Parameters
+        ----------
+        seq : str
+            rna sequence to update RNA with
+        append : bool, optional
+            whether seq is being added (True) or removed (False) from RNA, by default False
+        append_to : str, optional
+            whether to update 5' or 3' end of sequence, by default None
+        """
         if append:
             if append_to is None:
                 raise ValueError("Must specify an end to append to append [5_primed, 3_primed]")
@@ -176,13 +193,13 @@ class RNA(Macromolecule):
             self.charge += -len(seq)
 
             base_counts = dict()
-            for base_letter in metab.seq_element_map.keys():
+            for base_letter in metab.seq_element_map:
                 base_counts[base_letter] = seq.count(base_letter)
                 self.base_counts[base_letter] += seq.count(base_letter)
 
             new_elements = self.elements.copy()
-            for base_letter in metab.seq_element_map.keys():
-                for element in new_elements.keys():
+            for base_letter in metab.seq_element_map:
+                for element in new_elements:
                     new_elements[element] += base_counts[base_letter] * metab.seq_element_map[base_letter][element]
             self.elements = new_elements
 
@@ -190,11 +207,21 @@ class RNA(Macromolecule):
             raise ValueError('Situation in which RNA sequence is removed or replaced has not been implemented yet')
 
 
-# In[5]:
-
-
 class pre_mRNA(RNA):
-    def __init__(self, gene_info, compartment='n', triphosphate=True):
+    """premRNA macromolecule object representation."""
+
+    def __init__(self, gene_info, compartment: str = 'n', triphosphate: bool = True):
+        """Init method for pre_mRNA.
+
+        Parameters
+        ----------
+        gene_info : GeneInformation
+            gene's associated GeneInformation object
+        compartment : str, optional
+            RNA subcellular location, by default 'n'
+        triphosphate : bool, optional
+            the presence of a triphosphate (True) or monophosphate (False) on the 5' end of the molecule, by default True
+        """
         if compartment != 'n':
             raise ValueError("Premrna's outside of the nucleus are not currently considered")
 
@@ -206,7 +233,20 @@ class pre_mRNA(RNA):
 
 
 class mRNA(RNA):
-    def __init__(self, gene_info, compartment='n', triphosphate=True):
+    """mRNA macromolecule object representation."""
+
+    def __init__(self, gene_info, compartment: str = 'n', triphosphate: bool = True):
+        """Init method for mRNA.
+
+        Parameters
+        ----------
+        gene_info : GeneInformation
+            gene's associated GeneInformation object
+        compartment : str, optional
+            RNA subcellular location, by default 'n'
+        triphosphate : bool, optional
+            the presence of a triphosphate (True) or monophosphate (False) on the 5' end of the molecule, by default True
+        """
         if compartment not in ['n', 'c']:
             raise ValueError('mRNA must either be in nucleus or cytosol')
 
@@ -222,7 +262,10 @@ class mRNA(RNA):
 
 
 class tRNA(RNA):
+    """tRNA macromolecule object representation."""
+
     def __init__(self, metabolite_name, seq, compartment='n', triphosphate=True):
+        """See RNA.__init__ for parameter information"""
         RNA.__init__(self, metabolite_name=metabolite_name, seq=seq, compartment=compartment,
                      triphosphate=triphosphate)
 
@@ -231,18 +274,38 @@ class tRNA(RNA):
 
 
 class rRNA(RNA):
+    """rRNA macromolecule object representation."""
+
     def __init__(self, metabolite_name, seq, compartment='n', triphosphate=True):
+        """See RNA.__init__ for parameter information"""
         RNA.__init__(self, metabolite_name=metabolite_name, seq=seq, compartment=compartment,
                      triphosphate=triphosphate)
 
         self.type = 'rrna'
         self.id = self.id.replace('RNA', self.type)
-        self.k_deg = params.rrna_degradation_constant
-
+        self.k_deg = params.RNA_DEGRADATION_CONSTANT
 
 class RNA_fragment(RNA):
-    def __init__(self, metabolite_name, seq, fragment_type, compartment='n', triphosphate=True,
-                 hgnc_id=None):
+    """object representation of fragmented RNA such as lariats and other excised sequences"""
+    def __init__(self, metabolite_name: str, seq: str, fragment_type: str, compartment: str = 'n', triphosphate: bool = True,
+                 hgnc_id: Optional[str] = None):
+        """Init method for RNA_fragment.
+
+        Parameters
+        ----------
+        metabolite_name : str
+            descriptive name to be incorporated into self.id
+        seq : str
+            the rna sequenc
+        fragment_type: str
+            the type of RNA fragment (options ['lariat', 'its', 'ets', '5_leader', '3_trailer', 'trna_intron'])
+        compartment : str, optional
+            RNA subcellular location, by default 'n'
+        triphosphate : bool, optional
+            the presence of a triphosphate (True) or monophosphate (False) on the 5' end of the molecule, by default True
+        hgnc_id : str, optional
+            gene HGNC ID, by default None
+        """
 
         if fragment_type not in ['lariat', 'its', 'ets', '5_leader', '3_trailer', 'trna_intron']:
             raise ValueError('RNA fragment type specified is not considered')
@@ -250,11 +313,11 @@ class RNA_fragment(RNA):
         if compartment not in ['n', 'c']:
             raise ValueError('Only nuclear or cytosolic RNA fragments are incorporated for now')
 
-        RNA.__init__(self, metabolite_name=metabolite_name, seq=seq, compartment=compartment,
-                     triphosphate=triphosphate, hgnc_id=hgnc_id)
+        RNA.__init__(self, metabolite_name = metabolite_name, seq = seq, compartment = compartment,
+                     triphosphate = triphosphate, hgnc_id = hgnc_id)
 
-        self.type = 'fragment_rna'
-        self.fragment_type = fragment_type
+        self.type='fragment_rna'
+        self.fragment_type=fragment_type
         if self.fragment_type == 'lariat' and hgnc_id is None:
             raise ValueError('Must specify hgnc ID for lariats')
-        self.id = self.id.replace('RNA', self.fragment_type)
+        self.id=self.id.replace('RNA', self.fragment_type)

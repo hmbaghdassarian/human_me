@@ -3,47 +3,45 @@
 
 import collections
 from collections import OrderedDict
+from typing import Dict, List, Optional
+
 import numpy as np
 from faker import Faker
 
+from human_me.core.macromolecules.macromolecule import Macromolecule, Proxy
+from human_me.core.reaction import ExpressionReaction
 from human_me.utils import machinery as mach
 from human_me.utils import parameters as params
 from human_me.utils.functions import flatten_list
-from human_me.core.macromolecules.macromolecule import Macromolecule, Proxy
-from human_me.core.reaction import ExpressionReaction
 
 cotransloc_ids = set([mid + '_folded_protein_r' for mid in mach.ctnm + mach.translation_efs])
 
 
 class Complex(Macromolecule):
-    """Complexes formed by non-covalent interactions between macromolecules"""
+    """Complexes formed by non-covalent interactions between macromolecules."""
 
-    def __init__(self, metabolites: list, complex_id: str = None, seed: int = None):
-        """
+    def __init__(self, metabolites: List[Macromolecule], complex_id: Optional[str] = None, seed: Optional[int] = None):
+        """Init method for Complex
+
         Parameters
         ----------
-        metabolites: list
-            each entry is a Macromolecule object (protein or RNA or complex, not generic metabolites)
-        complex_id: str
-            the id of the complex metabolite; if None, will generate a random id
-        seed: int
-            A seed for generating the complex ID if it is None
-
-        Returns
-        ----------
-        A Complex object representing the complex formed between input macromolecules
-
+        metabolites : List[Macromolecule]
+            the macromolecules to form a complex
+        complex_id : str, optional
+            complex identifier, by default None
+        seed : Optional[int], optional
+            A seed for generating the complex ID if complex_id is None, by default None
         """
         # checks
         if type(metabolites) != list or len(metabolites) == 0:
             raise ValueError('Must provide a list of macromolecules to form complex')
         # cobra metabolite not set up, check for bc they don't have the attribute .type
-        if len([m for m in metabolites if not (isinstance(m, Macromolecule))]) > 0:
+        if len([m for m in metabolites if not isinstance(m, Macromolecule)]) > 0:
             raise ValueError('Generic cobra.Metabolite cannot form complexes with macromolecules currently')
 
         self.type = 'complex'
         self.components = {m: metabolites.count(m) for m in metabolites}
-        # parse compartment    
+        # parse compartment
         compartments = list(set([m.compartment for m in self.components]))
         if len(compartments) == 1:
             compartment = compartments[0]
@@ -62,7 +60,7 @@ class Complex(Macromolecule):
         elements = dict()
         for m, count in self.components.items():
             for k, v in m.elements.items():
-                if k in elements.keys():
+                if k in elements:
                     elements[k] += v * count
                 else:
                     elements[k] = v * count
@@ -78,7 +76,7 @@ class Complex(Macromolecule):
         self.keff = None
         self.hgnc_id = None  # always None, for internal use with expression/protein_expression/degradation
 
-    def update_id(self, new_id=None):
+    def update_id(self, new_id: Optional[str] = None):
         """In cases where complex id is too long (see build_me_model generate_complex_reactions method)"""
 
         if self.reaction_id is not None:
@@ -92,24 +90,28 @@ class Complex(Macromolecule):
             self.temp_id = new_id
         self.id = self.temp_id + '_complex_' + self.compartment
 
-    def form_complex(self, reaction_id=None, reversible=False, synthesis=True, synthesis_type='complex'):
-
-        """The reaction required to generate the Complex object
+    def form_complex(self, reaction_id: Optional[str] = None, reversible: bool = False,
+                     synthesis: bool = True, synthesis_type: str = 'complex') -> ExpressionReaction:
+        """The reaction to generate the Complex object.
         Note: assumes non-covalent complex formation (in terms of elemental balance)
 
         Parameters
-        -----------
-        reaction_id: str
-            ID to assign to the reaction
-        reversible: bool
-            Whether the reaction is reversible. Setting to True may make model more efficient (allows reuse of
-            self.components if involved in other reactions)
+        ----------
+        reaction_id : Optional[str], optional
+            reaction identifier, by default None
+        reversible : bool, optional
+            Whether the reaction is reversible, by default False
+            Setting to True may make model more efficient (allows reuse of self.components if involved in other reactions)
+        synthesis : bool, optional
+            whether the reaction represents the "main" synthesis/production for the macromolecule (used for appropriate mapping of coupling)
+            intended for use with genes (reactions with an associated hgnc id, and complexes), by default True
+        synthesis_type : str, optional
+            [description], by default 'complex'
 
         Returns
-        ----------
-        complex_formation: human_me.core.ExpressionReaction
+        -------
+        complex_formation : ExpressionReaction
             the complex formation between metabolites stored in self.components
-
         """
         self._check_metabolite_types()
         if reaction_id is None:
@@ -127,7 +129,7 @@ class Complex(Macromolecule):
 
         return complex_formation
 
-    def decompose_complex(self, decomposed_complex=None):
+    def decompose_complex(self, decomposed_complex=None) -> OrderedDict:
         """Recursive method to get the complex by its individual components, including nested complexes"""
         if decomposed_complex is None:
             all_metab = flatten_list([[m] * count for m, count in self.components.items()])
@@ -139,20 +141,20 @@ class Complex(Macromolecule):
             dc = decomposed_complex.components
             dc_map = {m.id: m for m in dc}
             return OrderedDict({dc_map[m_id]: dc[dc_map[m_id]] for m_id in sorted(dc_map)})
-        else:
-            metabolites_ = flatten_list(
-                [[m] * count for m, count in decomposed_complex.components.items() if m.type != 'complex'])
-            metabolites_ += flatten_list(flatten_list(
-                [[[m_] * count_ for m_, count_ in m.components.items()] * count for m, count in
-                 decomposed_complex.components.items() if m.type == 'complex']))
-            return self.decompose_complex(decomposed_complex=Complex(metabolites=metabolites_, complex_id='ignore'))
 
-    def get_complex_biomass(self):
+        metabolites_ = flatten_list(
+            [[m] * count for m, count in decomposed_complex.components.items() if m.type != 'complex'])
+        metabolites_ += flatten_list(flatten_list(
+            [[[m_] * count_ for m_, count_ in m.components.items()] * count for m, count in
+                decomposed_complex.components.items() if m.type == 'complex']))
+        return self.decompose_complex(decomposed_complex=Complex(metabolites=metabolites_, complex_id='ignore'))
+
+    def get_complex_biomass(self) -> Dict[str, float]:
         """Returns a dictionary of the complex biomass by its individual component types"""
 
         biomass_by_type = dict()
         for m, count in self.decompose_complex().items():
-            if m.type in biomass_by_type.keys():
+            if m.type in biomass_by_type:
                 biomass_by_type[m.type] += count * (m.formula_weight / 1000)
             else:
                 biomass_by_type[m.type] = count * (m.formula_weight / 1000)
@@ -172,7 +174,7 @@ class Complex(Macromolecule):
         for p, c in dc.items():
             self.length += p.length * c
             for i in range(c):
-                self._amino_acid_counts.update(p._amino_acid_counts)
+                self._amino_acid_counts.update(p._amino_acid_counts) # TODO: unused var i, check
                 if hasattr(p, '_ptms'):
                     self._ptms.update(p._ptms)
 
@@ -188,18 +190,28 @@ class Complex(Macromolecule):
         """Remove redundant IDs"""
         self._degradation_reactions = list(set(self._degradation_reactions))
 
-    def change_compartment(self, new_compartment):
+    def change_compartment(self, new_compartment: str):
         """Returns a copy of the complex metabolite, but in new compartment"""
         self._check_metabolite_types()
         return self._change_compartment_and_components(new_compartment)
 
     def _change_compartment_and_components(self, new_compartment):
-        """Returns a copy of the complex metabolite, but in new compartment.
-        Recursive to change all components (nested complexes and their components)"""
+        """Create a complex the same as self, but in a different compartment
+
+        Parameters
+        ----------
+        new_compartment : str
+            one-letter code of compartment to change to 
+
+        Returns
+        -------
+        Complex
+            a copy of the macromolecule in the new compartment
+        """
 
         if new_compartment == self.compartment:
             raise ValueError('The macromolecule is already in this compartment')
-        if new_compartment not in params.compartments.keys():
+        if new_compartment not in params.compartments:
             err = 'Specified compartment is not considered in the ME Model. Please input one of the following: '
             err += ', '.join(list(params.compartments.keys()))
 
@@ -229,41 +241,35 @@ class Complex(Macromolecule):
         return Proxy(associated_macromolecule=self)
 
 
-# In[6]:
-
-
 class RibosomalComplex(Complex):
     """Complexes specifically associated with ribosome biogenesis, which has RNA-protein complexes and
     multiple compartments"""
 
-    def __init__(self, metabolites, complex_id=None, ignore_compartment=False, seed=None):
-        """
+    def __init__(self, metabolites: List[Macromolecule], complex_id: Optional[str] = None, ignore_compartment: bool = False, seed: Optional[int] = None):
+        """Init method for RibosomalComplex
+
         Parameters
         ----------
-        metabolites: list
+        metabolites : List[Macromolecule]
             each entry is a Macromolecule object (protein or RNA or complex, not generic metabolites)
-        complex_id: str
-            the id of the complex metabolite; if None, will generate a random id
-        ignore_compartment: bool
-            whether to ignore the metabolite compartments, mainly for internal use
-        seed: int
-            A seed for generating the complex ID if it is None
-
-        Returns
-        ----------
-        A Complex object representing the complex formed between input macromolecules
-
+        complex_id : Optional[str], optional
+            the id of the complex metabolite; if None, will generate a random id, by default None
+        ignore_compartment : bool, optional
+            whether to ignore the metabolite compartments, mainly for internal use, by default False
+        seed : Optional[int], optional
+            A seed for generating the complex ID if it is None, by default None
         """
+
         # checks
         if type(metabolites) != list or len(metabolites) == 0:
             raise ValueError('Must provide a list of macromolecules to form complex')
         # cobra metabolite not set up, check for bc they don't have the attribute .type
-        if len([m for m in metabolites if not (isinstance(m, Macromolecule))]) > 0:
+        if len([m for m in metabolites if not isinstance(m, Macromolecule)]) > 0:
             raise ValueError('Generic cobra.Metabolite cannot form complexes with macromolecules currently')
 
         self.type = 'complex'
         self.components = {m: metabolites.count(m) for m in metabolites}
-        # parse compartment    
+        # parse compartment
         compartments = list(set([m.compartment for m in self.components]))
 
         # test compartment consistency - exception of ribosome complexes
@@ -289,7 +295,7 @@ class RibosomalComplex(Complex):
         elements = dict()
         for m, count in self.components.items():
             for k, v in m.elements.items():
-                if k in elements.keys():
+                if k in elements:
                     elements[k] += v * count
                 else:
                     elements[k] = v * count
@@ -317,34 +323,38 @@ class RibosomalComplex(Complex):
             dc = decomposed_complex.components
             dc_map = {m.id: m for m in dc}
             return OrderedDict({dc_map[m_id]: dc[dc_map[m_id]] for m_id in sorted(dc_map)})
-        else:
-            metabolites_ = flatten_list(
-                [[m] * count for m, count in decomposed_complex.components.items() if m.type != 'complex'])
-            metabolites_ += flatten_list(flatten_list(
-                [[[m_] * count_ for m_, count_ in m.components.items()] * count for m, count in
-                 decomposed_complex.components.items() if m.type == 'complex']))
-            return self.decompose_complex(
-                decomposed_complex=RibosomalComplex(metabolites=metabolites_, complex_id='ignore'))
 
-    def form_complex(self, reaction_id=None, reversible=False, synthesis=False, synthesis_type=None):
+        metabolites_ = flatten_list(
+            [[m] * count for m, count in decomposed_complex.components.items() if m.type != 'complex'])
+        metabolites_ += flatten_list(flatten_list(
+            [[[m_] * count_ for m_, count_ in m.components.items()] * count for m, count in
+                decomposed_complex.components.items() if m.type == 'complex']))
+        return self.decompose_complex(decomposed_complex=RibosomalComplex(metabolites=metabolites_, complex_id='ignore'))
 
-        """The reaction required to generate the Complex object
+    def form_complex(self, reaction_id: Optional[str] = None, reversible: bool = False,
+                     synthesis: bool = False, synthesis_type: Optional[str] = None) -> ExpressionReaction:
+        """The reaction to generate the Complex object.
         Note: assumes non-covalent complex formation (in terms of elemental balance)
 
         Parameters
-        -----------
-        reaction_id: str
-            ID to assign to the reaction
-        reversible: bool
-            Whether the reaction is reversible. Setting to True may make model more efficient (allows reuse of
-            self.components if involved in other reactions)
+        ----------
+        reaction_id : Optional[str], optional
+            reaction identifier, by default None
+        reversible : bool, optional
+            Whether the reaction is reversible, by default False
+            Setting to True may make model more efficient (allows reuse of self.components if involved in other reactions)
+        synthesis : bool, optional
+            whether the reaction represents the "main" synthesis/production for the macromolecule (used for appropriate mapping of coupling)
+            intended for use with genes (reactions with an associated hgnc id, and complexes), by default False
+        synthesis_type : str, optional
+            [description], by default None
 
         Returns
-        ----------
-        complex_formation: human_me.core.ExpressionReaction
+        -------
+        complex_formation : ExpressionReaction
             the complex formation between metabolites stored in self.components
-
         """
+
         self._check_metabolite_types()
         if reaction_id is None:
             self.reaction_id = self.temp_id + '_COMPLEX_FORMATION' + self.compartment
@@ -395,13 +405,13 @@ class RibosomalComplex(Complex):
 
         del dc
 
-    def _change_compartment_and_components(self, new_compartment):
+    def _change_compartment_and_components(self, new_compartment: str):
         """Returns a copy of the complex metabolite, but in new compartment.
             Recursive to change all components (nested complexes and their components)"""
 
         if new_compartment == self.compartment:
             raise ValueError('The macromolecule is already in this compartment')
-        if new_compartment not in params.compartments.keys():
+        if new_compartment not in params.compartments:
             err = 'Specified compartment is not considered in the ME Model. Please input one of the following: '
             err += ', '.join(list(params.compartments.keys()))
 
@@ -418,29 +428,23 @@ class RibosomalComplex(Complex):
         return new_complex
 
 
-# In[ ]:
-
-
-def add_complex_metabolites(cplx, met_to_add, complex_id):
+def add_complex_metabolites(cplx: Complex, met_to_add: Dict[Macromolecule, int], complex_id: str) -> Complex:
     """Add a metabolite to an existing complex object, returning it as a new complex
 
     Parameters
-    -----------
-    cplx: macromolecules.complex.Complex
+    ----------
+    cplx : Complex
         The Complex object to be appended
-    met_to_add: dict
-        The metabolites to add to the complex. Keys are objects inherited from
-        macrmolecules.macromolecule.Macromolecule and values are the number of copies of this metabolite to add.
-    complex_id: str
+    met_to_add : Dict[Macromolecule, int]
+        The metabolites to add to the complex. Keys are the macromolecules and values are the number of copies to add.
+    complex_id : str
         The new id for the new complex
 
     Returns
-    ----------
-    cplx2: macromolecules.complex.Complex
+    -------
+    cplx2 : Complex
         The new Complex object with the added metabolites
-
     """
-
     mtblts = list()
     for m, c in cplx.components.items():
         mtblts += [m] * c
