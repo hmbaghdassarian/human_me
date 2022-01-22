@@ -11,9 +11,10 @@ import cobra
 import cobra.manipulation.delete as c_del
 import pandas as pd
 # make sure the creat_environment function from the preprocesss script is run before this
+
 from human_me.preprocess import parse_complex
-from human_me.utils.load_environmental_variables import (build_files_path,
-                                                         input_data_path,
+from human_me.data.data import build_files_url
+from human_me.utils.load_environmental_variables import (input_data_path,
                                                          processed_data_path)
 
 logging.basicConfig()
@@ -75,8 +76,8 @@ def correct_model(model_file: Union[cobra.core.model, str] = input_data_path + '
         Cobra model with GPRs corrected, metabolite transport reactions needed for ME Model incorporated,
         and removed biomass objective. Used as input to building the ME Model.
     """
-    required_metabolites = json.load(open(build_files_path + "required_metabolic_model_metabolites.json"))
-    rmd = pd.read_csv(build_files_path + 'required_metabolic_model_metabolites.csv', index_col=0)
+    required_metabolites = json.load(open(build_files_url + "required_metabolic_model_metabolites.json"))
+    rmd = pd.read_csv(build_files_url + 'required_metabolic_model_metabolites.csv', index_col=0)
 
     if isinstance(model_file, str):
         if not os.path.isfile(model_file):
@@ -334,7 +335,7 @@ def correct_psim(psim_df: Union[pd.DataFrame, str] = input_data_path + 'psim_me.
     # run basic non-machinery check
     non_machinery = check_non_machinery(non_machinery=non_machinery)
 
-    expression_machinery = list(open(build_files_path + 'expression_machinery.txt').read().splitlines())
+    expression_machinery = list(open(build_files_url + 'expression_machinery.txt').read().splitlines())
     if os.path.isfile(processed_data_path + 'corrected_model.xml'):
         m_model = cobra.io.read_sbml_model(processed_data_path + 'corrected_model.xml')
     else:
@@ -350,7 +351,7 @@ def correct_psim(psim_df: Union[pd.DataFrame, str] = input_data_path + 'psim_me.
     all_columns = user_provided + essential_cols + optional_cols + nm_cols
 
     # load the MANE/RefSEQ Select PSIM---------------------------------------------------------------------
-    psim_gold = pd.read_hdf(build_files_path + 'psim_me.h5')
+    psim_gold = pd.read_hdf(build_files_url + 'psim_me.h5')
     psim_gold = psim_gold[psim_gold.Status != 0]  # drop genes that won't work with model
     psim_gold = psim_gold[all_columns]
 
@@ -457,7 +458,7 @@ def correct_psim(psim_df: Union[pd.DataFrame, str] = input_data_path + 'psim_me.
     if 'PTR' not in missing_cols:
         max_val = psim_me['PTR'].dropna().value_counts().index.tolist()
         if len(max_val) > 0 and type(max_val[0]) == str:
-            ptr = pd.read_csv(build_files_path + 'PTR_Gagneur_processed.tsv', sep='\t', index_col=0)
+            ptr = pd.read_csv(build_files_url + 'PTR_Gagneur_processed.tsv', sep='\t', index_col=0)
             ptr.drop(columns=['ENSG_ID'], inplace=True)
             ptr.columns = pd.Series(ptr.columns).apply(lambda x: x.split('_')[0] if '_PTR' in x else x).tolist()
             if max_val[0] in ptr.columns.tolist():

@@ -7,8 +7,8 @@ import numpy as np
 import pandas as pd
 from sympy.parsing.sympy_parser import parse_expr
 
-from human_me.utils.load_environmental_variables import (build_files_path,
-                                                         processed_data_path)
+from human_me.data.data import build_files_url
+from human_me.utils.load_environmental_variables import processed_data_path
 
 logging.basicConfig()
 logger = logging.getLogger(cobra.__name__)
@@ -74,15 +74,15 @@ ALPHA_M_MEDIAN = 0.06108233261605428  # units: hours (Gregersen et al ) median v
 ALPHA_P_MEDIAN = 0.019808138247250934  # units: hours ^-1 (Cambridge et al 2011 + Li et al 2021) median value
 PTR_MEDIAN = 65162.83940608428  # (Eraslan et al 2019) median value
 
-ptr = pd.read_csv(build_files_path + 'PTR_Gagneur_processed.tsv', sep='\t', index_col=0)
+ptr = pd.read_csv(build_files_url + 'PTR_Gagneur_processed.tsv', sep='\t', index_col=0)
 # don't groupby hgnc ID median, because if tissue option is used, can include unmapped ids in calculation
 ptr.drop(columns=['ENSG_ID'], inplace=True)
 ptr.columns = pd.Series(ptr.columns).apply(lambda x: x.split('_')[0] if '_PTR' in x else x).tolist()
 
-alpha_p = pd.read_csv(build_files_path + 'protein_turnover.csv', index_col=0)
+alpha_p = pd.read_csv(build_files_url + 'protein_turnover.csv', index_col=0)
 alpha_p = alpha_p.groupby(alpha_p.HGNC_ID).median().kdeg  # get median across cell lines
 
-alpha_m = pd.read_csv(build_files_path + 'Gregersen_mrna_turnover_processed.tsv', sep='\t', index_col=0)
+alpha_m = pd.read_csv(build_files_url + 'Gregersen_mrna_turnover_processed.tsv', sep='\t', index_col=0)
 alpha_m = alpha_m.groupby(alpha_m.HGNC_ID).median().median_turnover  # have true median stored above
 
 turnover = {'alpha_m': alpha_m, 'alpha_p': alpha_p,

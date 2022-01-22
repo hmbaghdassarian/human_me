@@ -117,9 +117,9 @@ class GeneInformation:
             coefficients, by default None
             The key-value pairs are as follows:
                 a) 'alpha_m': The mrna first-order degradation constant (hrs^-1). If not provided, defaults to a gene-specific value from build/Gregersen_mrna_turnover_processed.tsv if hgnc_id is in the dataframe, otherwise to 0.061
-                b) 'alpha_p': The protein first-order degradation constant (hrs^-1). If not provided, defaults to a gene-specific value from build_files_path/protein_turnover.csv if hgnc_id is in the dataframe, otherwise to 0.018
+                b) 'alpha_p': The protein first-order degradation constant (hrs^-1). If not provided, defaults to a gene-specific value from build_files_url/protein_turnover.csv if hgnc_id is in the dataframe, otherwise to 0.018
                 c) 'ptr': float or str
-                        the protein-to-RNA ratio. default values drawn from: build_files_path/PTR_Gagneur_processed.tsv
+                        the protein-to-RNA ratio. default values drawn from: build_files_url/PTR_Gagneur_processed.tsv
                         if float, assumes it is a specified ptr value
                         if str, assumes it is a tissue (must be one of tissues in the .tsv column, or "Median"); 
                         will take the gene-specific tissue-median if the HGNC ID is present in the dataframe, otherwise the median across all genes in the tissue

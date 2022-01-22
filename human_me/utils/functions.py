@@ -3,16 +3,19 @@
 
 import random
 from typing import List, Dict, Optional, Union, Tuple
+from urllib.request import urlopen
+from io import StringIO
 
 import cobra
 from Bio.Seq import Seq
+from Bio import SeqIO
 import numpy as np
 import pandas as pd
 
 import human_me.utils.machinery as mach
 import human_me.utils.metabolites as metab
 import human_me.utils.parameters as params
-from human_me.utils.load_environmental_variables import build_files_path
+from human_me.data.data import build_local_path 
 
 HiddenPrints = params.HiddenPrints
 
@@ -289,7 +292,7 @@ def average_protein_features(psim_me: pd.DataFrame, context_specific: bool = Fal
         psim = psim_me.copy()
         psim = psim[psim.HGNC_ID.isin(mach.metabolic_machinery)]  # filter for metabolic machinery only
     else:
-        psim = pd.read_csv(build_files_path + 'recon2_2_only_psim.csv')  # load recon2.2 metabolic machinery gold standard PSIM
+        psim = pd.read_csv(build_local_path + 'recon2_2_only_psim.csv')  # load recon2.2 metabolic machinery gold standard PSIM
 
     res = pd.DataFrame()
     res['premrna_counts'] = psim.PREMRNA_SEQ.dropna().apply(lambda x: {ntp: x.count(ntp) for ntp in set(x)})
@@ -393,3 +396,23 @@ def determine_transport(r: cobra.core.reaction.Reaction) -> List[str]:
     actual_transport_m = [m for m in potential_transport_m if len(set(sm_reactants[m]).intersection(sm_prod[m])) == 0
                           and (sm_reactants[m] + sm_prod[m] != ['e', 'b'])]  # this accounts for LParen_EParen reactions
     return actual_transport_m
+
+
+def read_fasta_url(file_url: str):
+    """Load a fasta format sequence from url.
+
+    Parameters
+    ----------
+    file_url : str
+        url to fast sequence
+
+    Returns
+    -------
+    formatted_fasta : SeqRecord
+        biopython SeqRecord iterator
+    """
+
+    response = urlopen(file_url)
+    fasta = response.read().decode("utf-8", "ignore")
+    formatted_fasta = SeqIO.read(StringIO(fasta), 'fasta')
+    return formatted_fasta

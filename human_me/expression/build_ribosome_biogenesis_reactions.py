@@ -4,7 +4,6 @@ import random
 from typing import Any, Dict, List
 
 import numpy as np
-from Bio import SeqIO
 
 import human_me.expression.gene_expression.build_mrna_expression_reactions as build_mrna
 from human_me.core.macromolecules.complex import RibosomalComplex
@@ -19,22 +18,22 @@ from human_me.utils import functions as func
 from human_me.utils import machinery as mach
 from human_me.utils import metabolites as metab
 from human_me.utils import parameters as params
-from human_me.utils.load_environmental_variables import build_files_path
+from human_me.data.data import build_files_url
 
 # # rRNA
-
+func.read_fasta_url(build_files_url + '45s_rrna_seq.txt')
 # rrna sequences
 # assume the ncbi 45s is actually 47s...see notes for details
-rrna_47s_seq = SeqIO.read(build_files_path + '45s_rrna_seq.txt', "fasta").seq.transcribe()
-rrna_18s_seq = SeqIO.read(build_files_path + '18s_rrna_seq.txt', "fasta").seq.transcribe()
-rrna_28s_seq = SeqIO.read(build_files_path + '28s_rrna_seq.txt', "fasta").seq.transcribe()
-rrna_5_8s_seq = SeqIO.read(build_files_path + '5_8s_rrna_seq.txt', "fasta").seq.transcribe()
+rrna_47s_seq = func.read_fasta_url(build_files_url + '45s_rrna_seq.txt').seq.transcribe()
+rrna_18s_seq = func.read_fasta_url(build_files_url + '18s_rrna_seq.txt').seq.transcribe()
+rrna_28s_seq = func.read_fasta_url(build_files_url + '28s_rrna_seq.txt').seq.transcribe()
+rrna_5_8s_seq = func.read_fasta_url(build_files_url + '5_8s_rrna_seq.txt').seq.transcribe()
 ets_5_seq = rrna_47s_seq[:rrna_47s_seq.index(rrna_18s_seq)]
 its_1_seq = rrna_47s_seq[rrna_47s_seq.index(rrna_18s_seq) + len(rrna_18s_seq):rrna_47s_seq.index(rrna_5_8s_seq)]
 its_2_seq = rrna_47s_seq[rrna_47s_seq.index(rrna_5_8s_seq) + len(rrna_5_8s_seq):rrna_47s_seq.index(rrna_28s_seq)]
 ets_3_seq = rrna_47s_seq[rrna_47s_seq.index(rrna_28s_seq) + len(rrna_28s_seq):]
 
-pre_rrna_5s_seq = SeqIO.read(build_files_path + '5s_rrna_seq.txt', "fasta").seq.transcribe()
+pre_rrna_5s_seq = func.read_fasta_url(build_files_url + '5s_rrna_seq.txt').seq.transcribe()
 rrna_5s_seq = pre_rrna_5s_seq[:120]  # 120 is length of mature 5s_rrna
 
 # rrna cut sites

@@ -7,10 +7,10 @@ import pandas as pd
 import scipy.stats as st
 import statsmodels.api as sm
 
-from human_me.utils.load_environmental_variables import build_files_path
+from human_me.data.data import build_files_url
 
 # polyA polyA_params
-polyA = pd.read_csv(build_files_path + 'polyA_length.csv', index_col=0)
+polyA = pd.read_csv(build_files_url + 'polyA_length.csv', index_col=0)
 polyA_params = st.johnsonsu.fit(polyA.MEAN)
 idx = sorted(set(polyA.SD.dropna().index.tolist()).intersection(polyA.MEAN.dropna().index.tolist()))
 reg_data = polyA.loc[idx, ['SD', 'MEAN']]

@@ -6,7 +6,7 @@ import warnings
 
 import pandas as pd
 
-from human_me.utils.load_environmental_variables import build_files_path
+from human_me.data.data import build_files_url
 from human_me.utils import machinery as mach
 from human_me.utils import parameters as params
 from human_me.utils import metabolites as metab
@@ -353,7 +353,7 @@ def get_base_frequency(seq_col, t_length):
     return final_seq
 
 
-trna_data = pd.read_excel(build_files_path + 'trna_leaders_and_trailers.xlsx')
+trna_data = pd.read_excel(build_files_url + 'trna_leaders_and_trailers.xlsx')
 trna_data['Mature_Length'] = trna_data['mature seq'].apply(lambda x: len(x))
 
 L_mature = trna_data.Mature_Length.value_counts()[
