@@ -6,7 +6,7 @@ import warnings
 
 import pandas as pd
 
-from human_me.data.data import build_files_url
+from human_me.data.file_paths import build_files_url
 from human_me.utils import machinery as mach
 from human_me.utils import parameters as params
 from human_me.utils import metabolites as metab
@@ -96,12 +96,13 @@ class TrnaInformation:
 
 # # Reactions
 class ExpressTrna:
-    def __init__(self, trna_info: TrnaInformation):
+    def __init__(self, trna_info: TrnaInformation, me_input_model):
         self.trna_info = trna_info
         self.reactions = []
+        self.me_input_model = me_input_model
 
     def transcribe_pretrna(self):
-        self.pretrna_n = tRNA(metabolite_name=self.trna_info.id + '_pre', seq=self.trna_info.pretrna_sequence,
+        self.pretrna_n = tRNA(me_input_model=self.me_input_model, metabolite_name=self.trna_info.id + '_pre', seq=self.trna_info.pretrna_sequence,
                               compartment='n', triphosphate=True)
         pretrna_transcription = self.pretrna_n.synthesize(id_='TRANSCRIPTION_PRE_TRNA_' + self.trna_info.id)
         self.reactions.append(pretrna_transcription)
@@ -125,7 +126,7 @@ class ExpressTrna:
         rxn[metab.h2o_n] = 0
 
         if self.trna_info.five_leader_seq is not None:  # if there is a 5' leader sequence
-            five_leader = RNA_fragment(metabolite_name=self.trna_info.id, seq=self.trna_info.five_leader_seq,
+            five_leader = RNA_fragment(me_input_model=self.me_input_model, metabolite_name=self.trna_info.id, seq=self.trna_info.five_leader_seq,
                                        compartment='n', triphosphate=True, fragment_type='5_leader')
 
             rxn[five_leader] = 1
@@ -141,13 +142,13 @@ class ExpressTrna:
         else:
             tp = True
 
-        self.trna_n = tRNA(metabolite_name=self.trna_info.id, seq=self.trna_info.maturetrna_sequence,
+        self.trna_n = tRNA(me_input_model=self.me_input_model, metabolite_name=self.trna_info.id, seq=self.trna_info.maturetrna_sequence,
                            compartment='n', triphosphate=tp)
         rxn[self.trna_n] = 1
 
         # 3' cleavage
         if self.trna_info.three_trailer_seq is not None:
-            three_trailer = RNA_fragment(metabolite_name=self.trna_info.id, seq=self.trna_info.three_trailer_seq,
+            three_trailer = RNA_fragment(me_input_model=self.me_input_model, metabolite_name=self.trna_info.id, seq=self.trna_info.three_trailer_seq,
                                          fragment_type='3_trailer',
                                          compartment='n', triphosphate=False)
             rxn[three_trailer] = 1
@@ -166,7 +167,7 @@ class ExpressTrna:
 
             # trna_introns_n = dict()
             for i, intron_seq in enumerate(self.trna_info.intron_sequences):
-                trna_intron_n = RNA_fragment(metabolite_name=self.trna_info.id + '_' + str(i),
+                trna_intron_n = RNA_fragment(me_input_model=self.me_input_model, metabolite_name=self.trna_info.id + '_' + str(i),
                                              seq=intron_seq, fragment_type='trna_intron',
                                              compartment='n', triphosphate=False)
 
@@ -258,7 +259,7 @@ class ExpressTrna:
                 else:
                     elements[element] = count
 
-            charged_trna_c = tRNA(metabolite_name='charged_' + self.trna_info.id + '_' + code,
+            charged_trna_c = tRNA(me_input_model=self.me_input_model, metabolite_name='charged_' + self.trna_info.id + '_' + code,
                                   seq='', compartment='c', triphosphate=self.modified_trna_c.triphosphate)
             charged_trna_c.compartment = 'c'
             charged_trna_c.elements = elements
@@ -289,22 +290,25 @@ class ExpressTrna:
 
         self.reactions += trna_charging_reactions
         self.charged_trna_metabolites = charged_trna_metabolites
+        del self.me_input_model
 
 
-def trna_biogenesis(trna_info: TrnaInformation) -> Tuple[List[ExpressionReaction], List[tRNA]]:
+def trna_biogenesis(trna_info: TrnaInformation, me_input_model) -> Tuple[List[ExpressionReaction], List[tRNA]]:
     """trna biogenesis reactions
 
     Parameters
     ----------
     trna_info : TrnaInformation
         Associated sequence information for trna
+    me_input_model : cobra.Model
+        the corrected input metabolic model (as provided in preprocess.correct_inputs.correct_model)
 
     Returns
     -------
     Tuple[List[ExpressionReaction], List[tRNA]]
         Resultant reactions and tRNA products
     """
-    tb = ExpressTrna(trna_info)
+    tb = ExpressTrna(trna_info, me_input_model)
     tb.transcribe_pretrna()
     tb.process_trna()
     tb.modify_trna_nuclear()

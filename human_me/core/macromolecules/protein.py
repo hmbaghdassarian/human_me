@@ -3,7 +3,7 @@
 
 from typing import Dict, Optional
 
-from human_me.utils import metabolites as metab
+from human_me.utils.metabolites import MetaboliteBin
 from human_me.core.macromolecules.macromolecule import Macromolecule, Proxy
 
 
@@ -12,7 +12,7 @@ class Protein(Macromolecule):
     
     type = 'protein'
 
-    def __init__(self, compartment: str, id_: str, gene_info = None,
+    def __init__(self, compartment: str, id_: str, me_input_model, gene_info = None,
                 amino_acid_counts: Optional[Dict[str,int]] = None, dummy: bool = False,
                  non_machinery: bool = False):
         """Generates a Macromolecule in the compartment for a protein. Generated either from gene_info or id_ and amino_acid_counts.
@@ -24,6 +24,8 @@ class Protein(Macromolecule):
             protein subcellular location (one-letter code)
         id_ : str
             protein identifier
+        me_input_model : cobra.Model
+            'the corrected input metabolic model (as provided in preprocess.correct_inputs.correct_model)'
         gene_info : GeneInformation, optional
             gene's associated GeneInformation object, by default None
         amino_acid_counts : Dict[str, int], optional
@@ -58,14 +60,15 @@ class Protein(Macromolecule):
             self.length = sum(amino_acid_counts.values())
             id_ = id_ + '_protein_' + compartment
 
+        model_metabolites = MetaboliteBin(me_input_model)
         charge = sum(
-            [metab.seq_amino_acid_map_compartments[compartment][aa_code].charge * aa_count for aa_code, aa_count in
+            [model_metabolites.seq_amino_acid_map_compartments[compartment][aa_code].charge * aa_count for aa_code, aa_count in
              self._amino_acid_counts.items()])
 
         elements = {'C': 0, 'H': 0, 'N': 0, 'O': 0, 'S': 0}
-        if compartment in metab.seq_amino_acid_map_compartments:
+        if compartment in model_metabolites.seq_amino_acid_map_compartments:
             for aa_code, aa_count in self._amino_acid_counts.items():
-                aa_elements = metab.seq_amino_acid_map_compartments[compartment][aa_code].elements
+                aa_elements = model_metabolites.seq_amino_acid_map_compartments[compartment][aa_code].elements
                 for element in aa_elements:
                     elements[element] += aa_count * aa_elements[element]
         else:

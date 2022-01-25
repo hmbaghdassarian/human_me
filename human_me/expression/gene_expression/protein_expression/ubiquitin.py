@@ -16,11 +16,13 @@ import human_me.expression.gene_expression.build_mrna_expression_reactions as bu
 from human_me.expression.gene_expression.protein_expression import cytosolic_translation as c_trln
 
 
-def express_ubiquitin(compress_mrna: bool) -> Dict[str, Any]:
+def express_ubiquitin(me_input_model, compress_mrna: bool) -> Dict[str, Any]:
     """Reactions for formation of ubiquitin.
 
     Parameters
     ----------
+    me_input_model : cobra.Model
+        the corrected input metabolic model (as provided in preprocess.correct_inputs.correct_model)
     compress_mrna : bool
         whether to condense elongation, processing, and nuclear export reactions into a single reaction
 
@@ -41,7 +43,8 @@ def express_ubiquitin(compress_mrna: bool) -> Dict[str, Any]:
                                polyA_length=round(ubc_psim['POLYA_LENGTH'].values.tolist()[0]))
     ubc_info.get_final_locations(nonmachinery_locations=['c'])
     ubc_info = func.convert_gi(ubc_info, non_machinery=dict())
-    ubc_mrna_expression_reactions, ubc_transcript_c, ubc_deg_proxy = build_mrna.get_mrna_expression_reactions(ubc_info,
+    ubc_mrna_expression_reactions, ubc_transcript_c, ubc_deg_proxy = build_mrna.get_mrna_expression_reactions(gene_info=ubc_info,
+                                                                                                            me_input_model=me_input_model,
                                                                                                               compress_mrna=compress_mrna)
 
     # ubiquitin monomer
@@ -50,9 +53,9 @@ def express_ubiquitin(compress_mrna: bool) -> Dict[str, Any]:
     monoub_aa_counts = {k: params.SINGLE_UB_SEQ.count(k) for k in params.amino_acids}
     mono_ub_length = len(params.SINGLE_UB_SEQ)
     n_ub_monomers = ubc_info.protein_seq.count(params.SINGLE_UB_SEQ)
-    ub_c = Protein(compartment='c', id_='ubiquitin_monomer', amino_acid_counts=monoub_aa_counts)
+    ub_c = Protein(compartment='c', id_='ubiquitin_monomer', me_input_model=me_input_model, amino_acid_counts=monoub_aa_counts)
 
-    ubc_translation_reaction_cytosolic, ubc_c = c_trln.translate_protein_cytosolic(ubc_info, ubc_transcript_c,
+    ubc_translation_reaction_cytosolic, ubc_c = c_trln.translate_protein_cytosolic(ubc_info, me_input_model, ubc_transcript_c,
                                                                                    ubc_deg_proxy)
 
     ubiquitin_monomerization_ubc = ExpressionReaction(ubc_info.hgnc_id + '_MONOMERIZATIONc',
@@ -74,9 +77,10 @@ def express_ubiquitin(compress_mrna: bool) -> Dict[str, Any]:
                                polyA_length=round(ubb_psim['POLYA_LENGTH'].values.tolist()[0]))
     ubb_info.get_final_locations(nonmachinery_locations=['c'])
     ubb_info = func.convert_gi(ubb_info, non_machinery=dict())
-    ubb_mrna_expression_reactions, ubb_transcript_c, ubb_deg_proxy = build_mrna.get_mrna_expression_reactions(ubb_info,
+    ubb_mrna_expression_reactions, ubb_transcript_c, ubb_deg_proxy = build_mrna.get_mrna_expression_reactions(gene_info=ubb_info,
+                                                                                                            me_input_model=me_input_model,
                                                                                                               compress_mrna=compress_mrna)
-    ubb_translation_reaction_cytosolic, ubb_c = c_trln.translate_protein_cytosolic(ubb_info, ubb_transcript_c,
+    ubb_translation_reaction_cytosolic, ubb_c = c_trln.translate_protein_cytosolic(ubb_info, me_input_model, ubb_transcript_c,
                                                                                    ubb_deg_proxy)
 
     # monomerization from ubb polyub
@@ -93,7 +97,7 @@ def express_ubiquitin(compress_mrna: bool) -> Dict[str, Any]:
 
     # breakdown of the polyubiquitin cleaved from proteins in ubiquitin-proteasome pathway
     polyub_aa_counts = {aa_code: aa_count * params.N_UB for aa_code, aa_count in monoub_aa_counts.items()}
-    polyub_c = Protein(id_='cleaved_polyubiquitin_moiety', amino_acid_counts=polyub_aa_counts,
+    polyub_c = Protein(id_='cleaved_polyubiquitin_moiety', me_input_model=me_input_model, amino_acid_counts=polyub_aa_counts,
                        compartment='c')
     ubiquitin_monomerization_polyub = ExpressionReaction('POLYUBIQUITIN_MONOMERIZATIONc',
                                                          subsystem='Protein_Expression',

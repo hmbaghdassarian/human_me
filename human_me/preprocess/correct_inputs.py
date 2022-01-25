@@ -5,6 +5,7 @@ import json
 import logging
 import os
 import warnings
+import urllib.request
 from typing import Optional, Tuple, Union, Dict, List
 
 import cobra
@@ -13,9 +14,7 @@ import pandas as pd
 # make sure the creat_environment function from the preprocesss script is run before this
 
 from human_me.preprocess import parse_complex
-from human_me.data.data import build_files_url
-from human_me.utils.load_environmental_variables import (input_data_path,
-                                                         processed_data_path)
+from human_me.data.file_paths import build_files_url, build_local_path, input_local_path
 
 logging.basicConfig()
 logger = logging.getLogger(cobra.__name__)
@@ -26,7 +25,7 @@ compartments_me = {'c': 'cytosol', 'l': 'lysosome', 'm': 'mitochondria', 'r': 'e
                    'i': 'inner mitochondrial compartment', 'pm': 'plasma membrane', 'b': 'boundary'}
 
 
-def bool_metabolite(m_id: str, compartment: str, m_model: cobra.core.model) -> Tuple[bool, cobra.core.metabolite]:
+def bool_metabolite(m_id: str, compartment: str, m_model: cobra.Model) -> Tuple[bool, cobra.Metabolite]:
     """Checks if a metabolite is in the model.
 
     Parameters
@@ -35,7 +34,7 @@ def bool_metabolite(m_id: str, compartment: str, m_model: cobra.core.model) -> T
         the metabolite id, without the "_compartment" at the end
     compartment : str
         one letter compartment code
-    m_model : cobra.core.model
+    m_model : cobra.Model
         a Cobra Metabolic Model
 
     Returns
@@ -53,7 +52,7 @@ def bool_metabolite(m_id: str, compartment: str, m_model: cobra.core.model) -> T
         return False, None
 
 
-def correct_model(model_file: Union[cobra.core.model, str] = input_data_path + 'recon2_2.xml') -> Tuple[cobra.core.model]:
+def correct_model(model_file: Union[cobra.Model, str] = input_local_path + 'recon2_2.xml') -> Tuple[cobra.Model]:
     """Makes necessary changes to cobrapy model, largely based on issues encountered with Recon2.2.    
     *Note that because the ME Model will create a new objective function, the input model's biomass objective function
     is removed. The returned models cm_1 and cm_2 allow the user to compare corrected metabolic models with intact
@@ -62,8 +61,8 @@ def correct_model(model_file: Union[cobra.core.model, str] = input_data_path + '
 
     Parameters
     ----------
-    model_file : Union[cobra.core.model, str], optional
-        string must be 'full/path/to/input_model.xml', by default input_data_path +'recon2_2.xml'
+    model_file : Union[cobra.Model, str], optional
+        string must be 'full/path/to/input_model.xml', by default input_local_path + 'recon2_2.xml' (full Recon2.2 model)
 
     Returns
     -------
@@ -72,11 +71,13 @@ def correct_model(model_file: Union[cobra.core.model, str] = input_data_path + '
     cm_2 : cobra.core.Model
         Cobra model with GPRs corrected, metabolite transport reactions needed for ME Model incorporated,
         and biomass objective intact
-    cm_3 : cobra.core.Model
+    me_input_model : cobra.core.Model
         Cobra model with GPRs corrected, metabolite transport reactions needed for ME Model incorporated,
         and removed biomass objective. Used as input to building the ME Model.
     """
-    required_metabolites = json.load(open(build_files_url + "required_metabolic_model_metabolites.json"))
+
+    with urllib.request.urlopen(build_files_url + "required_metabolic_model_metabolites.json") as url:
+        required_metabolites = json.loads(url.read().decode())
     rmd = pd.read_csv(build_files_url + 'required_metabolic_model_metabolites.csv', index_col=0)
 
     if isinstance(model_file, str):
@@ -231,11 +232,10 @@ def correct_model(model_file: Union[cobra.core.model, str] = input_data_path + '
     rm = sorted(set(metabolites_1).difference([m.id for m in m_model.metabolites]))
     if len([i for i in rm if 'biomass' not in i]) != 0:
         warnings.warn('Non biomass metabolites removed as orphan metabolites from biomass reactions')
-    cobra.io.write_sbml_model(cobra_model=m_model, filename=processed_data_path + 'corrected_model.xml')
-    cm_3 = m_model.copy()
+    me_input_model = m_model.copy()
     del m_model
 
-    return cm_1, cm_2, cm_3
+    return cm_1, cm_2, me_input_model
 
 
 def check_non_machinery(non_machinery: Optional[Dict[str, List[str]]] = None) -> Dict[str, List[str]]:
@@ -254,7 +254,7 @@ def check_non_machinery(non_machinery: Optional[Dict[str, List[str]]] = None) ->
         removes any non-machinery that would not have worked with model
     """
     if non_machinery is None:
-        non_machinery = dict()
+        return dict()
 
     for hgnc_id, compartments in non_machinery.items():
         if not hgnc_id.startswith('HGNC:'):
@@ -294,9 +294,10 @@ def get_status(psim_me: pd.DataFrame) -> pd.DataFrame:
     return psim
 
 
-def correct_psim(psim_df: Union[pd.DataFrame, str] = input_data_path + 'psim_me.h5',
+def correct_psim(me_input_model: cobra.Model,
+                psim_df: Union[pd.DataFrame, str] = build_local_path + 'psim_me.h5',
                  fill_na: str = 'default',
-                 non_machinery: Optional[dict] = None) -> Tuple[Dict[str, List[str]]]:
+                 non_machinery: Optional[Dict[str, List[str]]] = None):
     """Makes sure PSIM has all necessary correct information to build ME Model
 
     *Note, the default psim_file, build/psim_me.h5, is a PSIM generated from MANE/RefSeq Select isoforms.
@@ -304,8 +305,11 @@ def correct_psim(psim_df: Union[pd.DataFrame, str] = input_data_path + 'psim_me.
 
     Parameters
     ----------
+    me_input_model : cobra.core.Model
+        Cobra model with GPRs corrected, metabolite transport reactions needed for ME Model incorporated,
+        and removed biomass objective. Used as input to building the ME Model. Output of correct_model function.
     psim_df : Union[pd.DataFrame, str], optional
-        See PSIM_README for details on format of psim, by default input_data_path +'psim_me.h5'
+        See PSIM_README for details on format of psim, by default build_local_path +'psim_me.h5' (gold-standard PSIM)
     fill_na : str, optional
         options ['default', 'select'], by default 'default'
         if default: will fill incomplete values with default values (see PSIM_README for details)
@@ -323,10 +327,12 @@ def correct_psim(psim_df: Union[pd.DataFrame, str] = input_data_path + 'psim_me.
 
     Returns
     -------
+    psim_me : pd.DataFrame
+        corrected version of input PSIM
     non_machinery : Dict[str, List[str]]
         removes any non-machinery that would not have worked with model
     revised_genes : Dict[str, List[str]]
-        'added' is a list of genes missing (relative to m_model and non-machinery genes) in PSIM that were added
+        'added' is a list of genes missing (relative to me_input_model and non-machinery genes) in PSIM that were added
         'sequences' key is a superset of added, includes all genes with adjusted sequences
         'non-machinery locations' is for genes in non-machinery that did not have an appropriately specified location
 
@@ -335,12 +341,8 @@ def correct_psim(psim_df: Union[pd.DataFrame, str] = input_data_path + 'psim_me.
     # run basic non-machinery check
     non_machinery = check_non_machinery(non_machinery=non_machinery)
 
-    expression_machinery = list(open(build_files_url + 'expression_machinery.txt').read().splitlines())
-    if os.path.isfile(processed_data_path + 'corrected_model.xml'):
-        m_model = cobra.io.read_sbml_model(processed_data_path + 'corrected_model.xml')
-    else:
-        raise ValueError('Please run preprocess.correct_inputs.correct_model first')
-    metabolic_machinery = [g.id for g in m_model.genes]
+    expression_machinery = sorted(pd.read_csv(build_files_url + 'machinery/expression_machinery.txt', header = None)[0].tolist())
+    metabolic_machinery = [g.id for g in me_input_model.genes]
 
     # define the required/optional columns-----------------------------------------------------------------
     user_provided = ['HGNC_ID']  # must be fully provided by user
@@ -351,7 +353,7 @@ def correct_psim(psim_df: Union[pd.DataFrame, str] = input_data_path + 'psim_me.
     all_columns = user_provided + essential_cols + optional_cols + nm_cols
 
     # load the MANE/RefSEQ Select PSIM---------------------------------------------------------------------
-    psim_gold = pd.read_hdf(build_files_url + 'psim_me.h5')
+    psim_gold = pd.read_hdf(build_local_path + 'psim_me.h5')
     psim_gold = psim_gold[psim_gold.Status != 0]  # drop genes that won't work with model
     psim_gold = psim_gold[all_columns]
 
@@ -368,6 +370,8 @@ def correct_psim(psim_df: Union[pd.DataFrame, str] = input_data_path + 'psim_me.
             raise TypeError('PSIM must be in .csv or .h5 format')
     elif not isinstance(psim_df, pd.DataFrame):
         raise TypeError('The specified psim_df arg is invalid')
+    else:
+        psim_me = psim_df
 
     psim_me.reset_index(inplace=True, drop=True)
     # check that required cols are all present and appropriately formatted------------------------------------
@@ -501,8 +505,5 @@ def correct_psim(psim_df: Union[pd.DataFrame, str] = input_data_path + 'psim_me.
     psim_me.reset_index(inplace=True, drop=True)
 
     del psim_gold
-    psim_me.to_hdf(processed_data_path + 'corrected_psim.h5', key='corrected')
-    #     with open(processed_data_path + 'corrected_non_machinery.txt', 'w'):
-    #         for i in non_machinery:
-    #             f.write(i + '\n')
-    return non_machinery, revised_genes
+
+    return psim_me, non_machinery, revised_genes

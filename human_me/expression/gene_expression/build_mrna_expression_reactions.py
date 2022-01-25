@@ -14,7 +14,7 @@ from human_me.core.macromolecules.RNA import RNA_fragment, pre_mRNA, mRNA
 class ExpressMrna:
     '''Gene-specific mRNA expression.'''
 
-    def __init__(self, gene_info) -> None:
+    def __init__(self, me_input_model, gene_info) -> None:
         """Init method for ExpressMrna
 
         Parameters
@@ -25,13 +25,14 @@ class ExpressMrna:
         self.reactions = []
         self.lariat = None
         self.gene_info = gene_info
+        self.me_input_model = me_input_model
 
     def transcribe_premrna(self) -> None:
         """Elongation reaction."""
         # elongation reaction
         # https://www.google.com/search?q=rna+polymerization+reaction&source=lnms&tbm=isch&sa=X&ved=2ahUKEwiN_73Vk7rqAhXOsJ4KHW5lB4UQ_AUoAXoECA4QAw&biw=1920&bih=1001#imgrc=w7XH4mHmJglCuM
 
-        self.premrna = pre_mRNA(self.gene_info)
+        self.premrna = pre_mRNA(me_input_model=self.me_input_model, gene_info=self.gene_info)
         self.transcript_elongation = self.premrna.synthesize(id_=self.gene_info.hgnc_id + '_TRANSCRIPTION_ELONGATION')
         self.reactions.append(self.transcript_elongation)
 
@@ -39,7 +40,7 @@ class ExpressMrna:
         """Processing includes capping, splicing, and polyA tail."""
         # combine in to one to not create too many reactions (capping itself is 4 reactions)
         # make mrna_n metabolite
-        self.mrna_n = mRNA(self.gene_info, compartment='n')
+        self.mrna_n = mRNA(e_input_model=self.me_input_model, gene_info=self.gene_info, compartment='n')
 
         self.polyA_length = calculate_polyA_length(self.gene_info.polyA_length, self.gene_info.stochastic,
                                                    self.gene_info.seed)
@@ -93,7 +94,7 @@ class ExpressMrna:
                     diff = self.premrna.sequence.count(nt) - (self.mrna_n.sequence.count(nt) - self.polyA_length)
                     lariat_seq += ''.join([nt] * diff)
 
-            self.lariat = RNA_fragment(metabolite_name=self.gene_info.hgnc_id, fragment_type='lariat',
+            self.lariat = RNA_fragment(me_input_model=self.me_input_model, metabolite_name=self.gene_info.hgnc_id, fragment_type='lariat',
                                        seq=lariat_seq, triphosphate=False, hgnc_id=self.gene_info.hgnc_id)
 
             rxn[self.lariat] = 1
@@ -246,13 +247,15 @@ class ExpressMrna:
         self.reactions.append(transcription)
 
 
-def get_mrna_expression_reactions(gene_info, compress_mrna: bool = False):
+def get_mrna_expression_reactions(gene_info, me_input_model, compress_mrna: bool = False):
     """Generates reactions and macromolecules associated with transcription of a gene.
 
     Parameters
     ----------
     gene_info : GeneInformation
         representation of gene to be expressed
+    me_input_model : cobra.Model
+        the corrected input metabolic model (as provided in preprocess.correct_inputs.correct_model)
     compress_mrna : bool, optional
         whether to condense elongation, processing, and nuclear export reactions into a single reaction, by default False
 
@@ -265,7 +268,7 @@ def get_mrna_expression_reactions(gene_info, compress_mrna: bool = False):
     em.mrna_deg_proxy : core.macromolecules.macromolecule.Proxy
         proxy metabolite generated in mRNA degradation reaction for coupling
     """
-    em = ExpressMrna(gene_info)
+    em = ExpressMrna(me_input_model=me_input_model, gene_info=gene_info)
     em.transcribe_premrna()
     em.process_mrna()
     em.export_mrna()

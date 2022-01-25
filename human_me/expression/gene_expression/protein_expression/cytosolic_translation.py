@@ -12,13 +12,15 @@ from human_me.utils import machinery as mach
 from human_me.utils import metabolites as metab
 
 
-def translate_protein_cytosolic(gene_info, mrna_transcript_c, mrna_deg_proxy: Proxy) -> Tuple[ProteinExpressionReaction, Protein]:
+def translate_protein_cytosolic(gene_info, me_input_model, mrna_transcript_c, mrna_deg_proxy: Proxy) -> Tuple[ProteinExpressionReaction, Protein]:
     """Generate cytosolic translation reaction
 
     Parameters
     ----------
     gene_info : GeneInformation
         representation of gene to be expressed
+    me_input_model : cobra.Model
+        the corrected input metabolic model (as provided in preprocess.correct_inputs.correct_model)
     mrna_transcript_c : mRNA
         the final, cytosolic mRNA transcript
     mrna_deg_proxy : Proxy
@@ -51,7 +53,7 @@ def translate_protein_cytosolic(gene_info, mrna_transcript_c, mrna_deg_proxy: Pr
     rxn[metab.pi_c] = gene_info.L_protein
     rxn[metab.h_c] += gene_info.L_protein
 
-    unfolded_protein_c = Protein(compartment='c', id_='unfolded', gene_info=gene_info)
+    unfolded_protein_c = Protein(compartment='c', id_='unfolded', me_input_model=me_input_model, gene_info=gene_info)
     rxn[unfolded_protein_c] = 1
 
     translation_elongation = ProteinExpressionReaction(gene_info.hgnc_id + '_TRANSLATION_ELONGATIONc',

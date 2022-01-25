@@ -79,7 +79,7 @@ class GeneInformation:
     """
 
     def __init__(self, hgnc_id: str, premrna_seq: str, mrna_seq: str, protein_seq: str,
-                 machinery_list: List[str] = mach.metabolic_machinery,
+                 machinery_list: List[str],
                  ptms: Optional[Dict[str, int]] = None, tmd: int = 0, sp: bool = False,
                  polyA_length: Optional[float] = None, n_exons: Optional[int] = None,
                  coupling_params: Optional[Dict[str, Union[str, float]]] = None, stochastic: bool = False, seed: int = None) -> None:
@@ -95,8 +95,8 @@ class GeneInformation:
             the mrna sequence (length must be <= premrna_seq)
         protein_seq : str
             the protein sequence (length must be <= mrna_seq/3)
-        machinery_list : List[str], optional
-            each entry is the HGNC ID of a protein that should be considered as catalyzing an M_model reaction, by default mach.metabolic_machinery
+        machinery_list : List[str]
+            each entry is the HGNC ID of a protein that should be considered as catalyzing an M_model reaction
         ptms : Optional[Dict[str, int]], optional
             keys represent the ptm (options ['dsb', 'gpi', 'og'] for ['disulfide bond formation', 'GPI Anchor','O-linked glycosylation'] respectively) and 
             values representing the number of that ptms of that kind for that gene. The exception here is gpi, which is binary with 0 for no GPI Anchor and 1 indicating GPI Anchor presence. 
@@ -409,7 +409,7 @@ ptm_keys = list(params.allowed_ptms.keys())
 cp_keys = ['alpha_m', 'alpha_p', 'ptr']
 
 
-def generate_from_psim(hgnc_id: str, psim: pd.DataFrame = params.psim_me, machinery_list: List[str] = mach.metabolic_machinery,
+def generate_from_psim(hgnc_id: str, psim: pd.DataFrame = params.psim_me, machinery_list: List[str], 
                        reactions: Optional[List[cobra.Reaction]] = None, nonmachinery_locations: Optional[List[str]] = None,
                        stochastic: bool = False, seed: int = None) -> GeneInformation:
     """Generates gene information object from PSIM. Assumes the gene information object being
@@ -421,8 +421,8 @@ def generate_from_psim(hgnc_id: str, psim: pd.DataFrame = params.psim_me, machin
         gene HGNC ID in the format HGNC:####
     psim : pd.DataFrame, optional
         PSIM, by default params.psim_me
-    machinery_list : List[str], optional
-        each entry is the HGNC ID of a protein that should be considered as catalyzing a reaction, by default mach.metabolic_machinery
+    machinery_list : List[str]
+        each entry is the HGNC ID of a protein that should be considered as catalyzing a reaction
     reactions : Optional[List[cobra.Reaction]], optional
         list of cobra reactions, by default None
     nonmachinery_locations : Optional[List[str]], optional

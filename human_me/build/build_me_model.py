@@ -49,8 +49,9 @@ with warnings.catch_warnings():
 
 class MEBuilder:
     """Builder class for ME Model."""
-    def __init__(self, model_id: str = 'HUMAN_ME_MODEL',
-                 psim_me: pd.DataFrame = params.psim_me, m_model: cobra.Model = params.human_model,
+    def __init__(self, 
+                m_model: cobra.Model 
+                 psim_me: pd.DataFrame = params.psim_me, 
                  stochastic: bool = False, seed: int = 888, n_cores: int = os.cpu_count(),
                  non_machinery: Optional[Dict[str, List[str]]] = None, knock_out: Optional[List[str]] = None,
                  dummy_protein: bool = True, context_specific_dummy: bool = False,
@@ -94,6 +95,9 @@ class MEBuilder:
 
         self.psim_me = psim_me
         self.m_model = m_model
+        # all parameters that use m_model as input
+        self.metabolic_machinery, self.all_machinery = mach.get_model_machinery(self.m_model)
+        self.biomass_reactions= biomass.create_biomass_reactions(self.m_model)
 
         self.n_cores = n_cores
         if self.n_cores in [0, 1, None]:
@@ -108,7 +112,7 @@ class MEBuilder:
         random.seed(self.seed)
         self._seeds = random.sample(range(0, int((2 ** 32 - 1))), k=250000)  # 10x # of human protein-coding genes
         # assign a gene-specific seed, independent of the order the gene's expression reactions
-        all_genes = mach.all_machinery + list(self.non_machinery)
+        all_genes = self.all_machinery + list(self.non_machinery)
         self._gene_seed_map = dict(zip(all_genes, self._seeds[:len(all_genes)]))
         # if _gene_seed_map causes issues, it is unecessary and can be removed bc sorted() was added to
         # each gene for which expression reactions are being built. _gene_seed_map makes it independent of order,
@@ -119,13 +123,13 @@ class MEBuilder:
         # get pre-generated reactions - the compress_mrna arg requires that they be run with that input
         self.compress_mrna = compress_mrna
         print('Generate ubiquitin reactions for proteasomal degradation')
-        self.ub_args = ubiquitin.express_ubiquitin(compress_mrna=self.compress_mrna)
+        self.ub_args = ubiquitin.express_ubiquitin(me_input_model=self.m_model, compress_mrna=self.compress_mrna)
         print('Generate ribosome')
 
         # ribosome seeds different from seeds here for gene_info bc it also calls random.sample
         random.seed(self.seed)
         rib_seed = random.randint(0, int((2 ** 32 - 1)))
-        ribosomal_reactions, self.ribosome_complex_c = build_ribosome(self.ub_args, self.compress_mrna,
+        ribosomal_reactions, self.ribosome_complex_c = build_ribosome(self.m_model, self.ub_args, self.compress_mrna,
                                                                       self.deg_args['reversible_complex_formation'],
                                                                       stochastic=self.stochastic, seed=rib_seed)
 
@@ -169,7 +173,7 @@ class MEBuilder:
         # get protein expression for all metabolic reactions
         print('Generate protein expression reactions for metabolic enzymes and non-machinery')
 
-        self.loop_machinery = list(set(mach.metabolic_machinery + list(self.non_machinery)))
+        self.loop_machinery = list(set(self.metabolic_machinery + list(self.non_machinery)))
 
         gene_reaction_map = func.create_gene_reaction_map(self.m_model.reactions)
         for hgnc_id in self.non_machinery:
@@ -183,10 +187,13 @@ class MEBuilder:
             nml = list()
             if hgnc_id in self.non_machinery:
                 nml = self.non_machinery[hgnc_id]
-            expr_reactions, protein_metabolites = get_all_expression_reactions(hgnc_id,
+            expr_reactions, protein_metabolites = get_all_expression_reactions(me_input_model=self.m_model,
+                                                                                hgnc_id=hgnc_id,
                                                                                reactions=gene_reaction_map[hgnc_id],
                                                                                compress_mrna=self.compress_mrna,
                                                                                ub_args=self.ub_args,
+                                                                               psim=self.psim_me
+                                                                               machinery_list=self.metabolic_machinery
                                                                                nonmachinery_locations=nml,
                                                                                stochastic=self.stochastic,
                                                                                seed=self._gene_seed_map[
@@ -200,7 +207,8 @@ class MEBuilder:
         #             pool = multiprocessing.Pool(processes = self.n_cores)
         #             try:
         #                 n_iter = len(iterable)
-        #                 args = zip(iterable, [gene_reaction_map]*n_iter, [self.ub_args]*n_iter, [self.compress_mrna]*n_iter,
+        #                 args = zip(iterable, [self.m_model]*n_iter, [gene_reaction_map]*n_iter, [self.psim_me]*n_iter, [self.metabolic_machinery]*n_iter, 
+        #                                       [self.ub_args]*n_iter, [self.compress_mrna]*n_iter,
         #                            [self.non_machinery]*n_iter, [self.stochastic]*n_iter, list(range(self._seed_idx, len(iterable))))
         #                 mm = pool.starmap(emm_par, args)
         #                 self._seed_idx += len(iterable)
@@ -220,8 +228,11 @@ class MEBuilder:
 
         for hgnc_id in sorted(self.knock_out):
             # None bc will add later for expression model specific to this
-            expr_reactions, protein_metabolites = get_all_expression_reactions(hgnc_id,
+            expr_reactions, protein_metabolites = get_all_expression_reactions(me_input_model=self.m_model, 
+                                                                                hgnc_id=hgnc_id,
                                                                                reactions=gene_reaction_map[hgnc_id],
+                                                                               psim=self.psim_me
+                                                                               machinery_list=self.metabolic_machinery
                                                                                compress_mrna=self.compress_mrna,
                                                                                ub_args=self.ub_args,
                                                                                stochastic=self.stochastic,
@@ -262,7 +273,9 @@ class MEBuilder:
                 else:
                     not_present[generic_id] = r  # if shows up multiple times, will map to same compartment anyways
 
-            expr_reactions, protein_metabolites = get_all_expression_reactions(hgnc_id,
+            expr_reactions, protein_metabolites = get_all_expression_reactions(me_input_model=self.m_model, 
+                                                                                hgnc_id=hgnc_id, 
+                                                                                psim=self.psim_me,
                                                                                machinery_list=expression_machinery_me,
                                                                                reactions=gene_reaction_map[hgnc_id],
                                                                                compress_mrna=self.compress_mrna,
@@ -331,7 +344,7 @@ class MEBuilder:
                     else:
                         not_present[generic_id] = r  # if shows up multiple times, will map to same compartment anyways
 
-                expr_reactions, protein_metabolites = get_all_expression_reactions(hgnc_id,
+                expr_reactions, protein_metabolites = get_all_expression_reactions(me_input_model=self.m_model, hgnc_id=hgnc_id, psim=self.psim_me,
                                                                                    machinery_list=expression_machinery_me_2,
                                                                                    reactions=gene_reaction_map_2[
                                                                                        hgnc_id],
@@ -354,7 +367,7 @@ class MEBuilder:
                         r.enzyme_compartment, r._compartment_seed = rmap['compartment'], rmap['seed']
 
                         # self._seed_idx += 1
-                if hgnc_id not in set(expression_machinery_me_2).intersection(expression_machinery_me + mach.metabolic_machinery):
+                if hgnc_id not in set(expression_machinery_me_2).intersection(expression_machinery_me + self.metabolic_machinery):
                     if hgnc_id in self.id_protein_map:
                         raise ValueError('Some genes not accounted for when generating metabolic machinery expression reactions')
                     self.id_protein_map[hgnc_id] = {p.compartment: p for p in protein_metabolites}
@@ -400,9 +413,10 @@ class MEBuilder:
         if self.dummy_protein:
             print('Express dummy protein')
             dummy_psim = func.average_protein_features(psim_me=self.psim_me,
-                                                       context_specific=self.context_specific_dummy)
+                                                       context_specific=self.context_specific_dummy, 
+                                                       me_input_model=self.m_model)
 
-            dummy_reactions, dm = get_all_expression_reactions(hgnc_id='HGNC:DUMMY', psim=dummy_psim, machinery_list=[],
+            dummy_reactions, dm = get_all_expression_reactions(me_input_model=self.m_model,hgnc_id='HGNC:DUMMY', psim=dummy_psim, machinery_list=[],
                                                                reactions=None, compress_mrna=self.compress_mrna,
                                                                ub_args=self.ub_args, nonmachinery_locations=['c'],
                                                                stochastic=self.stochastic,
@@ -982,7 +996,7 @@ class MEBuilder:
 
             me_orphans += self.complex_formation_reactions
             self.orphan += me_orphans
-            self.orphan = [r.id for r in self.orphan + biomass.biomass_reactions]
+            self.orphan = [r.id for r in self.orphan + self.biomass_reactions]
             self.final_reactions += me_orphans
             del me_orphans
 
@@ -1146,7 +1160,7 @@ class MEBuilder:
                         reactions = [r_f, r_r]
                     self.deorphaned += reactions
             self.final_reactions += self.orphan + self.deorphaned
-            self.orphan = [r.id for r in self.orphan + biomass.biomass_reactions + [biomass.upb_reaction]]
+            self.orphan = [r.id for r in self.orphan + self.biomass_reactions + [biomass.upb_reaction]]
             for r in self.deorphaned:
                 r.enzyme_compartment = 'c'
             self.deorphaned = [r.id for r in self.deorphaned]
@@ -1244,7 +1258,7 @@ class MEBuilder:
         for r in self.final_reactions:
             biomass.add_biomass_change(r)
 
-        br = [r.copy() for r in biomass.biomass_reactions]
+        br = [r.copy() for r in self.biomass_reactions]
         #         br.append(self.pb_reaction)
         if self.dummy_protein is not None:
             br.append(biomass.upb_reaction.copy())
@@ -1281,8 +1295,9 @@ class MEBuilder:
         return me_model
 
 
-def build_me(model_id: str = 'HUMAN_ME_MODEL',
-             psim_me: pd.DataFrame = params.psim_me, m_model: cobra.Model = params.human_model,
+def build_me(me_input_model: cobra.Model,
+            model_id: str = 'HUMAN_ME_MODEL',
+             psim_me: pd.DataFrame = params.psim_me, 
              stochastic: bool = False, seed: int = 888, n_cores: int = os.cpu_count(),
              non_machinery: Optional[Dict[str, List[str]]] = None, knock_out: Optional[List[str]] = None,
              dummy_protein: bool = True, context_specific_dummy: bool = False,
@@ -1298,10 +1313,10 @@ def build_me(model_id: str = 'HUMAN_ME_MODEL',
     ----------
     model_id : str, optional
         model identifier, by default 'HUMAN_ME_MODEL'
+    me_input_model : cobra.Model
+        the corrected input metabolic model (as provided in preprocess.correct_inputs.correct_model)
     psim_me : pd.DataFrame, optional
         the corrected psim matrix (as provided in preprocess.correct_inputs.correct_psim)
-    m_model : cobra.Model, optional
-        the corrected input metabolic model (as provided in preprocess.correct_inputs.correct_model)
     stochastic : bool, optional
         Whether a potentially stochastic output should be stochastic, or choose a default behavior instead, by default False
     seed : int, optional
@@ -1362,7 +1377,7 @@ def build_me(model_id: str = 'HUMAN_ME_MODEL',
         instance of MEBuilder used to generate the me_model
     """
     start = time.time()
-    builder = MEBuilder(model_id = model_id, psim_me=params.psim_me, m_model=params.human_model,
+    builder = MEBuilder(m_model=me_input_model, model_id = model_id, psim_me=params.psim_me, 
                         stochastic=stochastic, seed=seed, n_cores=n_cores,
                         non_machinery=non_machinery, knock_out=knock_out,
                         dummy_protein=dummy_protein, context_specific_dummy=context_specific_dummy,

@@ -7,7 +7,7 @@ import pandas as pd
 import scipy.stats as st
 import statsmodels.api as sm
 
-from human_me.data.data import build_files_url
+from human_me.data.file_paths import build_files_url
 
 # polyA polyA_params
 polyA = pd.read_csv(build_files_url + 'polyA_length.csv', index_col=0)

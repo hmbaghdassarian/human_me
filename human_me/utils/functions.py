@@ -2,7 +2,7 @@
 # coding: utf-8
 
 import random
-from typing import List, Dict, Optional, Union, Tuple
+from typing import Any, List, Dict, Optional, Union, Tuple
 from urllib.request import urlopen
 from io import StringIO
 
@@ -15,17 +15,17 @@ import pandas as pd
 import human_me.utils.machinery as mach
 import human_me.utils.metabolites as metab
 import human_me.utils.parameters as params
-from human_me.data.data import build_local_path 
+from human_me.data.file_paths import build_local_path 
 
 HiddenPrints = params.HiddenPrints
 
 
-def flatten_list(list1: List[list]) -> list:
-    """Create a single list froma  list of lists
+def flatten_list(list1: List[List[Any]]) -> list:
+    """Create a single list from a  list of lists
 
     Parameters
     ----------
-    list1 : List[list]
+    list1 : List[List[Any]]
         a list of lists
 
     Returns
@@ -271,7 +271,7 @@ def SASA(mw: float) -> float:
     return mw ** 0.75
 
 
-def average_protein_features(psim_me: pd.DataFrame, context_specific: bool = False) -> pd.DataFrame:
+def average_protein_features(psim_me: pd.DataFrame, context_specific: bool = False, me_input_model: Optional[cobra.Model] = None) -> pd.DataFrame:
     """Function to get the average protein features from the proteins used in a specific ME model being generated.
     *Note, we filter for metabolic enzymes only, because most orphan reactions come from the metabolic sector.
 
@@ -282,6 +282,8 @@ def average_protein_features(psim_me: pd.DataFrame, context_specific: bool = Fal
     context_specific : bool, optional
         whether the representative dummy protein is calculated for only genes in the user-provided context specific model from
         the user provided PSIM (True) or for all recon2.2 machinery proteins in the gold-standard PSIM , by default False
+    me_input_model : cobra.Model, optional
+        the corrected input metabolic model (as provided in preprocess.correct_inputs.correct_model)
 
     Returns
     -------
@@ -289,8 +291,11 @@ def average_protein_features(psim_me: pd.DataFrame, context_specific: bool = Fal
         [description]
     """
     if context_specific:
+        if me_input_model is None:
+            raise ValueError('Must specify a metabolic model to extract context specific information')
         psim = psim_me.copy()
-        psim = psim[psim.HGNC_ID.isin(mach.metabolic_machinery)]  # filter for metabolic machinery only
+        metabolic_machinery, _ = mach.get_model_machinery(me_input_model)
+        psim = psim[psim.HGNC_ID.isin(metabolic_machinery)]  # filter for metabolic machinery only
     else:
         psim = pd.read_csv(build_local_path + 'recon2_2_only_psim.csv')  # load recon2.2 metabolic machinery gold standard PSIM
 

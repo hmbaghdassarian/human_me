@@ -1,12 +1,12 @@
 #!/usr/bin/env python
 # coding: utf-8
 from collections import OrderedDict
-from typing import Dict, Optional, Union
+from typing import Dict, List, Optional, Union
 
 import cobra
 
 from human_me.utils import parameters as params
-from human_me.utils import metabolites as metab
+from human_me.utils.metabolites import MetaboliteBin
 from human_me.core.reaction import BiomassReaction
 from human_me.core.macromolecules.macromolecule import Macromolecule
 
@@ -64,65 +64,67 @@ upb_reaction = biomass_reactions.pop(len(biomass_reactions) - 1)
 
 # constant biomass reactions
 # TODO: make *_coef variables customizable by user
+def create_biomass_reactions(me_input_model: cobra.Model, biomass_reactions: List[BiomassReaction] = biomass_reactions):
+    model_metabolites = MetaboliteBin(me_input_model)
+    # DNA------------------------------------------------------
+    dna_reaction = BiomassReaction('DNA_biomass_formation')
 
-# DNA------------------------------------------------------
-dna_reaction = BiomassReaction('DNA_biomass_formation')
+    # coefs from original RECON2.2
+    datp_coef = 0.941642857142857
+    dctp_coef = 0.674428571428572
+    dgtp_coef = 0.707
+    dttp_coef = 0.935071428571429
 
-# coefs from original RECON2.2
-datp_coef = 0.941642857142857
-dctp_coef = 0.674428571428572
-dgtp_coef = 0.707
-dttp_coef = 0.935071428571429
+    # original coefficient from DNA biomass formation reaction*metabolite molecular weight
+    rxn = {model_metabolites.datp_n: -datp_coef * model_metabolites.datp_n.formula_weight / 1000,
+        model_metabolites.dctp_n: -dctp_coef * model_metabolites.dctp_n.formula_weight / 1000,
+        model_metabolites.dgtp_n: -dgtp_coef * model_metabolites.dgtp_n.formula_weight / 1000,
+        model_metabolites.dttp_n: -dttp_coef * model_metabolites.dttp_n.formula_weight / 1000,
+        dna_: params.DNA_FRAC}
+    dna_reaction.add_metabolites(rxn)
+    dna_reaction._lower_bound, dna_reaction._upper_bound = params.mu, params.mu
 
-# original coefficient from DNA biomass formation reaction*metabolite molecular weight
-rxn = {metab.datp_n: -datp_coef * metab.datp_n.formula_weight / 1000,
-       metab.dctp_n: -dctp_coef * metab.dctp_n.formula_weight / 1000,
-       metab.dgtp_n: -dgtp_coef * metab.dgtp_n.formula_weight / 1000,
-       metab.dttp_n: -dttp_coef * metab.dttp_n.formula_weight / 1000,
-       dna_: params.DNA_FRAC}
-dna_reaction.add_metabolites(rxn)
-dna_reaction._lower_bound, dna_reaction._upper_bound = params.mu, params.mu
+    # CARBOHYDRATE------------------------------------------------------
+    g6p_coef = 3.87591549295775
+    carbohydrate_reaction = BiomassReaction('carbohydrate_biomass_formation')
+    rxn = {model_metabolites.g6p_c: -g6p_coef * model_metabolites.g6p_c.formula_weight / 1000,
+        carb_: params.CARB_FRAC}
+    carbohydrate_reaction.add_metabolites(rxn)
+    carbohydrate_reaction._lower_bound, carbohydrate_reaction._upper_bound = params.mu, params.mu
 
-# CARBOHYDRATE------------------------------------------------------
-g6p_coef = 3.87591549295775
-carbohydrate_reaction = BiomassReaction('carbohydrate_biomass_formation')
-rxn = {metab.g6p_c: -g6p_coef * metab.g6p_c.formula_weight / 1000,
-       carb_: params.CARB_FRAC}
-carbohydrate_reaction.add_metabolites(rxn)
-carbohydrate_reaction._lower_bound, carbohydrate_reaction._upper_bound = params.mu, params.mu
+    # LIPID------------------------------------------------------
+    chsterol_coef = 0.210319587628866
+    clpn_hs_coef = 0.120185567010309
+    pail_hs_coef = 0.240360824742268
+    pchol_hs_coef = 1.59237113402062
+    pe_hs_coef = 0.570865979381443
+    pglyc_hs_coef = 0.0300412371134021
+    ps_hs_coef = 0.0600927835051546
+    sphmyln_hs_coef = 0.180268041237113
 
-# LIPID------------------------------------------------------
-chsterol_coef = 0.210319587628866
-clpn_hs_coef = 0.120185567010309
-pail_hs_coef = 0.240360824742268
-pchol_hs_coef = 1.59237113402062
-pe_hs_coef = 0.570865979381443
-pglyc_hs_coef = 0.0300412371134021
-ps_hs_coef = 0.0600927835051546
-sphmyln_hs_coef = 0.180268041237113
+    CLPN_HS_C_MW = 508.21930 / 1000  # ChEBI 28494
+    PAIL_HS_C_MW = 387.211 / 1000  # ChEBI 57880
+    PCHOL_HS_C_MW = 311.226 / 1000  # ChEBI 64482
+    PE_HS_C_MW = 269.146 / 1000  # ChEBI 16038
+    PGLYC_HS_C_MW = 299.14860 / 1000  # ChEB 60523
+    PS_HS_C_MW = 312.14740 / 1000  # ChEBI 58436
+    SPHMYLN_HS_C_MW = 492.630  # ChEBI 62490
 
-CLPN_HS_C_MW = 508.21930 / 1000  # ChEBI 28494
-PAIL_HS_C_MW = 387.211 / 1000  # ChEBI 57880
-PCHOL_HS_C_MW = 311.226 / 1000  # ChEBI 64482
-PE_HS_C_MW = 269.146 / 1000  # ChEBI 16038
-PGLYC_HS_C_MW = 299.14860 / 1000  # ChEB 60523
-PS_HS_C_MW = 312.14740 / 1000  # ChEBI 58436
-SPHMYLN_HS_C_MW = 492.630  # ChEBI 62490
+    lipid_reaction = BiomassReaction('lipid_biomass_formation')
+    rxn = {model_metabolites.chsterol_c: -chsterol_coef * model_metabolites.chsterol_c.formula_weight / 1000,
+        model_metabolites.clpn_hs_c: -clpn_hs_coef * CLPN_HS_C_MW,
+        model_metabolites.pail_hs_c: -pail_hs_coef * PAIL_HS_C_MW,
+        model_metabolites.pchol_hs_c: -pchol_hs_coef * PCHOL_HS_C_MW,
+        model_metabolites.pe_hs_c: -pe_hs_coef * PE_HS_C_MW,
+        model_metabolites.pglyc_hs_c: -pglyc_hs_coef * PGLYC_HS_C_MW,
+        model_metabolites.ps_hs_c: -ps_hs_coef * PS_HS_C_MW,
+        model_metabolites.sphmyln_hs_c: -sphmyln_hs_coef * SPHMYLN_HS_C_MW,
+        lipid_: params.LIPID_FRAC}
+    lipid_reaction.add_metabolites(rxn)
+    lipid_reaction._lower_bound, lipid_reaction._upper_bound = params.mu, params.mu
 
-lipid_reaction = BiomassReaction('lipid_biomass_formation')
-rxn = {metab.chsterol_c: -chsterol_coef * metab.chsterol_c.formula_weight / 1000,
-       metab.clpn_hs_c: -clpn_hs_coef * CLPN_HS_C_MW,
-       metab.pail_hs_c: -pail_hs_coef * PAIL_HS_C_MW,
-       metab.pchol_hs_c: -pchol_hs_coef * PCHOL_HS_C_MW,
-       metab.pe_hs_c: -pe_hs_coef * PE_HS_C_MW,
-       metab.pglyc_hs_c: -pglyc_hs_coef * PGLYC_HS_C_MW,
-       metab.ps_hs_c: -ps_hs_coef * PS_HS_C_MW,
-       metab.sphmyln_hs_c: -sphmyln_hs_coef * SPHMYLN_HS_C_MW,
-       lipid_: params.LIPID_FRAC}
-lipid_reaction.add_metabolites(rxn)
-lipid_reaction._lower_bound, lipid_reaction._upper_bound = params.mu, params.mu
-
-biomass_reactions += [dna_reaction, carbohydrate_reaction, lipid_reaction]
+    biomass_reactions += [dna_reaction, carbohydrate_reaction, lipid_reaction]
+    return biomass_reactions
 
 def add_biomass_change(reaction: cobra.Reaction, inplace: bool = True) -> Union[None, Dict[str, float]]:
     """Calculate net biomass change in a reaction.

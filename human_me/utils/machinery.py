@@ -1,10 +1,11 @@
 #!/usr/bin/env python
 # coding: utf-8
 
+from typing import Tuple, List
+
 import pandas as pd
 
-from human_me.data.data import build_files_url
-from human_me.utils.parameters import human_model
+from human_me.data.file_paths import build_files_url
 
 # define necessary variables
 rs = pd.read_csv(build_files_url + 'machinery/small_ribosomal_protein.csv', index_col=None, skiprows=[0])
@@ -295,7 +296,25 @@ endocytic_machinery = sorted(set(proteasome_ubiquitin + escrt + eps + clathrin_m
 
 cathepsins = ['HGNC:2527', 'HGNC:2529', 'HGNC:9251']
 
-metabolic_machinery = sorted([g.id for g in human_model.genes])
 expression_machinery = sorted(pd.read_csv(build_files_url + 'machinery/expression_machinery.txt', header = None)[0].tolist())
 
-all_machinery = sorted(set(metabolic_machinery + expression_machinery))
+def get_model_machinery(me_input_model) -> Tuple[List[str]]:
+    """Parse input metabolic model for metabolic machinery. 
+
+    Parameters
+    ----------
+    me_input_model : cobra.Model
+        the corrected input metabolic model (as provided in preprocess.correct_inputs.correct_model)
+
+    Returns
+    -------
+    metabolic_machinery : List[str]
+        HGNC IDs of metabolic genes
+    all_machinery : List[str]
+        HGNC IDs of metabolic and expression genes    
+    """
+
+    metabolic_machinery = sorted([g.id for g in me_input_model.genes])
+    all_machinery = sorted(set(metabolic_machinery + expression_machinery))
+
+    return metabolic_machinery, all_machinery

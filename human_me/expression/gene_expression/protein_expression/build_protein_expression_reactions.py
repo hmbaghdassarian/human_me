@@ -91,13 +91,15 @@ def transport_nuclear_protein(gene_info, folded_protein_c: Protein) -> ProteinEx
     return nuclear_import, folded_protein_n
 
 
-def get_nuclear_reactions(gene_info, folded_protein_c: Protein, ub_args: Dict[str, Any]) -> ProteinExpressionType:
+def get_nuclear_reactions(gene_info, me_input_model, folded_protein_c: Protein, ub_args: Dict[str, Any]) -> ProteinExpressionType:
     """All associated nuclear protein formation reactions
 
     Parameters
     ----------
     gene_info : GeneInformation
         GeneInformation object of associated gene
+    me_input_model : cobra.Model
+        the corrected input metabolic model (as provided in preprocess.correct_inputs.correct_model)
     folded_protein_c : Protein
         folded, cytosolic protein
     ub_args : Dict[str, Any]
@@ -109,7 +111,7 @@ def get_nuclear_reactions(gene_info, folded_protein_c: Protein, ub_args: Dict[st
         Associated reactions and protein products
     """
     nuclear_import, folded_protein_n = transport_nuclear_protein(gene_info, folded_protein_c)
-    nuclear_degradation_reactions = degradation.degrade(macromolecule=folded_protein_n, **{'ub_args': ub_args})
+    nuclear_degradation_reactions = degradation.degrade(macromolecule=folded_protein_n, **{'me_input_model': me_input_model, 'ub_args': ub_args})
 
     return [nuclear_import] + nuclear_degradation_reactions, folded_protein_n
 
@@ -389,7 +391,7 @@ def post_translational_translocation(gene_info, unfolded_protein_c: Protein) -> 
     return ptt_reactions, folded_protein_r
 
 
-def co_translational_translocation(gene_info, mrna_transcript_c, mrna_deg_proxy):
+def co_translational_translocation(gene_info, me_input_model, mrna_transcript_c, mrna_deg_proxy):
     if gene_info.L_protein <= params.PTT_LENGTH:
         raise ValueError('This protein is too short for co-translational translocation')
 
@@ -414,7 +416,7 @@ def co_translational_translocation(gene_info, mrna_transcript_c, mrna_deg_proxy)
     rxn[metab.ndp_map_c['G']] = gene_info.L_protein
     rxn[metab.pi_c] = gene_info.L_protein
     rxn[metab.h_c] += gene_info.L_protein
-    unprocessed_protein_r = Protein(compartment='r', id_='unprocessed_folded', gene_info=gene_info)
+    unprocessed_protein_r = Protein(compartment='r', id_='unprocessed_folded', me_input_model=me_input_model, gene_info=gene_info)
 
     rxn[unprocessed_protein_r] = 1
     rxn = func.hydrolyze_atp(rxn, n_atp=number_BiP, compartment='r')
@@ -440,7 +442,7 @@ def co_translational_translocation(gene_info, mrna_transcript_c, mrna_deg_proxy)
     gene_info.amino_acid_counts = {k: gene_info.protein_seq.count(k) for k in params.amino_acids}
     gene_info.L_protein = len(gene_info.protein_seq)
 
-    folded_protein_r = Protein(compartment='r', id_='folded', gene_info=gene_info)
+    folded_protein_r = Protein(compartment='r', id_='folded', me_input_model=me_input_model, gene_info=gene_info)
 
     rxn = {metab.seq_amino_acid_map_r[aa]: count for aa, count in sp_aa_counts.items()}
     rxn[metab.h2o_r] = -params.L_SP
@@ -754,13 +756,15 @@ def secrete_protein(gene_info, modified_protein_g: Protein) -> ProteinExpression
 # mapper = dict(zip(ehm['NCBI gene ID'], ehm['HGNC ID']))
 
 # # Protein Expression All
-def get_protein_expression_reactions(gene_info, mrna_transcript_c, mrna_deg_proxy, ub_args: Dict[str, Any]) -> ProteinExpressionType:
+def get_protein_expression_reactions(gene_info, me_input_model, mrna_transcript_c, mrna_deg_proxy, ub_args: Dict[str, Any]) -> ProteinExpressionType:
     """Generate all translation, processing, transport, and degradation reactions for protein monomers.
 
     Parameters
     ----------
     gene_info : GeneInformation
         GeneInformation object of associated gene
+    me_input_model : cobra.Model
+        the corrected input metabolic model (as provided in preprocess.correct_inputs.correct_model)
     mrna_transcript_c : mRNA
         the final, cytosolic mRNA transcript
     mrna_deg_proxy : [type]
@@ -778,7 +782,7 @@ def get_protein_expression_reactions(gene_info, mrna_transcript_c, mrna_deg_prox
 
     # cytosolic transport: c, n, m, i, x and post-translational translocation
     if 'Cytosolic Tranport' in gene_info.all_locations.values() or gene_info.L_protein <= params.PTT_LENGTH:
-        translation_elongation_c, unfolded_protein_c = c_trln.translate_protein_cytosolic(gene_info, mrna_transcript_c, mrna_deg_proxy)
+        translation_elongation_c, unfolded_protein_c = c_trln.translate_protein_cytosolic(gene_info, me_input_model, mrna_transcript_c, mrna_deg_proxy)
         translation_elongation_c._final_compartments += [comp for comp, v in gene_info.all_locations.items() if v == 'Cytosolic Tranport']
         protein_expression_reactions.append(translation_elongation_c)
 
@@ -790,7 +794,7 @@ def get_protein_expression_reactions(gene_info, mrna_transcript_c, mrna_deg_prox
 
                 if 'c' in gene_info.all_locations or 'x' in gene_info.all_locations or ('n' in gene_info.all_locations and folded_protein_c.formula_weight / 1000 <= params.NUCLEAR_DIFFUSION_LIMIT):
                    # cytoplasmic degradation of folded proteins: cytoplasmic proteins, peroxisomal proteins, or nuclear proteins undergoing passive diffusion
-                    dr = degradation.degrade(folded_protein_c, **{'ub_args': ub_args})
+                    dr = degradation.degrade(folded_protein_c, **{'me_input_model': me_input_model, 'ub_args': ub_args})
                     fc = list(set(gene_info.all_locations).intersection(['c', 'x', 'n']))
                     for r in dr:
                         r._final_compartments += fc
@@ -807,7 +811,7 @@ def get_protein_expression_reactions(gene_info, mrna_transcript_c, mrna_deg_prox
                         protein_metabolites += [folded_protein_x]
 
                 if 'n' in gene_info.all_locations:
-                    nuclear_reactions, folded_protein_n = get_nuclear_reactions(gene_info, folded_protein_c,
+                    nuclear_reactions, folded_protein_n = get_nuclear_reactions(gene_info, me_input_model, folded_protein_c,
                                                                                 ub_args=ub_args)
                     for r in nuclear_reactions:
                         r._final_compartments.append('n')
@@ -815,7 +819,7 @@ def get_protein_expression_reactions(gene_info, mrna_transcript_c, mrna_deg_prox
                     protein_metabolites += [folded_protein_n]
 
             if 'i' in gene_info.all_locations:  # no folding for i, but cytoplasmic degradation
-                dr = degradation.degrade(macromolecule=unfolded_protein_c, **{'ub_args': ub_args})
+                dr = degradation.degrade(macromolecule=unfolded_protein_c, **{'me_input_model': me_input_model, 'ub_args': ub_args})
                 for r in dr:
                     r._final_compartments.append('i')
                 protein_expression_reactions += dr
@@ -841,7 +845,7 @@ def get_protein_expression_reactions(gene_info, mrna_transcript_c, mrna_deg_prox
         # to be the new protein length after degradation of 22 residues
         fc = [comp for comp, v in gene_info.all_locations.items() if v == 'Canonical Secretion']
         if not ptt_:  # co translational translocation
-            ctt_reactions, folded_protein_r, gene_info = co_translational_translocation(gene_info, mrna_transcript_c, mrna_deg_proxy)
+            ctt_reactions, folded_protein_r, gene_info = co_translational_translocation(gene_info, me_input_model, mrna_transcript_c, mrna_deg_proxy)
             for r in ctt_reactions:
                 r._final_compartments += fc
             protein_expression_reactions += ctt_reactions
@@ -914,18 +918,18 @@ def get_protein_expression_reactions(gene_info, mrna_transcript_c, mrna_deg_prox
             fc = list(set(gene_info.all_locations).intersection(['r', 'g']))
             if ptt_:
                 erad_reactions, unfolded_protein_c = degradation.degrade(macromolecule=retro_protein_r,
-                                                                         **{'unfolded_protein_c': unfolded_protein_c})
+                                                                         **{'me_input_model': me_input_model, 'unfolded_protein_c': unfolded_protein_c})
                 for r in erad_reactions:
                     r._final_compartments += fc
                 rpdr += erad_reactions
                 if 'i' not in gene_info.all_locations:  # this reaction doesn't already exist
-                    dr = degradation.degrade(unfolded_protein_c, **{'ub_args': ub_args})
+                    dr = degradation.degrade(unfolded_protein_c, **{'me_input_model': me_input_model, 'ub_args': ub_args})
                     for r in dr:
                         r._final_compartments += fc
                     rpdr += dr
             else:
                 erad_reactions, unfolded_protein_c = degradation.degrade(macromolecule=retro_protein_r,
-                                                                         **{'unfolded_protein_c': None})
+                                                                         **{'me_input_model': me_input_model, 'unfolded_protein_c': None})
                 for r in erad_reactions:
                     r._final_compartments += fc
                 rpdr += erad_reactions
@@ -935,7 +939,7 @@ def get_protein_expression_reactions(gene_info, mrna_transcript_c, mrna_deg_prox
                 # in the case of multi-localization
                 # (this unfolded protein is different than cytosolically translated ones bc of the)
                 # signal peptide degradation reaction
-                dr = degradation.degrade(macromolecule=unfolded_protein_c, **{'ub_args': ub_args})
+                dr = degradation.degrade(macromolecule=unfolded_protein_c, **{'me_input_model': me_input_model, 'ub_args': ub_args})
                 for r in dr:
                     r._final_compartments += fc
                 rpdr += dr
@@ -960,7 +964,7 @@ def get_protein_expression_reactions(gene_info, mrna_transcript_c, mrna_deg_prox
             if 'pm' in gene_info.all_locations:
                 protein_pm = [p for p in secreted_proteins if p.compartment == 'pm'][0]
                 endocytosis_reactions, protein_l = degradation.build_endocytosis_reactions(macromolecule_pm=protein_pm,
-                                                                                           **{'ub_args': ub_args, 'macromolecule_l': protein_l})
+                                                                                           **{'me_input_model': me_input_model, 'ub_args': ub_args, 'macromolecule_l': protein_l})
                 for r in endocytosis_reactions:
                     r._final_compartments.append('pm')
 

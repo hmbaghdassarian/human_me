@@ -49,6 +49,8 @@ def protein_polyubiquitination(macromolecule: DegradedMacromoleculeType, **kwarg
         raise ValueError(macromolecule.id + ': Current compartment, ' + macromolecule.compartment + ' does not have polyubiquitination reactions available')
 
     if macromolecule.type == 'protein':
+        me_input_model = kwargs['me_input_model']
+
         polyu_protein_aa_counts = macromolecule._amino_acid_counts.copy()
         for aa_code, aa_counts in ub_args['monoub_aa_counts'].items():
             if aa_code in polyu_protein_aa_counts:
@@ -56,6 +58,7 @@ def protein_polyubiquitination(macromolecule: DegradedMacromoleculeType, **kwarg
             else:
                 polyu_protein_aa_counts[aa_code] = aa_counts * params.N_UB
         polyub_macromolecule = Protein(id_='_'.join(macromolecule.id.split('_')[:-1]) + '_polyub',
+                                       me_input_model=me_input_model,
                                        compartment=cmap[macromolecule.compartment],
                                        amino_acid_counts=polyu_protein_aa_counts)
         polyub_macromolecule._ptms = macromolecule._ptms
@@ -227,6 +230,8 @@ def degrade_cytosolic_nuclear_protein(macromolecule: DegradedMacromoleculeType, 
     ----------
     macromolecule : DegradedMacromoleculeType
         The macromolecule to be degraded
+    me_input_model : cobra.Model
+        the corrected input metabolic model (as provided in preprocess.correct_inputs.correct_model)
 
     Returns
     -------
@@ -234,8 +239,12 @@ def degrade_cytosolic_nuclear_protein(macromolecule: DegradedMacromoleculeType, 
         All associated degradation reactions of the macromolecule
     """
     ub_args = kwargs['ub_args']
-    polyubiquitinate_macromolecule, polyub_macromolecule = protein_polyubiquitination(macromolecule=macromolecule,
-                                                                                      ub_args=ub_args)
+    if macromolecule.type == 'protein':
+        me_input_model = kwargs['me_input_model']
+        polyubiquitinate_macromolecule, polyub_macromolecule = protein_polyubiquitination(macromolecule=macromolecule, me_input_model=me_input_model, 
+                                                                                        ub_args=ub_args)
+    else:
+        polyubiquitinate_macromolecule, polyub_macromolecule = protein_polyubiquitination(macromolecule=macromolecule, ub_args=ub_args)
     proteasomal_degradation_rxns = proteasomal_degradation(macromolecule=macromolecule,
                                                            polyub_macromolecule=polyub_macromolecule,
                                                            ub_args=ub_args)
@@ -497,6 +506,9 @@ def build_erad_reactions(macromolecule: DegradedMacromoleculeType, **kwargs):
     else:
         unfolded_protein_c = None
 
+    if macromolecule.type == 'protein':
+        me_input_model = kwargs['me_input_model']
+    
     if 'ub_args' in kwargs:
         ub_args = kwargs['ub_args']
     elif macromolecule.type == 'complex':
@@ -546,7 +558,10 @@ def build_erad_reactions(macromolecule: DegradedMacromoleculeType, **kwargs):
             r._update_tracking([macromolecule, macromolecule_r, unmodified_protein_r, unfolded_protein_c])  # redundanciese dealt with in _consolidate_tracking
         return erad_reactions, unfolded_protein_c
     # this portion is hard-coded in protein_expression portion
-    erad_reactions += degrade_cytosolic_nuclear_protein(unfolded_protein_c, **{'ub_args': ub_args})
+    if macromolecule.type == 'protein':
+        erad_reactions += degrade_cytosolic_nuclear_protein(macromolecule=unfolded_protein_c, me_input_model = me_input_model, ub_args = ub_args)
+    else: 
+        erad_reactions += degrade_cytosolic_nuclear_protein(macromolecule=unfolded_protein_c, ub_args = ub_args)
     for r in erad_reactions:
         r._update_tracking([macromolecule, macromolecule_r, unmodified_protein_r, unfolded_protein_c])
     return erad_reactions
@@ -566,6 +581,8 @@ def build_endocytosis_reactions(macromolecule_pm: DegradedMacromoleculeType, **k
         Associated reactions and output macromolecule after endocytosis
     """
     ub_args = kwargs['ub_args']
+    me_input_model = kwargs['me_input_model']
+
     if 'macromolecule_l' in kwargs:
         macromolecule_l = kwargs['macromolecule_l']
         if macromolecule_l is not None and macromolecule_l.type == 'complex':
@@ -574,8 +591,8 @@ def build_endocytosis_reactions(macromolecule_pm: DegradedMacromoleculeType, **k
         macromolecule_l = None
 
     # polyubiquitination for lysosomal targetting-------------------------------------
-    polyubiquitinate_protein, polyub_macromolecule_pm = protein_polyubiquitination(macromolecule=macromolecule_pm,
-                                                                                   ub_args=ub_args)
+    polyubiquitinate_protein, polyub_macromolecule_pm = protein_polyubiquitination(macromolecule=macromolecule_pm, me_input_model = me_input_model,
+                                                                                   ub_args = ub_args)
     # endocytosis--------------------------------------------------------------------------
     # combine dequbiquitination with endocytosis https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3987138/
     if macromolecule_l is None:
