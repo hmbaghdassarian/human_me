@@ -9,7 +9,6 @@ import pandas as pd
 from Bio.Seq import Seq
 
 from human_me.utils import functions as func
-from human_me.utils import machinery as mach
 from human_me.utils import parameters as params
 
 
@@ -409,7 +408,7 @@ ptm_keys = list(params.allowed_ptms.keys())
 cp_keys = ['alpha_m', 'alpha_p', 'ptr']
 
 
-def generate_from_psim(hgnc_id: str, psim: pd.DataFrame = params.psim_me, machinery_list: List[str], 
+def generate_from_psim(hgnc_id: str, psim: pd.DataFrame, machinery_list: List[str], 
                        reactions: Optional[List[cobra.Reaction]] = None, nonmachinery_locations: Optional[List[str]] = None,
                        stochastic: bool = False, seed: int = None) -> GeneInformation:
     """Generates gene information object from PSIM. Assumes the gene information object being
@@ -419,8 +418,8 @@ def generate_from_psim(hgnc_id: str, psim: pd.DataFrame = params.psim_me, machin
     ----------
     hgnc_id : str
         gene HGNC ID in the format HGNC:####
-    psim : pd.DataFrame, optional
-        PSIM, by default params.psim_me
+    psim : pd.DataFrame
+        see PSIM_README.md for details
     machinery_list : List[str]
         each entry is the HGNC ID of a protein that should be considered as catalyzing a reaction
     reactions : Optional[List[cobra.Reaction]], optional

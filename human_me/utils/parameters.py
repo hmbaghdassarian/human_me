@@ -1,34 +1,9 @@
-import logging
-import os
-import sys
-
-import cobra
 import numpy as np
 import pandas as pd
 from sympy.parsing.sympy_parser import parse_expr
 
 from human_me.data.file_paths import build_files_url
 from human_me.utils.load_environmental_variables import processed_data_path
-
-logging.basicConfig()
-logger = logging.getLogger(cobra.__name__)
-logger.setLevel(logging.CRITICAL)
-
-class HiddenPrints:
-    '''Supress package print messages.'''
-    def __enter__(self):
-        self._original_stdout = sys.stdout
-        sys.stdout = open(os.devnull, 'w')
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        sys.stdout.close()
-        sys.stdout = self._original_stdout
-
-with HiddenPrints():
-    human_model = cobra.io.read_sbml_model(processed_data_path + 'corrected_model.xml')
-
-psim_me = pd.read_hdf(processed_data_path + 'corrected_psim.h5', key='corrected')
-psim_me['SP'] = psim_me['SP'].apply(lambda x: bool(x))
 
 mu = parse_expr('mu')
 
@@ -49,7 +24,7 @@ allowed_trna_modifications = {}
 
 RATE_INTRON = 10 / 67000  # 10 introns / 67 kbp (https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5199132/)
 # L_polyA_n = 250 # https://www.nature.com/articles/s41592-019-0503-y
-N_UB = 4  # see this - no. of ubiquitins to add to protein
+N_UB = 4  # no. of ubiquitins to add to protein
 
 TRANSPORT_TRANSLOCATION_ATP_COST = 0.5  # 1 ATP/2 residues
 PROTEOLYSIS_TRANSLOCATION_ATP_COST = 0.5  # 1 ATP/2 residues

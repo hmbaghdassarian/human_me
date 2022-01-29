@@ -7,7 +7,7 @@ import os
 import random
 import time
 import warnings
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Union
 
 import cobra
 import numpy as np
@@ -29,6 +29,7 @@ with warnings.catch_warnings():
     from human_me.utils import machinery as mach
     from human_me.utils import parameters as params
     from human_me.utils.metabolites import MetaboliteBin
+    from human_me.io import load_metabolic_model, load_psim
 
     with func.HiddenPrints():
         from human_me.build.build_utils import (
@@ -41,7 +42,7 @@ with warnings.catch_warnings():
                                                           RibosomalComplex)
         from human_me.core.macromolecules.protein import Protein
         from human_me.expression.build_ribosome_biogenesis_reactions import \
-            build_ribosome
+            build_ribosome, set_ribosomal_psim
         from human_me.expression.build_trna_expression_reactions import create_trna
         from human_me.expression.gene_expression.protein_expression import (
             degradation, ubiquitin)
@@ -50,8 +51,8 @@ with warnings.catch_warnings():
 class MEBuilder:
     """Builder class for ME Model."""
     def __init__(self, 
-                m_model: cobra.Model 
-                 psim_me: pd.DataFrame = params.psim_me, 
+                m_model: Union[cobra.Model,str], 
+                 psim_me: Union[pd.DataFrame, str],
                  stochastic: bool = False, seed: int = 888, n_cores: int = os.cpu_count(),
                  non_machinery: Optional[Dict[str, List[str]]] = None, knock_out: Optional[List[str]] = None,
                  dummy_protein: bool = True, context_specific_dummy: bool = False,
@@ -93,9 +94,12 @@ class MEBuilder:
         if len(set(self.knock_out).intersection(self.non_machinery)) > 0:
             raise ValueError('Speficied knocking out of genes that are also specified to be expressed as non-machinery')
 
-        self.psim_me = psim_me
-        self.m_model = m_model
+        # all parameters that use psim_me as input
+        self.psim_me = load_psim(psim_me)
+        psim_rib = set_ribosomal_psim(self.psim_me)
+
         # all parameters that use m_model as input
+        self.m_model = load_metabolic_model(m_model)
         self.metabolic_machinery, self.all_machinery = mach.get_model_machinery(self.m_model)
         self.model_metabolites = MetaboliteBin(self.m_model)
         self.biomass_reactions= biomass.create_biomass_reactions(self.model_metabolites)
@@ -126,13 +130,13 @@ class MEBuilder:
         # get pre-generated reactions - the compress_mrna arg requires that they be run with that input
         self.compress_mrna = compress_mrna
         print('Generate ubiquitin reactions for proteasomal degradation')
-        self.ub_args = ubiquitin.express_ubiquitin(model_metabolites=self.model_metabolites, compress_mrna=self.compress_mrna)
+        self.ub_args = ubiquitin.express_ubiquitin(model_metabolites=self.model_metabolites, psim_me = self.psim_me, compress_mrna=self.compress_mrna)
         print('Generate ribosome')
 
         # ribosome seeds different from seeds here for gene_info bc it also calls random.sample
         random.seed(self.seed)
         rib_seed = random.randint(0, int((2 ** 32 - 1)))
-        ribosomal_reactions, self.ribosome_complex_c = build_ribosome(self.model_metabolites, self.modified_transcript_c, self.charged_trna_map, 
+        ribosomal_reactions, self.ribosome_complex_c = build_ribosome(self.model_metabolites, psim_rib, self.modified_transcript_c, self.charged_trna_map, 
                                                                         self.ub_args, self.compress_mrna,
                                                                         self.deg_args['reversible_complex_formation'],
                                                                         stochastic=self.stochastic, seed=rib_seed)
@@ -1311,9 +1315,9 @@ class MEBuilder:
         return me_model
 
 
-def build_me(me_input_model: cobra.Model,
-            model_id: str = 'HUMAN_ME_MODEL',
-             psim_me: pd.DataFrame = params.psim_me, 
+def build_me(me_input_model: Union[cobra.Model,str],
+             psim_me: Union[pd.DataFrame, str],
+             model_id: str = 'HUMAN_ME_MODEL',
              stochastic: bool = False, seed: int = 888, n_cores: int = os.cpu_count(),
              non_machinery: Optional[Dict[str, List[str]]] = None, knock_out: Optional[List[str]] = None,
              dummy_protein: bool = True, context_specific_dummy: bool = False,
@@ -1327,12 +1331,12 @@ def build_me(me_input_model: cobra.Model,
 
     Parameters
     ----------
+    me_input_model : cobra.Model
+        the corrected input metabolic model (as provided in preprocess.correct_inputs.correct_model) or 'full/path/to/corrected_model.xml'
+    psim_me : pd.DataFrame
+        the corrected psim matrix (as provided in preprocess.correct_inputs.correct_psim) or 'full/path/to/corrected_psim.csv or .h5'
     model_id : str, optional
         model identifier, by default 'HUMAN_ME_MODEL'
-    me_input_model : cobra.Model
-        the corrected input metabolic model (as provided in preprocess.correct_inputs.correct_model)
-    psim_me : pd.DataFrame, optional
-        the corrected psim matrix (as provided in preprocess.correct_inputs.correct_psim)
     stochastic : bool, optional
         Whether a potentially stochastic output should be stochastic, or choose a default behavior instead, by default False
     seed : int, optional
@@ -1388,12 +1392,12 @@ def build_me(me_input_model: cobra.Model,
     Returns
     -------
     me_model : ME_Model
-        the resultant ME-Model
+        the fully constructed ME-Model
     builder : MEBuilder
         instance of MEBuilder used to generate the me_model
     """
     start = time.time()
-    builder = MEBuilder(m_model=me_input_model, model_id = model_id, psim_me=params.psim_me, 
+    builder = MEBuilder(m_model=me_input_model, psim_me=psim_me, model_id = model_id, 
                         stochastic=stochastic, seed=seed, n_cores=n_cores,
                         non_machinery=non_machinery, knock_out=knock_out,
                         dummy_protein=dummy_protein, context_specific_dummy=context_specific_dummy,

@@ -7,8 +7,6 @@ import logging
 import math
 import multiprocessing
 import os
-import pathlib
-import pickle
 from typing import Dict, List, Optional, SupportsFloat, Tuple, Union
 import warnings
 
@@ -27,11 +25,12 @@ from human_me.core.macromolecules.complex import Complex, RibosomalComplex
 from human_me.core.macromolecules.macromolecule import Macromolecule
 from human_me.core.reaction import (BiomassReaction,
                                     ComplexDegradationReaction,
-                                    ExpressionReaction, ME_Reaction, MetabolicReaction)
+                                    ExpressionReaction, MetabolicReaction)
 from human_me.me_solver import solve_me
 from human_me.preprocess import parse_complex
 from human_me.utils import parameters as params
 from human_me.utils.functions import flatten_list
+from human_me.io import read_pickled_me_model, write_pickled_object
 from human_me.utils.machinery import rbps
 
 logger = logging.getLogger(__name__)
@@ -893,23 +892,16 @@ class ME_Model(cobra.Model):
             me_model_copy.reactions.get_by_id(r_id)._upper_bound = 0
             return me_model_copy
 
-    def pickle(self, file=os.path.join(os.path.abspath(os.getcwd()), 'me_model.pickle')):
+    def pickle(self, file_name: str = os.path.join(os.path.abspath(os.getcwd()), 'me_model.pickle')):
         """Save ME_Model as a pickled object
 
         Parameters
         ----------
-        file: str 
+        file_name: str 
             will save to file = "full/path/to/filename.pickle", default './me_model.pickle'
 
         """
-        if '.' in file:
-            p = pathlib.Path(file)
-            extensions = "".join(p.suffixes)
-            file = str(p).replace(extensions, '.pickle')
-        else:
-            file = file + '.pickle'
-        with open(file, 'wb') as handle:
-            pickle.dump(self, handle)
+        write_pickled_object(self, file_name = file_name)
 
     @staticmethod
     def load_pickled_model(file_name: str):
@@ -926,9 +918,7 @@ class ME_Model(cobra.Model):
             ME model object
         """
 
-        with open(file_name, 'rb') as handle:
-            me_model = pickle.load(handle)
-        me_model.correct_object_tracking()  # lost in pickling/loadings
+        me_model = read_pickled_me_model(file_name)
         return me_model
 
     def copy(self):

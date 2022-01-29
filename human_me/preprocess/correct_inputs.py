@@ -11,10 +11,10 @@ from typing import Optional, Tuple, Union, Dict, List
 import cobra
 import cobra.manipulation.delete as c_del
 import pandas as pd
-# make sure the creat_environment function from the preprocesss script is run before this
 
 from human_me.preprocess import parse_complex
 from human_me.data.file_paths import build_files_url, build_local_path, input_local_path
+from human_me.io import load_metabolic_model, load_psim
 
 logging.basicConfig()
 logger = logging.getLogger(cobra.__name__)
@@ -80,17 +80,7 @@ def correct_model(model_file: Union[cobra.Model, str] = input_local_path + 'reco
         required_metabolites = json.loads(url.read().decode())
     rmd = pd.read_csv(build_files_url + 'required_metabolic_model_metabolites.csv', index_col=0)
 
-    if isinstance(model_file, str):
-        if not os.path.isfile(model_file):
-            raise ValueError('Specified file does not exist')
-        if os.path.splitext(model_file)[1] != '.xml':
-            raise ValueError('Specified file must be an sbml model with extentsion ".xml"')
-        m_model = cobra.io.read_sbml_model(model_file)
-    elif isinstance(model_file, cobra.Model):
-        m_model = model_file
-        del model_file
-    else:
-        raise TypeError('Model arg must either by a cobrapy model or specify a path to a sbml file of a cobrapy model')
+    m_model = load_metabolic_model(model_file)
 
     # check for correct compartments
     different_compartments = list(set(m_model.compartments.keys()).difference(compartments_me.keys()))
@@ -294,7 +284,7 @@ def get_status(psim_me: pd.DataFrame) -> pd.DataFrame:
     return psim
 
 
-def correct_psim(me_input_model: cobra.Model,
+def correct_psim(me_input_model: Union[cobra.Model, str],
                 psim_df: Union[pd.DataFrame, str] = build_local_path + 'psim_me.h5',
                  fill_na: str = 'default',
                  non_machinery: Optional[Dict[str, List[str]]] = None):
@@ -305,9 +295,10 @@ def correct_psim(me_input_model: cobra.Model,
 
     Parameters
     ----------
-    me_input_model : cobra.core.Model
+    me_input_model : Union[cobra.Model, str]
         Cobra model with GPRs corrected, metabolite transport reactions needed for ME Model incorporated,
         and removed biomass objective. Used as input to building the ME Model. Output of correct_model function.
+        Can be 'full/path/to/corrected_model.xml'
     psim_df : Union[pd.DataFrame, str], optional
         See PSIM_README for details on format of psim, by default build_local_path +'psim_me.h5' (gold-standard PSIM)
     fill_na : str, optional
@@ -338,6 +329,7 @@ def correct_psim(me_input_model: cobra.Model,
 
     Also writes corrected PSIM to 'outdir/corrected_psim_me.h5' (specified in preprocess.create_environment)
     """
+    me_input_model = load_metabolic_model(me_input_model)
     # run basic non-machinery check
     non_machinery = check_non_machinery(non_machinery=non_machinery)
 
@@ -357,21 +349,7 @@ def correct_psim(me_input_model: cobra.Model,
     psim_gold = psim_gold[psim_gold.Status != 0]  # drop genes that won't work with model
     psim_gold = psim_gold[all_columns]
 
-    # load input PSIM---------------------------------------------------------------------------------------
-    if type(psim_df) == str:
-        if not os.path.isfile(psim_df):
-            raise ValueError('The specified PSIM file does not exist')
-        filename, file_extension = os.path.splitext(psim_df)
-        if file_extension == '.h5':
-            psim_me = pd.read_hdf(psim_df)
-        elif file_extension == '.csv':
-            psim_me = pd.read_csv(psim_df, index_col=0)
-        else:
-            raise TypeError('PSIM must be in .csv or .h5 format')
-    elif not isinstance(psim_df, pd.DataFrame):
-        raise TypeError('The specified psim_df arg is invalid')
-    else:
-        psim_me = psim_df
+    psim_me = load_psim(psim_df)
 
     psim_me.reset_index(inplace=True, drop=True)
     # check that required cols are all present and appropriately formatted------------------------------------

@@ -15,13 +15,15 @@ import human_me.expression.gene_expression.build_mrna_expression_reactions as bu
 from human_me.expression.gene_expression.protein_expression import cytosolic_translation as c_trln
 
 
-def express_ubiquitin(model_metabolites, compress_mrna: bool) -> Dict[str, Any]:
+def express_ubiquitin(model_metabolites, psim_me: pd.DataFrame, compress_mrna: bool) -> Dict[str, Any]:
     """Reactions for formation of ubiquitin.
 
     Parameters
     ----------
     model_metabolites : utils.metabolites.MetaboliteBin
         the me_input_model metabolites as specified by MetaboliteBin
+    psim_me : pd.DataFrame
+        the corrected psim matrix (as provided in preprocess.correct_inputs.correct_psim)
     compress_mrna : bool
         whether to condense elongation, processing, and nuclear export reactions into a single reaction
 
@@ -32,7 +34,7 @@ def express_ubiquitin(model_metabolites, compress_mrna: bool) -> Dict[str, Any]:
     """
 
     # UBC
-    ubc_psim = params.psim_me[params.psim_me['HGNC_ID'] == 'HGNC:12468']  # UBC
+    ubc_psim = psim_me[psim_me['HGNC_ID'] == 'HGNC:12468']  # UBC
     ubc_psim['Location'] = 'c'
     ubc_info = GeneInformation(hgnc_id=ubc_psim['HGNC_ID'].values.tolist()[0],
                                machinery_list=list(),
@@ -66,7 +68,7 @@ def express_ubiquitin(model_metabolites, compress_mrna: bool) -> Dict[str, Any]:
     ubiquitin_monomerization_ubc.gene_reaction_rule = mach.USP5[0]
 
     # UBB
-    ubb_psim = params.psim_me[params.psim_me['HGNC_ID'] == 'HGNC:12463']  # UBB
+    ubb_psim = psim_me[psim_me['HGNC_ID'] == 'HGNC:12463']  # UBB
     ubb_psim['Location'] = 'c'
     ubb_info = GeneInformation(hgnc_id=ubb_psim['HGNC_ID'].values.tolist()[0],
                                premrna_seq=ubb_psim['PREMRNA_SEQ'].values.tolist()[0],
