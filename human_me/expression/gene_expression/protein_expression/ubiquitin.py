@@ -5,7 +5,6 @@ from typing import Any, Dict
 
 from human_me.utils import machinery as mach
 from human_me.utils import parameters as params
-from human_me.utils import metabolites as metab
 from human_me.utils import functions as func
 
 from human_me.core.reaction import ExpressionReaction
@@ -16,13 +15,13 @@ import human_me.expression.gene_expression.build_mrna_expression_reactions as bu
 from human_me.expression.gene_expression.protein_expression import cytosolic_translation as c_trln
 
 
-def express_ubiquitin(me_input_model, compress_mrna: bool) -> Dict[str, Any]:
+def express_ubiquitin(model_metabolites, compress_mrna: bool) -> Dict[str, Any]:
     """Reactions for formation of ubiquitin.
 
     Parameters
     ----------
-    me_input_model : cobra.Model
-        the corrected input metabolic model (as provided in preprocess.correct_inputs.correct_model)
+    model_metabolites : utils.metabolites.MetaboliteBin
+        the me_input_model metabolites as specified by MetaboliteBin
     compress_mrna : bool
         whether to condense elongation, processing, and nuclear export reactions into a single reaction
 
@@ -43,8 +42,7 @@ def express_ubiquitin(me_input_model, compress_mrna: bool) -> Dict[str, Any]:
                                polyA_length=round(ubc_psim['POLYA_LENGTH'].values.tolist()[0]))
     ubc_info.get_final_locations(nonmachinery_locations=['c'])
     ubc_info = func.convert_gi(ubc_info, non_machinery=dict())
-    ubc_mrna_expression_reactions, ubc_transcript_c, ubc_deg_proxy = build_mrna.get_mrna_expression_reactions(gene_info=ubc_info,
-                                                                                                            me_input_model=me_input_model,
+    ubc_mrna_expression_reactions, ubc_transcript_c, ubc_deg_proxy = build_mrna.get_mrna_expression_reactions(gene_info=ubc_info, model_metabolites=model_metabolites,
                                                                                                               compress_mrna=compress_mrna)
 
     # ubiquitin monomer
@@ -53,17 +51,17 @@ def express_ubiquitin(me_input_model, compress_mrna: bool) -> Dict[str, Any]:
     monoub_aa_counts = {k: params.SINGLE_UB_SEQ.count(k) for k in params.amino_acids}
     mono_ub_length = len(params.SINGLE_UB_SEQ)
     n_ub_monomers = ubc_info.protein_seq.count(params.SINGLE_UB_SEQ)
-    ub_c = Protein(compartment='c', id_='ubiquitin_monomer', me_input_model=me_input_model, amino_acid_counts=monoub_aa_counts)
+    ub_c = Protein(compartment='c', id_='ubiquitin_monomer', model_metabolites=model_metabolites, amino_acid_counts=monoub_aa_counts)
 
-    ubc_translation_reaction_cytosolic, ubc_c = c_trln.translate_protein_cytosolic(ubc_info, me_input_model, ubc_transcript_c,
-                                                                                   ubc_deg_proxy)
+    ubc_translation_reaction_cytosolic, ubc_c = c_trln.translate_protein_cytosolic(ubc_info, ubc_transcript_c,
+                                                                                   ubc_deg_proxy, model_metabolites=model_metabolites)
 
     ubiquitin_monomerization_ubc = ExpressionReaction(ubc_info.hgnc_id + '_MONOMERIZATIONc',
                                                       subsystem='Protein_Expression', ubiquitin_biogenesis=True,
                                                       hgnc_id=ubc_info.hgnc_id, synthesis=True,
                                                       synthesis_type='protein')
-    rxn = {ubc_c: -1, ub_c: n_ub_monomers, metab.seq_amino_acid_map_c[ubc_info.protein_seq[n_ub_monomers * 76:]]: 1,
-           metab.h2o_c: -n_ub_monomers}
+    rxn = {ubc_c: -1, ub_c: n_ub_monomers, model_metabolites.seq_amino_acid_map_c[ubc_info.protein_seq[n_ub_monomers * 76:]]: 1,
+           model_metabolites.h2o_c: -n_ub_monomers}
     ubiquitin_monomerization_ubc.add_metabolites(rxn)
     ubiquitin_monomerization_ubc.gene_reaction_rule = mach.USP5[0]
 
@@ -78,10 +76,10 @@ def express_ubiquitin(me_input_model, compress_mrna: bool) -> Dict[str, Any]:
     ubb_info.get_final_locations(nonmachinery_locations=['c'])
     ubb_info = func.convert_gi(ubb_info, non_machinery=dict())
     ubb_mrna_expression_reactions, ubb_transcript_c, ubb_deg_proxy = build_mrna.get_mrna_expression_reactions(gene_info=ubb_info,
-                                                                                                            me_input_model=me_input_model,
+                                                                                                            model_metabolites=model_metabolites,
                                                                                                               compress_mrna=compress_mrna)
-    ubb_translation_reaction_cytosolic, ubb_c = c_trln.translate_protein_cytosolic(ubb_info, me_input_model, ubb_transcript_c,
-                                                                                   ubb_deg_proxy)
+    ubb_translation_reaction_cytosolic, ubb_c = c_trln.translate_protein_cytosolic(ubb_info, ubb_transcript_c,
+                                                                                   ubb_deg_proxy, model_metabolites=model_metabolites)
 
     # monomerization from ubb polyub
     n_ub_monomers = ubb_info.protein_seq.count(params.SINGLE_UB_SEQ)
@@ -90,20 +88,20 @@ def express_ubiquitin(me_input_model, compress_mrna: bool) -> Dict[str, Any]:
                                                       hgnc_id=ubb_info.hgnc_id, synthesis=True,
                                                       synthesis_type='protein')
 
-    rxn = {ubb_c: -1, ub_c: n_ub_monomers, metab.seq_amino_acid_map_c[ubb_info.protein_seq[n_ub_monomers * 76:]]: 1,
-           metab.h2o_c: -n_ub_monomers}
+    rxn = {ubb_c: -1, ub_c: n_ub_monomers, model_metabolites.seq_amino_acid_map_c[ubb_info.protein_seq[n_ub_monomers * 76:]]: 1,
+           model_metabolites.h2o_c: -n_ub_monomers}
     ubiquitin_monomerization_ubb.add_metabolites(rxn)
     ubiquitin_monomerization_ubb.gene_reaction_rule = mach.USP5[0]
 
     # breakdown of the polyubiquitin cleaved from proteins in ubiquitin-proteasome pathway
     polyub_aa_counts = {aa_code: aa_count * params.N_UB for aa_code, aa_count in monoub_aa_counts.items()}
-    polyub_c = Protein(id_='cleaved_polyubiquitin_moiety', me_input_model=me_input_model, amino_acid_counts=polyub_aa_counts,
+    polyub_c = Protein(id_='cleaved_polyubiquitin_moiety', model_metabolites=model_metabolites, amino_acid_counts=polyub_aa_counts,
                        compartment='c')
     ubiquitin_monomerization_polyub = ExpressionReaction('POLYUBIQUITIN_MONOMERIZATIONc',
                                                          subsystem='Protein_Expression',
                                                          ubiquitin_biogenesis=True, hgnc_id=None)
 
-    rxn = {polyub_c: -1, ub_c: params.N_UB, metab.h2o_c: -(params.N_UB - 1)}
+    rxn = {polyub_c: -1, ub_c: params.N_UB, model_metabolites.h2o_c: -(params.N_UB - 1)}
     ubiquitin_monomerization_polyub.add_metabolites(rxn)
     ubiquitin_monomerization_polyub.gene_reaction_rule = mach.USP5[0]
 
@@ -131,11 +129,11 @@ def express_ubiquitin(me_input_model, compress_mrna: bool) -> Dict[str, Any]:
     degradation_ub = ExpressionReaction('UBIQUITIN_MONOMER_DEGRADATIONc',
                                         subsystem='Protein_Degradation', ubiquitin_biogenesis=True, hgnc_id=None,
                                         sink=True, sink_type='protein')
-    rxn = {metab.seq_amino_acid_map_c[aa_code]: aa_counts for aa_code, aa_counts in monoub_aa_counts.items()}
+    rxn = {model_metabolites.seq_amino_acid_map_c[aa_code]: aa_counts for aa_code, aa_counts in monoub_aa_counts.items()}
     rxn[ub_c] = -1
-    rxn[metab.h2o_c] = -(mono_ub_length - 1)
+    rxn[model_metabolites.h2o_c] = -(mono_ub_length - 1)
     # atp hydrolysis for translocation/unfolding by 26S - known 1 ATP per 2 residues - https://www.nature.com/articles/s41586-018-0736-4
-    rxn = func.hydrolyze_atp(rxn, n_atp=mono_ub_length / 2, compartment='c')
+    rxn = func.hydrolyze_atp(rxn, n_atp=mono_ub_length / 2, compartment='c', model_metabolites=model_metabolites)
 
     degradation_ub.add_metabolites(rxn)
     degradation_ub.gene_reaction_rule = ' and '.join(mach.proteasome_machinery)

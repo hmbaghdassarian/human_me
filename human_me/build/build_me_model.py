@@ -28,6 +28,7 @@ with warnings.catch_warnings():
     from human_me.utils import functions as func
     from human_me.utils import machinery as mach
     from human_me.utils import parameters as params
+    from human_me.utils.metabolites import MetaboliteBin
 
     with func.HiddenPrints():
         from human_me.build.build_utils import (
@@ -41,8 +42,7 @@ with warnings.catch_warnings():
         from human_me.core.macromolecules.protein import Protein
         from human_me.expression.build_ribosome_biogenesis_reactions import \
             build_ribosome
-        from human_me.expression.build_trna_expression_reactions import \
-            trna_biogenesis_reactions
+        from human_me.expression.build_trna_expression_reactions import create_trna
         from human_me.expression.gene_expression.protein_expression import (
             degradation, ubiquitin)
 
@@ -97,7 +97,10 @@ class MEBuilder:
         self.m_model = m_model
         # all parameters that use m_model as input
         self.metabolic_machinery, self.all_machinery = mach.get_model_machinery(self.m_model)
-        self.biomass_reactions= biomass.create_biomass_reactions(self.m_model)
+        self.model_metabolites = MetaboliteBin(self.m_model)
+        self.biomass_reactions= biomass.create_biomass_reactions(self.model_metabolites)
+        self.trna_biogenesis_reactions, self.charged_trna_map, self.modified_trna_transcript_c = create_trna(self.model_metabolites)
+
 
         self.n_cores = n_cores
         if self.n_cores in [0, 1, None]:
@@ -123,15 +126,16 @@ class MEBuilder:
         # get pre-generated reactions - the compress_mrna arg requires that they be run with that input
         self.compress_mrna = compress_mrna
         print('Generate ubiquitin reactions for proteasomal degradation')
-        self.ub_args = ubiquitin.express_ubiquitin(me_input_model=self.m_model, compress_mrna=self.compress_mrna)
+        self.ub_args = ubiquitin.express_ubiquitin(model_metabolites=self.model_metabolites, compress_mrna=self.compress_mrna)
         print('Generate ribosome')
 
         # ribosome seeds different from seeds here for gene_info bc it also calls random.sample
         random.seed(self.seed)
         rib_seed = random.randint(0, int((2 ** 32 - 1)))
-        ribosomal_reactions, self.ribosome_complex_c = build_ribosome(self.m_model, self.ub_args, self.compress_mrna,
-                                                                      self.deg_args['reversible_complex_formation'],
-                                                                      stochastic=self.stochastic, seed=rib_seed)
+        ribosomal_reactions, self.ribosome_complex_c = build_ribosome(self.model_metabolites, self.modified_transcript_c, self.charged_trna_map, 
+                                                                        self.ub_args, self.compress_mrna,
+                                                                        self.deg_args['reversible_complex_formation'],
+                                                                        stochastic=self.stochastic, seed=rib_seed)
 
         self.dummy_protein = dummy_protein
         self.context_specific_dummy = context_specific_dummy
@@ -139,7 +143,7 @@ class MEBuilder:
         self.deorphaned = None
         self.orphan = None
 
-        self.me_reactions = trna_biogenesis_reactions + ribosomal_reactions + self.ub_args['ub_reactions']
+        self.me_reactions = self.trna_biogenesis_reactions + ribosomal_reactions + self.ub_args['ub_reactions']
         # map HGNC ID to a dictionary of compartments and cobra.Metabolite proteins
         self.id_protein_map = dict()
         self.complex_id_metabolite_map = dict()  # map complex id to the complex cobra.Metabolite
@@ -187,13 +191,15 @@ class MEBuilder:
             nml = list()
             if hgnc_id in self.non_machinery:
                 nml = self.non_machinery[hgnc_id]
-            expr_reactions, protein_metabolites = get_all_expression_reactions(me_input_model=self.m_model,
+            expr_reactions, protein_metabolites = get_all_expression_reactions(model_metabolites = self.model_metabolites, 
                                                                                 hgnc_id=hgnc_id,
                                                                                reactions=gene_reaction_map[hgnc_id],
                                                                                compress_mrna=self.compress_mrna,
                                                                                ub_args=self.ub_args,
                                                                                psim=self.psim_me
-                                                                               machinery_list=self.metabolic_machinery
+                                                                               machinery_list=self.metabolic_machinery, 
+                                                                               modified_trna_transcript_c=self.modified_trna_transcript_c, 
+                                                                               charged_trna_map=self.charged_trna_map,
                                                                                nonmachinery_locations=nml,
                                                                                stochastic=self.stochastic,
                                                                                seed=self._gene_seed_map[
@@ -208,7 +214,7 @@ class MEBuilder:
         #             try:
         #                 n_iter = len(iterable)
         #                 args = zip(iterable, [self.m_model]*n_iter, [gene_reaction_map]*n_iter, [self.psim_me]*n_iter, [self.metabolic_machinery]*n_iter, 
-        #                                       [self.ub_args]*n_iter, [self.compress_mrna]*n_iter,
+        #                                       [self.ub_args]*n_iter, [self.modified_transcript_c]*n_iter, [self.charged_trna_map]*n_iter, [self.compress_mrna]*n_iter,
         #                            [self.non_machinery]*n_iter, [self.stochastic]*n_iter, list(range(self._seed_idx, len(iterable))))
         #                 mm = pool.starmap(emm_par, args)
         #                 self._seed_idx += len(iterable)
@@ -228,11 +234,13 @@ class MEBuilder:
 
         for hgnc_id in sorted(self.knock_out):
             # None bc will add later for expression model specific to this
-            expr_reactions, protein_metabolites = get_all_expression_reactions(me_input_model=self.m_model, 
+            expr_reactions, protein_metabolites = get_all_expression_reactions(model_metabolites = self.model_metabolites, 
                                                                                 hgnc_id=hgnc_id,
                                                                                reactions=gene_reaction_map[hgnc_id],
                                                                                psim=self.psim_me
-                                                                               machinery_list=self.metabolic_machinery
+                                                                               machinery_list=self.metabolic_machinery, 
+                                                                               modified_trna_transcript_c=self.modified_trna_transcript_c, 
+                                                                               charged_trna_map=self.charged_trna_map,
                                                                                compress_mrna=self.compress_mrna,
                                                                                ub_args=self.ub_args,
                                                                                stochastic=self.stochastic,
@@ -273,10 +281,12 @@ class MEBuilder:
                 else:
                     not_present[generic_id] = r  # if shows up multiple times, will map to same compartment anyways
 
-            expr_reactions, protein_metabolites = get_all_expression_reactions(me_input_model=self.m_model, 
+            expr_reactions, protein_metabolites = get_all_expression_reactions(model_metabolites = self.model_metabolites,
                                                                                 hgnc_id=hgnc_id, 
                                                                                 psim=self.psim_me,
                                                                                machinery_list=expression_machinery_me,
+                                                                               modified_trna_transcript_c=self.modified_trna_transcript_c, 
+                                                                               charged_trna_map=self.charged_trna_map,
                                                                                reactions=gene_reaction_map[hgnc_id],
                                                                                compress_mrna=self.compress_mrna,
                                                                                ub_args=self.ub_args,
@@ -344,8 +354,11 @@ class MEBuilder:
                     else:
                         not_present[generic_id] = r  # if shows up multiple times, will map to same compartment anyways
 
-                expr_reactions, protein_metabolites = get_all_expression_reactions(me_input_model=self.m_model, hgnc_id=hgnc_id, psim=self.psim_me,
+                expr_reactions, protein_metabolites = get_all_expression_reactions( model_metabolites = self.model_metabolites, 
+                                                                                hgnc_id=hgnc_id, psim=self.psim_me,
                                                                                    machinery_list=expression_machinery_me_2,
+                                                                               modified_trna_transcript_c=self.modified_trna_transcript_c, 
+                                                                               charged_trna_map=self.charged_trna_map,
                                                                                    reactions=gene_reaction_map_2[
                                                                                        hgnc_id],
                                                                                    compress_mrna=self.compress_mrna,
@@ -414,9 +427,12 @@ class MEBuilder:
             print('Express dummy protein')
             dummy_psim = func.average_protein_features(psim_me=self.psim_me,
                                                        context_specific=self.context_specific_dummy, 
-                                                       me_input_model=self.m_model)
+                                                       metabolic_machinery=self.metabolic_machinery)
 
-            dummy_reactions, dm = get_all_expression_reactions(me_input_model=self.m_model,hgnc_id='HGNC:DUMMY', psim=dummy_psim, machinery_list=[],
+            dummy_reactions, dm = get_all_expression_reactions( model_metabolites = self.model_metabolites, 
+                                                                hgnc_id='HGNC:DUMMY', psim=dummy_psim, machinery_list=[],
+                                                                modified_trna_transcript_c=self.modified_trna_transcript_c, 
+                                                                charged_trna_map=self.charged_trna_map,
                                                                reactions=None, compress_mrna=self.compress_mrna,
                                                                ub_args=self.ub_args, nonmachinery_locations=['c'],
                                                                stochastic=self.stochastic,
@@ -566,12 +582,12 @@ class MEBuilder:
                 complex_formation_reaction.synthesis = True  # for ribosomal complex formation
                 if self.deg_args['complex_degradation']:
                     if complex_metabolite.compartment in ['c', 'n', 'r', 'g', 'pm']:
-                        complex_degradation_reaction = degradation.degrade(complex_metabolite,
+                        complex_degradation_reaction = degradation.degrade(complex_metabolite, model_metabolites=self.model_metabolites, 
                                                                            **{'ub_args': self.ub_args})
                     elif complex_metabolite.compartment == 'e':
                         complex_degradation_reaction = list()
                     else:
-                        complex_degradation_reaction = degradation.degrade(complex_metabolite)
+                        complex_degradation_reaction = degradation.degrade(complex_metabolite, model_metabolites=self.model_metabolites, )
 
                     for r in complex_degradation_reaction:
                         if len(r.genes) > 0:

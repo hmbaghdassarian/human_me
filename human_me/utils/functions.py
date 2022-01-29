@@ -12,8 +12,6 @@ from Bio import SeqIO
 import numpy as np
 import pandas as pd
 
-import human_me.utils.machinery as mach
-import human_me.utils.metabolites as metab
 import human_me.utils.parameters as params
 from human_me.data.file_paths import build_local_path 
 
@@ -136,7 +134,8 @@ def get_reaction_compartment(reaction: cobra.core.reaction.Reaction, stochastic:
 
 def hydrolyze_atp(metabolites_to_add: Dict[cobra.core.metabolite.Metabolite, Union[float, int]],
                   n_atp: Union[float, int],
-                  compartment: str) -> Dict[cobra.core.metabolite.Metabolite, Union[float, int]]:
+                  compartment: str, 
+                  model_metabolites) -> Dict[cobra.core.metabolite.Metabolite, Union[float, int]]:
     """
 
     Parameters
@@ -148,6 +147,8 @@ def hydrolyze_atp(metabolites_to_add: Dict[cobra.core.metabolite.Metabolite, Uni
         number of atps to hydrolyze
     compartment : str
         location of hydrolysis
+    model_metabolites : utils.metabolites.MetaboliteBin
+        the me_input_model metabolites as specified by MetaboliteBin
 
     Returns
     -------
@@ -156,41 +157,43 @@ def hydrolyze_atp(metabolites_to_add: Dict[cobra.core.metabolite.Metabolite, Uni
     """
     n_atp = round(n_atp)
 
-    if metab.atp_compartments[compartment] in metabolites_to_add.keys():
-        metabolites_to_add[metab.atp_compartments[compartment]] -= n_atp
+    if model_metabolites.atp_compartments[compartment] in metabolites_to_add.keys():
+        metabolites_to_add[model_metabolites.atp_compartments[compartment]] -= n_atp
     else:
-        metabolites_to_add[metab.atp_compartments[compartment]] = -n_atp
+        metabolites_to_add[model_metabolites.atp_compartments[compartment]] = -n_atp
 
-    if metab.h2o_compartments[compartment] in metabolites_to_add.keys():
-        metabolites_to_add[metab.h2o_compartments[compartment]] -= n_atp
+    if model_metabolites.h2o_compartments[compartment] in metabolites_to_add.keys():
+        metabolites_to_add[model_metabolites.h2o_compartments[compartment]] -= n_atp
     else:
-        metabolites_to_add[metab.h2o_compartments[compartment]] = -n_atp
+        metabolites_to_add[model_metabolites.h2o_compartments[compartment]] = -n_atp
 
-    if metab.adp_compartments[compartment] in metabolites_to_add.keys():
-        metabolites_to_add[metab.adp_compartments[compartment]] += n_atp
+    if model_metabolites.adp_compartments[compartment] in metabolites_to_add.keys():
+        metabolites_to_add[model_metabolites.adp_compartments[compartment]] += n_atp
     else:
-        metabolites_to_add[metab.adp_compartments[compartment]] = n_atp
+        metabolites_to_add[model_metabolites.adp_compartments[compartment]] = n_atp
 
-    if metab.pi_compartments[compartment] in metabolites_to_add.keys():
-        metabolites_to_add[metab.pi_compartments[compartment]] += n_atp
+    if model_metabolites.pi_compartments[compartment] in metabolites_to_add.keys():
+        metabolites_to_add[model_metabolites.pi_compartments[compartment]] += n_atp
     else:
-        metabolites_to_add[metab.pi_compartments[compartment]] = n_atp
+        metabolites_to_add[model_metabolites.pi_compartments[compartment]] = n_atp
 
-    if metab.h_compartments[compartment] in metabolites_to_add.keys():
-        metabolites_to_add[metab.h_compartments[compartment]] += n_atp
+    if model_metabolites.h_compartments[compartment] in metabolites_to_add.keys():
+        metabolites_to_add[model_metabolites.h_compartments[compartment]] += n_atp
     else:
-        metabolites_to_add[metab.h_compartments[compartment]] = n_atp
+        metabolites_to_add[model_metabolites.h_compartments[compartment]] = n_atp
 
     return metabolites_to_add
 
 
-def get_base_counts_and_elements(seq: Union[Seq, str], triphosphate: bool = True) -> Tuple[Dict[str, int], Dict[str, int]]:
+def get_base_counts_and_elements(seq: Union[Seq, str], model_metabolites, triphosphate: bool = True) -> Tuple[Dict[str, int], Dict[str, int]]:
     """Count the number of bases and atom elements in an RNA sequence
 
     Parameters
     ----------
     seq : Union[Seq, str]
         a gene's mRNA sequence
+    model_metabolites : utils.metabolites.MetaboliteBin
+        the me_input_model metabolites as specified by MetaboliteBin
     triphosphate : bool, optional
         whether the mRNA has a 5' triphosphate, by default True
 
@@ -203,13 +206,13 @@ def get_base_counts_and_elements(seq: Union[Seq, str], triphosphate: bool = True
     """
 
     base_counts = dict()
-    for base_letter in metab.seq_element_map:
+    for base_letter in model_metabolites.seq_element_map:
         base_counts[base_letter] = seq.count(base_letter)
 
     elements = {'C': 0, 'H': 0, 'N': 0, 'O': 0, 'P': 0}
-    for base_letter in metab.seq_element_map:
+    for base_letter in model_metabolites.seq_element_map:
         for element in elements:
-            elements[element] += base_counts[base_letter] * metab.seq_element_map[base_letter][element]
+            elements[element] += base_counts[base_letter] * model_metabolites.seq_element_map[base_letter][element]
 
             # 3' OH end
     elements['H'] += 1
@@ -271,7 +274,7 @@ def SASA(mw: float) -> float:
     return mw ** 0.75
 
 
-def average_protein_features(psim_me: pd.DataFrame, context_specific: bool = False, me_input_model: Optional[cobra.Model] = None) -> pd.DataFrame:
+def average_protein_features(psim_me: pd.DataFrame, context_specific: bool = False, metabolic_machinery: Optional[List[str]] = None) -> pd.DataFrame:
     """Function to get the average protein features from the proteins used in a specific ME model being generated.
     *Note, we filter for metabolic enzymes only, because most orphan reactions come from the metabolic sector.
 
@@ -282,8 +285,8 @@ def average_protein_features(psim_me: pd.DataFrame, context_specific: bool = Fal
     context_specific : bool, optional
         whether the representative dummy protein is calculated for only genes in the user-provided context specific model from
         the user provided PSIM (True) or for all recon2.2 machinery proteins in the gold-standard PSIM , by default False
-    me_input_model : cobra.Model, optional
-        the corrected input metabolic model (as provided in preprocess.correct_inputs.correct_model)
+    metabolic_machinery : List[str], optional
+        the context-specific metabolic machinery. Output of utils.machinery.get_model_machinery function
 
     Returns
     -------
@@ -293,9 +296,7 @@ def average_protein_features(psim_me: pd.DataFrame, context_specific: bool = Fal
     if context_specific:
         if me_input_model is None:
             raise ValueError('Must specify a metabolic model to extract context specific information')
-        psim = psim_me.copy()
-        metabolic_machinery, _ = mach.get_model_machinery(me_input_model)
-        psim = psim[psim.HGNC_ID.isin(metabolic_machinery)]  # filter for metabolic machinery only
+        psim = psim_me[psim_me.HGNC_ID.isin(metabolic_machinery)]  # filter for metabolic machinery only
     else:
         psim = pd.read_csv(build_local_path + 'recon2_2_only_psim.csv')  # load recon2.2 metabolic machinery gold standard PSIM
 

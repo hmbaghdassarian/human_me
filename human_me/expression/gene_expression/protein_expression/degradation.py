@@ -6,7 +6,6 @@ from typing import List, Optional, Tuple, Union
 
 from human_me.utils import machinery as mach
 from human_me.utils import parameters as params
-from human_me.utils import metabolites as metab
 from human_me.utils import functions as func
 
 from human_me.core.macromolecules.protein import Protein
@@ -22,7 +21,7 @@ DegradationReactionType = Union[ProteinDegradationReaction, ComplexDegradationRe
 # # Cytosol and Nucleus
 
 
-def protein_polyubiquitination(macromolecule: DegradedMacromoleculeType, **kwargs) -> Tuple[DegradationReactionType, DegradedMacromoleculeType]:
+def protein_polyubiquitination(macromolecule: DegradedMacromoleculeType, model_metabolites, **kwargs) -> Tuple[DegradationReactionType, DegradedMacromoleculeType]:
     """Adds 4 ubiquitins to the macromolecule
 
     Parameters
@@ -36,6 +35,8 @@ def protein_polyubiquitination(macromolecule: DegradedMacromoleculeType, **kwarg
         the polyubiquitination reaction
     polyub_macromolecule : DegradedMacromoleculeType
         the polyubiquitinated macromolecule
+    model_metabolites : utils.metabolites.MetaboliteBin
+        the me_input_model metabolites as specified by MetaboliteBin
     """
 
     ub_args = kwargs['ub_args']
@@ -49,8 +50,6 @@ def protein_polyubiquitination(macromolecule: DegradedMacromoleculeType, **kwarg
         raise ValueError(macromolecule.id + ': Current compartment, ' + macromolecule.compartment + ' does not have polyubiquitination reactions available')
 
     if macromolecule.type == 'protein':
-        me_input_model = kwargs['me_input_model']
-
         polyu_protein_aa_counts = macromolecule._amino_acid_counts.copy()
         for aa_code, aa_counts in ub_args['monoub_aa_counts'].items():
             if aa_code in polyu_protein_aa_counts:
@@ -58,7 +57,7 @@ def protein_polyubiquitination(macromolecule: DegradedMacromoleculeType, **kwarg
             else:
                 polyu_protein_aa_counts[aa_code] = aa_counts * params.N_UB
         polyub_macromolecule = Protein(id_='_'.join(macromolecule.id.split('_')[:-1]) + '_polyub',
-                                       me_input_model=me_input_model,
+                                       model_metabolites=model_metabolites,
                                        compartment=cmap[macromolecule.compartment],
                                        amino_acid_counts=polyu_protein_aa_counts)
         polyub_macromolecule._ptms = macromolecule._ptms
@@ -79,7 +78,7 @@ def protein_polyubiquitination(macromolecule: DegradedMacromoleculeType, **kwarg
                 for e, c in balance_og.items():
                     elements[e] += c
             if 'gpi' in macromolecule._ptms.keys():
-                for e, c in metab.balanced_gpi.items():
+                for e, c in model_metabolites.balanced_gpi.items():
                     if e in elements:
                         elements[e] += c
                     else:
@@ -104,9 +103,9 @@ def protein_polyubiquitination(macromolecule: DegradedMacromoleculeType, **kwarg
                                                        complex_id=macromolecule.temp_id + '_polyub')
 
     rxn = {macromolecule: -1, ub_args['ub_' + cmap[macromolecule.compartment]]: -params.N_UB,
-           polyub_macromolecule: 1, metab.h2o_compartments[cmap[macromolecule.compartment]]: params.N_UB}
+           polyub_macromolecule: 1, model_metabolites.h2o_compartments[cmap[macromolecule.compartment]]: params.N_UB}
     # 1 ATP hydrolysis per ubiquitin monomer added (https://link.springer.com/article/10.1007/s10637-020-00894-6)
-    rxn = func.hydrolyze_atp(rxn, n_atp=params.N_UB, compartment=cmap[macromolecule.compartment])
+    rxn = func.hydrolyze_atp(rxn, n_atp=params.N_UB, compartment=cmap[macromolecule.compartment], model_metabolites=model_metabolites)
     polyubiquitinate_protein.add_metabolites(rxn)
     if macromolecule.compartment in ['c', 'n']:
         polyubiquitinate_protein.gene_reaction_rule = ' and '.join(mach.UB_ligases[macromolecule.compartment])
@@ -117,13 +116,15 @@ def protein_polyubiquitination(macromolecule: DegradedMacromoleculeType, **kwarg
     return polyubiquitinate_protein, polyub_macromolecule
 
 
-def proteasomal_degradation(macromolecule: DegradedMacromoleculeType, **kwargs) -> List[DegradationReactionType]:
+def proteasomal_degradation(macromolecule: DegradedMacromoleculeType, model_metabolites, **kwargs) -> List[DegradationReactionType]:
     """Protoeasomal degradation of macromolecule.   
 
     Parameters
     ----------
     macromolecule : DegradedMacromoleculeType
         the macromolecule to be degraded
+    model_metabolites : utils.metabolites.MetaboliteBin
+        the me_input_model metabolites as specified by MetaboliteBin
 
     Returns
     -------
@@ -143,7 +144,7 @@ def proteasomal_degradation(macromolecule: DegradedMacromoleculeType, **kwargs) 
     deubiquitination = deg_reaction_map[macromolecule.type](r_id + '_DEUBIQUITINATION' + macromolecule.compartment,
                                                             hgnc_id=macromolecule.hgnc_id)
     deubiquitination.add_metabolites({polyub_macromolecule: -1,
-                                      metab.h2o_compartments[macromolecule.compartment]: -1,
+                                      model_metabolites.h2o_compartments[macromolecule.compartment]: -1,
                                       macromolecule: 1, ub_args['polyub_' + macromolecule.compartment]: 1})
 
     deubiquitination.gene_reaction_rule = ' and '.join(mach.proteasome_machinery)
@@ -168,18 +169,18 @@ def proteasomal_degradation(macromolecule: DegradedMacromoleculeType, **kwargs) 
         aac.subtract(ub_args['polyub_' + macromolecule.compartment]._amino_acid_counts)
         h2o_length += 1  # 1 required for fused polyub
 
-    rxn = {metab.seq_amino_acid_map_compartments[macromolecule.compartment][aa_code]: aa_counts for aa_code, aa_counts in aac.items()}
+    rxn = {model_metabolites.seq_amino_acid_map_compartments[macromolecule.compartment][aa_code]: aa_counts for aa_code, aa_counts in aac.items()}
     rxn[polyub_macromolecule] = -1
-    rxn[metab.h2o_compartments[macromolecule.compartment]] = -h2o_length
+    rxn[model_metabolites.h2o_compartments[macromolecule.compartment]] = -h2o_length
     rxn[ub_args['polyub_' + macromolecule.compartment]] = 1
     # atp hydrolysis for translocation/unfolding  - known 1 ATP per 2 residues - https://www.nature.com/articles/s41586-018-0736-4
     rxn = func.hydrolyze_atp(rxn, n_atp=protein_length / 2,
-                             compartment=macromolecule.compartment)
+                             compartment=macromolecule.compartment, model_metabolites=model_metabolites)
 
     # ------------
     # add attribute to indicate whether unique ribosomal complex machinery
     # also adds gene_reaction rules:
-    protein_degradation._set_proteasomal_degradation(macromolecule=macromolecule,
+    protein_degradation._set_proteasomal_degradation(macromolecule=macromolecule, 
                                                      ribosomal_complex=rcp)
     # ------------
     protein_degradation.add_metabolites(rxn)
@@ -223,15 +224,15 @@ def proteasomal_degradation(macromolecule: DegradedMacromoleculeType, **kwargs) 
     return [deubiquitination, protein_degradation]
 
 
-def degrade_cytosolic_nuclear_protein(macromolecule: DegradedMacromoleculeType, **kwargs) -> List[DegradationReactionType]:
+def degrade_cytosolic_nuclear_protein(macromolecule: DegradedMacromoleculeType, model_metabolites, **kwargs) -> List[DegradationReactionType]:
     """Degradation reactions for cytosolic or nuclear proteins.
 
     Parameters
     ----------
     macromolecule : DegradedMacromoleculeType
         The macromolecule to be degraded
-    me_input_model : cobra.Model
-        the corrected input metabolic model (as provided in preprocess.correct_inputs.correct_model)
+    model_metabolites : utils.metabolites.MetaboliteBin
+        the me_input_model metabolites as specified by MetaboliteBin
 
     Returns
     -------
@@ -240,36 +241,36 @@ def degrade_cytosolic_nuclear_protein(macromolecule: DegradedMacromoleculeType, 
     """
     ub_args = kwargs['ub_args']
     if macromolecule.type == 'protein':
-        me_input_model = kwargs['me_input_model']
-        polyubiquitinate_macromolecule, polyub_macromolecule = protein_polyubiquitination(macromolecule=macromolecule, me_input_model=me_input_model, 
-                                                                                        ub_args=ub_args)
+        polyubiquitinate_macromolecule, polyub_macromolecule = protein_polyubiquitination(macromolecule=macromolecule, model_metabolites=model_metabolites, ub_args = ub_args)
     else:
-        polyubiquitinate_macromolecule, polyub_macromolecule = protein_polyubiquitination(macromolecule=macromolecule, ub_args=ub_args)
-    proteasomal_degradation_rxns = proteasomal_degradation(macromolecule=macromolecule,
-                                                           polyub_macromolecule=polyub_macromolecule,
-                                                           ub_args=ub_args)
+        polyubiquitinate_macromolecule, polyub_macromolecule = protein_polyubiquitination(macromolecule=macromolecule, model_metabolites=model_metabolites, ub_args=ub_args)
+    proteasomal_degradation_rxns = proteasomal_degradation(macromolecule=macromolecule, model_metabolites=model_metabolites,
+                                                           polyub_macromolecule = polyub_macromolecule,
+                                                           ub_args = ub_args)
 
     return [polyubiquitinate_macromolecule] + proteasomal_degradation_rxns
 
 
 # # Mitochondria and Intermembrane Space
-def degrade_mitochondrial_protein(macromolecule: DegradedMacromoleculeType) -> List[DegradationReactionType]:
+def degrade_mitochondrial_protein(macromolecule: DegradedMacromoleculeType, model_metabolites) -> List[DegradationReactionType]:
     """Degradation reactions for proteins localized to mitochondria.
 
     Parameters
     ----------
     macromolecule : DegradedMacromoleculeType
         The macromolecule to be degraded
+    model_metabolites : utils.metabolites.MetaboliteBin
+        the me_input_model metabolites as specified by MetaboliteBin
 
     Returns
     -------
     List[DegradationReactionType]
         The degradation reaction
     """
-    rxn = {metab.seq_amino_acid_map_m[aa_code]: aa_counts for aa_code, aa_counts in macromolecule._amino_acid_counts.items()}
+    rxn = {model_metabolites.seq_amino_acid_map_m[aa_code]: aa_counts for aa_code, aa_counts in macromolecule._amino_acid_counts.items()}
 
     h2o_length = macromolecule.length - 1 if macromolecule.type == 'protein' else macromolecule.length - sum(macromolecule.decompose_complex().values())  # non-covalent bonds, +1,-1 cancel out
-    rxn[macromolecule], rxn[metab.h2o_m] = -1, -h2o_length
+    rxn[macromolecule], rxn[model_metabolites.h2o_m] = -1, -h2o_length
 
     if macromolecule.compartment == 'm':
         mitochondrial_degradation = deg_reaction_map[macromolecule.type](macromolecule._deg_id + '_DEGRADATIONm',
@@ -277,7 +278,7 @@ def degrade_mitochondrial_protein(macromolecule: DegradedMacromoleculeType) -> L
         mitochondrial_degradation.gene_reaction_rule = mach.mLON[0]
 
         # ATP hydrolysis by LON: 2 ATP per residue - https://www.ncbi.nlm.nih.gov/pmc/articles/PMC2518814/
-        rxn = func.hydrolyze_atp(rxn, n_atp=macromolecule.length * 2, compartment='m')
+        rxn = func.hydrolyze_atp(rxn, n_atp=macromolecule.length * 2, compartment='m', model_metabolites=model_metabolites)
 
     elif macromolecule.compartment == 'i':
         mitochondrial_degradation = deg_reaction_map[macromolecule.type](macromolecule._deg_id + '_DEGRADATIONi',
@@ -286,7 +287,7 @@ def degrade_mitochondrial_protein(macromolecule: DegradedMacromoleculeType) -> L
         # in the future, may want to add ubqituin-proteasome:
 
         # ATP hydrolysis by m/i-AAA: 1 ATP per 2 residues -- no source, assumes same as 26S proteasome
-        rxn = func.hydrolyze_atp(rxn, n_atp=macromolecule.length * params.PROTEOLYSIS_TRANSLOCATION_ATP_COST, compartment='i')
+        rxn = func.hydrolyze_atp(rxn, n_atp=macromolecule.length * params.PROTEOLYSIS_TRANSLOCATION_ATP_COST, compartment='i', model_metabolites=model_metabolites)
 
     mitochondrial_degradation.add_metabolites(rxn)
 
@@ -296,13 +297,15 @@ def degrade_mitochondrial_protein(macromolecule: DegradedMacromoleculeType) -> L
     return [mitochondrial_degradation]
 
 
-def degrade_peroxisomal_protein(macromolecule: DegradedMacromoleculeType) -> List[DegradationReactionType]:
+def degrade_peroxisomal_protein(macromolecule: DegradedMacromoleculeType, model_metabolites) -> List[DegradationReactionType]:
     """Degradation rof proteins localized to peroxisome.
 
     Parameters
     ----------
     macromolecule : DegradedMacromoleculeType
         The macromolecule to be degraded
+    model_metabolites : utils.metabolites.MetaboliteBin
+        the me_input_model metabolites as specified by MetaboliteBin
 
     Returns
     -------
@@ -316,10 +319,10 @@ def degrade_peroxisomal_protein(macromolecule: DegradedMacromoleculeType) -> Lis
 
     h2o_length = macromolecule.length - 1 if macromolecule.type == 'protein' else macromolecule.length - sum(macromolecule.decompose_complex().values())  # non-covalent bonds +1,-1 cancel out
 
-    rxn = {metab.seq_amino_acid_map_x[aa_code]: aa_counts for aa_code, aa_counts in macromolecule._amino_acid_counts.items()}
-    rxn[macromolecule], rxn[metab.h2o_x] = -1, -h2o_length
+    rxn = {model_metabolites.seq_amino_acid_map_x[aa_code]: aa_counts for aa_code, aa_counts in macromolecule._amino_acid_counts.items()}
+    rxn[macromolecule], rxn[model_metabolites.h2o_x] = -1, -h2o_length
     # ATP hydrolysis by LON: 2 ATP per residue - https://www.ncbi.nlm.nih.gov/pmc/articles/PMC2518814/
-    rxn = func.hydrolyze_atp(rxn, n_atp=macromolecule.length * 2, compartment='x')
+    rxn = func.hydrolyze_atp(rxn, n_atp=macromolecule.length * 2, compartment='x', model_metabolites=model_metabolites)
     peroxisomal_degradation.add_metabolites(rxn)
 
 #     peroxisomal_degradation.sink = True
@@ -329,7 +332,7 @@ def degrade_peroxisomal_protein(macromolecule: DegradedMacromoleculeType) -> Lis
 
 
 # # Secretory Pathway Degradation
-def unfold_secretory_protein(macromolecule: DegradedMacromoleculeType) -> Tuple[DegradedMacromoleculeType]:
+def unfold_secretory_protein(macromolecule: DegradedMacromoleculeType, model_metabolites) -> Tuple[DegradedMacromoleculeType]:
     """Remove PTMs and unfold proteins for lysosomal and secretory compartments. For lysosomal degradation, 
     only remove PTMs, there is no unfolding/misfolding as in ERAD.
 
@@ -337,6 +340,8 @@ def unfold_secretory_protein(macromolecule: DegradedMacromoleculeType) -> Tuple[
     ----------
     macromolecule : DegradedMacromoleculeType
         The macromolecule to be degraded
+    model_metabolites : utils.metabolites.MetaboliteBin
+        the me_input_model metabolites as specified by MetaboliteBin
 
     Returns
     -------
@@ -377,14 +382,14 @@ def unfold_secretory_protein(macromolecule: DegradedMacromoleculeType) -> Tuple[
     if 'gpi' in macromolecule._ptms.keys():
         unfolded_protein.id = unfolded_protein.id.replace('_GPI', '')
 
-        for e, c in metab.balanced_gpi.items():
+        for e, c in model_metabolites.balanced_gpi.items():
             elements[e] -= c
 
-        rxn[metab.gpi_hs_r] = 1
+        rxn[model_metabolites.gpi_hs_r] = 1
         if macromolecule.compartment == 'r':
-            rxn[metab.hdca_r], rxn[metab.h_r], rxn[metab.h2o_r] = -1, -1, 1
+            rxn[model_metabolites.hdca_r], rxn[model_metabolites.h_r], rxn[model_metabolites.h2o_r] = -1, -1, 1
         elif macromolecule.compartment == 'l':
-            rxn[metab.hdca_l], rxn[metab.h_l], rxn[metab.h2o_l] = -1, -1, 1
+            rxn[model_metabolites.hdca_l], rxn[model_metabolites.h_l], rxn[model_metabolites.h2o_l] = -1, -1, 1
 
     if 'dsb' in macromolecule._ptms.keys():
         unfolded_protein.id = unfolded_protein.id.replace('_DSB', '')
@@ -392,9 +397,9 @@ def unfold_secretory_protein(macromolecule: DegradedMacromoleculeType) -> Tuple[
         elements['H'] += 2 * number_DSB
         # incorporate exchange with reductase in future versions
         if macromolecule.compartment == 'r':
-            rxn[metab.o2_r], rxn[metab.h2o2_r] = number_DSB, -number_DSB
+            rxn[model_metabolites.o2_r], rxn[model_metabolites.h2o2_r] = number_DSB, -number_DSB
         elif macromolecule.compartment == 'l':
-            rxn[metab.o2_l], rxn[metab.h2o2_l] = number_DSB, -number_DSB
+            rxn[model_metabolites.o2_l], rxn[model_metabolites.h2o2_l] = number_DSB, -number_DSB
         unfold_mach += mach.ERDJ5
     if 'og' in macromolecule._ptms.keys():
         unfolded_protein.id = unfolded_protein.id.replace('_OG', '')
@@ -407,19 +412,19 @@ def unfold_secretory_protein(macromolecule: DegradedMacromoleculeType) -> Tuple[
             elements[e] -= c
 
         if macromolecule.compartment == 'r':
-            rxn[metab.udpacgal_r], rxn[metab.udpgal_r], rxn[metab.uacgam_r] = number_Oglycans, number_Oglycans, number_Oglycans
-            rxn[metab.udp_r] = -3 * number_Oglycans
-            if metab.h_r in rxn.keys():
-                rxn[metab.h_r] -= 3 * number_Oglycans
+            rxn[model_metabolites.udpacgal_r], rxn[model_metabolites.udpgal_r], rxn[model_metabolites.uacgam_r] = number_Oglycans, number_Oglycans, number_Oglycans
+            rxn[model_metabolites.udp_r] = -3 * number_Oglycans
+            if model_metabolites.h_r in rxn.keys():
+                rxn[model_metabolites.h_r] -= 3 * number_Oglycans
             else:
-                rxn[metab.h_r] = -3 * number_Oglycans
+                rxn[model_metabolites.h_r] = -3 * number_Oglycans
         elif macromolecule.compartment == 'l':
-            rxn[metab.udpacgal_l], rxn[metab.udpgal_g], rxn[metab.uacgam_g] = number_Oglycans, number_Oglycans, number_Oglycans
-            rxn[metab.udp_l] = -3 * number_Oglycans
-            if metab.h_l in rxn.keys():
-                rxn[metab.h_l] -= 3 * number_Oglycans
+            rxn[model_metabolites.udpacgal_l], rxn[model_metabolites.udpgal_g], rxn[model_metabolites.uacgam_g] = number_Oglycans, number_Oglycans, number_Oglycans
+            rxn[model_metabolites.udp_l] = -3 * number_Oglycans
+            if model_metabolites.h_l in rxn.keys():
+                rxn[model_metabolites.h_l] -= 3 * number_Oglycans
             else:
-                rxn[metab.h_l] = -3 * number_Oglycans
+                rxn[model_metabolites.h_l] = -3 * number_Oglycans
 
     ###########
     unfolded_protein._ptms = dict()
@@ -453,13 +458,15 @@ def unfold_secretory_protein(macromolecule: DegradedMacromoleculeType) -> Tuple[
     return unfold_protein, unmodified_protein
 
 
-def retrograde_er(macromolecule: DegradedMacromoleculeType, retro_protein_r: Optional[DegradedMacromoleculeType] = None) -> Tuple[DegradationReactionType, DegradedMacromoleculeType]:
+def retrograde_er(macromolecule: DegradedMacromoleculeType, model_metabolites, retro_protein_r: Optional[DegradedMacromoleculeType] = None) -> Tuple[DegradationReactionType, DegradedMacromoleculeType]:
     """ER retrograde transport
 
     Parameters
     ----------
     macromolecule : DegradedMacromoleculeType
         Macromolecule undergoing retrograde transport
+    model_metabolites : utils.metabolites.MetaboliteBin
+        the me_input_model metabolites as specified by MetaboliteBin
     retro_protein_r : DegradedMacromoleculeType, optional
         If the ER version of this protein exists, provide it here, by default None
 
@@ -481,7 +488,7 @@ def retrograde_er(macromolecule: DegradedMacromoleculeType, retro_protein_r: Opt
 
     rxn = {macromolecule: -copi_coeff, retro_protein_r: copi_coeff}
     # gtp hydrolysis
-    rxn[metab.ntp_map_c['G']], rxn[metab.h2o_c], rxn[metab.ndp_map_c['G']], rxn[metab.pi_c], rxn[metab.h_c] = -127, -127, 127, 127, 127
+    rxn[model_metabolites.ntp_map_c['G']], rxn[model_metabolites.h2o_c], rxn[model_metabolites.ndp_map_c['G']], rxn[model_metabolites.pi_c], rxn[model_metabolites.h_c] = -127, -127, 127, 127, 127
 
     retrograde_transport = deg_reaction_map[macromolecule.type](macromolecule._deg_id + '_COPI_RETROtr', hgnc_id=macromolecule.hgnc_id)
     retrograde_transport.add_metabolites(rxn)
@@ -491,13 +498,15 @@ def retrograde_er(macromolecule: DegradedMacromoleculeType, retro_protein_r: Opt
     return retrograde_transport, retro_protein_r
 
 
-def build_erad_reactions(macromolecule: DegradedMacromoleculeType, **kwargs):
+def build_erad_reactions(macromolecule: DegradedMacromoleculeType, model_metabolites, **kwargs):
     """Generate all ERAD reactions
 
     Parameters
     ----------
     macromolecule : DegradedMacromoleculeType
         macromolecule to undergo ERAD
+    model_metabolites : utils.metabolites.MetaboliteBin
+        the me_input_model metabolites as specified by MetaboliteBin
     """
     if 'unfolded_protein_c' in kwargs:
         if macromolecule.type == 'complex':
@@ -505,9 +514,6 @@ def build_erad_reactions(macromolecule: DegradedMacromoleculeType, **kwargs):
         unfolded_protein_c = kwargs['unfolded_protein_c']
     else:
         unfolded_protein_c = None
-
-    if macromolecule.type == 'protein':
-        me_input_model = kwargs['me_input_model']
     
     if 'ub_args' in kwargs:
         ub_args = kwargs['ub_args']
@@ -520,13 +526,13 @@ def build_erad_reactions(macromolecule: DegradedMacromoleculeType, **kwargs):
             err = 'Internal: Unexpected direct ERAD of Golgi protein (hard-coded seperate retrograde transport'
             err += 'reaction); this situation is only for complexes. Should work without this error, but just double check. '
             raise ValueError(err)
-        retrograde_transport, macromolecule_r = retrograde_er(macromolecule)
+        retrograde_transport, macromolecule_r = retrograde_er(macromolecule, model_metabolites=model_metabolites)
     elif macromolecule.compartment == 'r':
         retrograde_transport = None
     else:
         raise ValueError('ERAD is only for Golgi or ER proteins in current model implementation')
 
-    unfold_er_protein, unmodified_protein_r = unfold_secretory_protein(macromolecule_r)
+    unfold_er_protein, unmodified_protein_r = unfold_secretory_protein(macromolecule_r, model_metabolites=model_metabolites)
 
     # Retro-translocation
     retrotranslocate_protein = deg_reaction_map[macromolecule.type](macromolecule._deg_id + '_RETROTRANSLOCATION', hgnc_id=macromolecule.hgnc_id)
@@ -544,7 +550,7 @@ def build_erad_reactions(macromolecule: DegradedMacromoleculeType, **kwargs):
     # if 'ng' in macromolecule._ptms.keys() or 'og' in macromolecule._ptms.keys():
 
     # glyco based ERAD from Jahir
-    rxn = func.hydrolyze_atp(rxn, n_atp=6, compartment='c')  # from Jahir retro_TRANSLOC_2
+    rxn = func.hydrolyze_atp(rxn, n_atp=6, compartment='c', model_metabolites=model_metabolites)  # from Jahir retro_TRANSLOC_2
     retrotranslocate_protein.add_metabolites(rxn)
     retrotranslocate_protein.gene_reaction_rule = ' and '.join(mach.retro_mach_glyco)
 
@@ -558,22 +564,25 @@ def build_erad_reactions(macromolecule: DegradedMacromoleculeType, **kwargs):
             r._update_tracking([macromolecule, macromolecule_r, unmodified_protein_r, unfolded_protein_c])  # redundanciese dealt with in _consolidate_tracking
         return erad_reactions, unfolded_protein_c
     # this portion is hard-coded in protein_expression portion
-    if macromolecule.type == 'protein':
-        erad_reactions += degrade_cytosolic_nuclear_protein(macromolecule=unfolded_protein_c, me_input_model = me_input_model, ub_args = ub_args)
-    else: 
-        erad_reactions += degrade_cytosolic_nuclear_protein(macromolecule=unfolded_protein_c, ub_args = ub_args)
+    erad_reactions += degrade_cytosolic_nuclear_protein(macromolecule=unfolded_protein_c, model_metabolites=model_metabolites, ub_args = ub_args)
+    # if macromolecule.type == 'protein':
+    #     erad_reactions += degrade_cytosolic_nuclear_protein(macromolecule=unfolded_protein_c, model_metabolites=model_metabolites, ub_args = ub_args)
+    # else: 
+    #     erad_reactions += degrade_cytosolic_nuclear_protein(macromolecule=unfolded_protein_c, model_metabolites=model_metabolites, ub_args = ub_args)
     for r in erad_reactions:
         r._update_tracking([macromolecule, macromolecule_r, unmodified_protein_r, unfolded_protein_c])
     return erad_reactions
 
 
-def build_endocytosis_reactions(macromolecule_pm: DegradedMacromoleculeType, **kwargs) -> Tuple[List[DegradationReactionType], DegradedMacromoleculeType]:
+def build_endocytosis_reactions(macromolecule_pm: DegradedMacromoleculeType, model_metabolites, **kwargs) -> Tuple[List[DegradationReactionType], DegradedMacromoleculeType]:
     """Create the endocytosis reactions
 
     Parameters
     ----------
     macromolecule_pm : DegradedMacromoleculeType
         macromolecule to undergo endocytosis
+    model_metabolites : utils.metabolites.MetaboliteBin
+        the me_input_model metabolites as specified by MetaboliteBin
 
     Returns
     -------
@@ -581,7 +590,6 @@ def build_endocytosis_reactions(macromolecule_pm: DegradedMacromoleculeType, **k
         Associated reactions and output macromolecule after endocytosis
     """
     ub_args = kwargs['ub_args']
-    me_input_model = kwargs['me_input_model']
 
     if 'macromolecule_l' in kwargs:
         macromolecule_l = kwargs['macromolecule_l']
@@ -591,7 +599,7 @@ def build_endocytosis_reactions(macromolecule_pm: DegradedMacromoleculeType, **k
         macromolecule_l = None
 
     # polyubiquitination for lysosomal targetting-------------------------------------
-    polyubiquitinate_protein, polyub_macromolecule_pm = protein_polyubiquitination(macromolecule=macromolecule_pm, me_input_model = me_input_model,
+    polyubiquitinate_protein, polyub_macromolecule_pm = protein_polyubiquitination(macromolecule=macromolecule_pm, model_metabolites=model_metabolites, 
                                                                                    ub_args = ub_args)
     # endocytosis--------------------------------------------------------------------------
     # combine dequbiquitination with endocytosis https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3987138/
@@ -603,14 +611,14 @@ def build_endocytosis_reactions(macromolecule_pm: DegradedMacromoleculeType, **k
 
     endocytosis = deg_reaction_map[macromolecule_pm.type](macromolecule_pm._deg_id + '_CLATHRIN_ENDOCYTOSIS',
                                                           hgnc_id=macromolecule_pm.hgnc_id)
-    rxn = {polyub_macromolecule_pm: -1, macromolecule_l: 1, metab.h2o_c: -1, ub_args['polyub_c']: 1}
+    rxn = {polyub_macromolecule_pm: -1, macromolecule_l: 1, model_metabolites.h2o_c: -1, ub_args['polyub_c']: 1}
 
     # gtp hydrolysis for vesicle scission
-    rxn[metab.ntp_map_c['G']] = -round(macromolecule_pm.length) * params.TRANSPORT_TRANSLOCATION_ATP_COST
-    rxn[metab.h2o_c] -= round(macromolecule_pm.length) * params.TRANSPORT_TRANSLOCATION_ATP_COST
-    rxn[metab.ndp_map_c['G']] = round(macromolecule_pm.length) * params.TRANSPORT_TRANSLOCATION_ATP_COST
-    rxn[metab.pi_c] = round(macromolecule_pm.length) * params.TRANSPORT_TRANSLOCATION_ATP_COST
-    rxn[metab.h_c] = round(macromolecule_pm.length) * params.TRANSPORT_TRANSLOCATION_ATP_COST
+    rxn[model_metabolites.ntp_map_c['G']] = -round(macromolecule_pm.length) * params.TRANSPORT_TRANSLOCATION_ATP_COST
+    rxn[model_metabolites.h2o_c] -= round(macromolecule_pm.length) * params.TRANSPORT_TRANSLOCATION_ATP_COST
+    rxn[model_metabolites.ndp_map_c['G']] = round(macromolecule_pm.length) * params.TRANSPORT_TRANSLOCATION_ATP_COST
+    rxn[model_metabolites.pi_c] = round(macromolecule_pm.length) * params.TRANSPORT_TRANSLOCATION_ATP_COST
+    rxn[model_metabolites.h_c] = round(macromolecule_pm.length) * params.TRANSPORT_TRANSLOCATION_ATP_COST
 
     endocytosis.add_metabolites(rxn)
     endocytosis.gene_reaction_rule = ' and '.join(mach.endocytic_machinery)
@@ -620,13 +628,15 @@ def build_endocytosis_reactions(macromolecule_pm: DegradedMacromoleculeType, **k
     return [polyubiquitinate_protein, endocytosis], macromolecule_l
 
 
-def lysosomal_degradation(macromolecule: DegradedMacromoleculeType) -> List[DegradationReactionType]:
+def lysosomal_degradation(macromolecule: DegradedMacromoleculeType, model_metabolites) -> List[DegradationReactionType]:
     """Generate reactions and associated macromolecules for lysosomal degradation
 
     Parameters
     ----------
     macromolecule : DegradedMacromoleculeType
         macromolecule to undergo lysosomal degradation
+    model_metabolites : utils.metabolites.MetaboliteBin
+        the me_input_model metabolites as specified by MetaboliteBin
 
     Returns
     -------
@@ -639,7 +649,7 @@ def lysosomal_degradation(macromolecule: DegradedMacromoleculeType) -> List[Degr
 
     if len(macromolecule._ptms.keys()) > 0:
         # not unfolding lysosomal protein is just removing the PTMs, not an actual unfolding reaction
-        unfold_lysosomal_protein, unmodified_macromolecule = unfold_secretory_protein(macromolecule)
+        unfold_lysosomal_protein, unmodified_macromolecule = unfold_secretory_protein(macromolecule, model_metabolites=model_metabolites)
         lysosomal_degradation_rxns += [unfold_lysosomal_protein]
     else:
         unmodified_macromolecule = macromolecule
@@ -649,9 +659,9 @@ def lysosomal_degradation(macromolecule: DegradedMacromoleculeType) -> List[Degr
 
     h2o_length = macromolecule.length - 1 if macromolecule.type == 'protein' else macromolecule.length - sum(macromolecule.decompose_complex().values())  # non-covalent bonds, +1,-1 cancel out
 
-    rxn = {metab.seq_amino_acid_map_l[aa_code]: aa_counts for aa_code, aa_counts in macromolecule._amino_acid_counts.items()}
-    rxn[unmodified_macromolecule], rxn[metab.h2o_l] = -1, -h2o_length
-    rxn = func.hydrolyze_atp(rxn, n_atp=macromolecule.length * params.PROTEOLYSIS_TRANSLOCATION_ATP_COST, compartment='l')
+    rxn = {model_metabolites.seq_amino_acid_map_l[aa_code]: aa_counts for aa_code, aa_counts in macromolecule._amino_acid_counts.items()}
+    rxn[unmodified_macromolecule], rxn[model_metabolites.h2o_l] = -1, -h2o_length
+    rxn = func.hydrolyze_atp(rxn, n_atp=macromolecule.length * params.PROTEOLYSIS_TRANSLOCATION_ATP_COST, compartment='l', model_metabolites=model_metabolites)
 
     degrade_lysosomal_protein.add_metabolites(rxn)
     degrade_lysosomal_protein.gene_reaction_rule = ' and '.join(mach.cathepsins)
@@ -665,13 +675,15 @@ def lysosomal_degradation(macromolecule: DegradedMacromoleculeType) -> List[Degr
     return lysosomal_degradation_rxns
 
 
-def degrade_lysosomal_pm_protein(macromolecule: DegradationReactionType, **kwargs) -> List[DegradationReactionType]:
+def degrade_lysosomal_pm_protein(macromolecule: DegradationReactionType, model_metabolites, **kwargs) -> List[DegradationReactionType]:
     """Lysoomal degradation of membrane proteins
 
     Parameters
     ----------
     macromolecule : DegradationReactionType
         macromolecule to undergo degradation
+    model_metabolites : utils.metabolites.MetaboliteBin
+        the me_input_model metabolites as specified by MetaboliteBin
 
     Returns
     -------
@@ -693,14 +705,14 @@ def degrade_lysosomal_pm_protein(macromolecule: DegradationReactionType, **kwarg
             err += ' this situation is expected only to be used for complexes. Should work without this error,'
             err += ' but just double check.'
             raise ValueError(err)
-        endocytosis_reactions, macromolecule_l = build_endocytosis_reactions(macromolecule_pm=macromolecule,
-                                                                             ub_args=ub_args)
+        endocytosis_reactions, macromolecule_l = build_endocytosis_reactions(macromolecule_pm=macromolecule, model_metabolites=model_metabolites,
+                                                                             ub_args = ub_args)
     else:
         endocytosis_reactions = None
     if macromolecule_l.compartment != 'l':
         raise ValueError('Must be a lysosomal protein/complex being degraded')
 
-    deg_reactions = lysosomal_degradation(macromolecule_l)
+    deg_reactions = lysosomal_degradation(macromolecule_l, model_metabolites)
     if endocytosis_reactions is not None:
         deg_reactions += endocytosis_reactions
 
@@ -716,13 +728,15 @@ degrade_reaction_map = {'c': degrade_cytosolic_nuclear_protein, 'n': degrade_cyt
                         'l': degrade_lysosomal_pm_protein, 'pm': degrade_lysosomal_pm_protein}
 
 
-def degrade(macromolecule: DegradedMacromoleculeType, **kwargs) -> List[DegradationReactionType]:
+def degrade(macromolecule: DegradedMacromoleculeType, model_metabolites,  **kwargs) -> List[DegradationReactionType]:
     """Compartment-specific degradation reactions for proteins or protein-protein complexes
 
     Parameters
     ----------
     macromolecule : DegradedMacromoleculeType
         macromolecule to be degraded
+    model_metabolites : utils.metabolites.MetaboliteBin
+        the me_input_model metabolites as specified by MetaboliteBin
 
     Returns
     -------
@@ -741,7 +755,7 @@ def degrade(macromolecule: DegradedMacromoleculeType, **kwargs) -> List[Degradat
     if macromolecule.type == 'complex' and not macromolecule._deg_initialized:
         macromolecule._initialize_deg_params()
 
-    deg_reactions = degrade_reaction_map[macromolecule.compartment](macromolecule, **kwargs)
+    deg_reactions = degrade_reaction_map[macromolecule.compartment](macromolecule, model_metabolites, **kwargs)
     if isinstance(macromolecule, RibosomalComplex):
         for r in deg_reactions:
             r.ribosome_biogenesis = True

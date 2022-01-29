@@ -6,13 +6,10 @@ from typing import Tuple
 from human_me.core.macromolecules.macromolecule import Proxy
 from human_me.core.macromolecules.protein import Protein
 from human_me.core.reaction import ProteinExpressionReaction
-from human_me.expression.build_trna_expression_reactions import (
-    charged_trna_map, modified_trna_transcript_c)
 from human_me.utils import machinery as mach
-from human_me.utils import metabolites as metab
 
 
-def translate_protein_cytosolic(gene_info, me_input_model, mrna_transcript_c, mrna_deg_proxy: Proxy) -> Tuple[ProteinExpressionReaction, Protein]:
+def translate_protein_cytosolic(gene_info, mrna_transcript_c, mrna_deg_proxy: Proxy, modified_trna_transcript_c, charged_trna_map, model_metabolites) -> Tuple[ProteinExpressionReaction, Protein]:
     """Generate cytosolic translation reaction
 
     Parameters
@@ -25,6 +22,12 @@ def translate_protein_cytosolic(gene_info, me_input_model, mrna_transcript_c, mr
         the final, cytosolic mRNA transcript
     mrna_deg_proxy : Proxy
         proxy metabolite generated in mRNA degradation reaction for coupling
+    modified_transcript_c : macromolecules.RNA.tRNA
+        output of create_trna()
+    charged_trna_map : Dict[str, macromolecules.RNA.tRNA]
+        output of creat_trna()
+    model_metabolites : utils.metabolites.MetaboliteBin
+        the me_input_model metabolites as specified by MetaboliteBin
 
     Returns
     -------
@@ -42,18 +45,18 @@ def translate_protein_cytosolic(gene_info, me_input_model, mrna_transcript_c, mr
 
     rxn[modified_trna_transcript_c] = gene_info.L_protein
 
-    rxn[metab.h2o_c] = -gene_info.L_protein  # release of peptide from tRNA, addition of -OH to uncharged tRNA
-    rxn[metab.h_c] = gene_info.L_protein  # release of peptide from tRNA, addition of -OH to uncharged tRNA
-    rxn[metab.h2o_c] += gene_info.L_protein - 1  # peptide bond formation (hydrolysis)
+    rxn[model_metabolites.h2o_c] = -gene_info.L_protein  # release of peptide from tRNA, addition of -OH to uncharged tRNA
+    rxn[model_metabolites.h_c] = gene_info.L_protein  # release of peptide from tRNA, addition of -OH to uncharged tRNA
+    rxn[model_metabolites.h2o_c] += gene_info.L_protein - 1  # peptide bond formation (hydrolysis)
 
     # gtp hydrolysis per aa added
-    rxn[metab.ntp_map_c['G']] = -gene_info.L_protein
-    rxn[metab.h2o_c] -= gene_info.L_protein
-    rxn[metab.ndp_map_c['G']] = gene_info.L_protein
-    rxn[metab.pi_c] = gene_info.L_protein
-    rxn[metab.h_c] += gene_info.L_protein
+    rxn[model_metabolites.ntp_map_c['G']] = -gene_info.L_protein
+    rxn[model_metabolites.h2o_c] -= gene_info.L_protein
+    rxn[model_metabolites.ndp_map_c['G']] = gene_info.L_protein
+    rxn[model_metabolites.pi_c] = gene_info.L_protein
+    rxn[model_metabolites.h_c] += gene_info.L_protein
 
-    unfolded_protein_c = Protein(compartment='c', id_='unfolded', me_input_model=me_input_model, gene_info=gene_info)
+    unfolded_protein_c = Protein(compartment='c', id_='unfolded', model_metabolites=model_metabolites, gene_info=gene_info)
     rxn[unfolded_protein_c] = 1
 
     translation_elongation = ProteinExpressionReaction(gene_info.hgnc_id + '_TRANSLATION_ELONGATIONc',

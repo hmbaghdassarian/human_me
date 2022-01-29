@@ -28,9 +28,7 @@ with HiddenPrints():
     human_model = cobra.io.read_sbml_model(processed_data_path + 'corrected_model.xml')
 
 psim_me = pd.read_hdf(processed_data_path + 'corrected_psim.h5', key='corrected')
-
 psim_me['SP'] = psim_me['SP'].apply(lambda x: bool(x))
-human_model = cobra.io.read_sbml_model(processed_data_path + 'corrected_model.xml')
 
 mu = parse_expr('mu')
 

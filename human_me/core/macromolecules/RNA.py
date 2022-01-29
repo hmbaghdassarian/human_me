@@ -3,7 +3,6 @@
 
 from typing import Optional
 
-from human_me.utils.metabolites import MetaboliteBin
 from human_me.utils import machinery as mach
 from human_me.utils import functions as func
 from human_me.utils import parameters as params
@@ -26,13 +25,13 @@ rb_map = dict(zip(molecule_type, [False, True, False, False]))
 
 
 class RNA(Macromolecule):
-    def __init__(self, me_input_model, metabolite_name: str, seq: str, compartment: str = 'n', triphosphate: bool = True, hgnc_id: Optional[str] = None):
+    def __init__(self, model_metabolites, metabolite_name: str, seq: str, compartment: str = 'n', triphosphate: bool = True, hgnc_id: Optional[str] = None):
         """Generates an RNA metabolite.
 
         Parameters
         ----------
-        me_input_model : cobra.Model
-            the corrected input metabolic model (as provided in preprocess.correct_inputs.correct_model)
+        model_metabolites : MetaboliteBin
+            the me_input_model metabolites as specified by MetaboliteBin
         metabolite_name : str
             descriptive name to be incorporated into self.id
         seq : str
@@ -50,7 +49,7 @@ class RNA(Macromolecule):
         self.triphosphate = triphosphate
         self.length = len(self.sequence)
         self.get_base_counts_and_elements()
-        self.model_metabolites = MetaboliteBin(me_input_model)
+        self.model_metabolites = model_metabolites
 
         super().__init__(id = rna_id, compartment=compartment, charge = -self.length, elements = self.elements,
                                hgnc_id = hgnc_id)
@@ -59,7 +58,7 @@ class RNA(Macromolecule):
 
     def get_base_counts_and_elements(self):
         """Updates RNA metabolite to have appropriate formula according to sequence."""
-        self.base_counts, self.elements = func.get_base_counts_and_elements(seq=self.sequence,
+        self.base_counts, self.elements = func.get_base_counts_and_elements(seq=self.sequence, model_metabolites=self.model_metabolites,
                                                                             triphosphate=self.triphosphate)
 
     def synthesize(self, id_: str) -> ExpressionReaction:
@@ -215,13 +214,13 @@ class pre_mRNA(RNA):
 
     type = 'premrna'
 
-    def __init__(self, me_input_model, gene_info, compartment: str = 'n', triphosphate: bool = True):
+    def __init__(self, model_metabolites, gene_info, compartment: str = 'n', triphosphate: bool = True):
         """Init method for pre_mRNA.
 
         Parameters
         ----------
-        me_input_model : cobra.Model
-            the corrected input metabolic model (as provided in preprocess.correct_inputs.correct_model)
+        model_metabolites : MetaboliteBin
+            the me_input_model metabolites as specified by MetaboliteBin
         gene_info : GeneInformation
             gene's associated GeneInformation object
         compartment : str, optional
@@ -232,7 +231,7 @@ class pre_mRNA(RNA):
         if compartment != 'n':
             raise ValueError("Premrna's outside of the nucleus are not currently considered")
 
-        super().__init__(me_input_model=me_input_model, metabolite_name=gene_info.hgnc_id, seq=gene_info.premrna_seq,
+        super().__init__(model_metabolites=model_metabolites, metabolite_name=gene_info.hgnc_id, seq=gene_info.premrna_seq,
                      compartment=compartment, triphosphate=triphosphate, hgnc_id=gene_info.hgnc_id)
 
         self.id = self.id.replace('RNA', self.type)
@@ -244,13 +243,13 @@ class mRNA(RNA):
 
     type = 'mrna'
 
-    def __init__(self, me_input_model, gene_info, compartment: str = 'n', triphosphate: bool = True):
+    def __init__(self, model_metabolites, gene_info, compartment: str = 'n', triphosphate: bool = True):
         """Init method for mRNA.
 
         Parameters
         ----------
-        me_input_model : cobra.Model
-            the corrected input metabolic model (as provided in preprocess.correct_inputs.correct_model)
+        model_metabolites : MetaboliteBin
+            the me_input_model metabolites as specified by MetaboliteBin
         gene_info : GeneInformation
             gene's associated GeneInformation object
         compartment : str, optional
@@ -261,7 +260,7 @@ class mRNA(RNA):
         if compartment not in ['n', 'c']:
             raise ValueError('mRNA must either be in nucleus or cytosol')
 
-        super().__init__(me_input_model=me_input_model, metabolite_name=gene_info.hgnc_id, seq=gene_info.mrna_seq,
+        super().__init__(model_metabolites=model_metabolites, metabolite_name=gene_info.hgnc_id, seq=gene_info.mrna_seq,
                      compartment=compartment, triphosphate=triphosphate, hgnc_id=gene_info.hgnc_id)
         self.id = self.id.replace('RNA', self.type)
         self.hgnc_id = gene_info.hgnc_id
@@ -276,9 +275,9 @@ class tRNA(RNA):
 
     type = 'trna'
 
-    def __init__(self, me_input_model, metabolite_name, seq, compartment='n', triphosphate=True):
+    def __init__(self, model_metabolites, metabolite_name, seq, compartment='n', triphosphate=True):
         """See RNA.__init__ for parameter information"""
-        super().__init__(me_input_model=me_input_model, metabolite_name=metabolite_name, seq=seq, compartment=compartment,
+        super().__init__(model_metabolites=model_metabolites, metabolite_name=metabolite_name, seq=seq, compartment=compartment,
                      triphosphate=triphosphate)
 
         self.id = self.id.replace('RNA', self.type)
@@ -289,9 +288,9 @@ class rRNA(RNA):
 
     type = 'rrna'
 
-    def __init__(self, me_input_model, metabolite_name, seq, compartment='n', triphosphate=True):
+    def __init__(self, model_metabolites, metabolite_name, seq, compartment='n', triphosphate=True):
         """See RNA.__init__ for parameter information"""
-        super().__init__(me_input_model=me_input_model,metabolite_name=metabolite_name, seq=seq, compartment=compartment,
+        super().__init__(model_metabolites=model_metabolites, metabolite_name=metabolite_name, seq=seq, compartment=compartment,
                      triphosphate=triphosphate)
 
         self.id = self.id.replace('RNA', self.type)
@@ -302,14 +301,14 @@ class RNA_fragment(RNA):
 
     type = 'fragment_rna'
 
-    def __init__(self, me_input_model, metabolite_name: str, seq: str, fragment_type: str, compartment: str = 'n', triphosphate: bool = True,
+    def __init__(self, model_metabolites, metabolite_name: str, seq: str, fragment_type: str, compartment: str = 'n', triphosphate: bool = True,
                  hgnc_id: Optional[str] = None):
         """Init method for RNA_fragment.
 
         Parameters
         ----------
-        me_input_model : cobra.Model
-            the corrected input metabolic model (as provided in preprocess.correct_inputs.correct_model)
+        model_metabolites : MetaboliteBin
+            the me_input_model metabolites as specified by MetaboliteBin
         metabolite_name : str
             descriptive name to be incorporated into self.id
         seq : str
@@ -330,7 +329,7 @@ class RNA_fragment(RNA):
         if compartment not in ['n', 'c']:
             raise ValueError('Only nuclear or cytosolic RNA fragments are incorporated for now')
 
-        super().__init__(me_input_model=me_input_model, metabolite_name = metabolite_name, seq = seq, compartment = compartment,
+        super().__init__(model_metabolites=model_metabolites, metabolite_name = metabolite_name, seq = seq, compartment = compartment,
                      triphosphate = triphosphate, hgnc_id = hgnc_id)
 
         self.fragment_type=fragment_type

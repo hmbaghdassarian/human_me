@@ -64,8 +64,7 @@ upb_reaction = biomass_reactions.pop(len(biomass_reactions) - 1)
 
 # constant biomass reactions
 # TODO: make *_coef variables customizable by user
-def create_biomass_reactions(me_input_model: cobra.Model, biomass_reactions: List[BiomassReaction] = biomass_reactions):
-    model_metabolites = MetaboliteBin(me_input_model)
+def create_biomass_reactions(model_metabolites, biomass_reactions: List[BiomassReaction] = biomass_reactions):
     # DNA------------------------------------------------------
     dna_reaction = BiomassReaction('DNA_biomass_formation')
 

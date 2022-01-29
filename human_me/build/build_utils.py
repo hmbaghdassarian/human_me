@@ -20,7 +20,8 @@ with warnings.catch_warnings():
     from human_me.expression.gene_expression import gene_information
     from human_me.expression.gene_expression.protein_expression import build_protein_expression_reactions as build_protein
 
-def get_all_expression_reactions(me_input_model, hgnc_id: str, reactions: List[cobra.Reaction], ub_args: Dict[str, Any], psim: pd.DataFrame, machinery_list: List[str],
+def get_all_expression_reactions(model_metabolites, hgnc_id: str, reactions: List[cobra.Reaction], ub_args: Dict[str, Any], psim: pd.DataFrame, machinery_list: List[str],
+                                modified_trna_transcript_c, charged_trna_map, model_metabolites,
                                  compress_mrna: bool = False, nonmachinery_locations: Optional[List[str]] = None, stochastic: bool = False, seed: Optional[int] = None):
     """Generates all the expression reactions for a given protein from the HGNC ID and the PSIM.
 
@@ -28,6 +29,8 @@ def get_all_expression_reactions(me_input_model, hgnc_id: str, reactions: List[c
     ----------
     me_input_model : cobra.Model
         the corrected input metabolic model (as provided in preprocess.correct_inputs.correct_model)
+    model_metabolites : utils.metabolites.MetaboliteBin
+        the me_input_model metabolites as specified by MetaboliteBin
     hgnc_id : str
         gene HGNC ID
     reactions : List[cobra.Reaction]
@@ -38,6 +41,10 @@ def get_all_expression_reactions(me_input_model, hgnc_id: str, reactions: List[c
         see PSIM_README
     machinery_list : List[str]
         each entry is the HGNC ID of a protein that should be considered as catalyzing a reaction
+    modified_transcript_c : macromolecules.RNA.tRNA
+        output of create_trna()
+    charged_trna_map : Dict[str, macromolecules.RNA.tRNA]
+        output of creat_trna()
     compress_mrna : bool, optional
         whether to condense elongation, processing, and nuclear export reactions into a single reaction, by default False
     nonmachinery_locations : List[str], optional
@@ -63,18 +70,20 @@ def get_all_expression_reactions(me_input_model, hgnc_id: str, reactions: List[c
                                                             nonmachinery_locations=nonmachinery_locations,
                                                             stochastic=stochastic, seed=seed)
             mrna_reactions, mrna_transcript_c, mrna_deg_proxy = build_mrna.get_mrna_expression_reactions(gene_info=gene_info,
-                                                                                                        me_input_model=me_input_model,
+                                                                                                        model_metabolites=model_metabolites,
                                                                                                          compress_mrna=compress_mrna)
             protein_reactions, protein_metabolites = build_protein.get_protein_expression_reactions(gene_info,
-                                                                                                    me_input_model,
                                                                                                     mrna_transcript_c,
                                                                                                     mrna_deg_proxy,
-                                                                                                    ub_args=ub_args)
+                                                                                                    ub_args=ub_args, 
+                                                                                                    modified_trna_transcript_c=modified_trna_transcript_c, 
+                                                                                                    charged_trna_map=charged_trna_map, 
+                                                                                                    model_metabolites=model_metabolites)
 
     return mrna_reactions + protein_reactions, protein_metabolites
 
 
-def emm_par(me_input_model, hgnc_id, gene_reaction_map, psim, machinery_list, ub_args, compress_mrna, non_machinery, stochastic, seed):
+def emm_par(me_input_model, hgnc_id, gene_reaction_map, psim, machinery_list, ub_args, modified_trna_transcript_c, charged_trna_map, compress_mrna, non_machinery, stochastic, seed):
     # None bc will add later for expression model specific to this
     nml = list()
     if hgnc_id in non_machinery:
@@ -83,6 +92,8 @@ def emm_par(me_input_model, hgnc_id, gene_reaction_map, psim, machinery_list, ub
                                                                         hgnc_id=hgnc_id,
                                                                         psim=psim, 
                                                                         machinery_list=machinery_list,
+                                                                        modified_trna_transcript_c=modified_trna_transcript_c, 
+                                                                        charged_trna_map=charged_trna_map,
                                                                        reactions=gene_reaction_map[hgnc_id],
                                                                        compress_mrna=compress_mrna,
                                                                        ub_args=ub_args, nonmachinery_locations=nml,

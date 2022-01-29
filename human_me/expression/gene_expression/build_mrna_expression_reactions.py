@@ -3,7 +3,6 @@
 from typing import List, Tuple
 
 from human_me.utils import machinery as mach
-from human_me.utils import metabolites as metab
 from human_me.utils import functions as func
 from human_me.utils.polyA_statistics import calculate_polyA_length
 
@@ -14,25 +13,27 @@ from human_me.core.macromolecules.RNA import RNA_fragment, pre_mRNA, mRNA
 class ExpressMrna:
     '''Gene-specific mRNA expression.'''
 
-    def __init__(self, me_input_model, gene_info) -> None:
+    def __init__(self, gene_info, model_metabolites) -> None:
         """Init method for ExpressMrna
 
         Parameters
         ----------
         gene_info : gene_information.GeneInformation
             GeneInformation object of gene to be expressed
+        model_metabolites : utils.metabolites.MetaboliteBin
+            the me_input_model metabolites as specified by MetaboliteBin
         """
         self.reactions = []
         self.lariat = None
         self.gene_info = gene_info
-        self.me_input_model = me_input_model
+        self.model_metabolites = model_metabolites
 
     def transcribe_premrna(self) -> None:
         """Elongation reaction."""
         # elongation reaction
         # https://www.google.com/search?q=rna+polymerization+reaction&source=lnms&tbm=isch&sa=X&ved=2ahUKEwiN_73Vk7rqAhXOsJ4KHW5lB4UQ_AUoAXoECA4QAw&biw=1920&bih=1001#imgrc=w7XH4mHmJglCuM
 
-        self.premrna = pre_mRNA(me_input_model=self.me_input_model, gene_info=self.gene_info)
+        self.premrna = pre_mRNA(model_metabolites=self.model_metabolites, gene_info=self.gene_info)
         self.transcript_elongation = self.premrna.synthesize(id_=self.gene_info.hgnc_id + '_TRANSCRIPTION_ELONGATION')
         self.reactions.append(self.transcript_elongation)
 
@@ -40,7 +41,7 @@ class ExpressMrna:
         """Processing includes capping, splicing, and polyA tail."""
         # combine in to one to not create too many reactions (capping itself is 4 reactions)
         # make mrna_n metabolite
-        self.mrna_n = mRNA(e_input_model=self.me_input_model, gene_info=self.gene_info, compartment='n')
+        self.mrna_n = mRNA(model_metabolites=self.model_metabolites, gene_info=self.gene_info, compartment='n')
 
         self.polyA_length = calculate_polyA_length(self.gene_info.polyA_length, self.gene_info.stochastic,
                                                    self.gene_info.seed)
@@ -54,22 +55,22 @@ class ExpressMrna:
                                                    subsystem='mRNA_expression', hgnc_id=self.gene_info.hgnc_id)
         rxn = dict()
 
-        rxn[metab.atp_n], rxn[metab.ppi_n] = -self.polyA_length, self.polyA_length  # polyA tail
+        rxn[self.model_metabolites.atp_n], rxn[self.model_metabolites.ppi_n] = -self.polyA_length, self.polyA_length  # polyA tail
 
         # 5' cap: https://sites.google.com/site/learnorganicchem/organic-molecules/biomolecules/rna/rna-processing?tmpl=%2Fsystem%2Fapp%2Ftemplates%2Fprint%2F&showPrintDialog=1
-        rxn[metab.h2o_n], rxn[metab.pi_n] = -1, 1  # rtpase
-        rxn[metab.gtp_n] = -1  # gp transfer
-        rxn[metab.ppi_n] += 1  # gp transfer
-        rxn[metab.amet_n], rxn[metab.ahcys_n] = -2, 2  # methyltransferase - cap0 and cap1 structure
-        rxn[metab.h_n] = 1  # methyltransferase cap1
+        rxn[self.model_metabolites.h2o_n], rxn[self.model_metabolites.pi_n] = -1, 1  # rtpase
+        rxn[self.model_metabolites.gtp_n] = -1  # gp transfer
+        rxn[self.model_metabolites.ppi_n] += 1  # gp transfer
+        rxn[self.model_metabolites.amet_n], rxn[self.model_metabolites.ahcys_n] = -2, 2  # methyltransferase - cap0 and cap1 structure
+        rxn[self.model_metabolites.h_n] = 1  # methyltransferase cap1
 
         # 4 ATP consumed per capping reaction
-        rxn = func.hydrolyze_atp(rxn, n_atp=4, compartment='n')
+        rxn = func.hydrolyze_atp(rxn, n_atp=4, compartment='n', model_metabolites=self.model_metabolites)
 
         processed_elements = self.mrna_n.elements.copy()
         for element in processed_elements.keys():
-            #             processed_elements[element] += (self.polyA_length* metab.seq_element_map['A'][element]) # polyA tail
-            processed_elements[element] += metab.gp[element]  # 5' cap rxn2 - addition of Gp
+            #             processed_elements[element] += (self.polyA_length* self.model_metabolites.seq_element_map['A'][element]) # polyA tail
+            processed_elements[element] += self.model_metabolites.gp[element]  # 5' cap rxn2 - addition of Gp
 
         # 5' cap
         processed_elements['P'] -= 1  # rxn 1: lost of third triphosphate by RTPase
@@ -94,13 +95,13 @@ class ExpressMrna:
                     diff = self.premrna.sequence.count(nt) - (self.mrna_n.sequence.count(nt) - self.polyA_length)
                     lariat_seq += ''.join([nt] * diff)
 
-            self.lariat = RNA_fragment(me_input_model=self.me_input_model, metabolite_name=self.gene_info.hgnc_id, fragment_type='lariat',
+            self.lariat = RNA_fragment(model_metabolites=self.model_metabolites, metabolite_name=self.gene_info.hgnc_id, fragment_type='lariat',
                                        seq=lariat_seq, triphosphate=False, hgnc_id=self.gene_info.hgnc_id)
 
             rxn[self.lariat] = 1
-            rxn[metab.h2o_n] -= 1  # endonucleolytic cleavage
+            rxn[self.model_metabolites.h2o_n] -= 1  # endonucleolytic cleavage
             # 10 ATP consumed per intron during splicing
-            rxn = func.hydrolyze_atp(rxn, n_atp=10 * self.gene_info.n_introns, compartment='n')
+            rxn = func.hydrolyze_atp(rxn, n_atp=10 * self.gene_info.n_introns, compartment='n', model_metabolites=self.model_metabolites)
             # lariat degradation - no linearization reaction (just one triphosphate consumption)
             lariat_degradation = self.lariat.exonucleolytic_degradation(
                 reaction_name=self.gene_info.hgnc_id + '_lariats')
@@ -135,7 +136,7 @@ class ExpressMrna:
         rxn[self.mrna_n], rxn[self.mrna_c] = -1, 1
 
         # 10 ATP consumer per transcript exported
-        rxn = func.hydrolyze_atp(rxn, n_atp=10, compartment='n')
+        rxn = func.hydrolyze_atp(rxn, n_atp=10, compartment='n', model_metabolites=self.model_metabolites)
 
         mrna_export.add_metabolites(rxn)
         # can change this GPR as an if statement in future based on following source:
@@ -163,10 +164,10 @@ class ExpressMrna:
 
         rxn = self.mrna_c.exonucleolytic_degradation(reaction_name='', balanced=False)
         rxn = rxn.metabolites.copy()
-        del rxn[[m for m in rxn.keys() if m.id == metab.ntp_map_c[self.gene_info.mrna_seq[0]].id][0]]
+        del rxn[[m for m in rxn.keys() if m.id == self.model_metabolites.ntp_map_c[self.gene_info.mrna_seq[0]].id][0]]
 
         # no m7g metabolite in recon2.2, so just reverse the methylation instead
-        rxn[metab.amet_c], rxn[metab.ahcys_c] = 2, -2  # reverse methyltransferase - cap0 and cap1 structure
+        rxn[self.model_metabolites.amet_c], rxn[self.model_metabolites.ahcys_c] = 2, -2  # reverse methyltransferase - cap0 and cap1 structure
 
         #         proxy metabolite for coupling mRNA degradation to protein synthesis flux
         self.mrna_deg_proxy = self.mrna_c.make_proxy()
@@ -181,7 +182,7 @@ class ExpressMrna:
                                                           sink=True, sink_type='mRNA')
             rxn_1 = rxn.copy()
 
-            rxn_1[metab.ndp_map_c[self.gene_info.mrna_seq[0]]] = 1
+            rxn_1[self.model_metabolites.ndp_map_c[self.gene_info.mrna_seq[0]]] = 1
 
             gmp_c = [m for m in rxn.keys() if m.id == 'gmp_c'][0]
             rxn_1[h2o_c] -= 1
@@ -203,11 +204,11 @@ class ExpressMrna:
                 sink=True, sink_type='mRNA')
 
             rxn_2 = rxn.copy()
-            rxn_2[[m for m in rxn_2.keys() if m.id == metab.nmp_map_c[self.gene_info.mrna_seq[0]].id][0]] += 1
+            rxn_2[[m for m in rxn_2.keys() if m.id == self.model_metabolites.nmp_map_c[self.gene_info.mrna_seq[0]].id][0]] += 1
             # 5' cap - from 5'-->3' direction (DCP1/DCP2 - NUDIX mechanism)
             rxn_2[h2o_c] -= 1
             rxn_2[h_c] += 1
-            rxn_2[metab.ndp_map_c['G']] = 1
+            rxn_2[self.model_metabolites.ndp_map_c['G']] = 1
 
             transcript_degradation_2_decapping.add_metabolites(rxn_2)
             transcript_degradation_2_decapping.gene_reaction_rule = mach.decapping_rule
@@ -247,15 +248,15 @@ class ExpressMrna:
         self.reactions.append(transcription)
 
 
-def get_mrna_expression_reactions(gene_info, me_input_model, compress_mrna: bool = False):
+def get_mrna_expression_reactions(gene_info, model_metabolites, compress_mrna: bool = False):
     """Generates reactions and macromolecules associated with transcription of a gene.
 
     Parameters
     ----------
     gene_info : GeneInformation
         representation of gene to be expressed
-    me_input_model : cobra.Model
-        the corrected input metabolic model (as provided in preprocess.correct_inputs.correct_model)
+    model_metabolites : utils.metabolites.MetaboliteBin
+        the me_input_model metabolites as specified by MetaboliteBin
     compress_mrna : bool, optional
         whether to condense elongation, processing, and nuclear export reactions into a single reaction, by default False
 
@@ -268,7 +269,7 @@ def get_mrna_expression_reactions(gene_info, me_input_model, compress_mrna: bool
     em.mrna_deg_proxy : core.macromolecules.macromolecule.Proxy
         proxy metabolite generated in mRNA degradation reaction for coupling
     """
-    em = ExpressMrna(me_input_model=me_input_model, gene_info=gene_info)
+    em = ExpressMrna(gene_info=gene_info, model_metabolites=model_metabolites)
     em.transcribe_premrna()
     em.process_mrna()
     em.export_mrna()
