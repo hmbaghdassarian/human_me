@@ -2,7 +2,8 @@ import logging
 import os
 import pathlib
 import pickle
-from typing import Any, Union
+import sys
+from typing import Any, Optional, Union
 
 import cobra 
 import pandas as pd
@@ -79,7 +80,7 @@ def read_psim(psim_file: str, h5_key: Optional[str] = None) -> pd.DataFrame:
     """
     _, file_extension = os.path.splitext(psim_file)
     if file_extension == '.h5':
-        if key is None:
+        if h5_key is None:
             psim = pd.read_hdf(psim_file)
         else:
             psim = pd.read_hdf(psim_file, key = h5_key) # key = 'corrected'

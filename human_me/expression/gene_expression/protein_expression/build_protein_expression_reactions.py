@@ -239,7 +239,7 @@ def mitochondrial_inter_protein_processing(gene_info, pre_protein_i: Protein) ->
     return process_mitochondrial_matrix_protein, processed_protein_i, aa_counts_processed_i, L_processed_protein_i
 
 
-def get_mitochondrial_reactions(gene_info, unfolded_protein_c: Protein, compartments: List[str]) -> Tuple[List[ProteinExpressionType]]:
+def get_mitochondrial_reactions(gene_info, unfolded_protein_c: Protein, compartments: List[str], model_metabolites) -> Tuple[List[ProteinExpressionType]]:
     """Generate all mitochondrial transport reactions
 
     Parameters
@@ -250,6 +250,8 @@ def get_mitochondrial_reactions(gene_info, unfolded_protein_c: Protein, compartm
         unfolded, cytosolic protein
     compartments : List[str]
         one-letter codes of all mitochondrial compartments (options ['m', 'i']) for protein to be transported to
+    model_metabolites : utils.metabolites.MetaboliteBin
+        the me_input_model metabolites as specified by MetaboliteBin
 
     Returns
     -------
@@ -821,7 +823,7 @@ def get_protein_expression_reactions(gene_info, mrna_transcript_c, mrna_deg_prox
 
                 if 'c' in gene_info.all_locations or 'x' in gene_info.all_locations or ('n' in gene_info.all_locations and folded_protein_c.formula_weight / 1000 <= params.NUCLEAR_DIFFUSION_LIMIT):
                    # cytoplasmic degradation of folded proteins: cytoplasmic proteins, peroxisomal proteins, or nuclear proteins undergoing passive diffusion
-                    dr = degradation.degrade(folded_protein_c, **{'ub_args': ub_args})
+                    dr = degradation.degrade(macromolecule=folded_protein_c, model_metabolites=model_metabolites, **{'ub_args': ub_args})
                     fc = list(set(gene_info.all_locations).intersection(['c', 'x', 'n']))
                     for r in dr:
                         r._final_compartments += fc
@@ -853,11 +855,11 @@ def get_protein_expression_reactions(gene_info, mrna_transcript_c, mrna_deg_prox
             # mitochondrial transport and degradation ('i' and 'm')
             if ('m' in gene_info.all_locations) or ('i' in gene_info.all_locations):
                 if ('m' in gene_info.all_locations) and ('i' in gene_info.all_locations):
-                    mitochondrial_reactions, mitochondrial_protein_metabolites = get_mitochondrial_reactions(gene_info, unfolded_protein_c, compartments=['m', 'i'])
+                    mitochondrial_reactions, mitochondrial_protein_metabolites = get_mitochondrial_reactions(gene_info, unfolded_protein_c, compartments=['m', 'i'], model_metabolites=model_metabolites)
                 elif 'm' in gene_info.all_locations:
-                    mitochondrial_reactions, mitochondrial_protein_metabolites = get_mitochondrial_reactions(gene_info, unfolded_protein_c, compartments=['m'])
+                    mitochondrial_reactions, mitochondrial_protein_metabolites = get_mitochondrial_reactions(gene_info, unfolded_protein_c, compartments=['m'], model_metabolites=model_metabolites)
                 elif 'i' in gene_info.all_locations:
-                    mitochondrial_reactions, mitochondrial_protein_metabolites = get_mitochondrial_reactions(gene_info, unfolded_protein_c, compartments=['i'])
+                    mitochondrial_reactions, mitochondrial_protein_metabolites = get_mitochondrial_reactions(gene_info, unfolded_protein_c, compartments=['i'], model_metabolites=model_metabolites)
                 protein_expression_reactions += mitochondrial_reactions
                 protein_metabolites += mitochondrial_protein_metabolites
 
@@ -1000,7 +1002,7 @@ def get_protein_expression_reactions(gene_info, mrna_transcript_c, mrna_deg_prox
 
             # lysosomal degradation
             fc = list(set(gene_info.all_locations).intersection(['l', 'pm']))
-            dr = degradation.degrade(macromolecule=protein_l)
+            dr = degradation.degrade(macromolecule=protein_l, model_metabolites=model_metabolites)
             for r in dr:
                 r._final_compartments += fc
             ppdr += dr

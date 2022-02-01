@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 # coding: utf-8
-from typing import List, Tuple
 
 from human_me.utils import machinery as mach
 from human_me.utils import functions as func

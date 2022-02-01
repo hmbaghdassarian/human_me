@@ -3,7 +3,6 @@ import pandas as pd
 from sympy.parsing.sympy_parser import parse_expr
 
 from human_me.data.file_paths import build_files_url
-from human_me.utils.load_environmental_variables import processed_data_path
 
 mu = parse_expr('mu')
 

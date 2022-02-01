@@ -19,6 +19,7 @@ pd.options.mode.chained_assignment = None
 
 with warnings.catch_warnings():
     warnings.simplefilter('ignore')
+    from human_me.io import HiddenPrints
     from human_me import core
     from human_me.core.model import ME_Model
     from human_me.core.reaction import (ComplexDegradationReaction,
@@ -31,7 +32,7 @@ with warnings.catch_warnings():
     from human_me.utils.metabolites import MetaboliteBin
     from human_me.io import load_metabolic_model, load_psim
 
-    with func.HiddenPrints():
+    with HiddenPrints():
         from human_me.build.build_utils import (
             get_all_expression_reactions, get_complex_df,
             get_expression_machinery, map_complex_machinery_compartment,
@@ -53,6 +54,7 @@ class MEBuilder:
     def __init__(self, 
                 m_model: Union[cobra.Model,str], 
                  psim_me: Union[pd.DataFrame, str],
+                 model_id: str,
                  stochastic: bool = False, seed: int = 888, n_cores: int = os.cpu_count(),
                  non_machinery: Optional[Dict[str, List[str]]] = None, knock_out: Optional[List[str]] = None,
                  dummy_protein: bool = True, context_specific_dummy: bool = False,
@@ -130,13 +132,14 @@ class MEBuilder:
         # get pre-generated reactions - the compress_mrna arg requires that they be run with that input
         self.compress_mrna = compress_mrna
         print('Generate ubiquitin reactions for proteasomal degradation')
-        self.ub_args = ubiquitin.express_ubiquitin(model_metabolites=self.model_metabolites, psim_me = self.psim_me, compress_mrna=self.compress_mrna)
+        self.ub_args = ubiquitin.express_ubiquitin(model_metabolites=self.model_metabolites, psim_me = self.psim_me, compress_mrna=self.compress_mrna, 
+                                                    charged_trna_map=self.charged_trna_map, modified_trna_transcript_c=self.modified_trna_transcript_c)
         print('Generate ribosome')
 
         # ribosome seeds different from seeds here for gene_info bc it also calls random.sample
         random.seed(self.seed)
         rib_seed = random.randint(0, int((2 ** 32 - 1)))
-        ribosomal_reactions, self.ribosome_complex_c = build_ribosome(self.model_metabolites, psim_rib, self.modified_transcript_c, self.charged_trna_map, 
+        ribosomal_reactions, self.ribosome_complex_c = build_ribosome(self.model_metabolites, psim_rib, self.modified_trna_transcript_c, self.charged_trna_map, 
                                                                         self.ub_args, self.compress_mrna,
                                                                         self.deg_args['reversible_complex_formation'],
                                                                         stochastic=self.stochastic, seed=rib_seed)
@@ -200,7 +203,7 @@ class MEBuilder:
                                                                                reactions=gene_reaction_map[hgnc_id],
                                                                                compress_mrna=self.compress_mrna,
                                                                                ub_args=self.ub_args,
-                                                                               psim=self.psim_me
+                                                                               psim=self.psim_me,
                                                                                machinery_list=self.metabolic_machinery, 
                                                                                modified_trna_transcript_c=self.modified_trna_transcript_c, 
                                                                                charged_trna_map=self.charged_trna_map,
@@ -241,7 +244,7 @@ class MEBuilder:
             expr_reactions, protein_metabolites = get_all_expression_reactions(model_metabolites = self.model_metabolites, 
                                                                                 hgnc_id=hgnc_id,
                                                                                reactions=gene_reaction_map[hgnc_id],
-                                                                               psim=self.psim_me
+                                                                               psim=self.psim_me,
                                                                                machinery_list=self.metabolic_machinery, 
                                                                                modified_trna_transcript_c=self.modified_trna_transcript_c, 
                                                                                charged_trna_map=self.charged_trna_map,
@@ -1397,7 +1400,7 @@ def build_me(me_input_model: Union[cobra.Model,str],
         instance of MEBuilder used to generate the me_model
     """
     start = time.time()
-    builder = MEBuilder(m_model=me_input_model, psim_me=psim_me, model_id = model_id, 
+    builder = MEBuilder(m_model=me_input_model, psim_me=psim_me, model_id=model_id, 
                         stochastic=stochastic, seed=seed, n_cores=n_cores,
                         non_machinery=non_machinery, knock_out=knock_out,
                         dummy_protein=dummy_protein, context_specific_dummy=context_specific_dummy,

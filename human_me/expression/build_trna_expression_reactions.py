@@ -118,21 +118,21 @@ class ExpressTrna:
 
         rxn = {self.pretrna_n: -1}
         # CCA synthesis
-        rxn[self.trna_info.model_metabolitesntp_map_n['C']] = -2
-        rxn[self.trna_info.model_metabolitesntp_map_n['A']] = -1
-        rxn[self.trna_info.model_metabolitesppi_n] = 3
+        rxn[self.trna_info.model_metabolites.ntp_map_n['C']] = -2
+        rxn[self.trna_info.model_metabolites.ntp_map_n['A']] = -1
+        rxn[self.trna_info.model_metabolites.ppi_n] = 3
         trna_processing_machinery = mach.TRNT1.copy()
 
         # initialize
         # reactions = list()
-        rxn[self.trna_info.model_metabolitesh2o_n] = 0
+        rxn[self.trna_info.model_metabolites.h2o_n] = 0
 
         if self.trna_info.five_leader_seq is not None:  # if there is a 5' leader sequence
             five_leader = RNA_fragment(model_metabolites=self.trna_info.model_metabolites, metabolite_name=self.trna_info.id, seq=self.trna_info.five_leader_seq,
                                        compartment='n', triphosphate=True, fragment_type='5_leader')
 
             rxn[five_leader] = 1
-            rxn[self.trna_info.model_metabolitesh2o_n] -= 1  # endonuclolytic cleavage (RNAse P)
+            rxn[self.trna_info.model_metabolites.h2o_n] -= 1  # endonuclolytic cleavage (RNAse P)
             trna_processing_machinery += mach.RNASEP
 
             five_leader_degradation = five_leader.exonucleolytic_degradation(
@@ -154,7 +154,7 @@ class ExpressTrna:
                                          fragment_type='3_trailer',
                                          compartment='n', triphosphate=False)
             rxn[three_trailer] = 1
-            rxn[self.trna_info.model_metabolitesh2o_n] -= 1  # endonuclolytic cleavage (RNase Z)
+            rxn[self.trna_info.model_metabolites.h2o_n] -= 1  # endonuclolytic cleavage (RNase Z)
             trna_processing_machinery += mach.RNASEZ
 
             three_trailer_degradation = three_trailer.exonucleolytic_degradation(
@@ -179,7 +179,7 @@ class ExpressTrna:
                     update=True)
                 self.reactions.append(intron_degradation)
 
-            rxn[self.trna_info.model_metabolitesh2o_n] -= n_introns
+            rxn[self.trna_info.model_metabolites.h2o_n] -= n_introns
 
         trna_processing = ExpressionReaction('PROCESSING_TRNA_' + self.trna_info.id, subsystem='tRNA_Biogenesis')
         trna_processing.subsytem = 'tRNA_Biogenesis'
@@ -213,8 +213,8 @@ class ExpressTrna:
 
         export_rxn = {self.modified_trna_n: -1, self.trna_c: 1}
         # gtp hydrolysis on cytoplasmic side for export (see protein_expression nuclear_transport for details)
-        export_rxn[self.trna_info.model_metabolitesntp_map_c['G']], export_rxn[self.trna_info.model_metabolitesh2o_c], export_rxn[self.trna_info.model_metabolitesndp_map_c['G']], export_rxn[
-            self.trna_info.model_metabolitespi_c], export_rxn[self.trna_info.model_metabolitesh_c] = -1, -1, 1, 1, 1
+        export_rxn[self.trna_info.model_metabolites.ntp_map_c['G']], export_rxn[self.trna_info.model_metabolites.h2o_c], export_rxn[self.trna_info.model_metabolites.ndp_map_c['G']], export_rxn[
+            self.trna_info.model_metabolites.pi_c], export_rxn[self.trna_info.model_metabolites.h_c] = -1, -1, 1, 1, 1
         trna_primary_export.add_metabolites(export_rxn)
         trna_primary_export.gene_reaction_rule = ' and '.join(mach.XPOT + mach.RAN)
 
@@ -250,7 +250,7 @@ class ExpressTrna:
 
         # diagram: https://www.researchgate.net/figure/The-reaction-scheme-for-the-two-steps-of-aminoacylation-reaction-at-the-active-site-of_fig4_231225238
         trna_charging_reactions, charged_trna_metabolites = [], []
-        for code, aa in self.trna_info.model_metabolitesseq_amino_acid_map_c.items():
+        for code, aa in self.trna_info.model_metabolites.seq_amino_acid_map_c.items():
             elements = self.modified_trna_c.elements.copy()
             # attachment - loss of hydrogen from tRNA hydroxyl, and oxygen from amino acid carboxyl
             elements['H'] -= 1
@@ -271,8 +271,8 @@ class ExpressTrna:
             trna_charging = ExpressionReaction('CHARGING_TRNA_' + self.trna_info.id + '_' + code,
                                                subsystem='tRNA_Biogenesis',
                                                trna_charging=True)
-            rxn = {self.modified_trna_c: -1, aa: -1, charged_trna_c: 1, self.trna_info.model_metabolitesatp_c: -1, self.trna_info.model_metabolitesppi_c: 1,
-                   self.trna_info.model_metabolitesamp_c: 1}
+            rxn = {self.modified_trna_c: -1, aa: -1, charged_trna_c: 1, self.trna_info.model_metabolites.atp_c: -1, self.trna_info.model_metabolites.ppi_c: 1,
+                   self.trna_info.model_metabolites.amp_c: 1}
             trna_charging.add_metabolites(rxn)
 
             # add gprs
@@ -389,7 +389,3 @@ def create_trna(model_metabolites):
     charged_trna_map = {v.id.split('_')[2]: v for v in charged_trna_metabolites}
 
     return trna_biogenesis_reactions, charged_trna_map, modified_trna_transcript_c
-
-
-
-

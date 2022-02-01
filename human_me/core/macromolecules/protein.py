@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # coding: utf-8
-
+import copy
 from typing import Dict, Optional
 
 from human_me.core.macromolecules.macromolecule import Macromolecule, Proxy
@@ -59,14 +59,15 @@ class Protein(Macromolecule):
             self.length = sum(amino_acid_counts.values())
             id_ = id_ + '_protein_' + compartment
 
+        self.model_metabolites = model_metabolites
         charge = sum(
-            [model_metabolites.seq_amino_acid_map_compartments[compartment][aa_code].charge * aa_count for aa_code, aa_count in
+            [self.model_metabolites.seq_amino_acid_map_compartments[compartment][aa_code].charge * aa_count for aa_code, aa_count in
              self._amino_acid_counts.items()])
 
         elements = {'C': 0, 'H': 0, 'N': 0, 'O': 0, 'S': 0}
-        if compartment in model_metabolites.seq_amino_acid_map_compartments:
+        if compartment in self.model_metabolites.seq_amino_acid_map_compartments:
             for aa_code, aa_count in self._amino_acid_counts.items():
-                aa_elements = model_metabolites.seq_amino_acid_map_compartments[compartment][aa_code].elements
+                aa_elements = self.model_metabolites.seq_amino_acid_map_compartments[compartment][aa_code].elements
                 for element in aa_elements:
                     elements[element] += aa_count * aa_elements[element]
         else:
@@ -94,3 +95,17 @@ class Protein(Macromolecule):
         if self.non_machinery:
             raise ValueError('Unexpected generation of coupling proxy metabolites for non-machinery')
         return Proxy(associated_macromolecule=self)
+    
+    def copy(self):
+        """Overwrite cobra.Species.copy"""
+
+        # copy while preserving model_metabolites pointer to avoid memory issues and not copying it to avoid speed issues
+        model_metabolites = self.model_metabolites
+        del self.model_metabolites
+
+        new_macromolecule = copy.deepcopy(self)
+        
+        self.model_metabolites = model_metabolites
+        new_macromolecule.model_metabolites = self.model_metabolites # retain same pointer to avoid memory issues
+
+        return new_macromolecule

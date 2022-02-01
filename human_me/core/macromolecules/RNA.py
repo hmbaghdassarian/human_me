@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # coding: utf-8
-
+import copy
 from typing import Optional
 
 from human_me.utils import machinery as mach
@@ -48,8 +48,8 @@ class RNA(Macromolecule):
         self.sequence = seq
         self.triphosphate = triphosphate
         self.length = len(self.sequence)
-        self.get_base_counts_and_elements()
         self.model_metabolites = model_metabolites
+        self.get_base_counts_and_elements()
 
         super().__init__(id = rna_id, compartment=compartment, charge = -self.length, elements = self.elements,
                                hgnc_id = hgnc_id)
@@ -207,6 +207,19 @@ class RNA(Macromolecule):
 
         else:
             raise ValueError('Situation in which RNA sequence is removed or replaced has not been implemented yet')
+    def copy(self):
+        """Overwrite cobra.Species.copy"""
+
+        # copy that preserves self.model_metabolites pointer to avoid memory issues and doesn't deep copy it to avoid speed issues
+        model_metabolites = self.model_metabolites
+        del self.model_metabolites
+
+        new_macromolecule = copy.deepcopy(self)
+
+        self.model_metabolites = model_metabolites
+        new_macromolecule.model_metabolites = self.model_metabolites # retain same pointer to avoid memory issues
+
+        return new_macromolecule
 
 
 class pre_mRNA(RNA):

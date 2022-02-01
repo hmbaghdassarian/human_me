@@ -6,7 +6,6 @@ from typing import Dict, List, Optional, Union
 import cobra
 
 from human_me.utils import parameters as params
-from human_me.utils.metabolites import MetaboliteBin
 from human_me.core.reaction import BiomassReaction
 from human_me.core.macromolecules.macromolecule import Macromolecule
 
@@ -144,7 +143,6 @@ def add_biomass_change(reaction: cobra.Reaction, inplace: bool = True) -> Union[
     """
 
     biomass_change = dict()
-    #     md = reaction._metabolites.copy()
     # must order for precision (order of adding masses effects final sum)
     md_ = reaction._metabolites.copy()
     md_map = {m.id: m for m in md_}

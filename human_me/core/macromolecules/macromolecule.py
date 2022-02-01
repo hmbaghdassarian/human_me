@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 # coding: utf-8
+
 from typing import Dict, Optional, SupportsFloat, Union
 
 import cobra

@@ -7,7 +7,7 @@ import os
 import time
 import warnings
 from collections import OrderedDict
-from typing import Any, Dict, List, Optional, Tuple, SupportsFloat
+from typing import Any, Dict, List, Optional, SupportsFloat
 
 import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
@@ -20,7 +20,7 @@ from qminospy.solver import QMINOS  # need solveME (https://github.com/SBRG/solv
 from tqdm import tqdm
 
 from human_me.core.reaction import BiomassReaction
-from human_me.utils import functions as func
+from human_me.io import HiddenPrints
 
 
 class qminosSolver:
@@ -162,12 +162,12 @@ class qminosSolver:
     def _try_mu(mu_val, objective, tolerance, 
                 res: Dict[SupportsFloat, Dict[str, Any]], feasible_mu: List[SupportsFloat], infeasible_mu: List[SupportsFloat]):
         """To be used with maximize_growth method"""
-        with func.HiddenPrints():
+        with HiddenPrints():
             sln, stat, hsq = self.solve_lp(me_model, mu_val, objective=objective, tolerance = tolerance)
         if stat.max() == 1 and mu_val < 1e-9:
             warnings.warn('Model is infeasible at mu = 0. Trying mu = 1e-9 instead')
             mu_val = 1e-9
-            with func.HiddenPrints():
+            with HiddenPrints():
                 sln, stat, hsq = self.solve_lp(me_model, mu_val, objective=objective, tolerance = tolerance)
             if stat.max() == 1:
                 raise ValueError('Provided minimum mu is infeasible')

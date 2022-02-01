@@ -13,9 +13,7 @@ import numpy as np
 import pandas as pd
 
 import human_me.utils.parameters as params
-from human_me.data.file_paths import build_local_path 
-
-HiddenPrints = params.HiddenPrints
+from human_me.data.file_paths import build_local_path
 
 
 def flatten_list(list1: List[List[Any]]) -> list:

@@ -25,7 +25,7 @@ class MetaboliteBin:
         self.pi_n = self.human_model.metabolites.get_by_id('pi_n')
         self.h_n = self.human_model.metabolites.get_by_id('h_n')
         self.h2o_n = self.human_model.metabolites.get_by_id('h2o_n')
-        gp = gtp_n.elements
+        gp = self.gtp_n.elements
         gp['O'] -= 6
         gp['P'] -= 2
         self.gp = gp
@@ -79,31 +79,30 @@ class MetaboliteBin:
 
         # mrna expression
         self.seq_metabolite_map = {self.human_model.metabolites.get_by_id('utp_n'): 'U',
-                            gtp_n: 'G',
+                            self.gtp_n: 'G',
                             self.human_model.metabolites.get_by_id('ctp_n'): 'C',
-                            atp_n: 'A'}
+                            self.atp_n: 'A'}
 
         # RNA backbone elements
-        seq_element_map = dict()
-        for k, v in seq_metabolite_map.items():
+        self.seq_element_map = dict()
+        for k, v in self.seq_metabolite_map.items():
             elements = k.elements
             elements['O'] = elements['O'] - 7  # lost from incoming ntp
             elements['P'] = elements['P'] - 2  # lost from incoming ntp
             elements['H'] = elements['H'] - 1  # lost from 3' end of growing strand
-            seq_element_map[v] = elements
-        self.seq_element_map = seq_element_map
+            self.seq_element_map[v] = elements
         # lariat degradataion------------------------------------------------------------
         self.nmp_map_n = {'C': self.human_model.metabolites.get_by_id('cmp_n'),
                     'U': self.human_model.metabolites.get_by_id('ump_n'),
                     'G': self.human_model.metabolites.get_by_id('gmp_n'),
                     'A': self.human_model.metabolites.get_by_id('amp_n')}
-        self.ntp_map_n = {v: k for k, v in seq_metabolite_map.items()}
+        self.ntp_map_n = {v: k for k, v in self.seq_metabolite_map.items()}
 
         # mrna degradation------------------------------------------------------------
         self.nmp_map_c = {'C': self.human_model.metabolites.get_by_id('cmp_c'),
                     'U': self.human_model.metabolites.get_by_id('ump_c'),
                     'G': self.human_model.metabolites.get_by_id('gmp_c'),
-                    'A': amp_c}
+                    'A': self.amp_c}
         self.ndp_map_c = {'C': self.human_model.metabolites.get_by_id('cdp_c'),
                     'U': self.human_model.metabolites.get_by_id('udp_c'),
                     'G': self.human_model.metabolites.get_by_id('gdp_c'),
@@ -113,7 +112,7 @@ class MetaboliteBin:
         self.ntp_map_c = {'C': self.human_model.metabolites.get_by_id('ctp_c'),
                     'U': self.human_model.metabolites.get_by_id('utp_c'),
                     'G': self.human_model.metabolites.get_by_id('gtp_c'),
-                    'A': atp_c}
+                    'A': self.atp_c}
 
         # trna expression
         self.seq_amino_acid_map_c = {
@@ -140,20 +139,20 @@ class MetaboliteBin:
         }
 
         self.seq_amino_acid_map_m = {aa_code: self.human_model.metabolites.get_by_id('_'.join(aa_metabolite.id.split('_')[:-1]) + '_m')
-                                for aa_code, aa_metabolite in seq_amino_acid_map_c.items()}
+                                for aa_code, aa_metabolite in self.seq_amino_acid_map_c.items()}
         self.seq_amino_acid_map_l = {aa_code: self.human_model.metabolites.get_by_id('_'.join(aa_metabolite.id.split('_')[:-1]) + '_l')
-                                for aa_code, aa_metabolite in seq_amino_acid_map_c.items()}
+                                for aa_code, aa_metabolite in self.seq_amino_acid_map_c.items()}
         self.seq_amino_acid_map_x = {aa_code: self.human_model.metabolites.get_by_id('_'.join(aa_metabolite.id.split('_')[:-1]) + '_x')
-                                for aa_code, aa_metabolite in seq_amino_acid_map_c.items()}
+                                for aa_code, aa_metabolite in self.seq_amino_acid_map_c.items()}
         self.seq_amino_acid_map_n = {aa_code: self.human_model.metabolites.get_by_id('_'.join(aa_metabolite.id.split('_')[:-1]) + '_n')
-                                for aa_code, aa_metabolite in seq_amino_acid_map_c.items()}
+                                for aa_code, aa_metabolite in self.seq_amino_acid_map_c.items()}
         self.seq_amino_acid_map_r = {aa_code: self.human_model.metabolites.get_by_id('_'.join(aa_metabolite.id.split('_')[:-1]) + '_r')
-                                for aa_code, aa_metabolite in seq_amino_acid_map_c.items()}
+                                for aa_code, aa_metabolite in self.seq_amino_acid_map_c.items()}
 
-        self.seq_amino_acid_map_compartments = {'c': seq_amino_acid_map_c, 'x': seq_amino_acid_map_x, 'r': seq_amino_acid_map_r,
-                                        'm': seq_amino_acid_map_m, 'n': seq_amino_acid_map_n, 'l': seq_amino_acid_map_l}
+        self.seq_amino_acid_map_compartments = {'c': self.seq_amino_acid_map_c, 'x': self.seq_amino_acid_map_x, 'r': self.seq_amino_acid_map_r,
+                                        'm': self.seq_amino_acid_map_m, 'n': self.seq_amino_acid_map_n, 'l': self.seq_amino_acid_map_l}
 
-        self.adp_c = ndp_map_c['A']
+        self.adp_c = self.ndp_map_c['A']
 
         self.atp_m = self.human_model.metabolites.get_by_id('atp_m')
         self.adp_m = self.human_model.metabolites.get_by_id('adp_m')
@@ -178,11 +177,11 @@ class MetaboliteBin:
         self.atp_l = self.human_model.metabolites.get_by_id('atp_l')
         self.adp_l = self.human_model.metabolites.get_by_id('adp_l')
 
-        self.atp_compartments = {'c': atp_c, 'm': atp_m, 'i': atp_m, 'x': atp_x, 'n': atp_n, 'r': atp_r, 'l': atp_l}
-        self.adp_compartments = {'c': adp_c, 'm': adp_m, 'i': adp_m, 'x': adp_x, 'n': adp_n, 'r': adp_r, 'l': adp_l}
-        self.h2o_compartments = {'c': h2o_c, 'm': h2o_m, 'i': h2o_m, 'x': h2o_x, 'n': h2o_n, 'r': h2o_r, 'l': h2o_l}
-        self.pi_compartments = {'c': pi_c, 'm': pi_m, 'i': pi_m, 'x': pi_x, 'n': pi_n, 'r': pi_r, 'l': pi_l}
-        self.h_compartments = {'c': h_c, 'm': h_m, 'i': h_i, 'x': h_x, 'n': h_n, 'r': h_r, 'l': h_l}
+        self.atp_compartments = {'c': self.atp_c, 'm': self.atp_m, 'i': self.atp_m, 'x': self.atp_x, 'n': self.atp_n, 'r': self.atp_r, 'l': self.atp_l}
+        self.adp_compartments = {'c': self.adp_c, 'm': self.adp_m, 'i': self.adp_m, 'x': self.adp_x, 'n': self.adp_n, 'r': self.adp_r, 'l': self.adp_l}
+        self.h2o_compartments = {'c': self.h2o_c, 'm': self.h2o_m, 'i': self.h2o_m, 'x': self.h2o_x, 'n': self.h2o_n, 'r': self.h2o_r, 'l': self.h2o_l}
+        self.pi_compartments = {'c': self.pi_c, 'm': self.pi_m, 'i': self.pi_m, 'x': self.pi_x, 'n': self.pi_n, 'r': self.pi_r, 'l': self.pi_l}
+        self.h_compartments = {'c': self.h_c, 'm': self.h_m, 'i': self.h_i, 'x': self.h_x, 'n': self.h_n, 'r': self.h_r, 'l': self.h_l}
 
         self.datp_n = self.human_model.metabolites.get_by_id('datp_n')
         self.dctp_n = self.human_model.metabolites.get_by_id('dctp_n')
@@ -203,5 +202,5 @@ class MetaboliteBin:
         self.sphmyln_hs_c = self.human_model.metabolites.get_by_id('sphmyln_hs_c')
 
         # h2o = {'r': h2o_r, 'c': h2o_c, 'l': h2o_l, 'm': h2o_m, 'n': h2o_n, 'x': h2o_x}
-        self.nmp_map = {'n': nmp_map_n, 'c': nmp_map_c}
-        self.ntp_map = {'n': ntp_map_n, 'c': ntp_map_c}
+        self.nmp_map = {'n': self.nmp_map_n, 'c': self.nmp_map_c}
+        self.ntp_map = {'n': self.ntp_map_n, 'c': self.ntp_map_c}

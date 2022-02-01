@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
+import pandas as pd
 from typing import Any, Dict
 
 from human_me.utils import machinery as mach
@@ -15,7 +16,8 @@ import human_me.expression.gene_expression.build_mrna_expression_reactions as bu
 from human_me.expression.gene_expression.protein_expression import cytosolic_translation as c_trln
 
 
-def express_ubiquitin(model_metabolites, psim_me: pd.DataFrame, compress_mrna: bool) -> Dict[str, Any]:
+def express_ubiquitin(model_metabolites, psim_me: pd.DataFrame, compress_mrna: bool, 
+                      charged_trna_map, modified_trna_transcript_c) -> Dict[str, Any]:
     """Reactions for formation of ubiquitin.
 
     Parameters
@@ -26,6 +28,10 @@ def express_ubiquitin(model_metabolites, psim_me: pd.DataFrame, compress_mrna: b
         the corrected psim matrix (as provided in preprocess.correct_inputs.correct_psim)
     compress_mrna : bool
         whether to condense elongation, processing, and nuclear export reactions into a single reaction
+    modified_transcript_c : macromolecules.RNA.tRNA
+        output of create_trna()
+    charged_trna_map : Dict[str, macromolecules.RNA.tRNA]
+        output of creat_trna()
 
     Returns
     -------
@@ -55,8 +61,10 @@ def express_ubiquitin(model_metabolites, psim_me: pd.DataFrame, compress_mrna: b
     n_ub_monomers = ubc_info.protein_seq.count(params.SINGLE_UB_SEQ)
     ub_c = Protein(compartment='c', id_='ubiquitin_monomer', model_metabolites=model_metabolites, amino_acid_counts=monoub_aa_counts)
 
-    ubc_translation_reaction_cytosolic, ubc_c = c_trln.translate_protein_cytosolic(ubc_info, ubc_transcript_c,
-                                                                                   ubc_deg_proxy, model_metabolites=model_metabolites)
+    ubc_translation_reaction_cytosolic, ubc_c = c_trln.translate_protein_cytosolic(gene_info=ubc_info, mrna_transcript_c=ubc_transcript_c,
+                                                                                   mrna_deg_proxy=ubc_deg_proxy, model_metabolites=model_metabolites, 
+                                                                                   charged_trna_map=charged_trna_map, 
+                                                                                   modified_trna_transcript_c=modified_trna_transcript_c)
 
     ubiquitin_monomerization_ubc = ExpressionReaction(ubc_info.hgnc_id + '_MONOMERIZATIONc',
                                                       subsystem='Protein_Expression', ubiquitin_biogenesis=True,
@@ -77,11 +85,14 @@ def express_ubiquitin(model_metabolites, psim_me: pd.DataFrame, compress_mrna: b
                                polyA_length=round(ubb_psim['POLYA_LENGTH'].values.tolist()[0]))
     ubb_info.get_final_locations(nonmachinery_locations=['c'])
     ubb_info = func.convert_gi(ubb_info, non_machinery=dict())
+
     ubb_mrna_expression_reactions, ubb_transcript_c, ubb_deg_proxy = build_mrna.get_mrna_expression_reactions(gene_info=ubb_info,
                                                                                                             model_metabolites=model_metabolites,
                                                                                                               compress_mrna=compress_mrna)
-    ubb_translation_reaction_cytosolic, ubb_c = c_trln.translate_protein_cytosolic(ubb_info, ubb_transcript_c,
-                                                                                   ubb_deg_proxy, model_metabolites=model_metabolites)
+    ubb_translation_reaction_cytosolic, ubb_c = c_trln.translate_protein_cytosolic(gene_info=ubb_info, mrna_transcript_c=ubb_transcript_c,
+                                                                                   mrna_deg_proxy=ubb_deg_proxy, model_metabolites=model_metabolites, 
+                                                                                   charged_trna_map=charged_trna_map, 
+                                                                                    modified_trna_transcript_c=modified_trna_transcript_c)
 
     # monomerization from ubb polyub
     n_ub_monomers = ubb_info.protein_seq.count(params.SINGLE_UB_SEQ)

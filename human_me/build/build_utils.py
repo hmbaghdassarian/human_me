@@ -12,6 +12,7 @@ pd.options.mode.chained_assignment = None
 
 with warnings.catch_warnings():
     warnings.simplefilter('ignore')
+    from human_me.io import HiddenPrints
     from human_me.utils import functions as func
 
     from human_me.preprocess import parse_complex
@@ -21,7 +22,7 @@ with warnings.catch_warnings():
     from human_me.expression.gene_expression.protein_expression import build_protein_expression_reactions as build_protein
 
 def get_all_expression_reactions(model_metabolites, hgnc_id: str, reactions: List[cobra.Reaction], ub_args: Dict[str, Any], psim: pd.DataFrame, machinery_list: List[str],
-                                modified_trna_transcript_c, charged_trna_map, model_metabolites,
+                                modified_trna_transcript_c, charged_trna_map,
                                  compress_mrna: bool = False, nonmachinery_locations: Optional[List[str]] = None, stochastic: bool = False, seed: Optional[int] = None):
     """Generates all the expression reactions for a given protein from the HGNC ID and the PSIM.
 
@@ -65,7 +66,7 @@ def get_all_expression_reactions(model_metabolites, hgnc_id: str, reactions: Lis
         nonmachinery_locations = list()
     with warnings.catch_warnings():
         warnings.simplefilter('ignore')
-        with func.HiddenPrints():
+        with HiddenPrints():
             gene_info = gene_information.generate_from_psim(hgnc_id=hgnc_id, psim=psim, machinery_list=machinery_list, reactions=reactions,
                                                             nonmachinery_locations=nonmachinery_locations,
                                                             stochastic=stochastic, seed=seed)
