@@ -24,6 +24,21 @@ class ME_Reaction(cobra.Reaction):
         super().__init__(id, name, subsystem, lower_bound, upper_bound)
         self.coupled_metabolites = dict()
         self._protein_deg_proxy = False
+    
+    def copy(self):
+        """Overwrite cobra.Species.copy"""
+
+        # doesn't copy ._metabolites to avoid compute time issues and allows the dictionary itself to work on the same metabolite pointers
+        rxn_metabolites = self._metabolites
+        self._metabolites = dict()
+
+        new_rxn = copy.deepcopy(self)
+        
+        self._metabolites = rxn_metabolites
+        new_rxn._metabolites = {k: v for k,v in self._metabolites.items()} # different pointer to allow updating of ._metabolites
+
+        return new_rxn
+
 
     def _couple(self, metabolite, type: str):
         """Add coupling coefficient and associated metadata to reaction for a coupled metabolite.
