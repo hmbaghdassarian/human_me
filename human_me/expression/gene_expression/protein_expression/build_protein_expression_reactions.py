@@ -325,7 +325,7 @@ def transport_peroxisome(gene_info, folded_protein_c: Protein, model_metabolites
     return peroxisomal_transport, folded_protein_x
 
 
-def get_peroxisomal_reactions(gene_info, folded_protein_c: Protein):
+def get_peroxisomal_reactions(gene_info, folded_protein_c: Protein, model_metabolites):
     """All peroxisomal protein expression reactions
 
     Parameters
@@ -334,6 +334,8 @@ def get_peroxisomal_reactions(gene_info, folded_protein_c: Protein):
         GeneInformation object of associated gene
     folded_protein_c : Protein
         Folded, cytosolic protein with a final location of peroxisome
+    model_metabolites : utils.metabolites.MetaboliteBin
+        the me_input_model metabolites as specified by MetaboliteBin
     """
     pr = list()
     peroxisomal_transport, folded_protein_x = transport_peroxisome(gene_info, folded_protein_c, model_metabolites)
@@ -833,7 +835,7 @@ def get_protein_expression_reactions(gene_info, mrna_transcript_c, mrna_deg_prox
                         protein_metabolites += [folded_protein_c]
 
                     if 'x' in gene_info.all_locations:
-                        peroxisomal_reactions, folded_protein_x = get_peroxisomal_reactions(gene_info, folded_protein_c)
+                        peroxisomal_reactions, folded_protein_x = get_peroxisomal_reactions(gene_info, folded_protein_c, model_metabolites=model_metabolites)
                         for r in peroxisomal_reactions:
                             r._final_compartments.append('x')
                         protein_expression_reactions += peroxisomal_reactions
@@ -926,9 +928,10 @@ def get_protein_expression_reactions(gene_info, mrna_transcript_c, mrna_deg_prox
             if 'r' in gene_info.all_locations or 'g' in gene_info.all_locations:
                 # golgi retrograde transport for degradation or delivery to ER
                 if not ('r' in gene_info.all_locations and 'og' in gene_info.ptms):
-                    retrograde_transport, retro_protein_r = degradation.retrograde_er(modified_protein_g, modified_protein_r)
+                    retrograde_transport, retro_protein_r = degradation.retrograde_er(macromolecule=modified_protein_g, model_metabolites=model_metabolites, 
+                                                                                    retro_protein_r=modified_protein_r)
                 else:
-                    retrograde_transport, retro_protein_r = degradation.retrograde_er(modified_protein_g)
+                    retrograde_transport, retro_protein_r = degradation.retrograde_er(macromolecule=modified_protein_g, model_metabolites=model_metabolites,)
                 if 'g' in gene_info.all_locations:
                     retrograde_transport._final_compartments.append('g')
                 if 'r' in gene_info.all_locations and 'og' in gene_info.ptms:

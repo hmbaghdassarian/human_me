@@ -118,6 +118,23 @@ def load_psim(psim_file: Union[str, pd.DataFrame], **kwargs) -> pd.DataFrame:
     else:
         raise TypeError('The specified psim_file must be a path to the dataframe of the pandas DataFrame')
 
+def read_pickled_object(file_name: str):
+    """Read an object as a pickled file
+
+    Parameters
+    ----------
+    file_name : str
+        'full/path/to/file.pickle'
+    
+    Returns
+    -------
+    pickled_object
+        the pickled object
+    """
+    with open(file_name, 'rb') as handle:
+        pickled_object = pickle.load(handle)
+    return pickled_object
+
 def read_pickled_me_model(file_name: str):
     """Loads a pickled me_model. Saved from me_model.pickle
 
@@ -131,12 +148,9 @@ def read_pickled_me_model(file_name: str):
     ME_Model
         ME model object
     """
-
-    with open(file_name, 'rb') as handle:
-        me_model = pickle.load(handle)
+    me_model = read_pickled_objected(file_name)
     me_model.correct_object_tracking()  # lost in pickling/loadings
     return me_model
-
 
 def write_metabolic_model(m_model: cobra.Model, file_name: str, **kwargs) -> None: 
     """Write a metabolic model to smbl format with .xml extension
@@ -151,7 +165,6 @@ def write_metabolic_model(m_model: cobra.Model, file_name: str, **kwargs) -> Non
         additional parameters to cobra.io.write_sbml_model
     """
     cobra.io.write_sbml_model(cobra_model=m_model, filename=file_name, **kwargs)
-
 
 def write_pickled_object(object: Any, file_name: str) -> None:
     """Save an object as a pickled file
