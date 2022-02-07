@@ -83,12 +83,8 @@ class Protein(Macromolecule):
         self.dummy = dummy
         self.enzyme = False  # whether the protein is involved in catalysis of a reaction
         self.keff = None
-        self._degradation_reactions = []  # associated degradation reactions for protein monomer, if any
+        self._degradation_reactions = set() # associated degradation reactions for protein monomer, if any
         self.non_machinery = non_machinery
-
-    def _consolidate_degradation_rxns(self):
-        """Remove redundant IDs"""
-        self._degradation_reactions = list(set(self._degradation_reactions))
 
     def make_proxy(self):
         """Make a proxy metabolite for coupling enzyme degradation to reaction catalysis"""

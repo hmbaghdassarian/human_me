@@ -184,12 +184,8 @@ class Complex(Macromolecule):
                 'PTMs to Complexes is currently unaccounted for and will likely lead to imbalances in degradation reactions')
 
         self._deg_id = self.temp_id + '_COMPLEX'
-        self._degradation_reactions = []
+        self._degradation_reactions = set()
         del dc
-
-    def _consolidate_degradation_rxns(self):
-        """Remove redundant IDs"""
-        self._degradation_reactions = list(set(self._degradation_reactions))
 
     def change_compartment(self, new_compartment: str):
         """Returns a copy of the complex metabolite, but in new compartment"""
@@ -403,7 +399,7 @@ class RibosomalComplex(Complex):
                 'PTMs to Complexes is currently unaccounted for and will likely lead to imbalances in degradation reactions')
 
         self._deg_id = self.temp_id + '_COMPLEX'
-        self._degradation_reactions = []
+        self._degradation_reactions = set()
 
         del dc
 
@@ -462,6 +458,5 @@ def add_complex_metabolites(cplx: Complex, met_to_add: Dict[Macromolecule, int],
 
     if cplx._deg_initialized:
         cplx2._initialize_deg_params()
-        cplx2._degradation_reactions += cplx._degradation_reactions  # inherit degradation reactions
-        cplx2._consolidate_degradation_rxns()
+        cplx2._degradation_reactions = cplx2._degradation_reactions.union(cplx._degradation_reactions)  # inherit degradation reactions
     return cplx2

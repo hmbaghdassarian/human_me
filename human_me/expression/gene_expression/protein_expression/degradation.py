@@ -112,7 +112,7 @@ def protein_polyubiquitination(macromolecule: DegradedMacromoleculeType, model_m
     else:
         polyubiquitinate_protein.gene_reaction_rule = ' and '.join(mach.UB_ligases_c + mach.HSP70_c + mach.HSP90AB1)
 
-    polyubiquitinate_protein._update_tracking(macromolecules=[macromolecule, polyub_macromolecule])
+    polyubiquitinate_protein._update_tracking(macromolecules={macromolecule, polyub_macromolecule})
     return polyubiquitinate_protein, polyub_macromolecule
 
 
@@ -219,7 +219,7 @@ def proteasomal_degradation(macromolecule: DegradedMacromoleculeType, model_meta
     # tracking
 #     protein_degradation.sink = True
     for r in [deubiquitination, protein_degradation]:
-        r._update_tracking(macromolecules=[macromolecule, polyub_macromolecule])
+        r._update_tracking(macromolecules={macromolecule, polyub_macromolecule})
 
     return [deubiquitination, protein_degradation]
 
@@ -453,7 +453,7 @@ def unfold_secretory_protein(macromolecule: DegradedMacromoleculeType, model_met
     #         unmodified_protein_r = unfolded_protein
 
     unmodified_protein = unfolded_protein  # for adding PTMs as separate reactions in future, if want to
-    unfold_protein._update_tracking(macromolecules=[macromolecule, unfolded_protein, unmodified_protein])
+    unfold_protein._update_tracking(macromolecules={macromolecule, unfolded_protein, unmodified_protein})
 
     return unfold_protein, unmodified_protein
 
@@ -493,7 +493,7 @@ def retrograde_er(macromolecule: DegradedMacromoleculeType, model_metabolites, r
     retrograde_transport = deg_reaction_map[macromolecule.type](macromolecule._deg_id + '_COPI_RETROtr', hgnc_id=macromolecule.hgnc_id)
     retrograde_transport.add_metabolites(rxn)
     retrograde_transport.gene_reaction_rule = ' and '.join(mach.copi_m)
-    retrograde_transport._update_tracking([macromolecule, retro_protein_r])
+    retrograde_transport._update_tracking({macromolecule, retro_protein_r})
 
     return retrograde_transport, retro_protein_r
 
@@ -561,7 +561,7 @@ def build_erad_reactions(macromolecule: DegradedMacromoleculeType, model_metabol
     # protein portion hard-coded into protein_expression script, complex degradation is added through build_me
     if macromolecule.type == 'protein':
         for r in erad_reactions:
-            r._update_tracking([macromolecule, macromolecule_r, unmodified_protein_r, unfolded_protein_c])  # redundanciese dealt with in _consolidate_tracking
+            r._update_tracking({macromolecule, macromolecule_r, unmodified_protein_r, unfolded_protein_c})  # redundanciese dealt with in _consolidate_tracking
         return erad_reactions, unfolded_protein_c
     # this portion is hard-coded in protein_expression portion
     erad_reactions += degrade_cytosolic_nuclear_protein(macromolecule=unfolded_protein_c, model_metabolites=model_metabolites, ub_args = ub_args)
@@ -570,7 +570,7 @@ def build_erad_reactions(macromolecule: DegradedMacromoleculeType, model_metabol
     # else: 
     #     erad_reactions += degrade_cytosolic_nuclear_protein(macromolecule=unfolded_protein_c, model_metabolites=model_metabolites, ub_args = ub_args)
     for r in erad_reactions:
-        r._update_tracking([macromolecule, macromolecule_r, unmodified_protein_r, unfolded_protein_c])
+        r._update_tracking({macromolecule, macromolecule_r, unmodified_protein_r, unfolded_protein_c})
     return erad_reactions
 
 
@@ -624,7 +624,7 @@ def build_endocytosis_reactions(macromolecule_pm: DegradedMacromoleculeType, mod
     endocytosis.gene_reaction_rule = ' and '.join(mach.endocytic_machinery)
 
     for r in [polyubiquitinate_protein, endocytosis]:
-        r._update_tracking([macromolecule_pm, macromolecule_l, polyub_macromolecule_pm])
+        r._update_tracking({macromolecule_pm, macromolecule_l, polyub_macromolecule_pm})
     return [polyubiquitinate_protein, endocytosis], macromolecule_l
 
 
@@ -670,7 +670,7 @@ def lysosomal_degradation(macromolecule: DegradedMacromoleculeType, model_metabo
     lysosomal_degradation_rxns += [degrade_lysosomal_protein]
 
     for r in lysosomal_degradation_rxns:
-        r._update_tracking([macromolecule, unmodified_macromolecule])
+        r._update_tracking({macromolecule, unmodified_macromolecule})
 
     return lysosomal_degradation_rxns
 
@@ -717,7 +717,7 @@ def degrade_lysosomal_pm_protein(macromolecule: DegradationReactionType, model_m
         deg_reactions += endocytosis_reactions
 
     for r in deg_reactions:
-        r._update_tracking([macromolecule, macromolecule_l])  # redundanciese dealt with in _consolidate_tracking
+        r._update_tracking({macromolecule, macromolecule_l})  # redundanciese dealt with in _consolidate_tracking
     return deg_reactions
 
 
@@ -767,7 +767,6 @@ def degrade(macromolecule: DegradedMacromoleculeType, model_metabolites,  **kwar
 
     err = False
     for r in dr:
-        r._consolidate_macromolecules()
         if len(r.check_mass_balance()) > 0:
             err = True
     if err:

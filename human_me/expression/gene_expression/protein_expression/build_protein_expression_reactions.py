@@ -271,7 +271,7 @@ def get_mitochondrial_reactions(gene_info, unfolded_protein_c: Protein, compartm
             raise ValueError('Internal: Unaccounted for change in amino acid counts for: ' + processed_protein_m.id)
         mitochondrial_reactions += degradation.degrade(macromolecule=processed_protein_m, model_metabolites=model_metabolites)
         for r in mitochondrial_reactions:
-            r._final_compartments.append('m')
+            r._final_compartments.add('m')
         mitochondrial_protein_metabolites += [processed_protein_m]
     if 'i' in compartments:
         mitochondrial_inter_transport, pre_protein_i = transport_mitochondrial_inter(gene_info, processed_protein_m)
@@ -283,7 +283,7 @@ def get_mitochondrial_reactions(gene_info, unfolded_protein_c: Protein, compartm
 
         mitochondrial_reactions += [mitochondrial_inter_transport] + degradation.degrade(macromolecule=processed_protein_i, model_metabolites=model_metabolites)
         for r in mitochondrial_reactions:
-            r._final_compartments.append('i')
+            r._final_compartments.add('i')
         mitochondrial_protein_metabolites += [processed_protein_i]
 
     return mitochondrial_reactions, mitochondrial_protein_metabolites
@@ -814,21 +814,21 @@ def get_protein_expression_reactions(gene_info, mrna_transcript_c, mrna_deg_prox
     if 'Cytosolic Tranport' in gene_info.all_locations.values() or gene_info.L_protein <= params.PTT_LENGTH:
         translation_elongation_c, unfolded_protein_c = c_trln.translate_protein_cytosolic(gene_info, mrna_transcript_c, mrna_deg_proxy, 
                                                                                             modified_trna_transcript_c, charged_trna_map, model_metabolites)
-        translation_elongation_c._final_compartments += [comp for comp, v in gene_info.all_locations.items() if v == 'Cytosolic Tranport']
+        translation_elongation_c._final_compartments = translation_elongation_c._final_compartments.union({comp for comp, v in gene_info.all_locations.items() if v == 'Cytosolic Tranport'})
         protein_expression_reactions.append(translation_elongation_c)
 
         if 'Cytosolic Tranport' in gene_info.all_locations.values():
             if len({'c', 'x', 'n'}.intersection(gene_info.all_locations.keys())) > 0: 
                 protein_folding_cytosolic, folded_protein_c = fold_protein_cytosolic(gene_info, unfolded_protein_c, model_metabolites=model_metabolites)
-                protein_folding_cytosolic._final_compartments += list(set(gene_info.all_locations).intersection(['c', 'x', 'n']))
+                protein_folding_cytosolic._final_compartments = protein_folding_cytosolic._final_compartments.union(set(gene_info.all_locations).intersection({'c', 'x', 'n'}))
                 protein_expression_reactions += [protein_folding_cytosolic]
 
                 if 'c' in gene_info.all_locations or 'x' in gene_info.all_locations or ('n' in gene_info.all_locations and folded_protein_c.formula_weight / 1000 <= params.NUCLEAR_DIFFUSION_LIMIT):
                    # cytoplasmic degradation of folded proteins: cytoplasmic proteins, peroxisomal proteins, or nuclear proteins undergoing passive diffusion
                     dr = degradation.degrade(macromolecule=folded_protein_c, model_metabolites=model_metabolites, **{'ub_args': ub_args})
-                    fc = list(set(gene_info.all_locations).intersection(['c', 'x', 'n']))
+                    fc = set(gene_info.all_locations).intersection({'c', 'x', 'n'})
                     for r in dr:
-                        r._final_compartments += fc
+                        r._final_compartments  = r._final_compartments.union(fc)
                     protein_expression_reactions += dr
 
                     if 'c' in gene_info.all_locations:
@@ -837,7 +837,7 @@ def get_protein_expression_reactions(gene_info, mrna_transcript_c, mrna_deg_prox
                     if 'x' in gene_info.all_locations:
                         peroxisomal_reactions, folded_protein_x = get_peroxisomal_reactions(gene_info, folded_protein_c, model_metabolites=model_metabolites)
                         for r in peroxisomal_reactions:
-                            r._final_compartments.append('x')
+                            r._final_compartments.add('x')
                         protein_expression_reactions += peroxisomal_reactions
                         protein_metabolites += [folded_protein_x]
 
@@ -845,14 +845,14 @@ def get_protein_expression_reactions(gene_info, mrna_transcript_c, mrna_deg_prox
                     nuclear_reactions, folded_protein_n = get_nuclear_reactions(gene_info, folded_protein_c,
                                                                                 ub_args=ub_args, model_metabolites=model_metabolites)
                     for r in nuclear_reactions:
-                        r._final_compartments.append('n')
+                        r._final_compartments.add('n')
                     protein_expression_reactions += nuclear_reactions
                     protein_metabolites += [folded_protein_n]
 
             if 'i' in gene_info.all_locations:  # no folding for i, but cytoplasmic degradation
                 dr = degradation.degrade(macromolecule=unfolded_protein_c, model_metabolites=model_metabolites, **{ 'ub_args': ub_args})
                 for r in dr:
-                    r._final_compartments.append('i')
+                    r._final_compartments.add('i')
                 protein_expression_reactions += dr
             # mitochondrial transport and degradation ('i' and 'm')
             if ('m' in gene_info.all_locations) or ('i' in gene_info.all_locations):
@@ -874,24 +874,24 @@ def get_protein_expression_reactions(gene_info, mrna_transcript_c, mrna_deg_prox
         # ptt_ variable is for ERAD reactions, on the off chance that the protein length was <= 160+22
         # residues before signal peptide degradation occured since we update gene_info object during cotranslation
         # to be the new protein length after degradation of 22 residues
-        fc = [comp for comp, v in gene_info.all_locations.items() if v == 'Canonical Secretion']
+        fc = {comp for comp, v in gene_info.all_locations.items() if v == 'Canonical Secretion'}
         if not ptt_:  # co translational translocation
             ctt_reactions, folded_protein_r, gene_info = co_translational_translocation(gene_info, mrna_transcript_c, mrna_deg_proxy, 
                                                                                         modified_trna_transcript_c, charged_trna_map, model_metabolites=model_metabolites)
             for r in ctt_reactions:
-                r._final_compartments += fc
+                r._final_compartments  = r._final_compartments.union(fc)
             protein_expression_reactions += ctt_reactions
         else:  # post translational translocation
             ptt_reactions, folded_protein_r = post_translational_translocation(gene_info, unfolded_protein_c, model_metabolites=model_metabolites)
             for r in ptt_reactions:
-                r._final_compartments += fc
+                r._final_compartments  = r._final_compartments.union(fc)
             protein_expression_reactions += ptt_reactions
 
         # er ptms
         if 'dsb' in gene_info.ptms or 'gpi' in gene_info.ptms or 'ng' in gene_info.ptms:
             modification_er_reactions, modified_protein_r = modify_protein_er(gene_info, folded_protein_r, model_metabolites=model_metabolites)
             for r in modification_er_reactions:
-                r._final_compartments += fc
+                r._final_compartments  = r._final_compartments.union(fc)
             protein_expression_reactions += modification_er_reactions
         else:
             modified_protein_r = folded_protein_r
@@ -910,7 +910,7 @@ def get_protein_expression_reactions(gene_info, mrna_transcript_c, mrna_deg_prox
             if 'og' in gene_info.ptms.keys():
                 modification_golgi_reactions, modified_protein_g = modify_protein_golgi(gene_info, protein_g, model_metabolites)
                 for r in modification_golgi_reactions:
-                    r._final_compartments += fc
+                    r._final_compartments  = r._final_compartments.union(fc)
                 protein_expression_reactions += modification_golgi_reactions
             else:
                 modified_protein_g = protein_g
@@ -918,9 +918,9 @@ def get_protein_expression_reactions(gene_info, mrna_transcript_c, mrna_deg_prox
             # transport to plasma membrane, ECM, and lysosome
             if len(set(['pm', 'e', 'l']).intersection(gene_info.all_locations.keys())) > 0:  # or lysosomal_degradation_ptm_condition:
                 secreted_protein_reactions, secreted_proteins = secrete_protein(gene_info, modified_protein_g, model_metabolites)
-                fc = list(set(gene_info.all_locations).intersection(['pm', 'e', 'l']))
+                fc = set(gene_info.all_locations).intersection({'pm', 'e', 'l'})
                 for r in secreted_protein_reactions:
-                    r._final_compartments += fc
+                    r._final_compartments  = r._final_compartments.union(fc)
                 protein_expression_reactions += secreted_protein_reactions
                 protein_metabolites += secreted_proteins
 
@@ -933,9 +933,9 @@ def get_protein_expression_reactions(gene_info, mrna_transcript_c, mrna_deg_prox
                 else:
                     retrograde_transport, retro_protein_r = degradation.retrograde_er(macromolecule=modified_protein_g, model_metabolites=model_metabolites,)
                 if 'g' in gene_info.all_locations:
-                    retrograde_transport._final_compartments.append('g')
+                    retrograde_transport._final_compartments.add('g')
                 if 'r' in gene_info.all_locations and 'og' in gene_info.ptms:
-                    retrograde_transport._final_compartments.append('r')
+                    retrograde_transport._final_compartments.add('r')
                 protein_expression_reactions += [retrograde_transport]
                 if 'g' in gene_info.all_locations:
                     protein_metabolites += [modified_protein_g]
@@ -948,23 +948,23 @@ def get_protein_expression_reactions(gene_info, mrna_transcript_c, mrna_deg_prox
             if 'r' in gene_info.all_locations:
                 protein_metabolites += [retro_protein_r]
             rpdr = list()
-            fc = list(set(gene_info.all_locations).intersection(['r', 'g']))
+            fc = set(gene_info.all_locations).intersection({'r', 'g'})
             if ptt_:
                 erad_reactions, unfolded_protein_c = degradation.degrade(macromolecule=retro_protein_r, model_metabolites=model_metabolites,
                                                                          **{'unfolded_protein_c': unfolded_protein_c})
                 for r in erad_reactions:
-                    r._final_compartments += fc
+                    r._final_compartments  = r._final_compartments.union(fc)
                 rpdr += erad_reactions
                 if 'i' not in gene_info.all_locations:  # this reaction doesn't already exist
                     dr = degradation.degrade(unfolded_protein_c, model_metabolites=model_metabolites, **{'ub_args': ub_args})
                     for r in dr:
-                        r._final_compartments += fc
+                        r._final_compartments  = r._final_compartments.union(fc)
                     rpdr += dr
             else:
                 erad_reactions, unfolded_protein_c = degradation.degrade(macromolecule=retro_protein_r,model_metabolites=model_metabolites,
                                                                          **{'unfolded_protein_c': None})
                 for r in erad_reactions:
-                    r._final_compartments += fc
+                    r._final_compartments  = r._final_compartments.union(fc)
                 rpdr += erad_reactions
                 # since metabolite id is different for unfolded_protein_c (see erad) and proteasomal degradation
                 # reactions use metabolite id rather than gene_info.hgnc_id,
@@ -974,13 +974,12 @@ def get_protein_expression_reactions(gene_info, mrna_transcript_c, mrna_deg_prox
                 # signal peptide degradation reaction
                 dr = degradation.degrade(macromolecule=unfolded_protein_c, model_metabolites=model_metabolites, **{'ub_args': ub_args})
                 for r in dr:
-                    r._final_compartments += fc
+                    r._final_compartments  = r._final_compartments.union(fc)
                 rpdr += dr
                 for r in rpdr:
                     if 'g' in gene_info.all_locations:
                         r._update_tracking(modified_protein_g)  # not explicitly accounted for for protein monomers
-                    r._update_tracking([retro_protein_r, unfolded_protein_c])
-                    r._consolidate_macromolecules()
+                    r._update_tracking({retro_protein_r, unfolded_protein_c})
 
             protein_expression_reactions += rpdr
 
@@ -999,21 +998,20 @@ def get_protein_expression_reactions(gene_info, mrna_transcript_c, mrna_deg_prox
                 endocytosis_reactions, protein_l = degradation.build_endocytosis_reactions(macromolecule_pm=protein_pm, model_metabolites=model_metabolites,
                                                                                            **{'ub_args': ub_args, 'macromolecule_l': protein_l})
                 for r in endocytosis_reactions:
-                    r._final_compartments.append('pm')
+                    r._final_compartments.add('pm')
 
                 ppdr += endocytosis_reactions
 
             # lysosomal degradation
-            fc = list(set(gene_info.all_locations).intersection(['l', 'pm']))
+            fc = set(gene_info.all_locations).intersection({'l', 'pm'})
             dr = degradation.degrade(macromolecule=protein_l, model_metabolites=model_metabolites)
             for r in dr:
-                r._final_compartments += fc
+                r._final_compartments  = r._final_compartments.union(fc)
             ppdr += dr
 
             if 'pm' in gene_info.all_locations:
                 for r in ppdr:
                     r._update_tracking(protein_pm)  # not explicitly accounted for for protein monomers
-                    r._consolidate_macromolecules()
 
             protein_expression_reactions += ppdr
 
@@ -1023,7 +1021,6 @@ def get_protein_expression_reactions(gene_info, mrna_transcript_c, mrna_deg_prox
     for r in protein_expression_reactions:
         if r.subsystem != 'Protein_Degradation':
             r.subsystem = 'Protein_Expression'
-        r._final_compartments = list(set(r._final_compartments))
 
     for m in protein_metabolites:
         if m.compartment not in gene_info.machinery_locations:

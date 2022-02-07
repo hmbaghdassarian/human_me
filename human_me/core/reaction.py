@@ -401,7 +401,7 @@ class ProteinExpressionReaction(ExpressionReaction):
         self.translation = translation
 
         # self is needed for expressing the associated protein metabolites in the these compartments:
-        self._final_compartments = list()
+        self._final_compartments = set()
 
 
 class ProteinDegradationReaction(ExpressionReaction):
@@ -412,10 +412,10 @@ class ProteinDegradationReaction(ExpressionReaction):
         """
         super().__init__(id=id, subsystem='Protein_Degradation', sink=sink, sink_type=sink_type,
                          name=name, lower_bound=lower_bound, upper_bound=upper_bound, hgnc_id=hgnc_id)
-        self._macromolecules = []  # list of macromolecule ids associated with this degradation reaction
-        self._enzymes = None  # list of enzyme ids associated with this degradation reaction
+        self._macromolecules = set()  # set of macromolecule ids associated with this degradation reaction
+        self._enzymes = set()  # set of enzyme ids associated with this degradation reaction
         self._ribosomal_degradation = False  # see complex_degradation_reaction for details
-        self._final_compartments = list()  # self is needed for expressing the associated protein metabolites in the these compartments:
+        self._final_compartments = set()
 
     def copy(self):
         """Also couple ._macromolecules"""
@@ -429,7 +429,7 @@ class ProteinDegradationReaction(ExpressionReaction):
             stored_attrs[ak] = self.__dict__[ak]
             self.__dict__[ak] = dict()
         rxn_macromolecules = self._macromolecules
-        self._macromolecules = []
+        self._macromolecules = set()
 
         new_rxn = copy.deepcopy(self)
        
@@ -438,7 +438,7 @@ class ProteinDegradationReaction(ExpressionReaction):
             new_rxn.__dict__[ak] = {k:v for k,v in av.items()} # different pointer to bin (dictionary) but not elements in bin for updating of metabolite objecs
         
         self._macromolecules = rxn_macromolecules
-        new_rxn._macromolecules = [mac for mac in rxn_macromolecules]
+        new_rxn._macromolecules = {mac for mac in rxn_macromolecules}
 
         return new_rxn
 
@@ -447,26 +447,16 @@ class ProteinDegradationReaction(ExpressionReaction):
 
         Parameters
         ----------
-        macromolecules : Union[Macromolecule, List[Macromolecule]]
+        macromolecules : Union[Macromolecule, Set[Macromolecule]]
             marcomolecule to be tracked
         """
-        if type(macromolecules) != list:
-            macromolecules._degradation_reactions.append(self.id)
-            self._macromolecules.append(macromolecules)
-        else:
-            for macromolecule in macromolecules:
-                macromolecule._degradation_reactions.append(self.id)
-                self._macromolecules.append(macromolecule)
-
-    def _consolidate_macromolecules(self):
-        """Remove redundant macromolecules"""
-        for m in self._macromolecules:
-            m._consolidate_degradation_rxns()
-        self._macromolecules = list(set(self._macromolecules))
+        for macromolecule in set(macromolecules):
+            macromolecule._degradation_reactions.add(self.id)
+        self._macromolecules.union(macromolecules)
 
     def _update_enzymes(self):
         """Update enzymes list to include macromolecules that are classified as enzymes"""
-        self._enzymes = [m for m in self._macromolecules if m.enzyme]
+        self._enzymes = {m for m in self._macromolecules if m.enzyme}
         for m in self._enzymes:
             if self.id not in m._degradation_reactions:
                 raise ValueError('Improper tracking of degradation reactions and associated macromolecules')
@@ -487,8 +477,8 @@ class ComplexDegradationReaction(ExpressionReaction):
         """
         super().__init__(id=id, subsystem='Complex_Degradation', sink=sink, sink_type=sink_type,
                          name=name, lower_bound=lower_bound, upper_bound=upper_bound)
-        self._macromolecules = []  # list of macromolecule ids associated with this degradation reaction
-        self._enzymes = None  # list of enzyme ids associated with this degradation reaction
+        self._macromolecules = set()  # set of macromolecule ids associated with this degradation reaction
+        self._enzymes = set()  # set of enzyme ids associated with this degradation reaction
         self._ribosomal_degradation = False
 
         def copy(self):
@@ -516,24 +506,20 @@ class ComplexDegradationReaction(ExpressionReaction):
             return new_rxn
 
     def _update_tracking(self, macromolecules):
-        """Mutual tracking of degradation reactions associated with a macromolecule and vice-versa"""
-        if type(macromolecules) != list:
-            macromolecules._degradation_reactions.append(self.id)
-            self._macromolecules.append(macromolecules)
-        else:
-            for macromolecule in macromolecules:
-                macromolecule._degradation_reactions.append(self.id)
-                self._macromolecules.append(macromolecule)
+        """Mutual tracking of degradation reactions associated with a macromolecule and vice-versa.
 
-    def _consolidate_macromolecules(self):
-        """Remove redundant macromolecules"""
-        for m in self._macromolecules:
-            m._consolidate_degradation_rxns()
-        self._macromolecules = list(set(self._macromolecules))
+        Parameters
+        ----------
+        macromolecules : Union[Macromolecule, Set[Macromolecule]]
+            marcomolecule to be tracked
+        """
+        for macromolecule in set(macromolecules):
+            macromolecule._degradation_reactions.add(self.id)
+        self._macromolecules.union(macromolecules)
 
     def _update_enzymes(self):
         """Update enzymes list to include macromolecules that are classified as enzymes"""
-        self._enzymes = [m for m in self._macromolecules if m.enzyme]
+        self._enzymes = {m for m in self._macromolecules if m.enzyme}
         for m in self._enzymes:
             if self.id not in m._degradation_reactions:
                 raise ValueError('Improper tracking of degradation reactions and associated macromolecules')
