@@ -43,9 +43,9 @@ class Complex(Macromolecule):
 
         self.components = {m: metabolites.count(m) for m in metabolites}
         # parse compartment
-        compartments = list(set([m.compartment for m in self.components]))
+        compartments = {m.compartment for m in self.components}
         if len(compartments) == 1:
-            compartment = compartments[0]
+            compartment = list(compartments)[0]
         else:
             raise ValueError('Metabolites forming a complex must all be in the same compartment')
 

@@ -2,6 +2,7 @@
 # coding: utf-8
 import copy
 from collections import defaultdict
+from collections.abc import Iterable
 from operator import attrgetter
 from typing import Dict, List, Optional, SupportsFloat, Union
 
@@ -215,7 +216,11 @@ class ME_Reaction(cobra.Reaction):
         if not mu_val > 0:
             raise ValueError('Mu must be > 0')
 
-        new_rxn = self.metabolites.copy()
+        if inplace:
+            new_rxn = {k:v for k,v in self.metabolites.items()}
+        else:
+            new_rxn = self.metabolites.copy()
+        
         for met, coeff in self.metabolites.items():
             if isinstance(coeff, sympy.Expr):
                 new_rxn[met] = float(coeff.subs(params.mu, mu_val))
@@ -450,9 +455,13 @@ class ProteinDegradationReaction(ExpressionReaction):
         macromolecules : Union[Macromolecule, Set[Macromolecule]]
             marcomolecule to be tracked
         """
-        for macromolecule in set(macromolecules):
+        if not isinstance(macromolecules, Iterable):
+            macromolecules = {macromolecules}
+
+        for macromolecule in macromolecules:
             macromolecule._degradation_reactions.add(self.id)
-        self._macromolecules.union(macromolecules)
+
+        self._macromolecules = self._macromolecules.union(macromolecules)
 
     def _update_enzymes(self):
         """Update enzymes list to include macromolecules that are classified as enzymes"""
@@ -513,9 +522,13 @@ class ComplexDegradationReaction(ExpressionReaction):
         macromolecules : Union[Macromolecule, Set[Macromolecule]]
             marcomolecule to be tracked
         """
-        for macromolecule in set(macromolecules):
+        if not isinstance(macromolecules, Iterable):
+            macromolecules = {macromolecules}
+
+        for macromolecule in macromolecules:
             macromolecule._degradation_reactions.add(self.id)
-        self._macromolecules.union(macromolecules)
+
+        self._macromolecules = self._macromolecules.union(macromolecules)
 
     def _update_enzymes(self):
         """Update enzymes list to include macromolecules that are classified as enzymes"""
@@ -622,6 +635,7 @@ class BiomassReaction(cobra.Reaction):
         _ub : bool, optional
             internal use, whether to use cobra.Reaction._upper_bound or cobra.Reaction.upper_bound, by default True
         """
+
         if _ub:
             lb, ub = copy.copy(self._lower_bound), copy.copy(self._upper_bound)
         else:

@@ -903,7 +903,7 @@ def get_protein_expression_reactions(gene_info, mrna_transcript_c, mrna_deg_prox
 #         lysosomal_degradation_ptm_condition = 'gpi' in gene_info.ptms.keys() and len(gene_info.ptms.keys()) == 1
         if len(set(['g', 'pm', 'e', 'l']).intersection(gene_info.all_locations.keys())) > 0 or 'og' in gene_info.ptms:  # or lysosomal_degradation_ptm_condition:
             golgi_import, protein_g = import_golgi(gene_info, modified_protein_r, model_metabolites)
-            golgi_import._final_compartments += fc
+            golgi_import._final_compartments = golgi_import._final_compartments.union(fc)
             protein_expression_reactions += [golgi_import]
 
             # golgi ptms

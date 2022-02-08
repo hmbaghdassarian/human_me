@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-import copy
 import gc
 import os
 import random
@@ -413,7 +412,7 @@ class MEBuilder:
                 self.me_reactions += expr_reactions
 
             # get protein expression reactions for all expression module reactions
-            expression_machinery_me = copy.deepcopy(expression_machinery_me_2)
+            expression_machinery_me = expression_machinery_me_2
             gene_reaction_map_2, expression_machinery_me_2 = get_expression_machinery(self.me_reactions)
             new_expression_machinery = list(
                 set(expression_machinery_me_2).difference(expression_machinery_me + self.knock_out))
@@ -1095,7 +1094,7 @@ class MEBuilder:
                                'POLYUBIQUITIN_MOIETY_EXPORTtn', 'COMPLEX_FORMATION']
             for r in enzymeless_reactions:
                 for expr_rid in expression_rids:
-                    if r.id.__contains__(expr_rid):
+                    if expr_rid in r.id:
                         self.orphan.append(r)
                         break
 
@@ -1281,14 +1280,13 @@ class MEBuilder:
         for r in self.final_reactions:
             biomass.add_biomass_change(r)
 
-        br = [r.copy() for r in self.biomass_reactions]
         #         br.append(self.pb_reaction)
         if self.dummy_protein is not None:
-            br.append(biomass.upb_reaction.copy())
+            self.biomass_reactions.append(biomass.upb_reaction)
 
         if len([r for r in self.final_reactions if not isinstance(r, core.reaction.ME_Reaction)]) > 0:
             raise ValueError('Internal: Reactions not of type ME_Reaction are included in the model')
-        self.final_reactions += br
+        self.final_reactions += self.biomass_reactions
 
         print('Generate ME-Model')
         me_model = ME_Model(m_model=self.m_model, id_or_model=self.model_id, n_cores=self.n_cores,
