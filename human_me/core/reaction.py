@@ -23,7 +23,7 @@ class ME_Reaction(cobra.Reaction):
         have mu in stochiometric coefficient."""
 
         super().__init__(id, name, subsystem, lower_bound, upper_bound)
-        self.coupled_metabolites = dict()
+        self.coupled_metabolites = {}
         self._protein_deg_proxy = False
     
     def copy(self):
@@ -32,6 +32,9 @@ class ME_Reaction(cobra.Reaction):
         # attributes to avoid deepcopying (for comp time/pointer issues), by default ['_metabolites', 'coupled_metabolites']
         # will create a new version of the bin (e.g., list or dict) but not the elements in the bin
 
+        # this is necessary because of any attributes/iterables themselves containing .metabolite_bin
+        # can write more generically to check if an attibute has .metabolite_bin as an attribute, and avoid deepcopying it 
+        
         # doesn't copy attributes in attr_keep to avoid compute time issues and allows elements contained within those attributes to point to the same metabolite object
         stored_attrs = {}
         for ak in attr_keep:
@@ -44,7 +47,10 @@ class ME_Reaction(cobra.Reaction):
        
         for ak, av in stored_attrs.items():
             self.__dict__[ak] = av
-            new_rxn.__dict__[ak] = {k:v for k,v in av.items()} # different pointer to bin (dictionary) but not elements in bin for updating of metabolite objecs
+             
+             # different pointer to bin (dictionary) but not elements in bin for updating of metabolite objecs
+             # note even though dict().copy() does the same thing as line below, it is much slower for some reason
+            new_rxn.__dict__[ak] = {k:v for k,v in av.items()}
 
         return new_rxn
 
@@ -424,7 +430,7 @@ class ProteinDegradationReaction(ExpressionReaction):
 
     def copy(self):
         """Also couple ._macromolecules"""
-        attr_keep = ['_metabolites', 'coupled_metabolites'] # in the future, this can be a parameter (will have to check type - list or dict)
+        attr_keep = ['_metabolites', 'coupled_metabolites'] #_macromolecules # in the future, this can be a parameter (will have to check type - list or dict)
         # attributes to avoid deepcopying (for comp time/pointer issues), by default ['_metabolites', 'coupled_metabolites']
         # will create a new version of the bin (e.g., list or dict) but not the elements in the bin
 
@@ -434,7 +440,7 @@ class ProteinDegradationReaction(ExpressionReaction):
             stored_attrs[ak] = self.__dict__[ak]
             self.__dict__[ak] = dict()
         rxn_macromolecules = self._macromolecules
-        self._macromolecules = set()
+        self._macromolecules = []
 
         new_rxn = copy.deepcopy(self)
        
@@ -443,7 +449,7 @@ class ProteinDegradationReaction(ExpressionReaction):
             new_rxn.__dict__[ak] = {k:v for k,v in av.items()} # different pointer to bin (dictionary) but not elements in bin for updating of metabolite objecs
         
         self._macromolecules = rxn_macromolecules
-        new_rxn._macromolecules = {mac for mac in rxn_macromolecules}
+        new_rxn._macromolecules = [mac for mac in rxn_macromolecules]
 
         return new_rxn
 
@@ -492,7 +498,7 @@ class ComplexDegradationReaction(ExpressionReaction):
 
         def copy(self):
             """Also couple ._macromolecules"""
-            attr_keep = ['_metabolites', 'coupled_metabolites'] # in the future, this can be a parameter (will have to check type - list or dict)
+            attr_keep = ['_metabolites', 'coupled_metabolites'] #_macromolecules #in the future, this can be a parameter (will have to check type - list or dict)
             # attributes to avoid deepcopying (for comp time/pointer issues), by default ['_metabolites', 'coupled_metabolites']
             # will create a new version of the bin (e.g., list or dict) but not the elements in the bin
 

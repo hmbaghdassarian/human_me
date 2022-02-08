@@ -52,8 +52,7 @@ class ExpressMrna:
 
         transcript_processing = ExpressionReaction(self.gene_info.hgnc_id + '_TRANSCRIPTION_PROCESSING',
                                                    subsystem='mRNA_expression', hgnc_id=self.gene_info.hgnc_id)
-        rxn = dict()
-
+        rxn = {}
         rxn[self.model_metabolites.atp_n], rxn[self.model_metabolites.ppi_n] = -self.polyA_length, self.polyA_length  # polyA tail
 
         # 5' cap: https://sites.google.com/site/learnorganicchem/organic-molecules/biomolecules/rna/rna-processing?tmpl=%2Fsystem%2Fapp%2Ftemplates%2Fprint%2F&showPrintDialog=1
@@ -161,9 +160,8 @@ class ExpressMrna:
             whether the 5' to 3' (False) or 3' to 5' (True) mRNA degradation pathway is used, by default False
         """
 
-        rxn = self.mrna_c.exonucleolytic_degradation(reaction_name='', balanced=False)
-        rxn = rxn.metabolites.copy()
-        del rxn[[m for m in rxn.keys() if m.id == self.model_metabolites.ntp_map_c[self.gene_info.mrna_seq[0]].id][0]]
+        rxn = self.mrna_c.exonucleolytic_degradation(reaction_name='', balanced=False).metabolites
+        del rxn[self.model_metabolites.ntp_map_c[self.gene_info.mrna_seq[0]]] 
 
         # no m7g metabolite in recon2.2, so just reverse the methylation instead
         rxn[self.model_metabolites.amet_c], rxn[self.model_metabolites.ahcys_c] = 2, -2  # reverse methyltransferase - cap0 and cap1 structure
@@ -172,21 +170,16 @@ class ExpressMrna:
         self.mrna_deg_proxy = self.mrna_c.make_proxy()
         rxn[self.mrna_deg_proxy] = 1
 
-        h2o_c = [m for m in rxn.keys() if m.id == 'h2o_c'][0]  # won't load directly from metab for some reason
-        h_c = [m for m in rxn.keys() if m.id == 'h_c'][0]
-
         if three_to_five:
             transcript_degradation_1 = ExpressionReaction(self.gene_info.hgnc_id + "_3'to5'_mRNA_DEGRADATIONc",
-                                                          subsystem='mRNA_expression', hgnc_id=self.gene_info.hgnc_id,
-                                                          sink=True, sink_type='mRNA')
+                                                            subsystem='mRNA_expression', hgnc_id=self.gene_info.hgnc_id,
+                                                            sink=True, sink_type='mRNA')
             rxn_1 = rxn.copy()
-
             rxn_1[self.model_metabolites.ndp_map_c[self.gene_info.mrna_seq[0]]] = 1
 
-            gmp_c = [m for m in rxn.keys() if m.id == 'gmp_c'][0]
-            rxn_1[h2o_c] -= 1
-            rxn_1[h_c] += 1
-            rxn_1[gmp_c] += 1
+            rxn_1[self.model_metabolites.h2o_c] -= 1
+            rxn_1[self.model_metabolites.h_c] += 1
+            rxn_1[self.model_metabolites.gmp_c] += 1
             transcript_degradation_1.add_metabolites(rxn_1)
             transcript_degradation_1.gene_reaction_rule = mach.degradation_rule1
 
@@ -203,11 +196,11 @@ class ExpressMrna:
                 sink=True, sink_type='mRNA')
 
             rxn_2 = rxn.copy()
-            rxn_2[[m for m in rxn_2.keys() if m.id == self.model_metabolites.nmp_map_c[self.gene_info.mrna_seq[0]].id][0]] += 1
+            rxn_2[self.model_metabolites.nmp_map_c[self.gene_info.mrna_seq[0]]] += 1
             # 5' cap - from 5'-->3' direction (DCP1/DCP2 - NUDIX mechanism)
-            rxn_2[h2o_c] -= 1
-            rxn_2[h_c] += 1
-            rxn_2[self.model_metabolites.ndp_map_c['G']] = 1
+            rxn_2[self.model_metabolites.h2o_c] -= 1
+            rxn_2[self.model_metabolites.h_c] += 1
+            rxn_2[self.model_metabolites.gdp_c] = 1
 
             transcript_degradation_2_decapping.add_metabolites(rxn_2)
             transcript_degradation_2_decapping.gene_reaction_rule = mach.decapping_rule

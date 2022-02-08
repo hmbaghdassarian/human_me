@@ -552,7 +552,7 @@ class MEBuilder:
         self.additional_ko = list()
 
         counter = 0
-        for i in unique_complexes.index:
+        for i in tqdm(unique_complexes.index):
             ko = unique_complexes.loc[i, 'knock_out']
             if ko:
                 # get the  genes that are only expressed to participate as part of a complex that is knocked out

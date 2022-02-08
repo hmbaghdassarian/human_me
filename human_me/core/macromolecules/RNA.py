@@ -137,7 +137,7 @@ class RNA(Macromolecule):
                                              subsystem=subsystem_map[_type], hgnc_id=self.hgnc_id,
                                              ribosome_biogenesis=rb_map[_type])
 
-        rxn = dict()
+        rxn = {}
         rxn[self.model_metabolites.h2o_compartments[self.compartment]] = -self.length + 1  # -sum(self.base_counts.values()) + 1
         rxn[self] = -1
         for k, v in self.model_metabolites.nmp_map[self.compartment].items():
