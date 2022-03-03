@@ -829,7 +829,8 @@ class MEBuilder:
 
         for i in tqdm(self.complex_df[self.complex_df.category == 'metabolic_reaction'].index):
             reaction_id = self.complex_df.loc[i, 'reaction_id']  # original reaction id
-            r = to_metabolic_reaction(reaction=self.m_model.reactions.get_by_id(reaction_id))
+            r = to_metabolic_reaction(model_metabolites=self.model_metabolites, 
+                                    reaction=self.m_model.reactions.get_by_id(reaction_id))
 
             ko = self.complex_df.loc[i, 'knock_out']
             if not ko:
@@ -843,12 +844,13 @@ class MEBuilder:
                     # if including PTMs in machinery in future, ER enzymes with OG PTM will have synthesis
                     # reaction be "COPI_RETROtr", which is a protein degradation reaction
 
-                    srs = [sr for sr in list(enzyme_to_couple.reactions) if
-                           enzyme_to_couple in sr.products and not isinstance(sr, ProteinDegradationReaction)]
-                    if len(srs) != 1:
-                        raise ValueError(
-                            enzyme_to_couple.id + ' has an incorrect number of associated synthesis reactions')
-                    srs[0].synthesis, srs[0].synthesis_type = True, 'protein'
+                    sr_tracker = set()
+                    for sr in list(enzyme_to_couple.reactions):
+                        if enzyme_to_couple in sr.products and not isinstance(sr, ProteinDegradationReaction):
+                            sr.synthesis, sr.synthesis_type = True, 'protein'
+                            sr_tracker.add(sr.id)
+                    if len(sr_tracker) != 1:
+                        raise ValueError(enzyme_to_couple.id + ' has an incorrect number of associated synthesis reactions')
                 else:
                     enzyme_to_couple = self.complex_id_metabolite_map[self.complex_df.loc[i, 'complex_id']]
                     enzyme_to_couple.get_k_deg()
@@ -907,7 +909,7 @@ class MEBuilder:
         if sorted(metabolic_reactions) != sorted([r.id for r in self.m_model.reactions if len(r.genes) == 0]):
             raise ValueError('Not all metabolic reactions that require machinery have been accounted for')
         if self.dummy_protein is None:
-            self.orphan = [to_metabolic_reaction(r) for r in self.m_model.reactions if len(r.genes) == 0]
+            self.orphan = [to_metabolic_reaction(model_metabolites=self.model_metabolites, reaction=r) for r in self.m_model.reactions if len(r.genes) == 0]
             final_reactions += self.orphan
             self.deorphaned = list()
         self.final_reactions = final_reactions
@@ -944,12 +946,14 @@ class MEBuilder:
                     enzyme_to_couple = self.id_protein_map[self.complex_df.loc[i, 'machinery']][
                         self.complex_df.loc[i, 'compartment']]
                     # back track assign synthesis attribute to monomeric enzymes
-                    srs = [sr for sr in list(enzyme_to_couple.reactions) if
-                           enzyme_to_couple in sr.products and not isinstance(sr, ProteinDegradationReaction)]
-                    if len(srs) != 1:
-                        raise ValueError(
-                            enzyme_to_couple.id + ' has an incorrect number of associated synthesis reactions')
-                    srs[0].synthesis, srs[0].synthesis_type = True, 'protein'
+
+                    sr_tracker = set()
+                    for sr in list(enzyme_to_couple.reactions):
+                        if enzyme_to_couple in sr.products and not isinstance(sr, ProteinDegradationReaction):
+                            sr.synthesis, sr.synthesis_type = True, 'protein'
+                            sr_tracker.add(sr.id)
+                    if len(sr_tracker) != 1:
+                        raise ValueError(enzyme_to_couple.id + ' has an incorrect number of associated synthesis reactions')
                 else:
                     enzyme_to_couple = self.complex_id_metabolite_map[self.complex_df.loc[i, 'complex_id']]
                     enzyme_to_couple.get_k_deg()
@@ -979,7 +983,6 @@ class MEBuilder:
                     reactions = [r]
                 else:  # add a forward and reverse reaction for reversible reactions
                     r_f, r_r = r.copy(), r.copy()
-                    #                     r_f._metabolites, r_r._metabolites = rxn.metabolites, rxn.metabolites
                     r_f.lower_bound, r_r.lower_bound, r_r.upper_bound = 0, 0, abs(r.lower_bound)
                     r_r.add_metabolites({metab: -coeff for metab, coeff in r_r.metabolites.items()}, combine=False)
 
@@ -1045,7 +1048,7 @@ class MEBuilder:
 
         if self.dummy_protein is not None:
             print('Deorphan enzymeless reactions')
-            enzymeless_reactions = [to_metabolic_reaction(r) for r in self.m_model.reactions if len(r.genes) == 0]
+            enzymeless_reactions = [to_metabolic_reaction(model_metabolites=self.model_metabolites, reaction=r) for r in self.m_model.reactions if len(r.genes) == 0]
             enzymeless_reactions_map = {r.cobra_id: r for r in enzymeless_reactions}
             enzymeless_reactions += [r for r in self.me_reactions if
                                      len(r.genes) == 0] + self.complex_formation_reactions
@@ -1297,6 +1300,7 @@ class MEBuilder:
         # running .add_metabolic_reactions() code outside of ME_Builder object doesn't create disagreement
         # between r.metabolites and r.coupled_metabolites, but running the method on the object does
         me_model.add_reactions(self.final_reactions)
+        # TODO: incorporate the following two lines into ME_Model class instead
         me_model.reaction_types['orphan'] = self.orphan
         me_model.reaction_types['deorphaned'] = self.deorphaned
 

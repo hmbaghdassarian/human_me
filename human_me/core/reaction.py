@@ -27,30 +27,34 @@ class ME_Reaction(cobra.Reaction):
         self._protein_deg_proxy = False
     
     def copy(self):
-        """Overwrite cobra.Species.copy."""
-        attr_keep = ['_metabolites', 'coupled_metabolites'] # in the future, this can be a parameter (will have to check type - list or dict)
-        # attributes to avoid deepcopying (for comp time/pointer issues), by default ['_metabolites', 'coupled_metabolites']
-        # will create a new version of the bin (e.g., list or dict) but not the elements in the bin
+        """Overwrite cobra.Species copy method.
+        Returns
+        -------
+        new_rxn : ME_Reaction
+            a copy of the reaction
+        """
 
-        # this is necessary because of any attributes/iterables themselves containing .metabolite_bin
-        # can write more generically to check if an attibute has .metabolite_bin as an attribute, and avoid deepcopying it 
-        
-        # doesn't copy attributes in attr_keep to avoid compute time issues and allows elements contained within those attributes to point to the same metabolite object
+        # avoid deeopcopying some attributes for:
+        # 1) compute time
+        # 2) maintaining pointers (same metabolites in the new reaction)
+
+        # additionally, make sure metabolites add the new copied reaction to their attributes (mutual tracking)
+        attr_keep = ['_metabolites', 'coupled_metabolites'] # in the future, this can be a parameter (will have to check type - list or dict)
         stored_attrs = {}
         for ak in attr_keep:
             stored_attrs[ak] = self.__dict__[ak]
             self.__dict__[ak] = dict()
-        # rxn_metabolites = self._metabolites
-        # self._metabolites = dict()
 
         new_rxn = copy.deepcopy(self)
-       
+        metabolites = set()
         for ak, av in stored_attrs.items():
             self.__dict__[ak] = av
-             
-             # different pointer to bin (dictionary) but not elements in bin for updating of metabolite objecs
-             # note even though dict().copy() does the same thing as line below, it is much slower for some reason
-            new_rxn.__dict__[ak] = {k:v for k,v in av.items()}
+            new_rxn.__dict__[ak] = {k:v for k,v in av.items()} # pointer: same objects, different bin
+            metabolites = metabolites.union(av.keys())
+        
+        # mutual tracking
+        for metabolite in metabolites: 
+            metabolite._reaction.add(new_rxn)
 
         return new_rxn
 
@@ -77,26 +81,10 @@ class ME_Reaction(cobra.Reaction):
             self._metabolites[metabolite] = self._metabolites.pop(mmap[metabolite.id])
             metabolite._reaction.add(self)
 
-        # maintain the coupling attributes
-        #         if mmap[metabolite.id].coupling_coefficient is None:
-        #             mmap[metabolite.id].coupling_coefficient = metabolite.coupling_coefficient
-        #         else:
-        #             for type,coeff in metabolite.coupling_coefficient.items():
-        #                 if type not in mmap[metabolite.id].coupling_coefficient:
-        #                     mmap[metabolite.id].coupling_coefficient[type] = coeff
-        #                 elif  mmap[metabolite.id].coupling_coefficient[type] != coeff:
-        #                     raise ValueError('Mismatch in coupling coefficient calculation')
-
-        #         mmap[metabolite.id].enzyme = True
-
-        #         for attr in ['keff', ]
-        #         if mmap[metabolite.id].keff is None:
-        #             mmap[metabolite.id].keff = metabolite.keff
-
-        if self.coupled_metabolites == dict():
-            self.coupled_metabolites = {metabolite: type}
-        else:
-            self.coupled_metabolites[metabolite] = type
+        # if self.coupled_metabolites == dict():
+        #     self.coupled_metabolites = {metabolite: type}
+        # else:
+        self.coupled_metabolites[metabolite] = type
 
     def couple(self, metabolites, types: Union[List[str], str]):
         """Add coupling coefficient and associated metadata to reaction for a coupled metabolite.
@@ -158,12 +146,12 @@ class ME_Reaction(cobra.Reaction):
         reaction_string += ' + '.join(product_bits)
         return reaction_string
 
-    def _map_coupled_metabolites(self):
-        mmap = {m.id: m for m in self.metabolites}
-        cm = dict()
-        for md, type_ in self.coupled_metabolites.items():
-            cm[mmap[md.id]] = type_
-        self.coupled_metabolites = cm
+    # def _map_coupled_metabolites(self):
+    #     mmap = {m.id: m for m in self.metabolites}
+    #     cm = dict()
+    #     for md, type_ in self.coupled_metabolites.items():
+    #         cm[mmap[md.id]] = type_
+    #     self.coupled_metabolites = cm
 
     def check_mass_balance(self, tol: SupportsFloat = 0, sympy_tol: SupportsFloat = 1e-15) -> Dict[str, float]:
         """Compute mass and charge balance for the reaction
@@ -289,6 +277,40 @@ class MetabolicReaction(ME_Reaction):
 
         super().__init__(id, name, subsystem, lower_bound, upper_bound)
         self.cobra_id = cobra_id
+
+def to_metabolic_reaction(model_metabolites, reaction: cobra.Reaction, id: Optional[str] = None) -> MetabolicReaction:
+    """Convert a cobrapy Reaction to a ME_Model MetabolicReaction
+
+    Parameters
+    ----------
+    model_metabolites : utils.metabolites.MetaboliteBin
+        the me_input_model metabolites as specified by MetaboliteBin
+    reaction : cobra.Reaction
+        cobra reaction to be converted
+    id : str, optional
+        reaction id (defaults to reaction.id), by default None
+
+    Returns
+    -------
+    MetabolicReaction
+        Converted reaction
+    """
+    if type(reaction) != cobra.Reaction:
+        raise TypeError('Reaction must be a cobra.Reaction')
+    if id is None:
+        id = reaction.id
+    new_rxn = MetabolicReaction(id=id, cobra_id=reaction.id, name=reaction.name, subsystem=reaction.subsystem,
+                            lower_bound=reaction.lower_bound, upper_bound=reaction.upper_bound)
+    new_rxn.add_metabolites({model_metabolites.id_object_map[m.id]: stoich for m, stoich in reaction.metabolites.items()}, 
+                        combine=False)
+
+    if hasattr(reaction, 'enzyme_compartment'):
+        new_rxn.enzyme_compartment = reaction.enzyme_compartment # compartment of the enzyme catalyzing this reaction
+    # for k in set(reaction.__dict__.keys()).difference(['_id', 'name', 'subsystem',
+    #                                                    '_lower_bound', '_upper_bound',
+    #                                                    '_model']):
+    #     rxn.__dict__[k] = copy.deepcopy(reaction.__dict__[k])
+    return new_rxn
 
 
 class ExpressionReaction(ME_Reaction):
@@ -430,26 +452,59 @@ class ProteinDegradationReaction(ExpressionReaction):
 
     def copy(self):
         """Also couple ._macromolecules"""
-        attr_keep = ['_metabolites', 'coupled_metabolites'] #_macromolecules # in the future, this can be a parameter (will have to check type - list or dict)
-        # attributes to avoid deepcopying (for comp time/pointer issues), by default ['_metabolites', 'coupled_metabolites']
-        # will create a new version of the bin (e.g., list or dict) but not the elements in the bin
+         # avoid deeopcopying some attributes for:
+        # 1) compute time
+        # 2) maintaining pointers (same metabolites in the new reaction)
 
-        # doesn't copy attributes in attr_keep to avoid compute time issues and allows elements contained within those attributes to point to the same metabolite object
+        # additionally, make sure metabolites add the new copied reaction to their attributes (mutual tracking)
+
+        dict_attr_keep = ['_metabolites', 'coupled_metabolites'] #_macromolecules # in the future, this can be a parameter (will have to check type - list or dict)
+        list_attr_keep = ['_macromolecules', '_enzymes']
+        stored_dict_attrs = {}
+        for ak in dict_attr_keep:
+            stored_dict_attrs[ak] = self.__dict__[ak]
+            self.__dict__[ak] = {}
+        
+        stored_list_attrs = {}
+        for ak in list_attr_keep:
+            stored_list_attrs[ak] = self.__dict__[ak]
+            self.__dict__[ak] = []
+
+        new_rxn = copy.deepcopy(self)
+
+        metabolites = set()
+        for ak, av in stored_dict_attrs.items():
+            self.__dict__[ak] = av
+            new_rxn.__dict__[ak] = {k:v for k,v in av.items()} # different pointer to bin (dictionary) but not elements in bin for updating of metabolite objecs
+            metabolites = metabolites.union(av.keys())
+        for ak, av in stored_list_attrs.items():
+            self.__dict__[ak] = av
+            new_rxn.__dict__[ak] = [item for item in av] # different pointer to bin (list) but not elements in bin
+            # metabolites = metabolites.union(av)
+        
+        # mutual tracking
+        for metabolite in metabolites: 
+            metabolite._reaction.add(new_rxn)
+
+        return new_rxn
+
+       
+        attr_keep = ['_metabolites', 'coupled_metabolites'] # in the future, this can be a parameter (will have to check type - list or dict)
         stored_attrs = {}
         for ak in attr_keep:
             stored_attrs[ak] = self.__dict__[ak]
             self.__dict__[ak] = dict()
-        rxn_macromolecules = self._macromolecules
-        self._macromolecules = []
 
         new_rxn = copy.deepcopy(self)
-       
+        metabolites = set()
         for ak, av in stored_attrs.items():
             self.__dict__[ak] = av
-            new_rxn.__dict__[ak] = {k:v for k,v in av.items()} # different pointer to bin (dictionary) but not elements in bin for updating of metabolite objecs
+            new_rxn.__dict__[ak] = {k:v for k,v in av.items()} # pointer: same objects, different bin
+            metabolites = metabolites.union(av.keys())
         
-        self._macromolecules = rxn_macromolecules
-        new_rxn._macromolecules = [mac for mac in rxn_macromolecules]
+        # mutual tracking
+        for metabolite in metabolites: 
+            metabolite._reaction.add(new_rxn)
 
         return new_rxn
 
@@ -496,29 +551,43 @@ class ComplexDegradationReaction(ExpressionReaction):
         self._enzymes = set()  # set of enzyme ids associated with this degradation reaction
         self._ribosomal_degradation = False
 
-        def copy(self):
-            """Also couple ._macromolecules"""
-            attr_keep = ['_metabolites', 'coupled_metabolites'] #_macromolecules #in the future, this can be a parameter (will have to check type - list or dict)
-            # attributes to avoid deepcopying (for comp time/pointer issues), by default ['_metabolites', 'coupled_metabolites']
-            # will create a new version of the bin (e.g., list or dict) but not the elements in the bin
+    def copy(self):
+        """Also couple ._macromolecules"""
+         # avoid deeopcopying some attributes for:
+        # 1) compute time
+        # 2) maintaining pointers (same metabolites in the new reaction)
 
-            # doesn't copy attributes in attr_keep to avoid compute time issues and allows elements contained within those attributes to point to the same metabolite object
-            stored_attrs = {}
-            for ak in attr_keep:
-                stored_attrs[ak] = self.__dict__[ak]
-                self.__dict__[ak] = dict()
-            rxn_macromolecules = self._macromolecules
-            self._macromolecules = []
+        # additionally, make sure metabolites add the new copied reaction to their attributes (mutual tracking)
 
-            new_rxn = copy.deepcopy(self)
+        dict_attr_keep = ['_metabolites', 'coupled_metabolites'] #_macromolecules # in the future, this can be a parameter (will have to check type - list or dict)
+        list_attr_keep = ['_macromolecules', '_enzymes']
+        stored_dict_attrs = {}
+        for ak in dict_attr_keep:
+            stored_dict_attrs[ak] = self.__dict__[ak]
+            self.__dict__[ak] = {}
         
-            for ak, av in stored_attrs.items():
-                self.__dict__[ak] = av
-                new_rxn.__dict__[ak] = {k:v for k,v in av.items()} # different pointer to bin (dictionary) but not elements in bin for updating of metabolite objecs
-            
-            self._macromolecules = rxn_macromolecules
-            new_rxn._macromolecules = [mac for mac in rxn_macromolecules]
-            return new_rxn
+        stored_list_attrs = {}
+        for ak in list_attr_keep:
+            stored_list_attrs[ak] = self.__dict__[ak]
+            self.__dict__[ak] = []
+
+        new_rxn = copy.deepcopy(self)
+
+        metabolites = set()
+        for ak, av in stored_dict_attrs.items():
+            self.__dict__[ak] = av
+            new_rxn.__dict__[ak] = {k:v for k,v in av.items()} # different pointer to bin (dictionary) but not elements in bin for updating of metabolite objecs
+            metabolites = metabolites.union(av.keys())
+        for ak, av in stored_list_attrs.items():
+            self.__dict__[ak] = av
+            new_rxn.__dict__[ak] = [item for item in av] # different pointer to bin (list) but not elements in bin
+            # metabolites = metabolites.union(av)
+        
+        # mutual tracking
+        for metabolite in metabolites: 
+            metabolite._reaction.add(new_rxn)
+
+        return new_rxn
 
     def _update_tracking(self, macromolecules):
         """Mutual tracking of degradation reactions associated with a macromolecule and vice-versa.
@@ -584,34 +653,6 @@ class ComplexDegradationReaction(ExpressionReaction):
         #                 raise ValueError(err)
 
         self.gene_reaction_rule = ' and '.join(machinery_)
-
-
-def to_metabolic_reaction(reaction: cobra.Reaction, id: Optional[str] = None) -> MetabolicReaction:
-    """Convert reaction type
-
-    Parameters
-    ----------
-    reaction : cobra.Reaction
-        cobra reaction to be converted
-    id : str, optional
-        reaction id (defaults to reaction.id), by default None
-
-    Returns
-    -------
-    MetabolicReaction
-        Converted reaction
-    """
-
-    if id is None:
-        id = reaction.id
-    rxn = MetabolicReaction(id=id, cobra_id=reaction.id, name=reaction.name, subsystem=reaction.subsystem,
-                            lower_bound=reaction.lower_bound, upper_bound=reaction.upper_bound)
-    for k in set(reaction.__dict__.keys()).difference(['_id', 'name', 'subsystem',
-                                                       '_lower_bound', '_upper_bound',
-                                                       '_model']):
-        rxn.__dict__[k] = copy.deepcopy(reaction.__dict__[k])
-    return rxn
-
 
 class BiomassReaction(cobra.Reaction):
     """Specifies biomass reactions in the model, allowing reaction bounds to be a function of mu"""

@@ -149,7 +149,7 @@ def read_pickled_me_model(file_name: str):
         ME model object
     """
     me_model = read_pickled_objected(file_name)
-    me_model.correct_object_tracking()  # lost in pickling/loadings
+    me_model._clean_metabolites()  # lost in pickling/loadings
     return me_model
 
 def write_metabolic_model(m_model: cobra.Model, file_name: str, **kwargs) -> None: 

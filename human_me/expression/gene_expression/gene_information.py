@@ -352,9 +352,8 @@ class GeneInformation:
                         r._compartment_seed = self.seed  # allows stochasticity
                     else:
                         r._compartment_seed = 888  # consistently same output
-                if not hasattr(r,
-                               'enzyme_compartment'):  # same reaction for a compartment, even if seed is None - stochastic = F, seed = None
-                    r.enzyme_compartment = func.get_reaction_compartment(r, self.stochastic, r._compartment_seed)
+                if not hasattr(r,'enzyme_compartment'):  # same reaction for a compartment, even if seed is None - stochastic = F, seed = None
+                    r.enzyme_compartment = func.get_reaction_compartment(r, self.stochastic, r._compartment_seed) # compartment of the enzyme catalyzing this reaction
                 self.machinery_locations.append(r.enzyme_compartment)
         self.machinery_locations = sorted(set(self.machinery_locations))
 

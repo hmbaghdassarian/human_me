@@ -143,17 +143,12 @@ def add_biomass_change(reaction: cobra.Reaction, inplace: bool = True) -> Union[
     """
 
     biomass_change = dict()
-    # must order for precision (order of adding masses effects final sum)
-    md_ = reaction._metabolites.copy() # copyign dictionary preserves pointers within it
-    md_map = {m.id: m for m in md_}
-    md = OrderedDict({md_map[m_id]: md_[md_map[m_id]] for m_id in sorted(md_map)})
+    # sorting needed for precision (order of adding masses effects final sum)
+    md_map = {m.id: m for m in reaction.metabolites}
+    md = OrderedDict({md_map[m_id]: reaction.metabolites[md_map[m_id]] for m_id in sorted(md_map)})
 
-    reaction._map_coupled_metabolites()
     for metabolite, type in reaction.coupled_metabolites.items():
         md[metabolite] -= metabolite.coupling_coefficient[type]  # coupling not part of mass balance
-
-    # extracellular proteins do not contribute to biomass
-    #     md = {m:count for m,count in md.items() if m.compartment != 'e'}
 
     for m, count in md.items():
         if m.compartment != 'e':
@@ -172,8 +167,7 @@ def add_biomass_change(reaction: cobra.Reaction, inplace: bool = True) -> Union[
 
     # exclude trna charging/uncharging from change in trna biomass
     # this removes tradeoffs between generating protein biomass and maintaining trna biomass
-    if (hasattr(reaction, 'trna_charging') and reaction.trna_charging) or (
-            hasattr(reaction, 'translation') and reaction.translation):
+    if (hasattr(reaction, 'trna_charging') and reaction.trna_charging) or (hasattr(reaction, 'translation') and reaction.translation):
         del biomass_change['trna']
 
     # proxy metabolites do not contribute to bimoass

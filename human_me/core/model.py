@@ -136,7 +136,6 @@ class ME_Model(cobra.Model):
             reaction._model = self
             # Build a `list()` because the dict will be modified in the loop.
             for metabolite in list(reaction.metabolites):
-                # TODO: Should we add a copy of the metabolite instead?
                 if metabolite not in self.metabolites:
                     self.add_metabolites(metabolite)
                 # A copy of the metabolite exists in the model, the reaction
@@ -204,91 +203,31 @@ class ME_Model(cobra.Model):
         self.reaction_types['coupled'] = [r.id for r in self.reactions if
                                           hasattr(r, 'coupled_metabolites') and r.coupled_metabolites != dict()]
 
-    def _get_enzymes(self, reaction_list: List[cobra.Reaction]):
-        """Track all .enzyme attributes. Run before _add_reactions.
-
-        Parameters
-        ----------
-        reaction_list : List[cobra.Reaction]
-            List of reactions to add
+    def _get_enzymes(self):
+        """Track all .enzyme attributes. Run after _add_reactions.
         """
-        self._enzymes = list()
-        for r in reaction_list:
-            for m in r.metabolites:
-                if hasattr(m, 'enzyme') and m.enzyme:
-                    self._enzymes.append(m.id)
-
-    def _map_enzymes(self):
-        """When running _add_reactions, for dummy protein, seems to change .enzyme attribute to False.
-        Generic correction in case it happens with other enzymes. Related to _get_enzymes() method"""
-        for m_id in self._enzymes:
-            self.metabolites.get_by_id(m_id).enzyme = True
-
-    def _map_coupled_metabolites(self):
-        """Reassigns metabolite object from r.metabolites to the .coupled_metabolites attribute of the reaction
-        to ensure that the metabolite object is the most up to date version (prevents multiple copies from existing)"""
-
-        for r in self.reactions:
-            if hasattr(r, 'coupled_metabolites'):
-                r._map_coupled_metabolites()
-
-    def _map_metabolite_reactions_and_coupling(self):
-        """Fixes error in which metabolites do not have all associated reactions or coupling constraints
-        in the .reactions and .coupling_coefficients attributes respectively"""
-
-        metab_reaction_map = {m.id: list() for m in self.metabolites}
-        metab_coupling_map = {m.id: dict() for m in self.metabolites if hasattr(m, 'coupling_coefficient')}
-        for r in self.reactions:
-            for m in r.metabolites:
-                metab_reaction_map[m.id] += [r.id]
-
-                if hasattr(m, 'coupling_coefficient') and m.coupling_coefficient is not None:
-                    for k, c in m.coupling_coefficient.items():
-                        if k in metab_coupling_map[m.id]:
-                            if c != metab_coupling_map[m.id][k]:
-                                raise ValueError(
-                                    'Disagreement in coupling coefficient for the same metabolite: ' + m.id)
-                        else:
-                            metab_coupling_map[m.id][k] = c
-        for m_id, val in metab_coupling_map.items():
-            if len(val) == 0:
-                metab_coupling_map[m_id] = None
-
-        for m_id, r_list in metab_reaction_map.items():
-            metab = self.metabolites.get_by_id(m_id)
-            metab._reaction = metab._reaction.union([self.reactions.get_by_id(r_id) for r_id in r_list])
-            if m_id in metab_coupling_map:
-                metab.coupling_coefficient = metab_coupling_map[m_id]
-
-    def _map_reaction_metabolites(self):
-        """Fixes error in which reactions do not have the most up to date metabolites"""
-
-        for r in self.reactions:
-            for m in r.metabolites:
-                m_ = self.metabolites.get_by_id(m.id)
-                if m != m_:
-                    r._metabolites[m_] = r._metabolites.pop(m)
+        self.enzymes = {m for m in self.metabolites if hasattr(m, 'enzyme') and m.enzyme}
+        # self._enzymes = list()
+        # for r in reaction_list:
+        #     for m in r.metabolites:
+        #         if hasattr(m, 'enzyme') and m.enzyme:
+        #             self._enzymes.append(m.id)
 
     def _clean_metabolites(self):
-        """Remove or correct reactions assigned to metabolites which are not in the model"""
-        rxn_ids = [r.id for r in self.reactions]
-        for m in self.metabolites:
-            for r in m.reactions:
-                if r.id not in rxn_ids:
-                    m._reaction.remove(r)
-                elif r not in self.reactions:
-                    m._reaction.remove(r)
-                    m._reaction.add(self.reactions.get_by_id(r.id))
+        """Remove or correct reactions assigned to metabolites during building process which are not in the final model"""
+        reaction_pointer_model = {hex(id(reaction)) for reaction in self.reactions}
+        if len(reaction_pointer_model) != len(self.reactions):
+            raise ValueError('Model contains duplicate reactions')
 
-    def correct_object_tracking(self):
-        """Resolves inconsistencies b/w metabolite.reactions and reaction.metabolites or reaction.coupled_metabolites"""
-        # update metabolites
-        self._clean_metabolites()
-        self._map_enzymes()
-        self._map_metabolite_reactions_and_coupling()
-        # update reactions
-        self._map_reaction_metabolites()
-        self._map_coupled_metabolites()
+        reaction_pointer_metabolite = set()
+        for metabolite in self.metabolites:
+            metabolite_reactions = metabolite.reactions
+            for reaction in metabolite_reactions:
+                if hex(id(reaction)) not in reaction_pointer_model: # remove reaciton copies in building that were not included in final model
+                    metabolite._reaction.remove(reaction) 
+                reaction_pointer_metabolite.add(hex(id(reaction)))
+        if len((reaction_pointer_model).difference(reaction_pointer_metabolite)) > 0: # should be a subset
+            raise ValueError('Unexpected reactions present in model')
 
     def add_reactions(self, reaction_list: List[cobra.Reaction]):
         """Add reactions to the model
@@ -298,9 +237,10 @@ class ME_Model(cobra.Model):
         reaction_list : List[cobra.Reaction]
             List of reactions to add
         """
-        self._get_enzymes(reaction_list)
+        # self._get_enzymes(reaction_list)
         self._add_reactions(reaction_list)
-        self.correct_object_tracking()
+        self._clean_metabolites() 
+        self._get_enzymes()
         self._assign_reaction_types()
 
     def remove_reactions(self, reactions: List[Union[cobra.Reaction, str]], remove_orphans: bool = True):
@@ -765,8 +705,13 @@ class ME_Model(cobra.Model):
                 else:
                     raise ValueError('Unaccounted for reaction criteria')
 
-    def check_enzymes(self):
+    def _check_enzymes(self):
         """Makes sure all genes being expressed participate in a catalysis reaction (no unecessary expression reactions)"""
+        # # following three lines replace .map_enzymes method
+        for r in me_model.reactions:
+            for m in r.metabolites:
+                if hasattr(m, 'enzyme') and m.enzyme and m not in self.enzymes:
+                    raise ValueError('Internal: Unexpected enzyme present in reactions unaccounted for in model')
 
         proteins, complexes = [], []
         active_proteins, active_complexes = [], []
@@ -797,15 +742,46 @@ class ME_Model(cobra.Model):
                 active_proteins + self.additional_ko + ub_genes + list(self.non_machinery.keys()))) > 0:
             raise ValueError('Unexpected inclusion of inactive protein monomers')
 
+    def _check_coupled_metabolite_tracking(self):
+        """Ensures appropriate object tracking in the coupled metabolites."""
+        # replaces ._map_coupled_metabolites
+        coupled_reactions = [r for r in self.reactions if hasattr(r, 'coupled_metabolites')]
+        metabolite_pointer_model = {hex(id(metabolite)) for metabolite in self.metabolites}
+        reaction_pointer_model = {hex(id(reaction)) for reaction in self.reactions}
+        for reaction in coupled_reactions:
+            for metabolite in reaction.coupled_metabolites:
+                if hex(id(metabolite)) not in metabolite_pointer_model:
+                    raise ValueError('Internal: Unexpected incorrect coupled metabolite tracking')
+                for reaction_m in metabolite.reactions:
+                    if hex(id(reaction_m)) not in reaction_pointer_model:
+                        raise ValueError('Internal: This should have been resolved in _clean_metabolites method')
+
+    def _check_reaction_metabolite_tracking(self):
+        """Ensures appropriate object tracking of reaction metbolites"""
+        # analogous to _clean_metabolites for reactions
+        # TODO: there is an occasional, inconsistent calling of this error with Clathrin_Importtl reactions
+        metabolite_pointer_model = {hex(id(metabolite)) for metabolite in self.metabolites}
+        if len(metabolite_pointer_model) != len(self.metabolites):
+            raise ValueError('Model contains duplicate metabolites')
+        for reaction in self.reactions:
+            reaction_metabolites = reaction.metabolites
+            for metabolite in reaction_metabolites:
+                if hex(id(metabolite)) not in metabolite_pointer_model:
+                    raise ValueError('Internal: Unexpected incorrect reaction metabolite tracking')
+
     def check(self):
         """Check ME Model built correctly
 
         """
+        # should work after running _clean_metabolites
+        self._check_coupled_metabolite_tracking()
+        self._check_reaction_metabolite_tracking()
+        # other
         self._check_complete_reactions()
         self._check_hgncs()
         self.check_me_mass_balance()
         self._check_coupling()
-        self.check_enzymes()
+        self._check_enzymes()
 
     @staticmethod
     def create_expressed_gene(hgnc_id: str, relat_objects) -> ExpressedGene:
