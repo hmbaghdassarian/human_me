@@ -3,6 +3,7 @@
 
 import collections
 from collections import OrderedDict
+import copy
 from typing import Dict, List, Optional
 
 import numpy as np
@@ -236,6 +237,19 @@ class Complex(Macromolecule):
     def make_proxy(self):
         """Make a proxy metabolite for coupling enzyme degradation to reaction catalysis"""
         return Proxy(associated_macromolecule=self)
+    def copy(self):
+        """Overwrite cobra.Species.copy"""
+
+        # copy while preserving metabolite pointers to avoid memory issues and not copying it to avoid speed issues
+        components = self.components
+        del self.components
+
+        new_macromolecule = copy.deepcopy(self)
+        
+        self.components = components
+        new_macromolecule.components = {subunit: stoich for subunit, stoich in components.items()} # retain same pointer to avoid memory issues
+
+        return new_macromolecule
 
 
 class RibosomalComplex(Complex):
