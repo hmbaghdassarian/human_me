@@ -742,13 +742,6 @@ def degrade(macromolecule: DegradedMacromoleculeType, model_metabolites,  **kwar
     -------
     List[DegradationReactionType]
         degradation reactions
-
-    Raises
-    ------
-    ValueError
-        [description]
-    ValueError
-        [description]
     """
     if macromolecule.type not in ['protein', 'complex']:
         raise ValueError('Macromolecule to degrade must be protein or complex')

@@ -133,6 +133,7 @@ class Complex(Macromolecule):
 
     def decompose_complex(self, decomposed_complex=None) -> OrderedDict:
         """Recursive method to get the complex by its individual components, including nested complexes"""
+        # TODO: this method is very slow
         if decomposed_complex is None:
             all_metab = flatten_list([[m] * count for m, count in self.components.items()])
             decomposed_complex = Complex(metabolites=all_metab, complex_id='ignore')
@@ -237,8 +238,20 @@ class Complex(Macromolecule):
     def make_proxy(self):
         """Make a proxy metabolite for coupling enzyme degradation to reaction catalysis"""
         return Proxy(associated_macromolecule=self)
-    def copy(self):
-        """Overwrite cobra.Species.copy"""
+    def copy(self, copy_metabolites = False):
+        """Overwrite cobra.Species.copy
+
+        Parameters
+        ----------
+        copy_metabolites : bool, optional
+            whether to copy the individual complex subunits, or retain the same pointer, by default False
+            set to True if will be modifying the individual complex subunits in just this complex, but not others
+
+        Returns
+        -------
+        _type_
+            _description_
+        """
 
         # copy while preserving metabolite pointers to avoid memory issues and not copying it to avoid speed issues
         components = self.components
@@ -247,8 +260,10 @@ class Complex(Macromolecule):
         new_macromolecule = copy.deepcopy(self)
         
         self.components = components
-        new_macromolecule.components = {subunit: stoich for subunit, stoich in components.items()} # retain same pointer to avoid memory issues
-
+        if not copy_metabolites:
+            new_macromolecule.components = {subunit: stoich for subunit, stoich in components.items()} # retain same pointer to avoid memory issues
+        else:
+            new_macromolecule.components = {subunit.copy(): stoich for subunit, stoich in components.items()} # new pointer, but still faster 
         return new_macromolecule
 
 

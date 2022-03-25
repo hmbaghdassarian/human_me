@@ -25,7 +25,6 @@ ribosomal_genes = {'HGNC:11325', 'HGNC:11740', 'HGNC:10369', 'HGNC:10414', 'HGNC
                    'HGNC:5238', 'HGNC:10315', 'HGNC:10349', 'HGNC:21370', 'HGNC:10409', 'HGNC:10405', 'HGNC:10351',
                    'HGNC:10420', 'HGNC:16931', 'HGNC:10306', 'HGNC:10402', 'HGNC:10350'}
 
-
 # checks work as follows: maximum limits checked within each method, minimum limit checked in .check methods
 class ExpressedGene:
     """Tracks all reactions and macromolecules associated with a ME Model gene.
@@ -106,7 +105,7 @@ class ExpressedGene:
                         if m.hgnc_id != self.hgnc_id:
                             catalysis = False
                 else:  # complexes
-                    if self.hgnc_id not in [m.hgnc_id for m in assoc_macro['catalysis'].decompose_complex()]:
+                    if self.hgnc_id not in [m.hgnc_id for m in assoc_macro['catalysis'].decompose_complex()]: # TODO: .decompose_complex is very slow
                         catalysis = False
             else:
                 catalysis = False

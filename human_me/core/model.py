@@ -218,16 +218,34 @@ class ME_Model(cobra.Model):
         reaction_pointer_model = {hex(id(reaction)) for reaction in self.reactions}
         if len(reaction_pointer_model) != len(self.reactions):
             raise ValueError('Model contains duplicate reactions')
+        reaction_model_map = {reaction.id: reaction for reaction in self.reactions}
 
         reaction_pointer_metabolite = set()
         for metabolite in self.metabolites:
             metabolite_reactions = metabolite.reactions
             for reaction in metabolite_reactions:
-                if hex(id(reaction)) not in reaction_pointer_model: # remove reaciton copies in building that were not included in final model
-                    metabolite._reaction.remove(reaction) 
+                if hex(id(reaction)) not in reaction_pointer_model: 
+                    metabolite._reaction.remove(reaction)
+                    if reaction.id in reaction_model_map:
+                        metabolite._reaction.add(reaction_model_map[reaction.id]) 
                 reaction_pointer_metabolite.add(hex(id(reaction)))
         if len((reaction_pointer_model).difference(reaction_pointer_metabolite)) > 0: # should be a subset
             raise ValueError('Unexpected reactions present in model')
+    
+    def _clean_reactions(self):
+        """Correct metabolites assigned to reactions during building process which are not in the final model"""
+        # TODO: this really only is an issue for Clathrin_IMPORTtl_COMPLEX_FORMATIONg and only sometimes
+        metabolite_pointer_model = {hex(id(metabolite)) for metabolite in self.metabolites}
+        if len(metabolite_pointer_model) != len(self.metabolites):
+            raise ValueError('Model contains duplicate metabolites')
+        metabolite_model_map = {metabolite.id: metabolite for metabolite in self.metabolites}
+
+        for reaction in self.reactions:
+            reaction_metabolites = reaction.metabolites
+            for metabolite in reaction_metabolites:
+                if hex(id(metabolite)) not in metabolite_pointer_model:
+                    reaction._metabolites[metabolite_model_map[metabolite.id]] = reaction._metabolites.pop(metabolite) # replace with correction version
+                    # raise ValueError('Internal: Unexpected incorrect reaction metabolite tracking')
 
     def add_reactions(self, reaction_list: List[cobra.Reaction]):
         """Add reactions to the model
@@ -240,6 +258,7 @@ class ME_Model(cobra.Model):
         # self._get_enzymes(reaction_list)
         self._add_reactions(reaction_list)
         self._clean_metabolites() 
+        self._clean_reactions()
         self._get_enzymes()
         self._assign_reaction_types()
 
@@ -708,7 +727,7 @@ class ME_Model(cobra.Model):
     def _check_enzymes(self):
         """Makes sure all genes being expressed participate in a catalysis reaction (no unecessary expression reactions)"""
         # # following three lines replace .map_enzymes method
-        for r in me_model.reactions:
+        for r in self.reactions:
             for m in r.metabolites:
                 if hasattr(m, 'enzyme') and m.enzyme and m not in self.enzymes:
                     raise ValueError('Internal: Unexpected enzyme present in reactions unaccounted for in model')
@@ -756,26 +775,12 @@ class ME_Model(cobra.Model):
                     if hex(id(reaction_m)) not in reaction_pointer_model:
                         raise ValueError('Internal: This should have been resolved in _clean_metabolites method')
 
-    def _check_reaction_metabolite_tracking(self):
-        """Ensures appropriate object tracking of reaction metbolites"""
-        # analogous to _clean_metabolites for reactions
-        # TODO: there is an occasional, inconsistent calling of this error with Clathrin_Importtl reactions
-        metabolite_pointer_model = {hex(id(metabolite)) for metabolite in self.metabolites}
-        if len(metabolite_pointer_model) != len(self.metabolites):
-            raise ValueError('Model contains duplicate metabolites')
-        for reaction in self.reactions:
-            reaction_metabolites = reaction.metabolites
-            for metabolite in reaction_metabolites:
-                if hex(id(metabolite)) not in metabolite_pointer_model:
-                    raise ValueError('Internal: Unexpected incorrect reaction metabolite tracking')
-
     def check(self):
         """Check ME Model built correctly
 
         """
         # should work after running _clean_metabolites
         self._check_coupled_metabolite_tracking()
-        self._check_reaction_metabolite_tracking()
         # other
         self._check_complete_reactions()
         self._check_hgncs()
@@ -797,7 +802,7 @@ class ME_Model(cobra.Model):
     def _generate_expressed_genes(self):
 
         # map all hgnc_ids to all associated macromolecules and reactions
-        hgnc_ids = set([m.hgnc_id for m in self.metabolites if isinstance(m, Macromolecule) and m.hgnc_id is not None])
+        hgnc_ids = {m.hgnc_id for m in self.metabolites if isinstance(m, Macromolecule) and m.hgnc_id is not None}
         hgnc_ids = {hgnc_id: {'macromolecules': []} for hgnc_id in hgnc_ids}
 
         for m in self.metabolites:
