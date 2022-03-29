@@ -1,0 +1,16 @@
+site_name: human_me
+site_description: "Python package to generate and analyze human ME Models."
+
+theme: readthedocs
+
+plugins:
+  - search
+  - mkdocstrings
+
+# markdown_extensions:
+#   - pymdownx.highlight
+#   - pymdownx.superfences
+
+nav:
+  - "Start": index.md
+  - "API": api.md

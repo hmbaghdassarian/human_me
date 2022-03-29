@@ -62,10 +62,8 @@ Input File Descriptions
 ------
 1. M_Model: a cobrapy metabolic model in sbml format. We highly recommend Recon2.2 or a context-specific metabolic model generated from Recon2.2, as this is the only model the pipeline has been tested on. Our "inputs" directory provides a version of Recon2.2 with minor modifications to work with the ME-Model building pipeline. Alternatively, you can use the preprocess.correct_inputs.correct_model function on your metabolic model to introduce these modifications. 
 2. PSIM: see the PSIM README for details
-3. Non-machinery: an optional list or text file of HGNC IDs for non-machinery proteins to be expressed by the ME-Model. We define machinery as proteins that are utilized in the reaction GPRs. In its current format, it is not possible for a protein to both be machinery and non-machinery (e.g., HGNC:23408 used to catalyze reaction "3HBCDm" in Recon2.2 will be expressed and transported to the mitochondria to catalyze this reaction in the ME-Model, but cannot also be specified as a non-machinery to be secreted). 
+3. Non-machinery: an optional list or text file of HGNC IDs for non-machinery proteins to be expressed by the ME-Model. We define machinery as proteins that are utilized in the reaction GPRs. In its current format, it is not possible for a protein to both be machinery and non-machinery (e.g., HGNC:23408 used to catalyze reaction "3HBCDm" in Recon2.2 will be expressed and transported to the mitochondria to catalyze this reaction in the ME-Model, but cannot also be specified as a non-machinery to be secreted).
 
-
-
-
-
-
+About
+------
+For instructions on how to use the human ME Model, visit the [documentation](https://hmbaghdassarian.github.io/human_me/) 

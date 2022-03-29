@@ -15,7 +15,7 @@ Operating System :: MacOS
 
 DISTNAME = 'human_me'
 AUTHOR = 'Hratch Baghdassarian'
-AUTHOR_EMAIL = 'hmbaghdassarian@gmail.com'
+AUTHOR_EMAIL = 'hmbaghdassarian@eng.ucsd.edu'
 DESCRIPTION = 'Python package to generate and analyze human ME Models.'
 LICENSE = 'MIT'
 README = 'Python package to generate and analyze human ME Models.'
