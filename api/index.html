@@ -50,7 +50,11 @@
     <ul class="current">
     <li class="toctree-l2"><a class="reference internal" href="#model-class">Model Class</a>
     </li>
-    <li class="toctree-l2"><a class="reference internal" href="#human_me.core.model.ME_Model.add_reactions">human_me.core.model.ME_Model.add_reactions</a>
+    <li class="toctree-l2"><a class="reference internal" href="#human_me.core.model.ME_Model">human_me.core.model.ME_Model</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#human_me.core.model.ME_Model.__init__">__init__()</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#human_me.core.model.ME_Model.add_reactions">add_reactions()</a>
     </li>
     </ul>
                 </li>
@@ -84,10 +88,87 @@
 <h2 id="model-class">Model Class</h2>
 
 
+  <div class="doc doc-object doc-class">
+
+<a id="human_me.core.model.ME_Model"></a>
+    <div class="doc doc-contents first">
+
+
+
+
+
+  <div class="doc doc-children">
+
+
+
+
+
+
+
+
+
   <div class="doc doc-object doc-method">
 
-<a id="human_me.core.model.ME_Model.add_reactions"></a>
-    <div class="doc doc-contents first">
+
+
+<h2 class="doc doc-heading" id="human_me.core.model.ME_Model.__init__">
+<code class="highlight language-python"><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">id_or_model</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">m_model</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">n_cores</span><span class="o">=</span><span class="mi">48</span><span class="p">,</span> <span class="n">non_machinery</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">knock_out</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">additional_ko</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
+
+  <span class="doc doc-properties">
+      <small class="doc doc-property doc-property-special"><code>special</code></small>
+  </span>
+
+</h2>
+
+    <div class="doc doc-contents ">
+
+      <p>Initialization method for ME_Model class.</p>
+
+<table class="field-list">
+  <colgroup>
+    <col class="field-name" />
+    <col class="field-body" />
+  </colgroup>
+  <tbody valign="top">
+    <tr class="field">
+      <th class="field-name">Parameters:</th>
+      <td class="field-body">
+        <ul class="first simple">
+            <li><p><strong>id_or_model</strong> (<code>[type]</code>) – [description]</p></li>
+            <li><p><strong>name</strong> (<code>Optional[str]</code>) – model name, by default None</p></li>
+            <li><p><strong>m_model</strong> (<code>Optional[cobra.core.model.Model]</code>) – The cobrapy model object that the ME_Model was built from. Only needed for checking model (.check_model), by default None</p></li>
+            <li><p><strong>n_cores</strong> (<code>int</code>) – # of cores to parallelize on, by default os.cpu_count()</p></li>
+            <li><p><strong>non_machinery</strong> (<code>Dict[str, List[str]]</code>) – keys are HGNC IDs for non-machinery genes to be expressed, values are a list of compartments within the model for the gene to be transported to, by default None
+Exceptions are ubiquitin genes (HGNC:12468, HGNC:12463) and ribosomal genes</p></li>
+            <li><p><strong>knock_out</strong> (<code>Optional[List[str]]</code>) – each element is the HGNC ID of a gene expressed in the model which should be knocked out</p>
+<p>*Note: you may want to instead knock-out during building if setting minimal_proteome = True and knocking out a
+gene that participates in a OR GPR rule (in case it is the one that is selected); otherwise
+me_model.knock_out() method should suffice, by default None</p></li>
+            <li><p><strong>additional_ko</strong> (<code>List[str]</code>) – a list of HGNC IDs for genes that were not explicitly knocked-out, but were only involved in catalysis of
+reactions catalyzed by a complex which contains another gene that was knocked-out, by default None
+this list is generated in build_me_model/me_builder</p></li>
+        </ul>
+      </td>
+    </tr>
+  </tbody>
+</table>
+    </div>
+
+  </div>
+
+
+
+  <div class="doc doc-object doc-method">
+
+
+
+<h2 class="doc doc-heading" id="human_me.core.model.ME_Model.add_reactions">
+<code class="highlight language-python"><span class="n">add_reactions</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">reaction_list</span><span class="p">)</span></code>
+
+
+</h2>
+
+    <div class="doc doc-contents ">
 
       <p>Add reactions to the model</p>
 
@@ -107,6 +188,16 @@
     </tr>
   </tbody>
 </table>
+    </div>
+
+  </div>
+
+
+
+
+
+  </div>
+
     </div>
 
   </div>
