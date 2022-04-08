@@ -2,10 +2,17 @@ site_name: human_me
 site_description: "Python package to generate and analyze human ME Models."
 
 theme: readthedocs
-
+repo_url: https://github.com/hmbaghdassarian/human_me
 plugins:
   - search
-  - mkdocstrings
+  - mkdocstrings:
+      default_handler: python
+      handlers:
+        python:
+          selection:
+            docstring_style: "numpy"
+          rendering:
+            show_source: false
 
 # markdown_extensions:
 #   - pymdownx.highlight

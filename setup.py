@@ -1,10 +1,11 @@
 # python setup.py develop
 # python setup.py install
 from setuptools import setup
+from setuptools import find_packages
 
 
 CLASSIFIERS = '''\
-License :: OSI Approved
+License :: OSI Approved :: MIT license
 Programming Language :: Python :: 3.6 :: 3.9
 Topic :: Genome-Scale Modeling
 Operating System :: Microsoft :: Windows
@@ -18,7 +19,6 @@ AUTHOR = 'Hratch Baghdassarian'
 AUTHOR_EMAIL = 'hmbaghdassarian@eng.ucsd.edu'
 DESCRIPTION = 'Python package to generate and analyze human ME Models.'
 LICENSE = 'MIT'
-README = 'Python package to generate and analyze human ME Models.'
 
 VERSION = '0.1.0'
 ISRELEASED = False
@@ -55,16 +55,23 @@ PACKAGES = [
     'human_me'
 ]
 
+with open('README.md') as f:
+    long_description = f.read()
+
 metadata = dict(
     name=DISTNAME,
     version=VERSION,
-    long_description=README,
-    packages=PACKAGES,
-    python_requires=PYTHON_REQUIRES,
-    install_requires=INSTALL_REQUIRES,
     author=AUTHOR,
     author_email=AUTHOR_EMAIL,
     description=DESCRIPTION,
+    long_description_content_type="text/markdown",
+    long_description=long_description,
+    url='https://github.com/hmbaghdassarian/human_me',  # homepage
+    packages=find_packages(include=('human_me*')),  # PACKAGES
+    # py_mopdules=['io'],
+    python_requires=PYTHON_REQUIRES,
+    install_requires=INSTALL_REQUIRES,
+    # long_description=README,
     classifiers=[CLASSIFIERS],
     license=LICENSE
 )

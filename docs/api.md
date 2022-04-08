@@ -1,25 +1,14 @@
-# References
-
-## Macromolecules
-
-::: human_me.core.macromolecules
-
-## Reactions
-
-::: human_me.core.reaction
-
-## Genes
-
-::: human_me.core.gene.ExpressedGene
+# Documentation for 'human_me'
 
 ## Model Class
 
-::: human_me.core.model
-
-## Builder
-
-::: human_me.build.build_me_model.build_me
-
-## qMinos Solver
-
-::: human_me.me_solver.solve_me.qminosSolver
+::: human_me.core.model.ME_Model
+    handler: python
+    selection:
+      members:
+        - __init__
+        - add_reactions
+        - check
+    rendering:
+      show_root_heading: false
+      show_source: false

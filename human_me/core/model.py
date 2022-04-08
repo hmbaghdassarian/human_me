@@ -527,7 +527,7 @@ class ME_Model(cobra.Model):
         return sln, predicted, interp_fit, optimal_vals, res
 
     def infeasible_reactions(self, mu_val: SupportsFloat, sln, stat, tolerance: SupportsFloat = 1e-19) -> Dict[str, SupportsFloat]:
-        """Binary search to find the maximum feasible growth rate
+        """Returns infeasible reactions in solution.
 
         Parameters
         ----------
