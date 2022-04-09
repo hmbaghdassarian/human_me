@@ -108,13 +108,15 @@ $python &lt;path/to/human_me/&gt;setup.py install
 The QMINOS solver can be obtained for academic use from Prof. Michael Saunders at Stanford University.
 The solver can be set up as specified in the installation instructions for <a href="https://github.com/SBRG/solvemepy">solvemepy</a>.  Make sure gfortran is available to your system, as it is needed for running the solver.</p>
 <p>Note: Disregard the requirements that are delineated in solvmepy's README, with the exception of gfortran (#4). The remainder should have been appropriately installed with installation of human_me, if necessary.</p>
-<p>First, download the qminos file into a specified solver directory, which we refer to here as "solver_parent_directory".</p>
-<p>Then, the solver can be installed using the human_me Makefile as follows:</p>
+<p>⋅⋅⋅i) download the qminos file into a specified solver directory, which we refer to here as "solver_parent_directory".</p>
+<p>⋅⋅⋅ii) the solver can be installed using the human_me Makefile as follows:</p>
 <pre><code class="language-console">$make -C &lt;path/to/human_me/&gt; install-qminos SOLVER_PATH=&lt;path/to/solver/solver_parent_directory&gt;
 </code></pre>
-<p>If SOLVER_PATH is not specified, it defaults to <path/to/human_me/solver>.</p>
-<p>Alternatively, instead of using make, you can set up qminos manually. This will require getting qminos working with solvemepy as follows:</p>
-<p>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Step 2a: Untar the QMINOS solver and follow Step 1 of solveme installation guide:</p>
+<p>If SOLVER_PATH is not specified, it defaults to {path/to/solver/solver_parent_directory}.</p>
+<p>Alternatively, instead of using make, you can set up qminos manually. This will require getting qminos working with solvemepy. 
+The solver parent directory specified above stores both qminos and solvemepy, but they do not need to be stored in the same directory.
+Ensure that all this is done with the virtual environment activated.</p>
+<p>⋅⋅⋅Step 2a: Untar the QMINOS solver and follow Step 1 of solveme installation guide:</p>
 <pre><code class="language-console">tar -xvf qminos.tar.gz #tar file from Prof. Michael Saunders
 cd &lt;path/to/solver/solver_parent_directory/&gt;qminos1114/
 cp Makefile.defs minos56/
@@ -126,9 +128,9 @@ cd ../qminos56/
 make clean
 make
 </code></pre>
-<p>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Step 2b: Having exited the qminos directory, clone the solveme github and follow Step 2-3 of the solveme installation guide, which is essentially the following: </p>
+<p>⋅⋅⋅Step 2b: Having exited the qminos directory, clone the solveme github and follow Step 2-3 of the solveme installation guide: </p>
 <pre><code class="language-console">git clone https://github.com/SBRG/solvemepy.git #@2a2c9c098d5bad957ef41637955fe338a31bac4c
-cd solvemepy
+cd &lt;path/to/solvemepy/&gt;
 cp &lt;path/to/solver/solver_parent_directory/&gt;qminos1114/minos56/lib/libminos.a ./
 cp &lt;path/to/solver/solver_parent_directory/&gt;qminos1114/qminos56/lib/libquadminos.a ./
 python setup.py develop
