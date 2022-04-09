@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+      <link rel="shortcut icon" href="../img/favicon.ico" />
+    <title>Installation - human_me</title>
+    <link rel="stylesheet" href="../css/theme.css" />
+    <link rel="stylesheet" href="../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.5.0/styles/github.min.css" />
+        <link href="../assets/_mkdocstrings.css" rel="stylesheet" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "Installation";
+        var mkdocs_page_input_path = "install.md";
+        var mkdocs_page_url = null;
+      </script>
+    
+    <script src="../js/jquery-3.6.0.min.js" defer></script>
+    <!--[if lt IE 9]>
+      <script src="../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.5.0/highlight.min.js"></script>
+      <script>hljs.initHighlightingOnLoad();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href=".." class="icon icon-home"> human_me
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../search.html" method="get">
+      <input type="text" name="q" placeholder="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="..">Start</a>
+                </li>
+              </ul>
+              <ul class="current">
+                <li class="toctree-l1 current"><a class="reference internal current" href="./">Installation</a>
+    <ul class="current">
+    <li class="toctree-l2"><a class="reference internal" href="#step-1-2-creating-the-environment">Step 1-2: Creating the Environment</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#step-3-setting-up-the-qminos-solver">Step 3: Setting up the qMINOS solver</a>
+    </li>
+    </ul>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../api/">API</a>
+                </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="..">human_me</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href=".." class="icon icon-home" alt="Docs"></a> &raquo;</li><li>Installation</li>
+    <li class="wy-breadcrumbs-aside">
+        <a href="https://github.com/hmbaghdassarian/human_me/edit/master/docs/install.md"
+          class="icon icon-github"> Edit on GitHub</a>
+    </li>
+  </ul>
+  <hr/>
+</div>
+
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="installation-instructions">Installation Instructions</h1>
+<p>These provide additional details and alternate installation instructions for setting up the human_me environment and qMINOS solver</p>
+<h2 id="step-1-2-creating-the-environment">Step 1-2: Creating the Environment</h2>
+<p>We highly recommending setting up a <a href="https://packaging.python.org/guides/">python virtual environment</a> instead of a conda environment, because it works better with the solver.</p>
+<p>This can be done as follows:</p>
+<pre><code class="language-console">$python3 -m venv &lt;env_name&gt; --python=python3.6.9
+$source [env_name]/bin/activate
+</code></pre>
+<p>The human_me environment can be setup independent of PyPi using github and requirements.txt: </p>
+<pre><code class="language-console">$git clone https://github.com/hmbaghdassarian/human_me.git
+$pip install -r &lt;path/to/human_me/&gt;requirements.txt
+</code></pre>
+<p>or setup.py:</p>
+<pre><code class="language-console">$git clone https://github.com/hmbaghdassarian/human_me.git
+$python &lt;path/to/human_me/&gt;setup.py install
+</code></pre>
+<p>If jupyter notebook does not load the virtual environment kernel, outside of the environment, try: </p>
+<pre><code class="language-console">python3 -m ipykernel install --user --name=&lt;env_name&gt;
+</code></pre>
+<h2 id="step-3-setting-up-the-qminos-solver">Step 3: Setting up the qMINOS solver</h2>
+<p>qMINOS is a high precision LP solver necessary for the order-of-magnitude differences in ME Model coefficients.
+The QMINOS solver can be obtained for academic use from Prof. Michael Saunders at Stanford University.
+The solver can be set up as specified in the installation instructions for <a href="https://github.com/SBRG/solvemepy">solvemepy</a>.  Make sure gfortran is available to your system, as it is needed for running the solver.</p>
+<p>Note: Disregard the requirements that are delineated in solvmepy's README, with the exception of gfortran (#4). The remainder should have been appropriately installed with installation of human_me, if necessary.</p>
+<p>First, download the qminos file into a specified solver directory, which we refer to here as "solver_parent_directory".</p>
+<p>Then, the solver can be installed using the human_me Makefile as follows:</p>
+<pre><code class="language-console">$make -C &lt;path/to/human_me/&gt; install-qminos SOLVER_PATH=&lt;path/to/solver/solver_parent_directory&gt;
+</code></pre>
+<p>If SOLVER_PATH is not specified, it defaults to <path/to/human_me/solver>.</p>
+<p>Alternatively, instead of using make, you can set up qminos manually. This will require getting qminos working with solvemepy as follows:</p>
+<p>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Step 2a: Untar the QMINOS solver and follow Step 1 of solveme installation guide:</p>
+<pre><code class="language-console">tar -xvf qminos.tar.gz #tar file from Prof. Michael Saunders
+cd &lt;path/to/solver/solver_parent_directory/&gt;qminos1114/
+cp Makefile.defs minos56/
+cp Makefile.defs qminos56/
+cd minos56
+make clean
+make
+cd ../qminos56/
+make clean
+make
+</code></pre>
+<p>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Step 2b: Having exited the qminos directory, clone the solveme github and follow Step 2-3 of the solveme installation guide, which is essentially the following: </p>
+<pre><code class="language-console">git clone https://github.com/SBRG/solvemepy.git #@2a2c9c098d5bad957ef41637955fe338a31bac4c
+cd solvemepy
+cp &lt;path/to/solver/solver_parent_directory/&gt;qminos1114/minos56/lib/libminos.a ./
+cp &lt;path/to/solver/solver_parent_directory/&gt;qminos1114/qminos56/lib/libquadminos.a ./
+python setup.py develop
+</code></pre>
+              
+            </div>
+          </div><footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="Footer Navigation">
+        <a href=".." class="btn btn-neutral float-left" title="Start"><span class="icon icon-circle-arrow-left"></span> Previous</a>
+        <a href="../api/" class="btn btn-neutral float-right" title="API">Next <span class="icon icon-circle-arrow-right"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+  </div>
+
+  Built with <a href="https://www.mkdocs.org/">MkDocs</a> using a <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+        <span>
+          <a href="https://github.com/hmbaghdassarian/human_me" class="fa fa-github" style="color: #fcfcfc"> GitHub</a>
+        </span>
+    
+    
+      <span><a href=".." style="color: #fcfcfc">&laquo; Previous</a></span>
+    
+    
+      <span><a href="../api/" style="color: #fcfcfc">Next &raquo;</a></span>
+    
+  </span>
+</div>
+    <script>var base_url = '..';</script>
+    <script src="../js/theme_extra.js" defer></script>
+    <script src="../js/theme.js" defer></script>
+      <script src="../search/main.js" defer></script>
+    <script defer>
+        window.onload = function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        };
+    </script>
+
+</body>
+</html>
