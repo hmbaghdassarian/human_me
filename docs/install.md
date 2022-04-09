@@ -36,9 +36,9 @@ The solver can be set up as specified in the installation instructions for [solv
 
 Note: Disregard the requirements that are delineated in solvmepy's README, with the exception of gfortran (#4). The remainder should have been appropriately installed with installation of human_me, if necessary.
 
-⋅⋅⋅i) download the qminos file into a specified solver directory, which we refer to here as "solver_parent_directory".
+⋅⋅⋅3a) download the qminos file into a specified solver directory, which we refer to here as "solver_parent_directory".
 
-⋅⋅⋅ii) the solver can be installed using the human_me Makefile as follows:
+⋅⋅⋅3b) the solver can be installed using the human_me Makefile as follows:
 
 ```console
 $make -C <path/to/human_me/> install-qminos SOLVER_PATH=<path/to/solver/solver_parent_directory>

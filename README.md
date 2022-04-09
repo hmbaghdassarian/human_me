@@ -11,17 +11,17 @@ Requirements: gfortran (>=4.6)
 ```console
 $pip install human_me
 ```
-3. Set up the qMINOS solver. 
+3. Set up the qMINOS solver. You will need the qminos file, which can be obtained for academic use from Prof. Michael Saunders at Stanford University.
 
-⋅⋅⋅i) download the qminos file into a specified solver directory, which we refer to here as "solver_parent_directory".
+⋅⋅⋅3a) download the qminos file into a specified solver directory, which we refer to here as "solver_parent_directory".
 
-⋅⋅⋅ii) the solver can be installed using the human_me Makefile as follows:
+⋅⋅⋅3b) the solver can be installed using the human_me Makefile as follows:
 
 ```console
 $make -C <path/to/human_me/> install-qminos SOLVER_PATH=<path/to/solver/solver_parent_directory>
 ```
 
-4. Download the files in the "data.zip" and "build_files.zip" folders. If you don't have a PSIM or cobrapy model to input, also download those from input files. If you want to express non_machinery, create that as a text file (list of HGNC IDs separated by \n)
+1. Download the files in the "data.zip" and "build_files.zip" folders. If you don't have a PSIM or cobrapy model to input, also download those from input files. If you want to express non_machinery, create that as a text file (list of HGNC IDs separated by \n)
 
 ## Downloadable Files
 Download directories 1 and 2: 

@@ -45,6 +45,12 @@
                 <li class="toctree-l1 current"><a class="reference internal current" href=".">Start</a>
     <ul class="current">
     <li class="toctree-l2"><a class="reference internal" href="#protein-specific-information-matrix-psim">Protein-Specific Information Matrix (PSIM)</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#data-sources">Data Sources</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#formatting">Formatting</a>
+    </li>
+        </ul>
     </li>
     </ul>
                 </li>
@@ -85,10 +91,8 @@
                 <h1 id="human_me">human_me</h1>
 <p>Python package to generate and analyze human ME Models.</p>
 <h2 id="protein-specific-information-matrix-psim">Protein-Specific Information Matrix (PSIM)</h2>
-<p>This section provides details on the PSIM</p>
-<h1 id="psim">PSIM</h1>
-<h3 id="the-protein-specific-expression-matrix-psim-is-a-dataframe-which-contains-all-protein-specific-features-needed-to-generate-the-expression-module-reactions-in-the-me-model">the protein-specific expression matrix (PSIM) is a dataframe which contains all protein-specific features needed to generate the expression module reactions in the ME-Model</h3>
-<h2 id="data-sources">Data Sources</h2>
+<p>This section provides details on the PSIM. The PSIM is a dataframe which contains all protein-specific features needed to generate the expression module reactions in the ME-Model</p>
+<h3 id="data-sources">Data Sources</h3>
 <p>We provide a "gold-standard" PSIM (both in the build/ directory and the inputs/ directory with file name "psim_me.h5"). 
 Sources:
 * Sequences were generated form MANE Select, RefSeq Select, and APPRIS. 
@@ -98,7 +102,7 @@ Sources:
 * mrna degradation rates were taken from https://doi.org/10.1016/j.molcel.2014.03.017
 * protein degradation rates were taken from https://doi.org/10.1021/pr101183k
 * PTRs were taken from https://doi.org/10.15252/msb.20188513</p>
-<h2 id="formatting">Formatting</h2>
+<h3 id="formatting">Formatting</h3>
 <p>We explain the formatting and values for all columns in the gold-standard PSIM. Any user-provided PSIM can be generated following this formatting (column names must match exactly). </p>
 <p>Legend:
 * super required columns<sup>0</sup>: default values unavailable, user must provide
@@ -211,5 +215,5 @@ Sources:
 
 <!--
 MkDocs version : 1.3.0
-Build Date UTC : 2022-04-09 20:33:27.327091+00:00
+Build Date UTC : 2022-04-09 20:45:19.833591+00:00
 -->
