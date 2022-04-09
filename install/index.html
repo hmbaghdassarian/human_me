@@ -88,53 +88,57 @@
 <p>These provide additional details and alternate installation instructions for setting up the human_me environment and qMINOS solver</p>
 <h2 id="step-1-2-creating-the-environment">Step 1-2: Creating the Environment</h2>
 <p>We highly recommending setting up a <a href="https://packaging.python.org/guides/">python virtual environment</a> instead of a conda environment, because it works better with the solver.</p>
-<p>This can be done as follows:</p>
-<pre><code class="language-console">$python3 -m venv &lt;env_name&gt; --python=python3.6.9
-$source [env_name]/bin/activate
-</code></pre>
-<p>The human_me environment can be setup independent of PyPi using github and requirements.txt: </p>
-<pre><code class="language-console">$git clone https://github.com/hmbaghdassarian/human_me.git
-$pip install -r &lt;path/to/human_me/&gt;requirements.txt
-</code></pre>
-<p>or setup.py:</p>
-<pre><code class="language-console">$git clone https://github.com/hmbaghdassarian/human_me.git
-$python &lt;path/to/human_me/&gt;setup.py install
-</code></pre>
-<p>If jupyter notebook does not load the virtual environment kernel, outside of the environment, try: </p>
-<pre><code class="language-console">python3 -m ipykernel install --user --name=&lt;env_name&gt;
-</code></pre>
+<p>This can be done as follows:
+<div class="highlight"><pre><span></span><code><span class="gp">$</span>python3 -m venv &lt;env_name&gt; <span class="c1">#--python=python3.6.9</span>
+<span class="gp">$</span><span class="nb">source</span> <span class="o">[</span>env_name<span class="o">]</span>/bin/activate
+</code></pre></div></p>
+<p>human_me can be installed using pip and PyPi:
+<div class="highlight"><pre><span></span><code><span class="gp">$</span>pip install human_me
+</code></pre></div></p>
+<p><strong><em>Alternatively</em></strong>, the human_me environment can be setup independent of PyPi using github and requirements.txt: 
+<div class="highlight"><pre><span></span><code><span class="gp">$</span>git clone https://github.com/hmbaghdassarian/human_me.git
+<span class="gp">$</span>pip install -r &lt;path/to/human_me/&gt;requirements.txt
+</code></pre></div></p>
+<p>or setup.py:
+<div class="highlight"><pre><span></span><code><span class="gp">$</span>git clone https://github.com/hmbaghdassarian/human_me.git
+<span class="gp">$</span>python &lt;path/to/human_me/&gt;setup.py install
+</code></pre></div></p>
+<p>If jupyter notebook does not load the virtual environment kernel, outside of the environment, try: 
+<div class="highlight"><pre><span></span><code><span class="go">python3 -m ipykernel install --user --name=&lt;env_name&gt;</span>
+</code></pre></div></p>
 <h2 id="step-3-setting-up-the-qminos-solver">Step 3: Setting up the qMINOS solver</h2>
-<p>qMINOS is a high precision LP solver necessary for the order-of-magnitude differences in ME Model coefficients.
-The QMINOS solver can be obtained for academic use from Prof. Michael Saunders at Stanford University.
-The solver can be set up as specified in the installation instructions for <a href="https://github.com/SBRG/solvemepy">solvemepy</a>.  Make sure gfortran is available to your system, as it is needed for running the solver.</p>
-<p>Note: Disregard the requirements that are delineated in solvmepy's README, with the exception of gfortran (#4). The remainder should have been appropriately installed with installation of human_me, if necessary.</p>
-<p>⋅⋅⋅3a) download the qminos file into a specified solver directory, which we refer to here as "solver_parent_directory".</p>
-<p>⋅⋅⋅3b) the solver can be installed using the human_me Makefile as follows:</p>
-<pre><code class="language-console">$make -C &lt;path/to/human_me/&gt; install-qminos SOLVER_PATH=&lt;path/to/solver/solver_parent_directory&gt;
-</code></pre>
+<p>qMINOS is a high precision LP solver necessary for the order-of-magnitude differences in ME Model coefficients.<br>
+The QMINOS solver can be obtained for academic use from Prof. Michael Saunders at Stanford University.<br>
+gfortran (&gt;=4.6) is required for qMINOS <br></p>
+<p>&emsp;i) download the qminos file into a specified solver directory, which we refer to here as "solver_parent_directory".</p>
+<p>&emsp;ii) the solver can be installed using the human_me Makefile as follows:</p>
+<div class="highlight"><pre><span></span><code><span class="gp">$</span>make -C &lt;path/to/human_me/&gt; install-qminos <span class="nv">SOLVER_PATH</span><span class="o">=</span>&lt;path/to/solver/solver_parent_directory&gt;
+</code></pre></div>
 <p>If SOLVER_PATH is not specified, it defaults to path/to/human_me/solver.</p>
-<p>Alternatively, instead of using make, you can set up qminos manually. This will require getting qminos working with solvemepy. 
-The solver parent directory specified above stores both qminos and solvemepy, but they do not need to be stored in the same directory.
-Ensure that all this is done with the virtual environment activated.</p>
-<p>⋅⋅⋅Step 2a: Untar the QMINOS solver and follow Step 1 of solveme installation guide:</p>
-<pre><code class="language-console">tar -xvf qminos.tar.gz #tar file from Prof. Michael Saunders
-cd &lt;path/to/solver/solver_parent_directory/&gt;qminos1114/
-cp Makefile.defs minos56/
-cp Makefile.defs qminos56/
-cd minos56
-make clean
-make
-cd ../qminos56/
-make clean
-make
-</code></pre>
-<p>⋅⋅⋅Step 2b: Having exited the qminos directory, clone the solveme github and follow Step 2-3 of the solveme installation guide: </p>
-<pre><code class="language-console">git clone https://github.com/SBRG/solvemepy.git #@2a2c9c098d5bad957ef41637955fe338a31bac4c
-cd &lt;path/to/solvemepy/&gt;
-cp &lt;path/to/solver/solver_parent_directory/&gt;qminos1114/minos56/lib/libminos.a ./
-cp &lt;path/to/solver/solver_parent_directory/&gt;qminos1114/qminos56/lib/libquadminos.a ./
-python setup.py develop
-</code></pre>
+<hr />
+<p><strong><em>Alternatively</em></strong>, instead of using make, you can set up qminos manually as specified in the installation instructions for <a href="https://github.com/SBRG/solvemepy">solvemepy</a>. </p>
+<p>This will require getting both qminos and solvemepy. The solver parent directory specified above stores both qminos and solvemepy, but they do not need to be stored in the same directory.</p>
+<p>You can disregard the requirements that are delineated in solvmepy's README, with the exception of gfortran (#4). The remainder should have been appropriately installed with installation of human_me, if necessary.</p>
+<p>Ensure that all this is done with the virtual environment activated.</p>
+<p>&emsp;i) Untar the QMINOS solver and follow Step 1 of solveme installation guide:</p>
+<div class="highlight"><pre><span></span><code><span class="go">tar -xvf qminos.tar.gz #tar file from Prof. Michael Saunders</span>
+<span class="go">cd &lt;path/to/solver/solver_parent_directory/&gt;qminos1114/</span>
+<span class="go">cp Makefile.defs minos56/</span>
+<span class="go">cp Makefile.defs qminos56/</span>
+<span class="go">cd minos56</span>
+<span class="go">make clean</span>
+<span class="go">make</span>
+<span class="go">cd ../qminos56/</span>
+<span class="go">make clean</span>
+<span class="go">make</span>
+</code></pre></div>
+<p>&emsp;ii) Having exited the qminos directory, clone the solveme github and follow Step 2-3 of the solveme installation guide: </p>
+<div class="highlight"><pre><span></span><code><span class="go">git clone https://github.com/SBRG/solvemepy.git #@2a2c9c098d5bad957ef41637955fe338a31bac4c</span>
+<span class="go">cd &lt;path/to/solvemepy/&gt;</span>
+<span class="go">cp &lt;path/to/solver/solver_parent_directory/&gt;qminos1114/minos56/lib/libminos.a ./</span>
+<span class="go">cp &lt;path/to/solver/solver_parent_directory/&gt;qminos1114/qminos56/lib/libquadminos.a ./</span>
+<span class="go">python setup.py develop</span>
+</code></pre></div>
               
             </div>
           </div><footer>
