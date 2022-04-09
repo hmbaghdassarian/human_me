@@ -1,3 +1,7 @@
 [submodule "MammalianSecretoryRecon"]
 	path = MammalianSecretoryRecon
 	url = https://github.com/LewisLabUCSD/MammalianSecretoryRecon
+
+[submodule "solvemepy"]
+	path = solvemepy
+	url = https://github.com/SBRG/solvemepy

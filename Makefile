@@ -2,7 +2,10 @@
 #SRC_TEST=tests
 #SRC_BENCHMARK=benchmarks
 
-# PYTHON=python
+PYTHON=python
+SOLVER_PATH=./solver/
+SOLVER_TYPE=qminos
+# VENV=me_env
 # PIP=pip
 
 help:
@@ -11,12 +14,11 @@ help:
 	@echo " build-files            - Download the build files."
 	# @echo " tests-coverage-html    - Run unit tests, code coverage and generate html."
 
+# make SOLVER_PATH=path/to/install_solver/ install-qminos
+# solver path is the parent directory that should contain the qminos.tar.gz file
 install-qminos:
-# 	$(PYTHON) -m pytest $(SRC_TEST)
+	${PYTHON} install_solver.py ${SOLVER_PATH} ${SOLVER_TYPE}
+	${PYTHON} ${SOLVER_PATH}/solvemepy/setup.py develop
 
-build-files:
-# 	$(PYTHON) -m pytest --cov=$(SRC_CORE) $(SRC_TEST)
-# 	$(PYTHON) -m codecov
-
-# test-coverage-html:
-# 	$(PYTHON) -m pytest --cov=$(SRC_CORE) $(SRC_TEST) --cov-report=html
+# build-data:
+	#YOURCODEHERE

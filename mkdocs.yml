@@ -20,4 +20,5 @@ plugins:
 
 nav:
   - "Start": index.md
+  - "Installation": install.md
   - "API": api.md

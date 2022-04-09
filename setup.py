@@ -67,7 +67,8 @@ metadata = dict(
     long_description_content_type="text/markdown",
     long_description=long_description,
     url='https://github.com/hmbaghdassarian/human_me',  # homepage
-    packages=find_packages(include=('human_me*')),  # PACKAGES
+    packages=find_packages(include=('human_me*')), # PACKAGES
+    scripts=['install_solver'], 
     # py_mopdules=['io'],
     python_requires=PYTHON_REQUIRES,
     install_requires=INSTALL_REQUIRES,
