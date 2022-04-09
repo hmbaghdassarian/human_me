@@ -2,7 +2,7 @@
 human_me is a python package to generate ME-Models from input context-extracted Recon2.2 M-Models
 
 ## Installation
-For additional details and alternate install options, see the documentation's [installation instructions](https://hmbaghdassarian.github.io/human_me/install/). 
+For additional details and alternate install options, see the documentation's [installation instructions](https://hmbaghdassarian.github.io/human_me/install/). <br>
 Requirements: gfortran (>=4.6)
 
 
@@ -13,9 +13,9 @@ $pip install human_me
 ```
 3. Set up the qMINOS solver. You will need the qminos file, which can be obtained for academic use from Prof. Michael Saunders at Stanford University.
 
-⋅⋅⋅3a) download the qminos file into a specified solver directory, which we refer to here as "solver_parent_directory".
+&emsp;i) download the qminos file into a specified solver directory, which we refer to here as "solver_parent_directory".
 
-⋅⋅⋅3b) the solver can be installed using the human_me Makefile as follows:
+&emsp;ii) the solver can be installed using the human_me Makefile as follows:
 
 ```console
 $make -C <path/to/human_me/> install-qminos SOLVER_PATH=<path/to/solver/solver_parent_directory>

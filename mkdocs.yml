@@ -14,9 +14,10 @@ plugins:
           rendering:
             show_source: false
 
-# markdown_extensions:
-#   - pymdownx.highlight
-#   - pymdownx.superfences
+markdown_extensions:
+  - smarty
+  - pymdownx.highlight
+  - pymdownx.superfences
 
 nav:
   - "Start": index.md
