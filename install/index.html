@@ -110,7 +110,7 @@
 <p>qMINOS is a high precision LP solver necessary for the order-of-magnitude differences in ME Model coefficients.<br>
 The QMINOS solver can be obtained for academic use from Prof. Michael Saunders at Stanford University.<br>
 gfortran (&gt;=4.6) is required for qMINOS <br></p>
-<p>&emsp;i) download the qminos file into a specified solver directory, which we refer to here as "solver_parent_directory".</p>
+<p>&emsp;i) download the qminos file into a specified solver directory, which we refer to here as &ldquo;solver_parent_directory&rdquo;.</p>
 <p>&emsp;ii) the solver can be installed using the human_me Makefile as follows:</p>
 <div class="highlight"><pre><span></span><code><span class="gp">$</span>make -C &lt;path/to/human_me/&gt; install-qminos <span class="nv">SOLVER_PATH</span><span class="o">=</span>&lt;path/to/solver/solver_parent_directory&gt;
 </code></pre></div>
@@ -118,7 +118,7 @@ gfortran (&gt;=4.6) is required for qMINOS <br></p>
 <hr />
 <p><strong><em>Alternatively</em></strong>, instead of using make, you can set up qminos manually as specified in the installation instructions for <a href="https://github.com/SBRG/solvemepy">solvemepy</a>. </p>
 <p>This will require getting both qminos and solvemepy. The solver parent directory specified above stores both qminos and solvemepy, but they do not need to be stored in the same directory.</p>
-<p>You can disregard the requirements that are delineated in solvmepy's README, with the exception of gfortran (#4). The remainder should have been appropriately installed with installation of human_me, if necessary.</p>
+<p>You can disregard the requirements that are delineated in solvmepy&rsquo;s README, with the exception of gfortran (#4). The remainder should have been appropriately installed with installation of human_me, if necessary.</p>
 <p>Ensure that all this is done with the virtual environment activated.</p>
 <p>&emsp;i) Untar the QMINOS solver and follow Step 1 of solveme installation guide:</p>
 <div class="highlight"><pre><span></span><code><span class="go">tar -xvf qminos.tar.gz #tar file from Prof. Michael Saunders</span>
