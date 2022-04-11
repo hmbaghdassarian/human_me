@@ -17,6 +17,7 @@
 # **/.pylintrc
 # **/.isort.cfg
 # **/.pydocstyle
+human_me/data/data.ini
 
 *.env
 .env_template
