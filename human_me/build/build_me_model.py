@@ -1350,6 +1350,7 @@ def build_me(me_input_model: Union[cobra.Model,str],
         # of cores to parallelize on, by default os.cpu_count()
     non_machinery : Dict[str, List[str]], optional
         keys are HGNC IDs, values are a list wherein element represents a compartment within the model for the gene to be expressed, by default None
+        We define machinery as proteins that are utilized in the reaction GPRs. In its current format, it is not possible for a protein to both be machinery and non-machinery
     knock_out : List[str], optional
         each element is the HGNC ID of a gene expressed in the model which should be knocked out, by default None
         *Note: you may want to knock-out during building if setting minimal_proteome = True and knocking out a 

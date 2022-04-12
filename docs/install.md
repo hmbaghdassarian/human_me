@@ -8,25 +8,25 @@ We highly recommending setting up a [python virtual environment](https://packagi
 
 This can be done as follows:
 ```console
-$python3 -m venv <env_name> #--python=python3.6.9
-$source [env_name]/bin/activate
+python3 -m venv <env_name> #--python=python3.6.9
+source [env_name]/bin/activate
 ```
 
 human_me can be installed using pip and PyPi:
 ```console
-$pip install human_me
+pip install human_me
 ```
 
 ***Alternatively***, the human_me environment can be setup independent of PyPi using github and requirements.txt: 
 ```console
-$git clone https://github.com/hmbaghdassarian/human_me.git
-$pip install -r <path/to/human_me/>requirements.txt
+git clone https://github.com/hmbaghdassarian/human_me.git
+pip install -r <path/to/human_me/>requirements.txt
 ```
 
 or setup.py:
 ```console
-$git clone https://github.com/hmbaghdassarian/human_me.git
-$python <path/to/human_me/>setup.py install
+git clone https://github.com/hmbaghdassarian/human_me.git
+python <path/to/human_me/>setup.py install
 ```
 
 If jupyter notebook does not load the virtual environment kernel, outside of the environment, try: 
@@ -44,7 +44,7 @@ gfortran (>=4.6) is required for qMINOS <br>
 &emsp;ii) the solver can be installed using the human_me Makefile as follows:
 
 ```console
-$make -C <path/to/human_me/> install-qminos SOLVER_PATH=<path/to/solver/solver_parent_directory>
+make -C <path/to/human_me/> install-qminos SOLVER_PATH=<path/to/solver/solver_parent_directory>
 ```
 
 If SOLVER_PATH is not specified, it defaults to path/to/human_me/solver.
@@ -83,3 +83,42 @@ cp <path/to/solver/solver_parent_directory/>qminos1114/minos56/lib/libminos.a ./
 cp <path/to/solver/solver_parent_directory/>qminos1114/qminos56/lib/libquadminos.a ./
 python setup.py develop
 ```
+
+## Step 4: Downloading supporting data files
+
+Data for human_me is structured as follows:
+```
+data
+└───build
+│      **psim_gold.h5
+│      **recon2_2_only_psim.csv
+└───inputs
+│      **recon2_2.xml
+│      psim_user
+│      non_machinery
+└───*prebuild
+```
+** = default, downloaded by make build-data
+
+1. inputs: files used as inputs to the ME Model building; the defaul M-Model (Recon2.2) is downloaded. 
+   Other main input files are briefly discussed below, and extensively discussed in the tutorials and API documentation. 
+   While they do not need to be stored in /data/inputs/, it is a useful organization structure.
+2. build: all files used in pipeline to building the ME Model; can be downloaded here
+3. prebuild: not needed to run; these are file inputs/outputs from analyses that helped generate the build files
+
+
+Small files are stored on Github in the [human_me_data repository](https://github.com/hmbaghdassarian/human_me_data) and accessed directly by the package. 
+Larger files need to be downloaded directly from public Google Drive files. This is done using the make build-files command as follows:
+
+```console
+make -C <path/to/human_me/> build-data DATA_DIR=</desired/local_data/directory>
+```
+
+If you also want to download the prebuild files, run the following command:
+```console
+make -C <path/to/human_me/> build-data DATA_DIR=</desired/local_data/directory> PREBUILD=1
+```
+The user-specificed local data directory is stored in a human_me/data/data.ini config file. 
+### Input File Descriptions
+1. M_Model: a cobrapy metabolic model in sbml format. We highly recommend Recon2.2 or a context-specific metabolic model generated from Recon2.2, as this is the only model the pipeline has been tested on. Our "inputs" directory provides a version of Recon2.2 with minor modifications to work with the ME-Model building pipeline. Alternatively, you can use the preprocess.correct_inputs.correct_model function on your metabolic model to introduce these modifications. 
+2. PSIM: see the [doumentation](https://hmbaghdassarian.github.io/human_me/) for details. If a user does not provide a PSIM, either directly into the function as a datatable or via data/inputs/psim_user, the default input PSIM is data/build/psim_gold.h5 (the gold-standard PSIM). 

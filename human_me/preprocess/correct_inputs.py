@@ -237,6 +237,7 @@ def check_non_machinery(non_machinery: Optional[Dict[str, List[str]]] = None) ->
     non_machinery : Dict[str, List[str]], optional
         keys are HGNC IDs, values are a list of strings, each element of which represents a compartment within the 
         metabolic model for the gene to be expressed, by default None
+        We define machinery as proteins that are utilized in the reaction GPRs. In its current format, it is not possible for a protein to both be machinery and non-machinery
 
     Returns
     -------
@@ -315,6 +316,7 @@ def correct_psim(me_input_model: Union[cobra.Model, str],
     non_machinery : dict, optional
         keys are HGNC IDs, values are a list of strings, each element of which represents a compartment
         within the metabolic model for the gene to be expressed, by default None
+        We define machinery as proteins that are utilized in the reaction GPRs. In its current format, it is not possible for a protein to both be machinery and non-machinery
 
     Returns
     -------

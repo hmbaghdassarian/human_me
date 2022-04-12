@@ -47,7 +47,7 @@ INSTALL_REQUIRES = [
     'seaborn==0.11.2'
     'biopython==1.79'
     'Faker==8.5.1'
-    'googledrivedownloader==0.4'
+    'gdown==4.4.0'
     'make==4.1 '
 ]
 

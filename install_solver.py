@@ -16,7 +16,7 @@ def install_qminos(solver_path: str = root_path + 'solver/'):
         by default, assumes the solver directory has been made in the package
     """
     # STEP 1: get the qminos solver locally
-    # TODO: replace STEP1 with juts downloading qminos if possible
+    # TODO: replace STEP1 with juts downloading qminos if possible -- can actually combine with human_me/data/_download_data.py (solver and data subdirs all into same parent directory)
     if not os.path.isdir(solver_path):
         raise ValueError('The path to the speciifed olver directory does not exist')
     if not os.path.isdir(os.path.join(solver_path, 'qminos1114')):
