@@ -93,7 +93,7 @@
 <h2 id="protein-specific-information-matrix-psim">Protein-Specific Information Matrix (PSIM)</h2>
 <p>This section provides details on the PSIM. The PSIM is a dataframe which contains all protein-specific features needed to generate the expression module reactions in the ME-Model</p>
 <h3 id="data-sources">Data Sources</h3>
-<p>We provide a &ldquo;gold-standard&rdquo; PSIM (both in the build/ directory and the inputs/ directory with file name &ldquo;psim_me.h5&rdquo;). 
+<p>We provide a "gold-standard" PSIM (both in the build/ directory and the inputs/ directory with file name "psim_me.h5"). 
 Sources:
 * Sequences were generated form MANE Select, RefSeq Select, and APPRIS. 
 * The number of exons was found using the Ensembl REST API for the specific transcript isoform. 
@@ -111,13 +111,13 @@ Sources:
 * optional columns<sup>3</sup>: used in pipeline, but default values can be used when not provided 
 * optional columns, secretory pathway only<sup>4</sup>: if provided, these are only used for proteins that will be processed via the secretory pathway (ER, Golgi, exctracellular membrane, plasma membrane, lysosome).
 * additional information<sup>5</sup>: not used in pipeline, but additional metadata associated with each gene - specific to Recon2.2 and gold-standard PSIM. User provided PSIM does not need these columns. </p>
-<p>The PSIM is read into the pipeline using the preprocess.correct_inputs.correct_psim function, which will check that all values make sense. If the fill_na argument is set to &lsquo;select&rsquo;, all NaN values in the user-provided PSIM are filled with values from the gold-standard PSIM when available, otherwise default. If the fill_na argument is set to &lsquo;default&rsquo;, all NaN values are replaced with a default value according to the expression.gene_expression.gene_information.GeneInformation class. </p>
+<p>The PSIM is read into the pipeline using the preprocess.correct_inputs.correct_psim function, which will check that all values make sense. If the fill_na argument is set to 'select', all NaN values in the user-provided PSIM are filled with values from the gold-standard PSIM when available, otherwise default. If the fill_na argument is set to 'default', all NaN values are replaced with a default value according to the expression.gene_expression.gene_information.GeneInformation class. </p>
 <p>Columns:
 * HGNC_ID<sup>0</sup>: The gene ID in HGNC format (HGNC:####). There should be an entry for all genes that are included in the M_Model GPR and in non-machinery. 
     * Datatype: str
-* PREMRNA_SEQ<sup>1</sup>: The gene premrna sequence. Requirements include that values can only include &lsquo;A&rsquo;, &lsquo;C&rsquo;, &lsquo;G&rsquo;, &lsquo;U&rsquo;, and the sequence length must be &gt;= mrna sequence length.<br />
+* PREMRNA_SEQ<sup>1</sup>: The gene premrna sequence. Requirements include that values can only include 'A', 'C', 'G', 'U', and the sequence length must be &gt;= mrna sequence length.<br />
     * Datatype: string
-    * Default value: Technically none, but preprocess.correct_inputs.correct_psim will fill incorrect values with the gold-standard PSIM values. Requirements include that values can only include &lsquo;A&rsquo;, &lsquo;C&rsquo;, &lsquo;G&rsquo;, &lsquo;U&rsquo;, the sequence length must be &lt;= premrna sequence length, and the sequence length must be &gt;= 3<em>protein sequence length.<br />
+    * Default value: Technically none, but preprocess.correct_inputs.correct_psim will fill incorrect values with the gold-standard PSIM values. Requirements include that values can only include 'A', 'C', 'G', 'U', the sequence length must be &lt;= premrna sequence length, and the sequence length must be &gt;= 3<em>protein sequence length.<br />
 </em> MRNA_SEQ<sup>1</sup>: The gene mrna sequence (isoform specific). 
     * Datatype: str
     * Default value: Technically none, but preprocess.correct_inputs.correct_psim will fill incorrect values with the gold-standard PSIM values. 
@@ -160,10 +160,10 @@ Sources:
 * LOCATION<sup>2</sup>: The final location of the protein. Required for non-machinery, disregarded for machinery (pipeline infers location from the reaction compartments).<br />
     * Datatype: str, on of utils.paramaters.compartments.keys()</p>
 <p>Additional Information in Gold-Standard PSIM:
-* Machinery<sup>5</sup>: Whether a protein is considered machinery according to the full Recon2.2 (&lsquo;Metabolic&rsquo;), the GPRs for expression reactions (&lsquo;Expression&rsquo;), both (&lsquo;Both&rsquo;), or neither (&lsquo;Non-Machinery&rsquo;). 
+* Machinery<sup>5</sup>: Whether a protein is considered machinery according to the full Recon2.2 ('Metabolic'), the GPRs for expression reactions ('Expression'), both ('Both'), or neither ('Non-Machinery'). 
 * Source<sup>5</sup>: From which database the isoform sequences were attained. 
 * Status<sup>5</sup>: 1 for entries that should work with the pipeline, 0 for entries that will cause an error in the pipeline. 
-* The remaining columns<sup>5</sup> are various IDs for the gene: &lsquo;GENE_SYMBOL&rsquo;, &lsquo;GeneID&rsquo;, &lsquo;ENSG_ID&rsquo;, &lsquo;ENST_ID&rsquo;, &lsquo;ENSP_ID&rsquo;, &lsquo;REFT_ID&rsquo;, &lsquo;REFP_ID&rsquo;,&rsquo;UNIPROT_ID&rsquo;. </p>
+* The remaining columns<sup>5</sup> are various IDs for the gene: 'GENE_SYMBOL', 'GeneID', 'ENSG_ID', 'ENST_ID', 'ENSP_ID', 'REFT_ID', 'REFP_ID','UNIPROT_ID'. </p>
               
             </div>
           </div><footer>
@@ -215,5 +215,5 @@ Sources:
 
 <!--
 MkDocs version : 1.3.0
-Build Date UTC : 2022-04-12 02:44:32.674194+00:00
+Build Date UTC : 2022-04-13 22:56:10.296132+00:00
 -->

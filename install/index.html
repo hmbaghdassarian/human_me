@@ -96,7 +96,7 @@
 <p>We highly recommending setting up a <a href="https://packaging.python.org/guides/">python virtual environment</a> instead of a conda environment, because it works better with the solver.</p>
 <p>This can be done as follows:
 <div class="highlight"><pre><span></span><code><span class="go">python3 -m venv &lt;env_name&gt; #--python=python3.6.9</span>
-<span class="go">source [env_name]/bin/activate</span>
+<span class="go">source &lt;env_name&gt;/bin/activate</span>
 </code></pre></div></p>
 <p>human_me can be installed using pip and PyPi:
 <div class="highlight"><pre><span></span><code><span class="go">pip install human_me</span>
@@ -116,7 +116,7 @@
 <p>qMINOS is a high precision LP solver necessary for the order-of-magnitude differences in ME Model coefficients.<br>
 The QMINOS solver can be obtained for academic use from Prof. Michael Saunders at Stanford University.<br>
 gfortran (&gt;=4.6) is required for qMINOS <br></p>
-<p>&emsp;i) download the qminos file into a specified solver directory, which we refer to here as &ldquo;solver_parent_directory&rdquo;.</p>
+<p>&emsp;i) download the qminos file into a specified solver directory, which we refer to here as "solver_parent_directory".</p>
 <p>&emsp;ii) the solver can be installed using the human_me Makefile as follows:</p>
 <div class="highlight"><pre><span></span><code><span class="go">make -C &lt;path/to/human_me/&gt; install-qminos SOLVER_PATH=&lt;path/to/solver/solver_parent_directory&gt;</span>
 </code></pre></div>
@@ -124,7 +124,7 @@ gfortran (&gt;=4.6) is required for qMINOS <br></p>
 <hr />
 <p><strong><em>Alternatively</em></strong>, instead of using make, you can set up qminos manually as specified in the installation instructions for <a href="https://github.com/SBRG/solvemepy">solvemepy</a>. </p>
 <p>This will require getting both qminos and solvemepy. The solver parent directory specified above stores both qminos and solvemepy, but they do not need to be stored in the same directory.</p>
-<p>You can disregard the requirements that are delineated in solvmepy&rsquo;s README, with the exception of gfortran (#4). The remainder should have been appropriately installed with installation of human_me, if necessary.</p>
+<p>You can disregard the requirements that are delineated in solvmepy's README, with the exception of gfortran (#4). The remainder should have been appropriately installed with installation of human_me, if necessary.</p>
 <p>Ensure that all this is done with the virtual environment activated.</p>
 <p>&emsp;i) Untar the QMINOS solver and follow Step 1 of solveme installation guide:</p>
 <div class="highlight"><pre><span></span><code><span class="go">tar -xvf qminos.tar.gz #tar file from Prof. Michael Saunders</span>
@@ -175,7 +175,7 @@ Larger files need to be downloaded directly from public Google Drive files. This
 The user-specificed local data directory is stored in a human_me/data/data.ini config file. </p>
 <h3 id="input-file-descriptions">Input File Descriptions</h3>
 <ol>
-<li>M_Model: a cobrapy metabolic model in sbml format. We highly recommend Recon2.2 or a context-specific metabolic model generated from Recon2.2, as this is the only model the pipeline has been tested on. Our &ldquo;inputs&rdquo; directory provides a version of Recon2.2 with minor modifications to work with the ME-Model building pipeline. Alternatively, you can use the preprocess.correct_inputs.correct_model function on your metabolic model to introduce these modifications. </li>
+<li>M_Model: a cobrapy metabolic model in sbml format. We highly recommend Recon2.2 or a context-specific metabolic model generated from Recon2.2, as this is the only model the pipeline has been tested on. Our "inputs" directory provides a version of Recon2.2 with minor modifications to work with the ME-Model building pipeline. Alternatively, you can use the preprocess.correct_inputs.correct_model function on your metabolic model to introduce these modifications. </li>
 <li>PSIM: see the <a href="https://hmbaghdassarian.github.io/human_me/">doumentation</a> for details. If a user does not provide a PSIM, either directly into the function as a datatable or via data/inputs/psim_user, the default input PSIM is data/build/psim_gold.h5 (the gold-standard PSIM). </li>
 </ol>
               
