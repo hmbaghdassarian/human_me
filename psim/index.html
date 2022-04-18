@@ -42,7 +42,7 @@
 
       <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
               <ul>
-                <li class="toctree-l1"><a class="reference internal" href="..">Start</a>
+                <li class="toctree-l1"><a class="reference internal" href="..">Home</a>
                 </li>
               </ul>
               <ul class="current">
@@ -91,20 +91,20 @@
                 <h2 id="protein-specific-information-matrix-psim">Protein-Specific Information Matrix (PSIM)</h2>
 <p>This section provides details on the PSIM. The PSIM is a dataframe which contains all protein-specific features needed to generate the expression module reactions in the ME-Model</p>
 <h3 id="data-sources">Data Sources</h3>
-<p>We provide a "gold-standard" PSIM (both in the build/ directory and the inputs/ directory with file name "psim_me.h5").
-Sources:</p>
+<p>We provide a "gold-standard" PSIM (file name "psim_gold.h5") which can be downloaded using make.</p>
+<p>Sources:</p>
 <ul>
 <li>Sequences were generated form MANE Select, RefSeq Select, and APPRIS.</li>
-<li>The number of exons was found using the Ensembl REST API for the specific transcript isoform. </li>
-<li>The poly(A)-length was taken from https://doi.org/10.1038/s41592-019-0503-y. </li>
-<li>Metadata associated to the secretory pathway was taken from human PSIM specified in  https://doi.org/10.1038/s41467-019-13867-y (https://github.com/LewisLabUCSD/MammalianSecretoryRecon/blob/master/JUPYTER_NOTEBOOKS/RECON2s_python/PSIM_HUMAN.tab)</li>
-<li>mrna degradation rates were taken from https://doi.org/10.1016/j.molcel.2014.03.017</li>
-<li>protein degradation rates were taken from https://doi.org/10.1021/pr101183k</li>
-<li>PTRs were taken from https://doi.org/10.15252/msb.20188513</li>
+<li>The number of exons was found using the Ensembl REST API for the specific transcript isoform.</li>
+<li>The poly(A)-length was taken from <a href="https://doi.org/10.1038/s41592-019-0503-y">here</a>. </li>
+<li>Metadata associated with the secretory pathway was taken from human PSIM specified <a href="https://doi.org/10.1038/s41467-019-13867-y">here</a>. The direct PSIM for this is <a href="(https://github.com/LewisLabUCSD/MammalianSecretoryRecon/blob/master/JUPYTER_NOTEBOOKS/RECON2s_python/PSIM_HUMAN.tab)">here</a>.</li>
+<li>mrna degradation rates were taken from <a href="https://doi.org/10.1016/j.molcel.2014.03.017">here</a>.</li>
+<li>protein degradation rates were taken from <a href="https://doi.org/10.1021/pr101183k">here</a>.</li>
+<li>PTRs were taken from <a href="https://doi.org/10.15252/msb.20188513">here</a>.</li>
 </ul>
 <h3 id="formatting">Formatting</h3>
 <p>We explain the formatting and values for all columns in the gold-standard PSIM. Any user-provided PSIM can be generated following this formatting (column names must match exactly). </p>
-<p>Legend:</p>
+<p>Legend for user-provided PSIM:</p>
 <ul>
 <li>super required columns<sup>0</sup>: default values unavailable, user must provide</li>
 <li>required columns<sup>1</sup>: default values unavailable, but if not provided or incorrect, will fill in with the gold-standard PSIM values when available (otherwise will error out)</li>
@@ -122,7 +122,7 @@ Sources:</p>
 </li>
 <li>PREMRNA_SEQ<sup>1</sup>: The gene premrna sequence. Requirements include that values can only include 'A', 'C', 'G', 'U', and the sequence length must be &gt;= mrna sequence length.  <ul>
 <li>Datatype: string</li>
-<li>Default value: Technically none, but preprocess.correct_inputs.correct_psim will fill incorrect values with the gold-standard PSIM values. Requirements include that values can only include 'A', 'C', 'G', 'U', the sequence length must be &lt;= premrna sequence length, and the sequence length must be &gt;= 3*protein sequence length.  </li>
+<li>Default value: Technically none, but preprocess.correct_inputs.correct_psim will fill incorrect values with the gold-standard PSIM values. Requirements include that values can only include 'A', 'C', 'G', 'U', the sequence length must be &gt;= mrna sequence length, and the sequence length must be &gt;= 3*protein sequence length.  </li>
 </ul>
 </li>
 <li>MRNA_SEQ<sup>1</sup>: The gene mrna sequence (isoform specific). <ul>
@@ -206,7 +206,7 @@ Sources:</p>
             </div>
           </div><footer>
     <div class="rst-footer-buttons" role="navigation" aria-label="Footer Navigation">
-        <a href=".." class="btn btn-neutral float-left" title="Start"><span class="icon icon-circle-arrow-left"></span> Previous</a>
+        <a href=".." class="btn btn-neutral float-left" title="Home"><span class="icon icon-circle-arrow-left"></span> Previous</a>
         <a href="../install/" class="btn btn-neutral float-right" title="Installation">Next <span class="icon icon-circle-arrow-right"></span></a>
     </div>
 
