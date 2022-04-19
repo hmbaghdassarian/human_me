@@ -178,8 +178,7 @@ class MEBuilder:
         del nm2, ipm
 
     def express_metabolic_enzymes(self):
-        """Get protein expression reactions for all metabolic enzymes and user-input non-machinery"""
-
+        """Get protein expression reactions for all metabolic enzymes and user-input non-machinery."""
         # get protein expression for all metabolic reactions
         print('Generate protein expression reactions for metabolic enzymes and non-machinery')
 
@@ -257,7 +256,7 @@ class MEBuilder:
                                                 protein_metabolites}  # store compartments and metabolite objects for each gene
 
     def express_expression_enzymes(self):
-        """Get protein expression reactions for all expression machinery"""
+        """Get protein expression reactions for all expression machinery."""
         # This method continues to add any expression module machinery that may have arisen from adding expression
         # reactions for expression machinery.
 
@@ -471,7 +470,7 @@ class MEBuilder:
             self.dummy_protein = None
 
     def get_complex_info(self):
-        "Parse and organize GPRs"
+        "Parse and organize GPRs."
         # ------------Metabolic Complexes
         print('Get metabolic module complex information')
         complex_df = get_complex_df(reactions=[r for r in self.m_model.reactions if len(r.genes) > 0],
@@ -704,7 +703,7 @@ class MEBuilder:
                 self.dummy_protein['protein_metabolite'].formula_weight / 1000) * (params.KEFF_MEDIAN / median_SASA)
 
     def minimize_proteome(self):
-        """In the presence of OR GPRs, retain only one reaction, that catalyzed by the enzyme with the lowest MW"""
+        """In the presence of OR GPRs, retain only one reaction, that catalyzed by the enzyme with the lowest MW."""
         if self.minimal_proteome:
             c_og = self.complex_df.copy()
             n_reactions_og = len(self.me_reactions) + len(self.complex_formation_reactions)
@@ -1035,7 +1034,7 @@ class MEBuilder:
         del self._check_catalysis_coefficient
 
     def deorphan(self):
-        """Couples dummy protein to reactions that don't have specified genes ("de-orphaning")
+        """Couples dummy protein to reactions that don't have specified genes ("de-orphaning").
 
         Returns
         ----------
@@ -1043,9 +1042,7 @@ class MEBuilder:
             a list of ME_Model reaction IDs for reactions that were de-orphaned
         self.orphan: list
             a list of ME_Model reaction IDs for reactions there were not de-orphaned despite having 0 specified genes 
-
         """
-
         if self.dummy_protein is not None:
             print('Deorphan enzymeless reactions')
             enzymeless_reactions = [to_metabolic_reaction(model_metabolites=self.model_metabolites, reaction=r) for r in self.m_model.reactions if len(r.genes) == 0]
@@ -1191,9 +1188,7 @@ class MEBuilder:
             self.deorphaned = [r.id for r in self.deorphaned]
 
     def incorporate_protein_degradation(self):
-        """Removes degradation reactions of inactive monomers and couples protein degradation to catalysis, depending on 
-        deg_args input."""
-
+        """Removes degradation reactions of inactive monomers and couples protein degradation to catalysis, depending on deg_args input."""
         if self.check_all and self.deg_args['complex_degradation']:
             for r in self.complex_degradation_reactions:
                 r._update_enzymes()  # updates rxn ._enzymes attribute to include all macromolecules involved in reaction catalysis
@@ -1331,8 +1326,7 @@ def build_me(me_input_model: Union[cobra.Model,str],
              deg_args: Dict[str, bool] = {'couple': True, 'reversible_complex_formation': False, 'nonenzyme_degradation': False,
                                           'complex_degradation': True}
              ):
-    """Build a human ME model according to input M-Model (as provided in preprocess.correct_inputs.correct_model), PSIM (as provided in preprocess.correct_inputs.correct_psim), 
-    and the parameters below. 
+    """Build a human ME model according to input M-Model (as provided in preprocess.correct_inputs.correct_model), PSIM (as provided in preprocess.correct_inputs.correct_psim), and the parameters below.
 
     Parameters
     ----------

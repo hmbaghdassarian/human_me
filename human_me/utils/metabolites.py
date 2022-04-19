@@ -4,14 +4,13 @@
 class MetaboliteBin:
     '''Stores all metabolites used in model building'''
     def __init__(self, me_input_model):
-        """Init method for MetaboliteBin
+        """Init method for MetaboliteBin.
 
         Parameters
         ----------
         me_input_model : cobra.Model
             the corrected input metabolic model (as provided in preprocess.correct_inputs.correct_model)
         """
-        
         self.human_model = me_input_model
         self.id_object_map = {m.id: m.copy() for m in self.human_model.metabolites} # copying dissociates metabolite from original cobrapy reactions/model
 

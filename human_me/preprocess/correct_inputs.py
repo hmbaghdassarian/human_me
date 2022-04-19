@@ -54,7 +54,8 @@ def bool_metabolite(m_id: str, compartment: str, m_model: cobra.Model) -> Tuple[
 
 def correct_model(model_file: Union[cobra.Model, str] = input_local_path + 'recon2_2.xml') -> Tuple[cobra.Model]:
     """Makes necessary changes to cobrapy model, largely based on issues encountered with Recon2.2.    
-    *Note that because the ME Model will create a new objective function, the input model's biomass objective function
+    
+    Note that because the ME Model will create a new objective function, the input model's biomass objective function
     is removed. The returned models cm_1 and cm_2 allow the user to compare corrected metabolic models with intact
     biomass objective functions with the output ME Model from human_me.build.build_me_model.build_me. We recommend
     using cm_1 for comparisons.
@@ -75,7 +76,6 @@ def correct_model(model_file: Union[cobra.Model, str] = input_local_path + 'reco
         Cobra model with GPRs corrected, metabolite transport reactions needed for ME Model incorporated,
         and removed biomass objective. Used as input to building the ME Model.
     """
-
     with urllib.request.urlopen(build_files_url + "required_metabolic_model_metabolites.json") as url:
         required_metabolites = json.loads(url.read().decode())
     rmd = pd.read_csv(build_files_url + 'required_metabolic_model_metabolites.csv', index_col=0)
@@ -229,8 +229,7 @@ def correct_model(model_file: Union[cobra.Model, str] = input_local_path + 'reco
 
 
 def check_non_machinery(non_machinery: Optional[Dict[str, List[str]]] = None) -> Dict[str, List[str]]:
-    """Runs checks on non-machinery input list. Non-machinery are categorized as any proteins to express in the ME-Model
-     that are not catalyzed in the reaction.
+    """Runs checks on non-machinery input list. Non-machinery are categorized as any proteins to express in the ME-Model that are not catalyzed in the reaction.
 
     Parameters
     ----------
@@ -256,7 +255,7 @@ def check_non_machinery(non_machinery: Optional[Dict[str, List[str]]] = None) ->
 
 
 def get_status(psim_me: pd.DataFrame) -> pd.DataFrame:
-    """Checks sequence columns for validity"""
+    """Checks sequence columns for validity."""
     psim = psim_me.copy()
     psim['Status'] = 1
 
@@ -286,12 +285,12 @@ def get_status(psim_me: pd.DataFrame) -> pd.DataFrame:
 
 
 def correct_psim(me_input_model: Union[cobra.Model, str],
-                psim_df: Union[pd.DataFrame, str] = build_local_path + 'psim_me.h5',
+                psim_df: Union[pd.DataFrame, str] = build_local_path + 'psim_gold.h5',
                  fill_na: str = 'default',
                  non_machinery: Optional[Dict[str, List[str]]] = None):
-    """Makes sure PSIM has all necessary correct information to build ME Model
+    """Makes sure PSIM has all necessary correct information to build ME Model.
 
-    *Note, the default psim_file, build/psim_me.h5, is a PSIM generated from MANE/RefSeq Select isoforms.
+    Note, the default psim_file, build/psim_gold.h5, is a PSIM generated from MANE/RefSeq Select isoforms.
     We refer to this as the gold standard "psim_gold".
 
     Parameters
@@ -301,7 +300,7 @@ def correct_psim(me_input_model: Union[cobra.Model, str],
         and removed biomass objective. Used as input to building the ME Model. Output of correct_model function.
         Can be 'full/path/to/corrected_model.xml'
     psim_df : Union[pd.DataFrame, str], optional
-        See PSIM_README for details on format of psim, by default build_local_path +'psim_me.h5' (gold-standard PSIM)
+        See PSIM_README for details on format of psim, by default build_local_path +'psim_gold.h5' (gold-standard PSIM)
     fill_na : str, optional
         options ['default', 'select'], by default 'default'
         if default: will fill incomplete values with default values (see PSIM_README for details)
@@ -328,8 +327,6 @@ def correct_psim(me_input_model: Union[cobra.Model, str],
         'added' is a list of genes missing (relative to me_input_model and non-machinery genes) in PSIM that were added
         'sequences' key is a superset of added, includes all genes with adjusted sequences
         'non-machinery locations' is for genes in non-machinery that did not have an appropriately specified location
-
-    Also writes corrected PSIM to 'outdir/corrected_psim_me.h5' (specified in preprocess.create_environment)
     """
     me_input_model = load_metabolic_model(me_input_model)
     # run basic non-machinery check
@@ -347,7 +344,7 @@ def correct_psim(me_input_model: Union[cobra.Model, str],
     all_columns = user_provided + essential_cols + optional_cols + nm_cols
 
     # load the MANE/RefSEQ Select PSIM---------------------------------------------------------------------
-    psim_gold = pd.read_hdf(build_local_path + 'psim_me.h5')
+    psim_gold = pd.read_hdf(build_local_path + 'psim_gold.h5')
     psim_gold = psim_gold[psim_gold.Status != 0]  # drop genes that won't work with model
     psim_gold = psim_gold[all_columns]
 
@@ -383,7 +380,7 @@ def correct_psim(me_input_model: Union[cobra.Model, str],
     missing_genes = sorted(set(proteins).difference(psim_me_genes + psim_gold_genes))
     if len(missing_genes) > 0:  # check all but expression machinery
         raise ValueError(
-            'The following specified genes are not present in the provided psim or build/psim_me.h5: ' + ', '.join(
+            'The following specified genes are not present in the provided psim or build/psim_gold.h5: ' + ', '.join(
                 missing_genes))
     # add expression machinery to lists
     proteins = sorted(set(proteins + expression_machinery))

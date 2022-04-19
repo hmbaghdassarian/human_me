@@ -17,7 +17,7 @@ from human_me.data.file_paths import build_local_path
 
 
 def flatten_list(list1: List[List[Any]]) -> list:
-    """Create a single list from a  list of lists
+    """Create a single list from a  list of lists.
 
     Parameters
     ----------
@@ -85,8 +85,7 @@ def convert_gi(gi, non_machinery: List[str]):
 
 
 def get_reaction_compartment(reaction: cobra.core.reaction.Reaction, stochastic: bool = False, seed: Optional[int] = None) -> str:
-    """Map reactions to a particular compartment according to some rules, informing the
-    compartment the enzyme catalyzing the reaction should be transported to.
+    """Map reactions to a particular compartment according to some rules, informing the compartment the enzyme catalyzing the reaction should be transported to.
 
     Parameters
     ----------
@@ -134,7 +133,7 @@ def hydrolyze_atp(metabolites_to_add: Dict[cobra.core.metabolite.Metabolite, Uni
                   n_atp: Union[float, int],
                   compartment: str, 
                   model_metabolites) -> Dict[cobra.core.metabolite.Metabolite, Union[float, int]]:
-    """
+    """Create ATP hydrolysis reaction.
 
     Parameters
     ----------
@@ -184,7 +183,7 @@ def hydrolyze_atp(metabolites_to_add: Dict[cobra.core.metabolite.Metabolite, Uni
 
 
 def get_base_counts_and_elements(seq: Union[Seq, str], model_metabolites, triphosphate: bool = True) -> Tuple[Dict[str, int], Dict[str, int]]:
-    """Count the number of bases and atom elements in an RNA sequence
+    """Count the number of bases and atom elements in an RNA sequence.
 
     Parameters
     ----------
@@ -202,7 +201,6 @@ def get_base_counts_and_elements(seq: Union[Seq, str], model_metabolites, tripho
     elements: Dict[str, int]
         the number of atom elements in the sequence
     """
-
     base_counts = dict()
     for base_letter in model_metabolites.seq_element_map:
         base_counts[base_letter] = seq.count(base_letter)
@@ -227,7 +225,7 @@ def get_base_counts_and_elements(seq: Union[Seq, str], model_metabolites, tripho
 
 
 def parse_me_reaction_id(x: str) -> str:
-    """Get HGNC ID associated with an expression module reaction
+    """Get HGNC ID associated with an expression module reaction.
 
     Parameters
     ----------
@@ -257,7 +255,7 @@ def parse_me_reaction_id(x: str) -> str:
 
 
 def SASA(mw: float) -> float:
-    """Estimate the protein solvent-accessible surface area from the molecular weight
+    """Estimate the protein solvent-accessible surface area from the molecular weight.
 
     Parameters
     ----------
@@ -274,7 +272,8 @@ def SASA(mw: float) -> float:
 
 def average_protein_features(psim_me: pd.DataFrame, context_specific: bool = False, metabolic_machinery: Optional[List[str]] = None) -> pd.DataFrame:
     """Function to get the average protein features from the proteins used in a specific ME model being generated.
-    *Note, we filter for metabolic enzymes only, because most orphan reactions come from the metabolic sector.
+    
+    Note, we filter for metabolic enzymes only, because most orphan reactions come from the metabolic sector.
 
     Parameters
     ----------
@@ -370,18 +369,18 @@ def average_protein_features(psim_me: pd.DataFrame, context_specific: bool = Fal
 
 
 def determine_transport(r: cobra.core.reaction.Reaction) -> List[str]:
-    """Checks which metabolites are transported in a cobra reaction
+    """Checks which metabolites are transported in a cobra reaction.
 
     Parameters
     ----------
     r : cobra.core.reaction.Reaction
+        the reaction to probe
 
     Returns
     -------
     actual_transport_m : List[str]
         a list of metabolites that are actually transported across compartments each element is a string of the metabolite id without the compartment ('_compartment' ending)
     """
-
     sm_reactants = dict()
     sm_prod = dict()
     for m in r.reactants:
@@ -415,7 +414,6 @@ def read_fasta_url(file_url: str):
     formatted_fasta : SeqRecord
         biopython SeqRecord iterator
     """
-
     response = urlopen(file_url)
     fasta = response.read().decode("utf-8", "ignore")
     formatted_fasta = SeqIO.read(StringIO(fasta), 'fasta')

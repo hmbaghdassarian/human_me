@@ -27,10 +27,7 @@ ribosomal_genes = {'HGNC:11325', 'HGNC:11740', 'HGNC:10369', 'HGNC:10414', 'HGNC
 
 # checks work as follows: maximum limits checked within each method, minimum limit checked in .check methods
 class ExpressedGene:
-    """Tracks all reactions and macromolecules associated with a ME Model gene.
-
-    Designed to be used after building the full ME_Model
-    """
+    """Tracks all reactions and macromolecules associated with a ME Model gene.Designed to be used after building the full ME_Model."""
 
     def __init__(self, hgnc_id: str):
         """Init method for ExpressedGene.
@@ -65,7 +62,8 @@ class ExpressedGene:
 
         Parameters
         ----------
-        r: Union[MetabolicReaction, ExpressionReaction]
+        r : Union[MetabolicReaction, ExpressionReaction]
+            the reaction to add
         """
         catalysis = self.is_catalyzing(r)
         if catalysis:
@@ -82,7 +80,7 @@ class ExpressedGene:
             raise ValueError('The reaction ' + r.id + ' does not appear to be associated with the gene ' + self.hgnc_id)
 
     def is_catalyzing(self, r) -> bool:
-        """"Determines whether the gene is involved in catalysis of the reaction.
+        """Determines whether the gene is involved in catalysis of the reaction.
 
         Parameters
         ----------
@@ -116,8 +114,7 @@ class ExpressedGene:
         return catalysis
 
     def _add_catalysis_reaction(self, r: Union[MetabolicReaction, ExpressionReaction]):
-        """Adds reactions that the gene catalyzes, splitting by whether it is catalyzing a metabolic or
-        expression module reaction.
+        """Adds reactions that the gene catalyzes, splitting by whether it is catalyzing a metabolic orexpression module reaction.
 
         Hierarchy is organized as follows: {reaction_id: {catalysis: enzyme_id, deg_proxy: proxy_id}}. 
 
@@ -130,7 +127,6 @@ class ExpressedGene:
         r : Union[MetabolicReaction, ExpressionReaction]
             catalysis reaction being added
         """
-
         if isinstance(r, MetabolicReaction):
             self.reactions['Catalysis_Reactions']['Metabolic_Module'][r.id] = {m.id: t for m, t in
                                                                                r.coupled_metabolites.items()}
@@ -157,7 +153,7 @@ class ExpressedGene:
             self.ribosome_biogenesis = True
 
     def _add_expression_reaction(self, r, tol: SupportsFloat = 1e-17):
-        """ Reactions involving expression of a gene (not catalysis, even if it is catalysis of an expression-module reaction).
+        """Reactions involving expression of a gene (not catalysis, even if it is catalysis of an expression-module reaction).
 
         Parameters
         ----------
@@ -291,6 +287,7 @@ class ExpressedGene:
         Parameters
         ----------
         m: Macromolecule
+            the macromolecule to add
         """
         if m.type not in ['complex', 'proxy']:
             if not hasattr(m, 'hgnc_id') or m.hgnc_id is None or m.hgnc_id != self.hgnc_id:
@@ -400,7 +397,7 @@ class ExpressedGene:
             raise ValueError('No enzyme degradation proxy metabolite associated with ' + self.hgnc_id)
 
     def check(self):
-        """Checks for completeness of self.reactions and self.macromolecules after adding all associated objects"""
+        """Checks for completeness of self.reactions and self.macromolecules after adding all associated objects."""
         self._is_non_machinery_only = ((len(self.macromolecules['Protein']['coupled']) == 0) and len(
             self.macromolecules['Protein']['non-machinery']) > 0)
         self._enzyme_compartments = [e_id.split('_')[-1] for e_id in

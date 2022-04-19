@@ -22,7 +22,7 @@ from human_me.core.reaction import ExpressionReaction
 class TrnaInformation:
     def __init__(self, model_metabolites, maturetrna_sequence: str, id_: str, three_trailer_seq: Optional[str] = None, five_leader_seq: Optional[str] = None,
                  modifications: Optional[Dict[str, int]] = None, intron_sequences: Optional[List[str]] = None):
-        """init method for trna information class
+        """init method for trna information class.
 
         Parameters
         ----------
@@ -42,7 +42,6 @@ class TrnaInformation:
         intron_sequences : Optional[List[str]], optional
             a list of RNA sequences corresponding to each intron, by default None
         """
-
         if maturetrna_sequence[-3:] != 'CCA':
             warnings.warn('CCA tail not present in provided mature sequence, adding to 3 primed end')
             maturetrna_sequence += 'CCA'
@@ -110,12 +109,11 @@ class ExpressTrna:
         self.reactions.append(pretrna_transcription)
 
     def process_trna(self):
-        """
-        This reaction processes pre-tRNA into mature tRNA in the nucleus.
+        """This reaction processes pre-tRNA into mature tRNA in the nucleus.
+
         This includes: CCA synthesis, 5' leader and 3' trailer cleavage (and degradation as separate reactions),
         and splicing (and intron degradation as a separate reactions for each intron).
         """
-
         rxn = {self.pretrna_n: -1}
         # CCA synthesis
         rxn[self.trna_info.model_metabolites.ntp_map_n['C']] = -2
@@ -221,7 +219,7 @@ class ExpressTrna:
         self.reactions.append(trna_primary_export)
 
     def modify_trna_cytosolic(self):
-        """This is for cytosolic modifications"""
+        """This is for cytosolic modifications."""
         if len(self.trna_info.modifications) > 0:
             # TODO: add trna modifications
             raise ValueError('Modifications are not currently considered')
@@ -244,7 +242,6 @@ class ExpressTrna:
 
     def charge_trna(self):
         """tRNA charging reaction combines the activation and charging steps into one reaction."""
-
         # TODO: in the future, this should take into account anticodon sequence, which should be in trna_info id
         # now, since just a generic charging reaction, will create one for each amino acid (for loop)
 
@@ -295,7 +292,7 @@ class ExpressTrna:
 
 
 def trna_biogenesis(trna_info: TrnaInformation) -> Tuple[List[ExpressionReaction], List[tRNA]]:
-    """trna biogenesis reactions
+    """trna biogenesis reactions.
 
     Parameters
     ----------
@@ -317,7 +314,6 @@ def trna_biogenesis(trna_info: TrnaInformation) -> Tuple[List[ExpressionReaction
     tb.charge_trna()
 
     return tb.reactions, tb.charged_trna_metabolites, tb.modified_trna_c
-
 
 # # Consensus Sequences
 #

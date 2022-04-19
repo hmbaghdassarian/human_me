@@ -24,7 +24,7 @@ class Complex(Macromolecule):
     type = 'complex' 
 
     def __init__(self, metabolites: List[Macromolecule], complex_id: Optional[str] = None, seed: Optional[int] = None):
-        """Init method for Complex
+        """Init method for Complex.
 
         Parameters
         ----------
@@ -79,8 +79,7 @@ class Complex(Macromolecule):
         self.hgnc_id = None  # always None, for internal use with expression/protein_expression/degradation
 
     def update_id(self, new_id: Optional[str] = None):
-        """In cases where complex id is too long (see build_me_model generate_complex_reactions method)"""
-
+        """In cases where complex id is too long (see build_me_model generate_complex_reactions method)."""
         if self.reaction_id is not None:
             raise ValueError(
                 'Reaction and complex IDs will be consistent since you are updating the id after forming the reaction.')
@@ -95,6 +94,7 @@ class Complex(Macromolecule):
     def form_complex(self, reaction_id: Optional[str] = None, reversible: bool = False,
                      synthesis: bool = True, synthesis_type: str = 'complex') -> ExpressionReaction:
         """The reaction to generate the Complex object.
+        
         Note: assumes non-covalent complex formation (in terms of elemental balance)
 
         Parameters
@@ -132,7 +132,7 @@ class Complex(Macromolecule):
         return complex_formation
 
     def decompose_complex(self, decomposed_complex=None) -> OrderedDict:
-        """Recursive method to get the complex by its individual components, including nested complexes"""
+        """Recursive method to get the complex by its individual components, including nested complexes."""
         # TODO: this method is very slow
         if decomposed_complex is None:
             all_metab = flatten_list([[m] * count for m, count in self.components.items()])
@@ -153,8 +153,7 @@ class Complex(Macromolecule):
         return self.decompose_complex(decomposed_complex=Complex(metabolites=metabolites_, complex_id='ignore'))
 
     def get_complex_biomass(self) -> Dict[str, float]:
-        """Returns a dictionary of the complex biomass by its individual component types"""
-
+        """Returns a dictionary of the complex biomass by its individual component types."""
         biomass_by_type = dict()
         for m, count in self.decompose_complex().items():
             if m.type in biomass_by_type:
@@ -165,8 +164,7 @@ class Complex(Macromolecule):
         return biomass_by_type
 
     def _initialize_deg_params(self):
-        """Initialize attributes for creating degradation reactions"""
-
+        """Initialize attributes for creating degradation reactions."""
         self._deg_initialized = True
         dc = self.decompose_complex()
         self._check_metabolite_types()
@@ -190,12 +188,12 @@ class Complex(Macromolecule):
         del dc
 
     def change_compartment(self, new_compartment: str):
-        """Returns a copy of the complex metabolite, but in new compartment"""
+        """Returns a copy of the complex metabolite, but in new compartment."""
         self._check_metabolite_types()
         return self._change_compartment_and_components(new_compartment)
 
     def _change_compartment_and_components(self, new_compartment):
-        """Create a complex the same as self, but in a different compartment
+        """Create a complex the same as self, but in a different compartment.
 
         Parameters
         ----------
@@ -207,7 +205,6 @@ class Complex(Macromolecule):
         Complex
             a copy of the macromolecule in the new compartment
         """
-
         if new_compartment == self.compartment:
             raise ValueError('The macromolecule is already in this compartment')
         if new_compartment not in params.compartments:
@@ -227,7 +224,7 @@ class Complex(Macromolecule):
         return new_complex
 
     def _check_metabolite_types(self):
-        """Only protein-protein complexes can be formed for now"""
+        """Only protein-protein complexes can be formed for now."""
         types = list(set([m.type for m in self.decompose_complex()]))
         if len(types) > 1 or types[0] != 'protein':
             raise ValueError('ME-Model is currently designed to only handle protein-protein complexes')
@@ -236,10 +233,10 @@ class Complex(Macromolecule):
         self.k_deg = np.median([m.k_deg * c for m, c in self.decompose_complex().items()])
 
     def make_proxy(self):
-        """Make a proxy metabolite for coupling enzyme degradation to reaction catalysis"""
+        """Make a proxy metabolite for coupling enzyme degradation to reaction catalysis."""
         return Proxy(associated_macromolecule=self)
     def copy(self, copy_metabolites = False):
-        """Overwrite cobra.Species.copy
+        """Overwrite cobra.Species.copy.
 
         Parameters
         ----------
@@ -252,7 +249,6 @@ class Complex(Macromolecule):
         _type_
             _description_
         """
-
         # copy while preserving metabolite pointers to avoid memory issues and not copying it to avoid speed issues
         components = self.components
         del self.components
@@ -274,7 +270,7 @@ class RibosomalComplex(Complex):
     type = 'complex' 
 
     def __init__(self, metabolites: List[Macromolecule], complex_id: Optional[str] = None, ignore_compartment: bool = False, seed: Optional[int] = None):
-        """Init method for RibosomalComplex
+        """Init method for RibosomalComplex.
 
         Parameters
         ----------
@@ -287,7 +283,6 @@ class RibosomalComplex(Complex):
         seed : Optional[int], optional
             A seed for generating the complex ID if it is None, by default None
         """
-
         # checks
         if type(metabolites) != list or len(metabolites) == 0:
             raise ValueError('Must provide a list of macromolecules to form complex')
@@ -339,7 +334,7 @@ class RibosomalComplex(Complex):
         self.hgnc_id = None  # always None, for internal use with expression/protein_expression/degradation
 
     def decompose_complex(self, decomposed_complex=None):
-        """Recursive method to get the complex by its individual components, including nested complexes"""
+        """Recursive method to get the complex by its individual components, including nested complexes."""
         if decomposed_complex is None:
             all_metab = flatten_list([[m] * count for m, count in self.components.items()])
             decomposed_complex = RibosomalComplex(metabolites=all_metab, complex_id='ignore')
@@ -361,6 +356,7 @@ class RibosomalComplex(Complex):
     def form_complex(self, reaction_id: Optional[str] = None, reversible: bool = False,
                      synthesis: bool = False, synthesis_type: Optional[str] = None) -> ExpressionReaction:
         """The reaction to generate the Complex object.
+        
         Note: assumes non-covalent complex formation (in terms of elemental balance)
 
         Parameters
@@ -381,7 +377,6 @@ class RibosomalComplex(Complex):
         complex_formation : ExpressionReaction
             the complex formation between metabolites stored in self.components
         """
-
         self._check_metabolite_types()
         if reaction_id is None:
             self.reaction_id = self.temp_id + '_COMPLEX_FORMATION' + self.compartment
@@ -400,12 +395,12 @@ class RibosomalComplex(Complex):
         return complex_formation
 
     def _check_metabolite_types(self):
-        """Only protein and rRNA can be included in ribosomal complexes"""
+        """Only protein and rRNA can be included in ribosomal complexes."""
         if len((set([m.type for m in self.decompose_complex()])).difference(['protein', 'rrna'])) > 0:
             raise ValueError('Ribosomal complexes can only include proteins and rRNA')
 
     def _initialize_deg_params(self):
-        """Initialize attributes for creating degradation reactions"""
+        """Initialize attributes for creating degradation reactions."""
 
         self._deg_initialized = True
         self.keff = None
@@ -433,9 +428,7 @@ class RibosomalComplex(Complex):
         del dc
 
     def _change_compartment_and_components(self, new_compartment: str):
-        """Returns a copy of the complex metabolite, but in new compartment.
-            Recursive to change all components (nested complexes and their components)"""
-
+        """Returns a copy of the complex metabolite, but in new compartment. Recursive to change all components (nested complexes and their components)."""
         if new_compartment == self.compartment:
             raise ValueError('The macromolecule is already in this compartment')
         if new_compartment not in params.compartments:
@@ -456,7 +449,7 @@ class RibosomalComplex(Complex):
 
 
 def add_complex_metabolites(cplx: Complex, met_to_add: Dict[Macromolecule, int], complex_id: str) -> Complex:
-    """Add a metabolite to an existing complex object, returning it as a new complex
+    """Add a metabolite to an existing complex object, returning it as a new complex.
 
     Parameters
     ----------

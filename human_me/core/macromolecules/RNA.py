@@ -208,8 +208,7 @@ class RNA(Macromolecule):
         else:
             raise ValueError('Situation in which RNA sequence is removed or replaced has not been implemented yet')
     def copy(self):
-        """Overwrite cobra.Species.copy"""
-
+        """Overwrite cobra.Species.copy."""
         # copy that preserves self.model_metabolites pointer to avoid memory issues and doesn't deep copy it to avoid speed issues
         model_metabolites = self.model_metabolites
         del self.model_metabolites
@@ -279,7 +278,7 @@ class mRNA(RNA):
         self.hgnc_id = gene_info.hgnc_id
 
     def make_proxy(self):
-        """Makes a proxy metabolite for coupling mRNA degradation to protein synthesis"""
+        """Makes a proxy metabolite for coupling mRNA degradation to protein synthesis."""
         return Proxy(associated_macromolecule=self)
 
 
@@ -289,7 +288,7 @@ class tRNA(RNA):
     type = 'trna'
 
     def __init__(self, model_metabolites, metabolite_name, seq, compartment='n', triphosphate=True):
-        """See RNA.__init__ for parameter information"""
+        """See RNA.__init__ for parameter information."""
         super().__init__(model_metabolites=model_metabolites, metabolite_name=metabolite_name, seq=seq, compartment=compartment,
                      triphosphate=triphosphate)
 
@@ -302,7 +301,7 @@ class rRNA(RNA):
     type = 'rrna'
 
     def __init__(self, model_metabolites, metabolite_name, seq, compartment='n', triphosphate=True):
-        """See RNA.__init__ for parameter information"""
+        """See RNA.__init__ for parameter information."""
         super().__init__(model_metabolites=model_metabolites, metabolite_name=metabolite_name, seq=seq, compartment=compartment,
                      triphosphate=triphosphate)
 
@@ -310,7 +309,7 @@ class rRNA(RNA):
         self.k_deg = params.RNA_DEGRADATION_CONSTANT
 
 class RNA_fragment(RNA):
-    """object representation of fragmented RNA such as lariats and other excised sequences"""
+    """object representation of fragmented RNA such as lariats and other excised sequences."""
 
     type = 'fragment_rna'
 
@@ -335,7 +334,6 @@ class RNA_fragment(RNA):
         hgnc_id : str, optional
             gene HGNC ID, by default None
         """
-
         if fragment_type not in ['lariat', 'its', 'ets', '5_leader', '3_trailer', 'trna_intron']:
             raise ValueError('RNA fragment type specified is not considered')
 

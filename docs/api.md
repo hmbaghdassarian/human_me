@@ -1,14 +1,79 @@
-# Documentation for 'human_me'
+# Documentation for 'human_me.utils'
 
-## Model Class
-
-::: human_me.core.model.ME_Model
+::: human_me.io
     handler: python
-    selection:
+    rendering:
+      show_root_heading: true
+      show_source: true
+
+::: human_me.preprocess
+    handler: python
+    rendering:
+      show_root_heading: true
+      show_source: true
+
+::: human_me.utils
+    handler: python
+    rendering:
+      show_root_heading: true
+      show_source: true
+
+::: human_me.core.macromolecules
+    handler: python
+    rendering:
+      show_root_heading: true
+      show_source: true
+
+::: human_me.core.reaction
+    handler: python
+    rendering:
+      show_root_heading: true
+      show_source: true
+
+::: human_me.core.model
+    handler: python
+    <!-- -- selection:
       members:
         - __init__
         - add_reactions
-        - check
+        - check -->
     rendering:
-      show_root_heading: false
-      show_source: false
+      show_root_heading: true
+      show_source: true
+
+::: human_me.core.gene
+    handler: python
+    rendering:
+      show_root_heading: true
+      show_source: true
+
+::: human_me.core.biomass.Biomass
+    handler: python
+    rendering:
+      show_root_heading: true
+      show_source: true
+
+::: human_me.core.biomass.add_biomass_change
+    handler: python
+    rendering:
+      show_root_heading: true
+      show_source: true
+
+::: human_me.build
+    handler: python
+    rendering:
+      show_root_heading: true
+      show_source: true
+
+::: human_me.expression
+    handler: python
+    rendering:
+      show_root_heading: true
+      show_source: true
+
+
+::: human_me.me_solver
+    handler: python
+    rendering:
+      show_root_heading: true
+      show_source: true

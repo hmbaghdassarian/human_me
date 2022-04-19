@@ -10,7 +10,7 @@ from human_me.utils import machinery as mach
 
 
 def translate_protein_cytosolic(gene_info, mrna_transcript_c, mrna_deg_proxy: Proxy, modified_trna_transcript_c, charged_trna_map, model_metabolites) -> Tuple[ProteinExpressionReaction, Protein]:
-    """Generate cytosolic translation reaction
+    """Generate cytosolic translation reaction.
 
     Parameters
     ----------

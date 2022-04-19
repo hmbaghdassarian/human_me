@@ -42,7 +42,11 @@
 
       <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
               <ul>
-                <li class="toctree-l1"><a class="reference internal" href="..">Start</a>
+                <li class="toctree-l1"><a class="reference internal" href="..">Home</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../psim/">PSIM</a>
                 </li>
               </ul>
               <ul class="current">
@@ -92,70 +96,75 @@
               
                 <h1 id="installation-instructions">Installation Instructions</h1>
 <p>These provide additional details and alternate installation instructions for setting up the human_me environment and qMINOS solver</p>
+<p>Note, throughout the instructions we will refer to "path/to/human_me" as the root path to the package directory. 
+After pip installing, this can be found as follows in Python:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1"></a><span class="kn">import</span> <span class="nn">human_me</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2"></a><span class="nb">print</span><span class="p">(</span><span class="n">human_me</span><span class="o">.</span><span class="vm">__file__</span><span class="p">)</span>
+</code></pre></div>
 <h2 id="step-1-2-creating-the-environment">Step 1-2: Creating the Environment</h2>
 <p>We highly recommending setting up a <a href="https://packaging.python.org/guides/">python virtual environment</a> instead of a conda environment, because it works better with the solver.</p>
 <p>This can be done as follows:
-<div class="highlight"><pre><span></span><code><span class="go">python3 -m venv &lt;env_name&gt; #--python=python3.6.9</span>
-<span class="go">source [env_name]/bin/activate</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1"></a><span class="go">python3 -m venv &lt;env_name&gt; #--python=python3.6.9</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2"></a><span class="go">source &lt;env_name&gt;/bin/activate</span>
 </code></pre></div></p>
 <p>human_me can be installed using pip and PyPi:
-<div class="highlight"><pre><span></span><code><span class="go">pip install human_me</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1"></a><span class="go">pip install human_me</span>
 </code></pre></div></p>
 <p><strong><em>Alternatively</em></strong>, the human_me environment can be setup independent of PyPi using github and requirements.txt: 
-<div class="highlight"><pre><span></span><code><span class="go">git clone https://github.com/hmbaghdassarian/human_me.git</span>
-<span class="go">pip install -r &lt;path/to/human_me/&gt;requirements.txt</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1"></a><span class="go">git clone https://github.com/hmbaghdassarian/human_me.git</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2"></a><span class="go">pip install -r &lt;path/to/human_me/&gt;requirements.txt</span>
 </code></pre></div></p>
 <p>or setup.py:
-<div class="highlight"><pre><span></span><code><span class="go">git clone https://github.com/hmbaghdassarian/human_me.git</span>
-<span class="go">python &lt;path/to/human_me/&gt;setup.py install</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1"></a><span class="go">git clone https://github.com/hmbaghdassarian/human_me.git</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2"></a><span class="go">python &lt;path/to/human_me/&gt;setup.py install</span>
 </code></pre></div></p>
 <p>If jupyter notebook does not load the virtual environment kernel, outside of the environment, try: 
-<div class="highlight"><pre><span></span><code><span class="go">python3 -m ipykernel install --user --name=&lt;env_name&gt;</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1"></a><span class="go">python3 -m ipykernel install --user --name=&lt;env_name&gt;</span>
 </code></pre></div></p>
 <h2 id="step-3-setting-up-the-qminos-solver">Step 3: Setting up the qMINOS solver</h2>
 <p>qMINOS is a high precision LP solver necessary for the order-of-magnitude differences in ME Model coefficients.<br>
 The QMINOS solver can be obtained for academic use from Prof. Michael Saunders at Stanford University.<br>
 gfortran (&gt;=4.6) is required for qMINOS <br></p>
-<p>&emsp;i) download the qminos file into a specified solver directory, which we refer to here as &ldquo;solver_parent_directory&rdquo;.</p>
+<p>&emsp;i) download the qminos file into a specified solver directory, which we refer to here as "solver_parent_directory".</p>
 <p>&emsp;ii) the solver can be installed using the human_me Makefile as follows:</p>
-<div class="highlight"><pre><span></span><code><span class="go">make -C &lt;path/to/human_me/&gt; install-qminos SOLVER_PATH=&lt;path/to/solver/solver_parent_directory&gt;</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1"></a><span class="go">make -C &lt;path/to/human_me/&gt; install-qminos SOLVER_PATH=&lt;path/to/solver/solver_parent_directory&gt;</span>
 </code></pre></div>
 <p>If SOLVER_PATH is not specified, it defaults to path/to/human_me/solver.</p>
 <hr />
 <p><strong><em>Alternatively</em></strong>, instead of using make, you can set up qminos manually as specified in the installation instructions for <a href="https://github.com/SBRG/solvemepy">solvemepy</a>. </p>
 <p>This will require getting both qminos and solvemepy. The solver parent directory specified above stores both qminos and solvemepy, but they do not need to be stored in the same directory.</p>
-<p>You can disregard the requirements that are delineated in solvmepy&rsquo;s README, with the exception of gfortran (#4). The remainder should have been appropriately installed with installation of human_me, if necessary.</p>
+<p>You can disregard the requirements that are delineated in solvmepy's README, with the exception of gfortran (#4). The remainder should have been appropriately installed with installation of human_me, if necessary.</p>
 <p>Ensure that all this is done with the virtual environment activated.</p>
 <p>&emsp;i) Untar the QMINOS solver and follow Step 1 of solveme installation guide:</p>
-<div class="highlight"><pre><span></span><code><span class="go">tar -xvf qminos.tar.gz #tar file from Prof. Michael Saunders</span>
-<span class="go">cd &lt;path/to/solver/solver_parent_directory/&gt;qminos1114/</span>
-<span class="go">cp Makefile.defs minos56/</span>
-<span class="go">cp Makefile.defs qminos56/</span>
-<span class="go">cd minos56</span>
-<span class="go">make clean</span>
-<span class="go">make</span>
-<span class="go">cd ../qminos56/</span>
-<span class="go">make clean</span>
-<span class="go">make</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1"></a><span class="go">tar -xvf qminos.tar.gz #tar file from Prof. Michael Saunders</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2"></a><span class="go">cd &lt;path/to/solver/solver_parent_directory/&gt;qminos1114/</span>
+<a id="__codelineno-7-3" name="__codelineno-7-3"></a><span class="go">cp Makefile.defs minos56/</span>
+<a id="__codelineno-7-4" name="__codelineno-7-4"></a><span class="go">cp Makefile.defs qminos56/</span>
+<a id="__codelineno-7-5" name="__codelineno-7-5"></a><span class="go">cd minos56</span>
+<a id="__codelineno-7-6" name="__codelineno-7-6"></a><span class="go">make clean</span>
+<a id="__codelineno-7-7" name="__codelineno-7-7"></a><span class="go">make</span>
+<a id="__codelineno-7-8" name="__codelineno-7-8"></a><span class="go">cd ../qminos56/</span>
+<a id="__codelineno-7-9" name="__codelineno-7-9"></a><span class="go">make clean</span>
+<a id="__codelineno-7-10" name="__codelineno-7-10"></a><span class="go">make</span>
 </code></pre></div>
 <p>&emsp;ii) Having exited the qminos directory, clone the solveme github and follow Step 2-3 of the solveme installation guide: </p>
-<div class="highlight"><pre><span></span><code><span class="go">git clone https://github.com/SBRG/solvemepy.git #@2a2c9c098d5bad957ef41637955fe338a31bac4c</span>
-<span class="go">cd &lt;path/to/solvemepy/&gt;</span>
-<span class="go">cp &lt;path/to/solver/solver_parent_directory/&gt;qminos1114/minos56/lib/libminos.a ./</span>
-<span class="go">cp &lt;path/to/solver/solver_parent_directory/&gt;qminos1114/qminos56/lib/libquadminos.a ./</span>
-<span class="go">python setup.py develop</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1"></a><span class="go">git clone https://github.com/SBRG/solvemepy.git #@2a2c9c098d5bad957ef41637955fe338a31bac4c</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2"></a><span class="go">cd &lt;path/to/solvemepy/&gt;</span>
+<a id="__codelineno-8-3" name="__codelineno-8-3"></a><span class="go">cp &lt;path/to/solver/solver_parent_directory/&gt;qminos1114/minos56/lib/libminos.a ./</span>
+<a id="__codelineno-8-4" name="__codelineno-8-4"></a><span class="go">cp &lt;path/to/solver/solver_parent_directory/&gt;qminos1114/qminos56/lib/libquadminos.a ./</span>
+<a id="__codelineno-8-5" name="__codelineno-8-5"></a><span class="go">python setup.py develop</span>
 </code></pre></div>
 <h2 id="step-4-downloading-supporting-data-files">Step 4: Downloading supporting data files</h2>
 <p>Data for human_me is structured as follows:
-<div class="highlight"><pre><span></span><code>data
-└───build
-│      **psim_gold.h5
-│      **recon2_2_only_psim.csv
-└───inputs
-│      **recon2_2.xml
-│      psim_user
-│      non_machinery
-└───*prebuild
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1"></a>data
+<a id="__codelineno-9-2" name="__codelineno-9-2"></a>└───build
+<a id="__codelineno-9-3" name="__codelineno-9-3"></a>│      **psim_gold.h5
+<a id="__codelineno-9-4" name="__codelineno-9-4"></a>│      **recon2_2_only_psim.csv
+<a id="__codelineno-9-5" name="__codelineno-9-5"></a>└───inputs
+<a id="__codelineno-9-6" name="__codelineno-9-6"></a>│      **recon2_2.xml
+<a id="__codelineno-9-7" name="__codelineno-9-7"></a>│      psim_user
+<a id="__codelineno-9-8" name="__codelineno-9-8"></a>│      non_machinery
+<a id="__codelineno-9-9" name="__codelineno-9-9"></a>└───*prebuild
 </code></pre></div>
 ** = default, downloaded by make build-data</p>
 <ol>
@@ -167,22 +176,22 @@ gfortran (&gt;=4.6) is required for qMINOS <br></p>
 </ol>
 <p>Small files are stored on Github in the <a href="https://github.com/hmbaghdassarian/human_me_data">human_me_data repository</a> and accessed directly by the package. 
 Larger files need to be downloaded directly from public Google Drive files. This is done using the make build-files command as follows:</p>
-<div class="highlight"><pre><span></span><code><span class="go">make -C &lt;path/to/human_me/&gt; build-data DATA_DIR=&lt;/desired/local_data/directory&gt;</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1"></a><span class="go">make -C &lt;path/to/human_me/&gt; build-data DATA_DIR=&lt;/desired/local_data/directory&gt;</span>
 </code></pre></div>
 <p>If you also want to download the prebuild files, run the following command:
-<div class="highlight"><pre><span></span><code><span class="go">make -C &lt;path/to/human_me/&gt; build-data DATA_DIR=&lt;/desired/local_data/directory&gt; PREBUILD=1</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1"></a><span class="go">make -C &lt;path/to/human_me/&gt; build-data DATA_DIR=&lt;/desired/local_data/directory&gt; PREBUILD=1</span>
 </code></pre></div>
 The user-specificed local data directory is stored in a human_me/data/data.ini config file. </p>
 <h3 id="input-file-descriptions">Input File Descriptions</h3>
 <ol>
-<li>M_Model: a cobrapy metabolic model in sbml format. We highly recommend Recon2.2 or a context-specific metabolic model generated from Recon2.2, as this is the only model the pipeline has been tested on. Our &ldquo;inputs&rdquo; directory provides a version of Recon2.2 with minor modifications to work with the ME-Model building pipeline. Alternatively, you can use the preprocess.correct_inputs.correct_model function on your metabolic model to introduce these modifications. </li>
+<li>M_Model: a cobrapy metabolic model in sbml format. We highly recommend Recon2.2 or a context-specific metabolic model generated from Recon2.2, as this is the only model the pipeline has been tested on. Our "inputs" directory provides a version of Recon2.2 with minor modifications to work with the ME-Model building pipeline. Alternatively, you can use the preprocess.correct_inputs.correct_model function on your metabolic model to introduce these modifications. </li>
 <li>PSIM: see the <a href="https://hmbaghdassarian.github.io/human_me/">doumentation</a> for details. If a user does not provide a PSIM, either directly into the function as a datatable or via data/inputs/psim_user, the default input PSIM is data/build/psim_gold.h5 (the gold-standard PSIM). </li>
 </ol>
               
             </div>
           </div><footer>
     <div class="rst-footer-buttons" role="navigation" aria-label="Footer Navigation">
-        <a href=".." class="btn btn-neutral float-left" title="Start"><span class="icon icon-circle-arrow-left"></span> Previous</a>
+        <a href="../psim/" class="btn btn-neutral float-left" title="PSIM"><span class="icon icon-circle-arrow-left"></span> Previous</a>
         <a href="../api/" class="btn btn-neutral float-right" title="API">Next <span class="icon icon-circle-arrow-right"></span></a>
     </div>
 
@@ -210,7 +219,7 @@ The user-specificed local data directory is stored in a human_me/data/data.ini c
         </span>
     
     
-      <span><a href=".." style="color: #fcfcfc">&laquo; Previous</a></span>
+      <span><a href="../psim/" style="color: #fcfcfc">&laquo; Previous</a></span>
     
     
       <span><a href="../api/" style="color: #fcfcfc">Next &raquo;</a></span>

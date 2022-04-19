@@ -22,7 +22,7 @@ DegradationReactionType = Union[ProteinDegradationReaction, ComplexDegradationRe
 
 
 def protein_polyubiquitination(macromolecule: DegradedMacromoleculeType, model_metabolites, **kwargs) -> Tuple[DegradationReactionType, DegradedMacromoleculeType]:
-    """Adds 4 ubiquitins to the macromolecule
+    """Adds 4 ubiquitins to the macromolecule.
 
     Parameters
     ----------
@@ -38,7 +38,6 @@ def protein_polyubiquitination(macromolecule: DegradedMacromoleculeType, model_m
     model_metabolites : utils.metabolites.MetaboliteBin
         the me_input_model metabolites as specified by MetaboliteBin
     """
-
     ub_args = kwargs['ub_args']
 
     r_id = macromolecule.id if macromolecule.type == 'protein' else macromolecule._deg_id
@@ -312,7 +311,6 @@ def degrade_peroxisomal_protein(macromolecule: DegradedMacromoleculeType, model_
     List[DegradationReactionType]
         The degradation reactions
     """
-
     peroxisomal_degradation = deg_reaction_map[macromolecule.type](macromolecule._deg_id + '_DEGRADATIONx',
                                                                    hgnc_id=macromolecule.hgnc_id, sink=True, sink_type=macromolecule.type)
     peroxisomal_degradation.gene_reaction_rule = mach.LONP2[0]
@@ -333,8 +331,7 @@ def degrade_peroxisomal_protein(macromolecule: DegradedMacromoleculeType, model_
 
 # # Secretory Pathway Degradation
 def unfold_secretory_protein(macromolecule: DegradedMacromoleculeType, model_metabolites) -> Tuple[DegradedMacromoleculeType]:
-    """Remove PTMs and unfold proteins for lysosomal and secretory compartments. For lysosomal degradation, 
-    only remove PTMs, there is no unfolding/misfolding as in ERAD.
+    """Remove PTMs and unfold proteins for lysosomal and secretory compartments. For lysosomal degradation, only remove PTMs, there is no unfolding/misfolding as in ERAD.
 
     Parameters
     ----------
@@ -347,11 +344,6 @@ def unfold_secretory_protein(macromolecule: DegradedMacromoleculeType, model_met
     -------
     Tuple[DegradedMacromoleculeType]
         Unfolded and PTM removed version of macromolecule
-
-    Raises
-    ------
-    ValueError
-        [description]
     """
     if macromolecule.compartment not in ['r', 'l']:
         raise ValueError('Protein metabolite does not have correct compartment')
@@ -459,7 +451,7 @@ def unfold_secretory_protein(macromolecule: DegradedMacromoleculeType, model_met
 
 
 def retrograde_er(macromolecule: DegradedMacromoleculeType, model_metabolites, retro_protein_r: Optional[DegradedMacromoleculeType] = None) -> Tuple[DegradationReactionType, DegradedMacromoleculeType]:
-    """ER retrograde transport
+    """ER retrograde transport.
 
     Parameters
     ----------
@@ -499,7 +491,7 @@ def retrograde_er(macromolecule: DegradedMacromoleculeType, model_metabolites, r
 
 
 def build_erad_reactions(macromolecule: DegradedMacromoleculeType, model_metabolites, **kwargs):
-    """Generate all ERAD reactions
+    """Generate all ERAD reactions.
 
     Parameters
     ----------
@@ -575,7 +567,7 @@ def build_erad_reactions(macromolecule: DegradedMacromoleculeType, model_metabol
 
 
 def build_endocytosis_reactions(macromolecule_pm: DegradedMacromoleculeType, model_metabolites, **kwargs) -> Tuple[List[DegradationReactionType], DegradedMacromoleculeType]:
-    """Create the endocytosis reactions
+    """Create the endocytosis reactions.
 
     Parameters
     ----------
@@ -629,7 +621,7 @@ def build_endocytosis_reactions(macromolecule_pm: DegradedMacromoleculeType, mod
 
 
 def lysosomal_degradation(macromolecule: DegradedMacromoleculeType, model_metabolites) -> List[DegradationReactionType]:
-    """Generate reactions and associated macromolecules for lysosomal degradation
+    """Generate reactions and associated macromolecules for lysosomal degradation.
 
     Parameters
     ----------
@@ -676,7 +668,7 @@ def lysosomal_degradation(macromolecule: DegradedMacromoleculeType, model_metabo
 
 
 def degrade_lysosomal_pm_protein(macromolecule: DegradationReactionType, model_metabolites, **kwargs) -> List[DegradationReactionType]:
-    """Lysoomal degradation of membrane proteins
+    """Lysoomal degradation of membrane proteins.
 
     Parameters
     ----------
@@ -690,7 +682,6 @@ def degrade_lysosomal_pm_protein(macromolecule: DegradationReactionType, model_m
     List[DegradationReactionType]
         associated degradation reactions
     """
-
     if 'ub_args' in kwargs:
         ub_args = kwargs['ub_args']
     else:
@@ -729,7 +720,7 @@ degrade_reaction_map = {'c': degrade_cytosolic_nuclear_protein, 'n': degrade_cyt
 
 
 def degrade(macromolecule: DegradedMacromoleculeType, model_metabolites,  **kwargs) -> List[DegradationReactionType]:
-    """Compartment-specific degradation reactions for proteins or protein-protein complexes
+    """Compartment-specific degradation reactions for proteins or protein-protein complexes.
 
     Parameters
     ----------

@@ -28,6 +28,7 @@ class ME_Reaction(cobra.Reaction):
     
     def copy(self):
         """Overwrite cobra.Species copy method.
+
         Returns
         -------
         new_rxn : ME_Reaction
@@ -154,7 +155,7 @@ class ME_Reaction(cobra.Reaction):
     #     self.coupled_metabolites = cm
 
     def check_mass_balance(self, tol: SupportsFloat = 0, sympy_tol: SupportsFloat = 1e-15) -> Dict[str, float]:
-        """Compute mass and charge balance for the reaction
+        """Compute mass and charge balance for the reaction.
 
         Parameters
         ----------
@@ -198,7 +199,7 @@ class ME_Reaction(cobra.Reaction):
         return {k: v for k, v in iteritems(reaction_element_dict) if abs(v) > tol}
 
     def replace_coefficient_mu(self, mu_val: SupportsFloat, inplace: bool = True):
-        """Replace mu coefficients with an actual value
+        """Replace mu coefficients with an actual value.
 
         Parameters
         ----------
@@ -241,7 +242,7 @@ class ME_Reaction(cobra.Reaction):
 
     @property
     def products(self):
-        """Return a list of products for the reaction"""
+        """Return a list of products for the reaction."""
         products_ = list()
         for k, v in iteritems(self._metabolites):
             if not isinstance(v, sympy.Expr) and v >= 0:
@@ -279,7 +280,7 @@ class MetabolicReaction(ME_Reaction):
         self.cobra_id = cobra_id
 
 def to_metabolic_reaction(model_metabolites, reaction: cobra.Reaction, id: Optional[str] = None) -> MetabolicReaction:
-    """Convert a cobrapy Reaction to a ME_Model MetabolicReaction
+    """Convert a cobrapy Reaction to a ME_Model MetabolicReaction.
 
     Parameters
     ----------
@@ -314,13 +315,13 @@ def to_metabolic_reaction(model_metabolites, reaction: cobra.Reaction, id: Optio
 
 
 class ExpressionReaction(ME_Reaction):
-    """Inherited from ME_Reaction, specifies the expression reactions in the model"""
+    """Inherited from ME_Reaction, specifies the expression reactions in the model."""
 
     def __init__(self, id: str, subsystem: str, name: str = '', lower_bound: SupportsFloat = 0.0, upper_bound: Optional[SupportsFloat] = None,
                  hgnc_id: Optional[str] = None,
                  synthesis: bool = False, synthesis_type: Optional[str] = None, sink: bool = False, sink_type: Optional[str] = None,
                  ubiquitin_biogenesis: bool = False, ribosome_biogenesis: bool = False, trna_charging: bool = False):
-        """Initialize the Expression reaction
+        """Initialize the Expression reaction.
 
         Parameters
         ----------
@@ -391,13 +392,12 @@ class ExpressionReaction(ME_Reaction):
 
 
 class ProteinExpressionReaction(ExpressionReaction):
-    """Inherited from ExpressionReaction, specifies the protein expression reactions in the model"""
+    """Inherited from ExpressionReaction, specifies the protein expression reactions in the model."""
 
     def __init__(self, id: str, name='', lower_bound: SupportsFloat = 0.0, upper_bound: Optional[SupportsFloat] = None,
                  hgnc_id: Optional[str] = None, translation: bool = False, synthesis: bool = False,
                  ubiquitin_biogenesis: bool = False, ribosome_biogenesis: bool = False):
-        """Initialize ProteinExpressionReaction 
-
+        """Initialize ProteinExpressionReaction. 
 
         Parameters
         ----------
@@ -422,7 +422,6 @@ class ProteinExpressionReaction(ExpressionReaction):
         ribosome_biogenesis : bool, optional
             whether the ExpressionReaction is part of ribosome_biogenesis reactions, only used to ignore hgnc_id is None, by default False
         """
-
         synthesis_type = None
         if synthesis:
             synthesis_type = 'protein'
@@ -440,9 +439,7 @@ class ProteinExpressionReaction(ExpressionReaction):
 class ProteinDegradationReaction(ExpressionReaction):
     def __init__(self, id: str, hgnc_id: str, sink: bool = False, sink_type: Optional[str] = None,
                  name: str = '', lower_bound: SupportsFloat = 0.0, upper_bound: Optional[SupportsFloat] = None):
-        """
-        See ExpressionReaction for parameter details
-        """
+        """See ExpressionReaction for parameter details."""
         super().__init__(id=id, subsystem='Protein_Degradation', sink=sink, sink_type=sink_type,
                          name=name, lower_bound=lower_bound, upper_bound=upper_bound, hgnc_id=hgnc_id)
         self._macromolecules = set()  # set of macromolecule ids associated with this degradation reaction
@@ -451,7 +448,7 @@ class ProteinDegradationReaction(ExpressionReaction):
         self._final_compartments = set()
 
     def copy(self):
-        """Also couple ._macromolecules"""
+        """Also couple ._macromolecules."""
          # avoid deeopcopying some attributes for:
         # 1) compute time
         # 2) maintaining pointers (same metabolites in the new reaction)
@@ -489,22 +486,22 @@ class ProteinDegradationReaction(ExpressionReaction):
         return new_rxn
 
        
-        attr_keep = ['_metabolites', 'coupled_metabolites'] # in the future, this can be a parameter (will have to check type - list or dict)
-        stored_attrs = {}
-        for ak in attr_keep:
-            stored_attrs[ak] = self.__dict__[ak]
-            self.__dict__[ak] = dict()
+        # attr_keep = ['_metabolites', 'coupled_metabolites'] # in the future, this can be a parameter (will have to check type - list or dict)
+        # stored_attrs = {}
+        # for ak in attr_keep:
+        #     stored_attrs[ak] = self.__dict__[ak]
+        #     self.__dict__[ak] = dict()
 
-        new_rxn = copy.deepcopy(self)
-        metabolites = set()
-        for ak, av in stored_attrs.items():
-            self.__dict__[ak] = av
-            new_rxn.__dict__[ak] = {k:v for k,v in av.items()} # pointer: same objects, different bin
-            metabolites = metabolites.union(av.keys())
+        # new_rxn = copy.deepcopy(self)
+        # metabolites = set()
+        # for ak, av in stored_attrs.items():
+        #     self.__dict__[ak] = av
+        #     new_rxn.__dict__[ak] = {k:v for k,v in av.items()} # pointer: same objects, different bin
+        #     metabolites = metabolites.union(av.keys())
         
-        # mutual tracking
-        for metabolite in metabolites: 
-            metabolite._reaction.add(new_rxn)
+        # # mutual tracking
+        # for metabolite in metabolites: 
+        #     metabolite._reaction.add(new_rxn)
 
         return new_rxn
 
@@ -525,26 +522,21 @@ class ProteinDegradationReaction(ExpressionReaction):
         self._macromolecules = self._macromolecules.union(macromolecules)
 
     def _update_enzymes(self):
-        """Update enzymes list to include macromolecules that are classified as enzymes"""
+        """Update enzymes list to include macromolecules that are classified as enzymes."""
         self._enzymes = {m for m in self._macromolecules if m.enzyme}
         for m in self._enzymes:
             if self.id not in m._degradation_reactions:
                 raise ValueError('Improper tracking of degradation reactions and associated macromolecules')
 
     def _set_proteasomal_degradation(self, **kwargs):
-        """For code consistency, mainly for ComplexDegradationReaction, see that method"""
-
+        """For code consistency, mainly for ComplexDegradationReaction, see that method."""
         self.gene_reaction_rule = ' and '.join(mach.proteasome_machinery)
 
 
 class ComplexDegradationReaction(ExpressionReaction):
     def __init__(self, id: Optional[str] = None, sink: bool = False, sink_type: Optional[str] = None,
                  name: str = '', lower_bound: SupportsFloat = 0.0, upper_bound: Optional[SupportsFloat] = None, hgnc_id: Optional[str] = None):
-        """
-        See ExpressionReaction for parameter details
-        hgnc_id: None
-            always None, for internal use with expression/protein_expression/degradation script
-        """
+        """See ExpressionReaction for parameter details."""
         super().__init__(id=id, subsystem='Complex_Degradation', sink=sink, sink_type=sink_type,
                          name=name, lower_bound=lower_bound, upper_bound=upper_bound)
         self._macromolecules = set()  # set of macromolecule ids associated with this degradation reaction
@@ -552,7 +544,7 @@ class ComplexDegradationReaction(ExpressionReaction):
         self._ribosomal_degradation = False
 
     def copy(self):
-        """Also couple ._macromolecules"""
+        """Also couple ._macromolecules."""
          # avoid deeopcopying some attributes for:
         # 1) compute time
         # 2) maintaining pointers (same metabolites in the new reaction)
@@ -606,7 +598,7 @@ class ComplexDegradationReaction(ExpressionReaction):
         self._macromolecules = self._macromolecules.union(macromolecules)
 
     def _update_enzymes(self):
-        """Update enzymes list to include macromolecules that are classified as enzymes"""
+        """Update enzymes list to include macromolecules that are classified as enzymes."""
         self._enzymes = {m for m in self._macromolecules if m.enzyme}
         for m in self._enzymes:
             if self.id not in m._degradation_reactions:
@@ -617,6 +609,8 @@ class ComplexDegradationReaction(ExpressionReaction):
         the proteosomal degradation different than standard complexes (to degrade rRNAs as well).
         Change in machinery hard-coded into degradation.degrade script and double-checked in build_me script.
 
+        Parameters
+        ----------
         macromolecule : Union[Protein, Complex]
         ribosomal_complex : bool
             whether the macromolecule is a ribosomal complex (True) or not (False)
@@ -655,7 +649,7 @@ class ComplexDegradationReaction(ExpressionReaction):
         self.gene_reaction_rule = ' and '.join(machinery_)
 
 class BiomassReaction(cobra.Reaction):
-    """Specifies biomass reactions in the model, allowing reaction bounds to be a function of mu"""
+    """Specifies biomass reactions in the model, allowing reaction bounds to be a function of mu."""
 
     def __init__(self, id: str, name: str = '', subsystem: str = '',
                  lower_bound: Union[SupportsFloat, sympy.Expr] = 0.0, upper_bound: Optional[Union[SupportsFloat, sympy.Expr]] = None):
@@ -682,7 +676,6 @@ class BiomassReaction(cobra.Reaction):
         _ub : bool, optional
             internal use, whether to use cobra.Reaction._upper_bound or cobra.Reaction.upper_bound, by default True
         """
-
         if _ub:
             lb, ub = copy.copy(self._lower_bound), copy.copy(self._upper_bound)
         else:
@@ -713,18 +706,12 @@ class BiomassReaction(cobra.Reaction):
 
     @property
     def reversibility(self) -> bool:
-        """
-        Whether the reaction can proceed in both directions (reversible)
-
-        This is computed from the current upper and lower bounds.
-
-        """
+        """Whether the reaction can proceed in both directions (reversible). This is computed from the current upper and lower bounds."""
         lb, ub = self.replace_bound_mu()
         return lb < 0 < ub
 
     def build_reaction_string(self, use_metabolite_names: bool = False):
-        """Generate a human readable reaction string"""
-
+        """Generate a human readable reaction string."""
         def format(number):
             return "" if number == 1 else str(number).rstrip(".") + " "
 

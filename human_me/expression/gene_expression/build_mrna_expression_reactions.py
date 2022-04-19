@@ -13,7 +13,7 @@ class ExpressMrna:
     '''Gene-specific mRNA expression.'''
 
     def __init__(self, gene_info, model_metabolites) -> None:
-        """Init method for ExpressMrna
+        """Init method for ExpressMrna.
 
         Parameters
         ----------
@@ -148,9 +148,7 @@ class ExpressMrna:
         self.reactions.append(mrna_export)
 
     def degrade_mrna(self, decapping: bool = True, three_to_five: bool = False) -> None:
-        """Currently, only one of the two degradation pathways is included. We assume the 5' to 3' pathway is present.
-        This is simply to limit the total number of reactions
-
+        """Currently, only one of the two degradation pathways is included. We assume the 5' to 3' pathway is present. This is simply to limit the total number of reactions
 
         Parameters
         ----------
@@ -159,7 +157,6 @@ class ExpressMrna:
         three_to_five : bool, optional
             whether the 5' to 3' (False) or 3' to 5' (True) mRNA degradation pathway is used, by default False
         """
-
         rxn = self.mrna_c.exonucleolytic_degradation(reaction_name='', balanced=False).metabolites
         del rxn[self.model_metabolites.ntp_map_c[self.gene_info.mrna_seq[0]]] 
 

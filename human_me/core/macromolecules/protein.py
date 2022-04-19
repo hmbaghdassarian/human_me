@@ -87,14 +87,13 @@ class Protein(Macromolecule):
         self.non_machinery = non_machinery
 
     def make_proxy(self):
-        """Make a proxy metabolite for coupling enzyme degradation to reaction catalysis"""
+        """Make a proxy metabolite for coupling enzyme degradation to reaction catalysis."""
         if self.non_machinery:
             raise ValueError('Unexpected generation of coupling proxy metabolites for non-machinery')
         return Proxy(associated_macromolecule=self)
     
     def copy(self):
-        """Overwrite cobra.Species.copy"""
-
+        """Overwrite cobra.Species.copy."""
         # copy while preserving model_metabolites pointer to avoid memory issues and not copying it to avoid speed issues
         model_metabolites = self.model_metabolites
         del self.model_metabolites

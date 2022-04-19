@@ -2,6 +2,14 @@
 
 These provide additional details and alternate installation instructions for setting up the human_me environment and qMINOS solver
 
+Note, throughout the instructions we will refer to "path/to/human_me" as the root path to the package directory. 
+After pip installing, this can be found as follows in Python:
+
+```python
+import human_me
+print(human_me.__file__)
+```
+
 ## Step 1-2: Creating the Environment
 
 We highly recommending setting up a [python virtual environment](https://packaging.python.org/guides/) instead of a conda environment, because it works better with the solver.
@@ -9,7 +17,7 @@ We highly recommending setting up a [python virtual environment](https://packagi
 This can be done as follows:
 ```console
 python3 -m venv <env_name> #--python=python3.6.9
-source [env_name]/bin/activate
+source <env_name>/bin/activate
 ```
 
 human_me can be installed using pip and PyPi:

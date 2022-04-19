@@ -69,10 +69,10 @@ metadata = dict(
     url='https://github.com/hmbaghdassarian/human_me',  # homepage
     packages=find_packages(include=('human_me*')), # PACKAGES
     scripts=['install_solver'], 
+    project_urls = {'Documentation': 'https://hmbaghdassarian.github.io/human_me/'}
     # py_mopdules=['io'],
     python_requires=PYTHON_REQUIRES,
     install_requires=INSTALL_REQUIRES,
-    # long_description=README,
     classifiers=[CLASSIFIERS],
     license=LICENSE
 )

@@ -44,7 +44,7 @@ def read_metabolic_model(file_name: str) -> cobra.Model:
     return m_model
 
 def load_metabolic_model(model_file: Union[str, cobra.Model]) -> cobra.Model:
-    """Reads in metabolic model, checking for appropriate type
+    """Reads in metabolic model, checking for appropriate type.
 
     Parameters
     ----------
@@ -64,7 +64,7 @@ def load_metabolic_model(model_file: Union[str, cobra.Model]) -> cobra.Model:
         raise TypeError('Model arg must either by a cobrapy model or specify a path to a sbml file of a cobrapy model')
 
 def read_psim(psim_file: str, h5_key: Optional[str] = None) -> pd.DataFrame:
-    """Read the PSIM from .csv or .h5 format
+    """Read the PSIM from .csv or .h5 format.
 
     Parameters
     ----------
@@ -96,7 +96,7 @@ def read_psim(psim_file: str, h5_key: Optional[str] = None) -> pd.DataFrame:
 
 
 def load_psim(psim_file: Union[str, pd.DataFrame], **kwargs) -> pd.DataFrame: 
-    """Reads in PSIM, checking for appropriate type
+    """Reads in PSIM, checking for appropriate type.
 
     Parameters
     ----------
@@ -108,7 +108,6 @@ def load_psim(psim_file: Union[str, pd.DataFrame], **kwargs) -> pd.DataFrame:
     pd.DataFrame
         the PSIM dataframe
     """
-
     if isinstance(psim_file, str):
         return read_psim(psim_file, **kwargs)
     if isinstance(psim_file, pd.DataFrame):
@@ -119,7 +118,7 @@ def load_psim(psim_file: Union[str, pd.DataFrame], **kwargs) -> pd.DataFrame:
         raise TypeError('The specified psim_file must be a path to the dataframe of the pandas DataFrame')
 
 def read_pickled_object(file_name: str):
-    """Read an object as a pickled file
+    """Read an object as a pickled file.
 
     Parameters
     ----------
@@ -136,7 +135,7 @@ def read_pickled_object(file_name: str):
     return pickled_object
 
 def read_pickled_me_model(file_name: str):
-    """Loads a pickled me_model. Saved from me_model.pickle
+    """Loads a pickled me_model. Saved from me_model.pickle.
 
     Parameters
     ----------
@@ -153,7 +152,7 @@ def read_pickled_me_model(file_name: str):
     return me_model
 
 def write_metabolic_model(m_model: cobra.Model, file_name: str, **kwargs) -> None: 
-    """Write a metabolic model to smbl format with .xml extension
+    """Write a metabolic model to smbl format with .xml extension.
 
     Parameters
     ----------
@@ -167,7 +166,7 @@ def write_metabolic_model(m_model: cobra.Model, file_name: str, **kwargs) -> Non
     cobra.io.write_sbml_model(cobra_model=m_model, filename=file_name, **kwargs)
 
 def write_pickled_object(object: Any, file_name: str) -> None:
-    """Save an object as a pickled file
+    """Save an object as a pickled file.
 
     Parameters
     ----------

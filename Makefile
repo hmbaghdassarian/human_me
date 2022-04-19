@@ -24,3 +24,5 @@ install-qminos:
 # make DATA_DIR=/data3/hratch/test_data PREBUILD=0 build-data
 build-data:
 	${PYTHON} ./human_me/data/_download_data.py ${DATA_DIR} ${PREBUILD}
+
+# TODO: the two make commands can be combined (parent dir with solver directory + data directories) if QMINOS can be downloaded

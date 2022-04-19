@@ -313,7 +313,6 @@ def get_model_machinery(me_input_model) -> Tuple[List[str]]:
     all_machinery : List[str]
         HGNC IDs of metabolic and expression genes    
     """
-
     metabolic_machinery = sorted([g.id for g in me_input_model.genes])
     all_machinery = sorted(set(metabolic_machinery + expression_machinery))
 

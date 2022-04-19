@@ -18,7 +18,7 @@ ProteinExpressionType = Tuple[
 ]
 
 def fold_protein_cytosolic(gene_info, unfolded_protein_c: Protein, model_metabolites) -> ProteinExpressionType:
-    """Fold cytosolic proteins
+    """Fold cytosolic proteins.
 
     Parameters
     ----------
@@ -71,7 +71,6 @@ def transport_nuclear_protein(gene_info, folded_protein_c: Protein, model_metabo
     ProteinExpressionType
         Transport reaction and transported protein
     """
-
     folded_protein_n = folded_protein_c.change_compartment('n')
 
     nuclear_import = ProteinExpressionReaction(gene_info.hgnc_id + '_IMPORTtn', hgnc_id=gene_info.hgnc_id)
@@ -93,7 +92,7 @@ def transport_nuclear_protein(gene_info, folded_protein_c: Protein, model_metabo
 
 
 def get_nuclear_reactions(gene_info, folded_protein_c: Protein, ub_args: Dict[str, Any], model_metabolites) -> ProteinExpressionType:
-    """All associated nuclear protein formation reactions
+    """All associated nuclear protein formation reactions.
 
     Parameters
     ----------
@@ -118,10 +117,6 @@ def get_nuclear_reactions(gene_info, folded_protein_c: Protein, ub_args: Dict[st
 
 
 # # Mitochondrial Reactions
-#
-
-# In[4]:
-
 
 # i is intermembrane space, but called inner in compartments BIGG
 # stick to notation and use inner instead of inter in reaction naming
@@ -163,7 +158,7 @@ def transport_mitochondrial_matrix(gene_info, unfolded_protein_c: Protein, model
 
 
 def mitochondrial_matrix_protein_processing(gene_info, pre_protein_m: Protein) -> Tuple[ProteinExpressionType, Dict[str, int], int]:
-    """Cleavage of MTS - unimplemented
+    """Cleavage of MTS - unimplemented.
 
     Parameters
     ----------
@@ -218,7 +213,7 @@ def transport_mitochondrial_inter(gene_info, processed_protein_m: Protein) -> Pr
 
 
 def mitochondrial_inter_protein_processing(gene_info, pre_protein_i: Protein) -> ProteinExpressionReaction:
-    """Processing of intermembrane mitochondrial protein
+    """Processing of intermembrane mitochondrial protein.
 
     Parameters
     ----------
@@ -240,7 +235,7 @@ def mitochondrial_inter_protein_processing(gene_info, pre_protein_i: Protein) ->
 
 
 def get_mitochondrial_reactions(gene_info, unfolded_protein_c: Protein, compartments: List[str], model_metabolites) -> Tuple[List[ProteinExpressionType]]:
-    """Generate all mitochondrial transport reactions
+    """Generate all mitochondrial transport reactions.
 
     Parameters
     ----------
@@ -291,7 +286,7 @@ def get_mitochondrial_reactions(gene_info, unfolded_protein_c: Protein, compartm
 
 # # Peroxisomal
 def transport_peroxisome(gene_info, folded_protein_c: Protein, model_metabolites) -> ProteinExpressionType:
-    """Transport of proteins to peroxisom
+    """Transport of proteins to peroxisome.
 
     Parameters
     ----------
@@ -326,7 +321,7 @@ def transport_peroxisome(gene_info, folded_protein_c: Protein, model_metabolites
 
 
 def get_peroxisomal_reactions(gene_info, folded_protein_c: Protein, model_metabolites):
-    """All peroxisomal protein expression reactions
+    """All peroxisomal protein expression reactions.
 
     Parameters
     ----------
@@ -349,7 +344,7 @@ def get_peroxisomal_reactions(gene_info, folded_protein_c: Protein, model_metabo
 
 # # ER transport
 def post_translational_translocation(gene_info, unfolded_protein_c: Protein, model_metabolites) -> ProteinExpressionType:
-    """Post translational translocation to ER
+    """Post translational translocation to ER.
 
     Parameters
     ----------
@@ -468,7 +463,7 @@ def co_translational_translocation(gene_info, mrna_transcript_c, mrna_deg_proxy,
 
 
 def form_disulfide_bond(gene_info, folded_protein_r: Protein, model_metabolites) -> ProteinExpressionType:
-    """Disulfide bond formation
+    """Disulfide bond formation.
 
     Parameters
     ----------
@@ -502,7 +497,7 @@ def form_disulfide_bond(gene_info, folded_protein_r: Protein, model_metabolites)
 
 
 def form_gpi(gene_info, modified_protein_r: Protein, model_metabolites) -> ProteinExpressionType:
-    """GPI formation
+    """GPI formation.
 
     Parameters
     ----------
@@ -555,7 +550,7 @@ def glycosylate_n_linked(gene_info, modified_protein_r: Protein):
 
 
 def modify_protein_er(gene_info, folded_protein_r: Protein, model_metabolites) -> ProteinExpressionType:
-    """All ER associated PTMs
+    """All ER associated PTMs.
 
     Parameters
     ----------
@@ -596,7 +591,7 @@ def modify_protein_er(gene_info, folded_protein_r: Protein, model_metabolites) -
 
 # # Golgi Reactions
 def import_golgi(gene_info, modified_protein_r: Protein, model_metabolites) -> ProteinExpressionType:
-    """Golgi transport
+    """Golgi transport.
 
     Parameters
     ----------
@@ -633,7 +628,7 @@ def import_golgi(gene_info, modified_protein_r: Protein, model_metabolites) -> P
 
 
 def glycosylate_o_linked(gene_info, protein_g: Protein, model_metabolites) -> ProteinExpressionType:
-    """O-linked glycosylation
+    """O-linked glycosylation.
 
     Parameters
     ----------
@@ -681,7 +676,7 @@ def glycosylate_o_linked(gene_info, protein_g: Protein, model_metabolites) -> Pr
 
 
 def modify_protein_golgi(gene_info, protein_g: Protein, model_metabolites) -> ProteinExpressionType:
-    """All PTM modifications in Golgi
+    """All PTM modifications in Golgi.
 
     Parameters
     ----------

@@ -13,8 +13,8 @@ class Macromolecule(cobra.Metabolite):
     def __init__(self, id: Optional[str] = None, formula: Optional[str] = None, name: str = "", charge: Optional[int] = None,
                  compartment: Optional[str] = None, elements: Optional[Dict[str, int]] = None,
                  hgnc_id: Optional[str] = None):
-        """RNA, proteins, complexes, and coupling proxies
-        see cobra.Metabolite for undescribed parameters
+        """RNA, proteins, complexes, and coupling proxies/ see cobra.Metabolite for undescribed parameters.
+
         Parameters
         ----------
         id : str, optional
@@ -49,7 +49,7 @@ class Macromolecule(cobra.Metabolite):
         self.hgnc_id = hgnc_id
 
     def change_compartment(self, new_compartment: str):
-        """Create a macromolecule the same as self, but in a different compartment
+        """Create a macromolecule the same as self, but in a different compartment.
 
         Parameters
         ----------
@@ -61,7 +61,6 @@ class Macromolecule(cobra.Metabolite):
         Macromolecule
             a copy of the macromolecule in the new compartment
         """
-
         if new_compartment == self.compartment:
             raise ValueError('The macromolecule is already in this compartment')
         if new_compartment not in params.compartments.keys():
@@ -75,7 +74,7 @@ class Macromolecule(cobra.Metabolite):
         return new_macromolecule
 
     def couple(self, type: str, value: Union[SupportsFloat, sympy.Expr]):
-        """Stores coupling information for macromolecule
+        """Stores coupling information for macromolecule.
 
         Parameters
         ----------
@@ -85,7 +84,7 @@ class Macromolecule(cobra.Metabolite):
             the coupling coefficient value
 
         Returns
-        ----------
+        -------
         self.coupling_coefficient: Dict[str, Union[SupportsFloat, sympy.Expr]]
             dictionary of length one, key is the type, value is the coupling coefficient
         """
@@ -108,7 +107,7 @@ class Macromolecule(cobra.Metabolite):
 
 
 class Proxy(Macromolecule):
-    """Proxy macromolecules for c2/c4 coupling of degradation"""
+    """Proxy macromolecules for c2/c4 coupling of degradation."""
 
     type = 'proxy'
 
@@ -144,11 +143,10 @@ class Proxy(Macromolecule):
             the coupling coefficient value
 
         Returns
-        ----------
+        -------
         self.coupling_coefficient: Dict[str, Union[SupportsFloat, sympy.Expr]]
             dictionary of length one, key is the type, value is the coupling coefficient
         """
-
         key_mapper = {'mrna': 'mrna_degradation', 'protein': 'enzyme_degradation',
                       'complex': 'enzyme_degradation'}
 

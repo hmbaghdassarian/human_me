@@ -215,7 +215,6 @@ class qminosSolver:
         res: Dict[float, Tuple[np.array, int]]]
             keys are all attempted growth values, values are dictionaries with keys as output from self.solve_lp
         """
-
         objective = {'biomass_dilution': 1}  # maximizing for growth
         feasible_mu = []
         infeasible_mu = []
@@ -251,7 +250,7 @@ class qminosSolver:
     def optimize(self, me_model, objective: Dict[str, int], mu_max: SupportsFloat,
                  n_points: int = 10, tolerance: SupportsFloat = 0, n_cores: Optional[int] = None,
                  visualize: bool = True, fig_name: Optional[str] = None):
-        """General optimization of any non-growth objective
+        """General optimization of any non-growth objective.
 
         Parameters
         ----------
@@ -291,7 +290,6 @@ class qminosSolver:
             keys are n_points growth values between 0 and mu_max, values are the output of .solve_lp at
             corresponding growth values with the objective set to the non-growth objective input
         """
-
         obj_keys = list(objective.keys())
         if len(obj_keys) == 1 and obj_keys[0] == 'biomass_dilution':
             raise ValueError('To optimize for growth, use the .maximize_growth() method')

@@ -20,7 +20,7 @@ min_polyA_mean = -polyA_mod.params['const'] / polyA_mod.params['MEAN']
 
 
 def calculate_polyA_length(polyA_length: Optional[Union[int, float]] = None, stochastic: bool = False, seed: Optional[int] = None) -> int:
-    """Calculates expected length of polyA tail based on input float and data distribution
+    """Calculates expected length of polyA tail based on input float and data distribution.
 
     Parameters
     ----------

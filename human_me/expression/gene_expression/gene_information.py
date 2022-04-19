@@ -29,7 +29,6 @@ def format_final_locations(final_locations: List[str], sp: bool, hgnc_id: str) -
     final_locations_dict : Dict[str, str]
          keys are elements in final_locations and values are means of translation ('Cytosolic Transport', 'Canonical Secretion', 'Non-Canonical Secretion', or 'Mitochondrial Expression')
     """
-
     # transport rules
     # assume location dictates transport pathway ind of sp;
     # assume all genes are transported to mitochondria
@@ -63,26 +62,19 @@ def format_final_locations(final_locations: List[str], sp: bool, hgnc_id: str) -
                 final_locations_dict[loc] = 'Non-Canonical Secretion'
     return final_locations_dict
 
-
-# In[6]:
-
-
 class GeneInformation:
     """This class compiles all the necessary information for a given transcript/protein to be expressed in the 
     ME model. 
 
-    Notes: 
-
-    1) As of right now, machinery PTMs are not considered. Only non-machinery proteins processed via the 
-    secretory pathway can have PTMs. 
+    Notes: 1) As of right now, machinery PTMs are not considered. Only non-machinery proteins processed via the 
+    secretory pathway can have PTMs.
     """
-
     def __init__(self, hgnc_id: str, premrna_seq: str, mrna_seq: str, protein_seq: str,
                  machinery_list: List[str],
                  ptms: Optional[Dict[str, int]] = None, tmd: int = 0, sp: bool = False,
                  polyA_length: Optional[float] = None, n_exons: Optional[int] = None,
                  coupling_params: Optional[Dict[str, Union[str, float]]] = None, stochastic: bool = False, seed: int = None) -> None:
-        """Init method for GeneInformation class
+        """Init method for GeneInformation class.
 
         Parameters
         ----------
@@ -318,8 +310,7 @@ class GeneInformation:
                 raise ValueError('The coupling constraint "' + k + '" must be positive for gene ' + self.hgnc_id)
 
     def get_final_locations(self, reactions: Optional[List[cobra.Reaction]] = None, nonmachinery_locations: Optional[List[str]] = None) -> None:
-        """Assigns a set of final compartments for the protein. For machinery, extracts this from the input
-        cobrapy model. This method helps define necessary transport reactions.
+        """Assigns a set of final compartments for the protein. For machinery, extracts this from the input cobrapy model. This method helps define necessary transport reactions.
 
         Parameters
         ----------
@@ -410,8 +401,7 @@ cp_keys = ['alpha_m', 'alpha_p', 'ptr']
 def generate_from_psim(hgnc_id: str, psim: pd.DataFrame, machinery_list: List[str], 
                        reactions: Optional[List[cobra.Reaction]] = None, nonmachinery_locations: Optional[List[str]] = None,
                        stochastic: bool = False, seed: int = None) -> GeneInformation:
-    """Generates gene information object from PSIM. Assumes the gene information object being
-    generated is not for a non-machinery protein.
+    """Generates gene information object from PSIM. Assumes the gene information object being generated is not for a non-machinery protein.
 
     Parameters
     ----------

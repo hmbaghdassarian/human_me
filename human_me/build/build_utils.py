@@ -113,7 +113,7 @@ def get_expression_machinery(reactions):
 
 
 def parse_complex_degradation_reaction_id(r_id: str) -> str:
-    """Generates universal reaction ID analagous to func.parse_me_reaction_id specifically for ComplexDegradationReaction"""
+    """Generates universal reaction ID analagous to func.parse_me_reaction_id specifically for ComplexDegradationReaction."""
     if r_id.count('_COMPLEX_') == 1:
         return r_id[r_id.index('_COMPLEX_') + len('_COMPLEX_'):]
 
@@ -121,14 +121,14 @@ def parse_complex_degradation_reaction_id(r_id: str) -> str:
 
 
 def get_ko(mach_: List[str], knock_out: List[str]):
-    """Determine whether a machinery list intersects with a knock_out genes list"""
+    """Determine whether a machinery list intersects with a knock_out genes list."""
     if len(knock_out) == 0 or len(set(mach_).intersection(knock_out)) == 0:
         return False
     return True
 
 
 def get_complex_df(reactions: List[cobra.Reaction], knock_out: List[str]) -> pd.DataFrame:
-    """Generate the complex df
+    """Generate the complex df.
 
     Parameters
     ----------
@@ -180,7 +180,7 @@ def get_complex_df(reactions: List[cobra.Reaction], knock_out: List[str]) -> pd.
 
 
 def explode(df_, explode_cols, sep=None, fill_value=float('nan'), preserve_index=False):
-    """Split entries with multiple values separated by a separator into multiple rows (or entries in lists)
+    """Split entries with multiple values separated by a separator into multiple rows (or entries in lists).
 
     https://stackoverflow.com/questions/12680754/split-explode-pandas-dataframe-string-entry-to-separate-rows
 
@@ -193,7 +193,6 @@ def explode(df_, explode_cols, sep=None, fill_value=float('nan'), preserve_index
         if empty entry, what to fill it with
     preserve_index: bool
         keep original index values for each new row
-
     """
     res = None
     for col in explode_cols:

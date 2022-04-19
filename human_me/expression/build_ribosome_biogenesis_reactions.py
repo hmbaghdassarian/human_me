@@ -75,7 +75,7 @@ SIX_S_IDX = 1  # https://www.nature.com/articles/s41594-019-0234-x?draft=collect
 exclude = ['POLYUBIQUITINATIONn', 'DEUBIQUITINATIONn', 'DEGRADATIONn']
 
 def set_ribosomal_psim(psim_me: pd.DataFrame) -> pd.DataFrame:
-    """Format psim information specifically for ribosomal biogenesis
+    """Format psim information specifically for ribosomal biogenesis.
 
     Parameters
     ----------
@@ -90,8 +90,6 @@ def set_ribosomal_psim(psim_me: pd.DataFrame) -> pd.DataFrame:
     psim_rib = psim_me.copy()
     psim_rib.LOCATION = psim_rib.LOCATION.apply(lambda x: ['n', 'c'])
     return psim_rib
-    
-
 
 def cleave_ub(hgnc_id: str, model_metabolites, psim_rib, ub_args: Dict[str, Any], compress_mrna: bool, 
               charged_trna_map, modified_trna_transcript_c,
@@ -183,7 +181,7 @@ def cleave_ub(hgnc_id: str, model_metabolites, psim_rib, ub_args: Dict[str, Any]
 
 def build_ribosome_protein_expression_reactions(model_metabolites, psim_rib, modified_trna_transcript_c, charged_trna_map,
                                                 ub_args: Dict[str, Any], compress_mrna: bool, stochastic: bool, seeds: List[int]):
-    """Reactions associated with transcription and translation of ribosomal proteins
+    """Reactions associated with transcription and translation of ribosomal proteins.
 
     Parameters
     ----------
@@ -206,7 +204,6 @@ def build_ribosome_protein_expression_reactions(model_metabolites, psim_rib, mod
     seeds : List[int]
         A list of seeds for if stochastic is set to True
     """
-
     # small ribosome proteins--------------------------------------------------------------------------------
     rs_ids = mach.rs['HGNC ID (gene)'].tolist()
     RPS27A_HGNC = 'HGNC:10417'
@@ -321,10 +318,6 @@ def build_rrna5s_reactions(rpl5_n, rpl11_n, model_metabolites):
     rrna5s_reactions = [rrna5s_transcription, rrna5s_processing, rrna5s_degradation]
 
     return rrna5s_reactions, rrna5s_complex_n, rrna5s_c
-
-
-# In[5]:
-
 
 # ets_5_frag1 is from 5' end of 47s to A' site
 # ets_5_frag2 is from A' to 18s
@@ -704,7 +697,7 @@ def build_other_rrna_reactions(rrna5s_complex_n, rs_protein_metabolites, rl_prot
 
 
 def build_ribosome(model_metabolites, psim_rib, modified_trna_transcript_c, charged_trna_map, ub_args: Dict[str, Any], compress_mrna: bool, reversible_complex_formation: bool, stochastic: bool, seed: int):
-    """Generate all ribosome biogenesis reactions
+    """Generate all ribosome biogenesis reactions.
 
     Parameters
     ----------

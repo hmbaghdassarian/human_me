@@ -141,7 +141,6 @@ def add_biomass_change(reaction: cobra.Reaction, inplace: bool = True) -> Union[
     Dict[str, float]
         if inplace is False, the new reaction.metabolites representation is returned
     """
-
     biomass_change = dict()
     # sorting needed for precision (order of adding masses effects final sum)
     md_map = {m.id: m for m in reaction.metabolites}
