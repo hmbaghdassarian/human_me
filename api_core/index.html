@@ -5,7 +5,7 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
       <link rel="shortcut icon" href="../img/favicon.ico" />
-    <title>Core API - human_me</title>
+    <title>Documentation for 'human_me.preprocess' - human_me</title>
     <link rel="stylesheet" href="../css/theme.css" />
     <link rel="stylesheet" href="../css/theme_extra.css" />
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.5.0/styles/github.min.css" />
@@ -13,7 +13,7 @@
     
       <script>
         // Current page data
-        var mkdocs_page_name = "Core API";
+        var mkdocs_page_name = "Documentation for \u0027human_me.preprocess\u0027";
         var mkdocs_page_input_path = "api_core.md";
         var mkdocs_page_url = null;
       </script>
@@ -53,190 +53,8 @@
                 <li class="toctree-l1"><a class="reference internal" href="../install/">Installation</a>
                 </li>
               </ul>
-              <ul class="current">
-                <li class="toctree-l1 current"><a class="reference internal current" href="./">Core API</a>
-    <ul class="current">
-    <li class="toctree-l2"><a class="reference internal" href="#human_me.core.macromolecules">macromolecules</a>
-        <ul>
-    <li class="toctree-l3"><a class="reference internal" href="#human_me.core.macromolecules.RNA">RNA</a>
-        <ul>
-    <li class="toctree-l4"><a class="reference internal" href="#human_me.core.macromolecules.RNA.RNA">RNA</a>
-    </li>
-    <li class="toctree-l4"><a class="reference internal" href="#human_me.core.macromolecules.RNA.RNA_fragment">RNA_fragment</a>
-    </li>
-    <li class="toctree-l4"><a class="reference internal" href="#human_me.core.macromolecules.RNA.mRNA">mRNA</a>
-    </li>
-    <li class="toctree-l4"><a class="reference internal" href="#human_me.core.macromolecules.RNA.pre_mRNA">pre_mRNA</a>
-    </li>
-    <li class="toctree-l4"><a class="reference internal" href="#human_me.core.macromolecules.RNA.rRNA">rRNA</a>
-    </li>
-    <li class="toctree-l4"><a class="reference internal" href="#human_me.core.macromolecules.RNA.tRNA">tRNA</a>
-    </li>
-        </ul>
-    </li>
-    <li class="toctree-l3"><a class="reference internal" href="#human_me.core.macromolecules.complex">complex</a>
-        <ul>
-    <li class="toctree-l4"><a class="reference internal" href="#human_me.core.macromolecules.complex.Complex">Complex</a>
-    </li>
-    <li class="toctree-l4"><a class="reference internal" href="#human_me.core.macromolecules.complex.RibosomalComplex">RibosomalComplex</a>
-    </li>
-    <li class="toctree-l4"><a class="reference internal" href="#human_me.core.macromolecules.complex.add_complex_metabolites">add_complex_metabolites()</a>
-    </li>
-        </ul>
-    </li>
-    <li class="toctree-l3"><a class="reference internal" href="#human_me.core.macromolecules.macromolecule">macromolecule</a>
-        <ul>
-    <li class="toctree-l4"><a class="reference internal" href="#human_me.core.macromolecules.macromolecule.Macromolecule">Macromolecule</a>
-    </li>
-    <li class="toctree-l4"><a class="reference internal" href="#human_me.core.macromolecules.macromolecule.Proxy">Proxy</a>
-    </li>
-        </ul>
-    </li>
-    <li class="toctree-l3"><a class="reference internal" href="#human_me.core.macromolecules.protein">protein</a>
-        <ul>
-    <li class="toctree-l4"><a class="reference internal" href="#human_me.core.macromolecules.protein.Protein">Protein</a>
-    </li>
-        </ul>
-    </li>
-        </ul>
-    </li>
-    <li class="toctree-l2"><a class="reference internal" href="#human_me.core.reaction">reaction</a>
-        <ul>
-    <li class="toctree-l3"><a class="reference internal" href="#human_me.core.reaction.BiomassReaction">BiomassReaction</a>
-        <ul>
-    <li class="toctree-l4"><a class="reference internal" href="#human_me.core.reaction.BiomassReaction.reversibility">reversibility</a>
-    </li>
-    <li class="toctree-l4"><a class="reference internal" href="#human_me.core.reaction.BiomassReaction.build_reaction_string">build_reaction_string()</a>
-    </li>
-    <li class="toctree-l4"><a class="reference internal" href="#human_me.core.reaction.BiomassReaction.replace_bound_mu">replace_bound_mu()</a>
-    </li>
-        </ul>
-    </li>
-    <li class="toctree-l3"><a class="reference internal" href="#human_me.core.reaction.ComplexDegradationReaction">ComplexDegradationReaction</a>
-        <ul>
-    <li class="toctree-l4"><a class="reference internal" href="#human_me.core.reaction.ComplexDegradationReaction.__init__">__init__()</a>
-    </li>
-    <li class="toctree-l4"><a class="reference internal" href="#human_me.core.reaction.ComplexDegradationReaction.copy">copy()</a>
-    </li>
-        </ul>
-    </li>
-    <li class="toctree-l3"><a class="reference internal" href="#human_me.core.reaction.ExpressionReaction">ExpressionReaction</a>
-        <ul>
-    <li class="toctree-l4"><a class="reference internal" href="#human_me.core.reaction.ExpressionReaction.__init__">__init__()</a>
-    </li>
-        </ul>
-    </li>
-    <li class="toctree-l3"><a class="reference internal" href="#human_me.core.reaction.ME_Reaction">ME_Reaction</a>
-        <ul>
-    <li class="toctree-l4"><a class="reference internal" href="#human_me.core.reaction.ME_Reaction.products">products</a>
-    </li>
-    <li class="toctree-l4"><a class="reference internal" href="#human_me.core.reaction.ME_Reaction.reactants">reactants</a>
-    </li>
-    <li class="toctree-l4"><a class="reference internal" href="#human_me.core.reaction.ME_Reaction.__init__">__init__()</a>
-    </li>
-    <li class="toctree-l4"><a class="reference internal" href="#human_me.core.reaction.ME_Reaction.build_reaction_string">build_reaction_string()</a>
-    </li>
-    <li class="toctree-l4"><a class="reference internal" href="#human_me.core.reaction.ME_Reaction.check_mass_balance">check_mass_balance()</a>
-    </li>
-    <li class="toctree-l4"><a class="reference internal" href="#human_me.core.reaction.ME_Reaction.copy">copy()</a>
-    </li>
-    <li class="toctree-l4"><a class="reference internal" href="#human_me.core.reaction.ME_Reaction.couple">couple()</a>
-    </li>
-    <li class="toctree-l4"><a class="reference internal" href="#human_me.core.reaction.ME_Reaction.replace_coefficient_mu">replace_coefficient_mu()</a>
-    </li>
-        </ul>
-    </li>
-    <li class="toctree-l3"><a class="reference internal" href="#human_me.core.reaction.MetabolicReaction">MetabolicReaction</a>
-        <ul>
-    <li class="toctree-l4"><a class="reference internal" href="#human_me.core.reaction.MetabolicReaction.__init__">__init__()</a>
-    </li>
-        </ul>
-    </li>
-    <li class="toctree-l3"><a class="reference internal" href="#human_me.core.reaction.ProteinDegradationReaction">ProteinDegradationReaction</a>
-        <ul>
-    <li class="toctree-l4"><a class="reference internal" href="#human_me.core.reaction.ProteinDegradationReaction.__init__">__init__()</a>
-    </li>
-    <li class="toctree-l4"><a class="reference internal" href="#human_me.core.reaction.ProteinDegradationReaction.copy">copy()</a>
-    </li>
-        </ul>
-    </li>
-    <li class="toctree-l3"><a class="reference internal" href="#human_me.core.reaction.ProteinExpressionReaction">ProteinExpressionReaction</a>
-        <ul>
-    <li class="toctree-l4"><a class="reference internal" href="#human_me.core.reaction.ProteinExpressionReaction.__init__">__init__()</a>
-    </li>
-        </ul>
-    </li>
-    <li class="toctree-l3"><a class="reference internal" href="#human_me.core.reaction.to_metabolic_reaction">to_metabolic_reaction()</a>
-    </li>
-        </ul>
-    </li>
-    <li class="toctree-l2"><a class="reference internal" href="#human_me.core.model">model</a>
-        <ul>
-    <li class="toctree-l3"><a class="reference internal" href="#human_me.core.model.ME_Model">ME_Model</a>
-        <ul>
-    <li class="toctree-l4"><a class="reference internal" href="#human_me.core.model.ME_Model.__init__">__init__()</a>
-    </li>
-    <li class="toctree-l4"><a class="reference internal" href="#human_me.core.model.ME_Model.add_reactions">add_reactions()</a>
-    </li>
-    <li class="toctree-l4"><a class="reference internal" href="#human_me.core.model.ME_Model.check">check()</a>
-    </li>
-    <li class="toctree-l4"><a class="reference internal" href="#human_me.core.model.ME_Model.check_me_mass_balance">check_me_mass_balance()</a>
-    </li>
-    <li class="toctree-l4"><a class="reference internal" href="#human_me.core.model.ME_Model.copy">copy()</a>
-    </li>
-    <li class="toctree-l4"><a class="reference internal" href="#human_me.core.model.ME_Model.create_expressed_gene">create_expressed_gene()</a>
-    </li>
-    <li class="toctree-l4"><a class="reference internal" href="#human_me.core.model.ME_Model.create_stoichiometric_matrix">create_stoichiometric_matrix()</a>
-    </li>
-    <li class="toctree-l4"><a class="reference internal" href="#human_me.core.model.ME_Model.infeasible_reactions">infeasible_reactions()</a>
-    </li>
-    <li class="toctree-l4"><a class="reference internal" href="#human_me.core.model.ME_Model.initialize_solver">initialize_solver()</a>
-    </li>
-    <li class="toctree-l4"><a class="reference internal" href="#human_me.core.model.ME_Model.knock_out_gene">knock_out_gene()</a>
-    </li>
-    <li class="toctree-l4"><a class="reference internal" href="#human_me.core.model.ME_Model.load_pickled_model">load_pickled_model()</a>
-    </li>
-    <li class="toctree-l4"><a class="reference internal" href="#human_me.core.model.ME_Model.maximize_growth">maximize_growth()</a>
-    </li>
-    <li class="toctree-l4"><a class="reference internal" href="#human_me.core.model.ME_Model.optimize">optimize()</a>
-    </li>
-    <li class="toctree-l4"><a class="reference internal" href="#human_me.core.model.ME_Model.pickle">pickle()</a>
-    </li>
-    <li class="toctree-l4"><a class="reference internal" href="#human_me.core.model.ME_Model.remove_reactions">remove_reactions()</a>
-    </li>
-    <li class="toctree-l4"><a class="reference internal" href="#human_me.core.model.ME_Model.solve_lp">solve_lp()</a>
-    </li>
-        </ul>
-    </li>
-        </ul>
-    </li>
-    <li class="toctree-l2"><a class="reference internal" href="#human_me.core.gene">gene</a>
-        <ul>
-    <li class="toctree-l3"><a class="reference internal" href="#human_me.core.gene.ExpressedGene">ExpressedGene</a>
-        <ul>
-    <li class="toctree-l4"><a class="reference internal" href="#human_me.core.gene.ExpressedGene.__init__">__init__()</a>
-    </li>
-    <li class="toctree-l4"><a class="reference internal" href="#human_me.core.gene.ExpressedGene.add_macromolecule">add_macromolecule()</a>
-    </li>
-    <li class="toctree-l4"><a class="reference internal" href="#human_me.core.gene.ExpressedGene.add_reaction">add_reaction()</a>
-    </li>
-    <li class="toctree-l4"><a class="reference internal" href="#human_me.core.gene.ExpressedGene.check">check()</a>
-    </li>
-    <li class="toctree-l4"><a class="reference internal" href="#human_me.core.gene.ExpressedGene.is_catalyzing">is_catalyzing()</a>
-    </li>
-        </ul>
-    </li>
-        </ul>
-    </li>
-    <li class="toctree-l2"><a class="reference internal" href="#human_me.core.biomass.Biomass">Biomass</a>
-    </li>
-    <li class="toctree-l2"><a class="reference internal" href="#human_me.core.biomass.add_biomass_change">add_biomass_change()</a>
-    </li>
-    </ul>
-                </li>
-              </ul>
               <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../api_main/">Main API</a>
+                <li class="toctree-l1"><a class="reference internal" href="../api/">API</a>
                 </li>
               </ul>
       </div>
@@ -252,7 +70,7 @@
       <div class="wy-nav-content">
         <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
   <ul class="wy-breadcrumbs">
-    <li><a href=".." class="icon icon-home" alt="Docs"></a> &raquo;</li><li>Core API</li>
+    <li><a href=".." class="icon icon-home" alt="Docs"></a> &raquo;</li><li>Documentation for 'human_me.preprocess'</li>
     <li class="wy-breadcrumbs-aside">
         <a href="https://github.com/hmbaghdassarian/human_me/edit/master/docs/api_core.md"
           class="icon icon-github"> Edit on GitHub</a>
@@ -9446,10 +9264,6 @@ human_me.core.biomass.Biomass            (<span title="cobra.core.metabolite.Met
               
             </div>
           </div><footer>
-    <div class="rst-footer-buttons" role="navigation" aria-label="Footer Navigation">
-        <a href="../install/" class="btn btn-neutral float-left" title="Installation"><span class="icon icon-circle-arrow-left"></span> Previous</a>
-        <a href="../api_main/" class="btn btn-neutral float-right" title="Main API">Next <span class="icon icon-circle-arrow-right"></span></a>
-    </div>
 
   <hr/>
 
@@ -9475,10 +9289,6 @@ human_me.core.biomass.Biomass            (<span title="cobra.core.metabolite.Met
         </span>
     
     
-      <span><a href="../install/" style="color: #fcfcfc">&laquo; Previous</a></span>
-    
-    
-      <span><a href="../api_main/" style="color: #fcfcfc">Next &raquo;</a></span>
     
   </span>
 </div>
