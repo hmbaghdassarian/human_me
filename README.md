@@ -6,7 +6,7 @@ For additional details and alternate install options, see the documentation's [i
 Requirements: gfortran (>=4.6)
 
 
-1. Create a [python virtual environment](https://packaging.python.org/guides/) and activate this environment
+1. Create a [python virtual environment](https://docs.python.org/3/library/venv.html) and activate this environment
 2. Install human_me:
 ```console
 pip install human_me

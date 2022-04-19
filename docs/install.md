@@ -12,7 +12,7 @@ print(human_me.__file__)
 
 ## Step 1-2: Creating the Environment
 
-We highly recommending setting up a [python virtual environment](https://packaging.python.org/guides/) instead of a conda environment, because it works better with the solver.
+We highly recommending setting up a [python virtual environment](https://docs.python.org/3/library/venv.html) instead of a conda environment, because it works better with the solver.
 
 This can be done as follows:
 ```console
