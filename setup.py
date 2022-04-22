@@ -28,24 +28,20 @@ PYTHON_MAX_VERSION = '3.9'
 PYTHON_REQUIRES = f'>={PYTHON_MIN_VERSION}, <={PYTHON_MAX_VERSION}'
 
 INSTALL_REQUIRES = [
-    'pathos==0.2.7'
-    'cmake==3.18.2'
-    'cython==0.29.20'
-    #'more-itertools==8.4.0'
-    'numpy==1.19.5'
-    'pandas==1.1.5'
-    'scipy==1.5.4'
-    'statsmodels==0.10.2'
-    'sympy==1.9'
-    'tqdm'
-    'cobra==0.18.1'
-    #'xlrd==1.2.0'
-    #'requests==2.26.0'
-    #'tables==3.6.1'
-    'matplotlib==3.3.4'
-    'seaborn==0.11.2'
-    'biopython==1.79'
-    'Faker==8.5.1'
+    'pathos==0.2.7',
+    'cmake==3.18.2',
+    'cython==0.29.20',
+    'numpy==1.19.5',
+    'pandas==1.1.5',
+    'scipy==1.5.4',
+    'statsmodels==0.10.2',
+    'sympy==1.9',
+    'tqdm',
+    'cobra==0.18.1',
+    'matplotlib==3.3.4',
+    'seaborn==0.11.2',
+    'biopython==1.79',
+    'Faker==8.5.1',
     'gdown==4.4.0'
 ]
 
