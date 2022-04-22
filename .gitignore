@@ -23,7 +23,6 @@ human_me/data/data.ini
 .env_template
 
 project_files/
-data/
 notebooks/.pybiomart.sqlite
 test_code/
 me_env/
