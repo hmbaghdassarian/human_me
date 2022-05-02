@@ -18,6 +18,18 @@ class HiddenPrints:
         sys.stdout.close()
         sys.stdout = self._original_stdout
 
+def _correct_sbml_bounds(m_model):
+    """Corrects error in read_sbml_model that changes (-1000,1000) reaction bounds to (-inf,inf)."""
+    for reaction in m_model.reactions:
+        if reaction.id.startswith('EX_') and not (reaction.id.endswith('LPAREN_e_RPAREN_') or reaction.id.endswith('_')):
+            bounds = list(reaction.bounds).copy()
+            if bounds[0] == -float('inf'):
+                bounds[0] = -1000
+            if bounds[1] == float('inf'):
+                bounds[1] = 1000
+            reaction.bounds = tuple(bounds)
+
+
 def read_metabolic_model(file_name: str) -> cobra.Model:
     """Read a metabolic model from sbml format with .xml extension
 
@@ -40,6 +52,7 @@ def read_metabolic_model(file_name: str) -> cobra.Model:
 
     with HiddenPrints():
         m_model = cobra.io.read_sbml_model(file_name)
+        _correct_sbml_bounds(m_model)
 
     return m_model
 
