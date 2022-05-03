@@ -9,6 +9,8 @@ import warnings
 from collections import OrderedDict
 from typing import Any, Dict, List, Optional, SupportsFloat
 
+import cobra
+from cobra.util.array import create_stoichiometric_matrix
 import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
 import numpy as np
@@ -42,7 +44,8 @@ class qminosSolver:
         Parameters
         ----------
         me_model : human_me.core.model.ME_Model
-            ME Model to solve
+            ME Model to solve 
+            (can also input a metabolic model with some of the parameter no longer being relevant)
         mu_val : SupportsFloat
             The growth value for which to solve the linear program [hr^-1]
         objective : Dict[str, int], optional
@@ -79,7 +82,10 @@ class qminosSolver:
         objective = {k: v / tot for k, v in objective.items()}
 
         # get stoichiometric matrix at mu_val
-        S = me_model.create_stoichiometric_matrix(mu_val=mu_val, array_type='numpy', inplace=False)
+        if type(me_model) != cobra.Model: # ME Model
+            S = me_model.create_stoichiometric_matrix(mu_val=mu_val, array_type='numpy', inplace=False)
+        else: # a regular metabolic model
+            S = create_stoichiometric_matrix(me_model)
 
         # get equality and inequality matrices to format (Ev=b; lb <= Iv <= ub; A = concat[E,I])
         zero_tol = 1e-6

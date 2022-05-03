@@ -1,0 +1,25 @@
+from numpy.testing import assert_allclose
+import cobra.test
+from cobra.util.solver import linear_reaction_coefficients
+
+from human_me.me_solver.solve_me import qminosSolver
+
+def test_solve_lp(objective = 'Biomass_Ecoli_core'):
+    """Tests that the qminos finds the same solution as cobrapy's glpk for metabolic model objective.
+
+    Parameters
+    ----------
+    objective : str, optional
+        reaction ID of objective function to optimize for, by default 'Biomass_Ecoli_core'
+        must be just one single reaction
+    """
+    model = cobra.test.create_test_model("textbook")
+    model.objective = objective
+    
+    glpk_sln = model.slim_optimize() # using cobrapy glpk solver
+
+    objective = {r.id: obj for r, obj in linear_reaction_coefficients(model).items()}
+    qminos_sln, stat, hsq = qminosSolver().solve_lp(me_model = model, mu_val = None, objective = objective)
+    reaction_indeces = [model.reactions.index(r_id) for r_id in list(objective)]
+
+    assert_allclose(qminos_sln[reaction_indeces], glpk_sln)

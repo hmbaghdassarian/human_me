@@ -71,7 +71,6 @@
       show_root_heading: true
       show_source: true
 
-
 ::: human_me.me_solver
     handler: python
     rendering:

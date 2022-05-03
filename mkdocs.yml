@@ -13,6 +13,9 @@ plugins:
             docstring_style: "numpy"
           rendering:
             show_source: false
+  - exclude:
+    regex:
+      - '**/*tests/'
 
 markdown_extensions:
   # - search
