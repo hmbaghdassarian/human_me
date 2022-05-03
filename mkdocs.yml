@@ -14,8 +14,8 @@ plugins:
           rendering:
             show_source: false
   - exclude:
-    regex:
-      - '**/*tests/'
+      glob:
+        - 'human_me/me_solver/tests/*'
 
 markdown_extensions:
   # - search
