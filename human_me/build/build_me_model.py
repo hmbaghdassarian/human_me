@@ -28,6 +28,7 @@ with warnings.catch_warnings():
     from human_me.utils import functions as func
     from human_me.utils import machinery as mach
     from human_me.utils import parameters as params
+    from human_me.utils.parameters import biomass_parameters
     from human_me.utils.metabolites import MetaboliteBin
     from human_me.io import load_metabolic_model, load_psim
 
@@ -60,7 +61,9 @@ class MEBuilder:
                  minimal_proteome: bool = True, compress_mrna: bool = True,
                  check_all: bool = True,
                  deg_args: Dict[str, bool] = {'couple': True, 'reversible_complex_formation': False, 'nonenzyme_degradation': False,
-                                              'complex_degradation': True}
+                                              'complex_degradation': True},
+                mass_fraction: Dict[str,float] = biomass_parameters.mass_fraction, 
+                biomass_coefficients: Dict = biomass_parameters.coefficients
                  ):
         """See build_me function for parameter descriptions."""
 
@@ -103,7 +106,9 @@ class MEBuilder:
         self.m_model = load_metabolic_model(m_model)
         self.metabolic_machinery, self.all_machinery = mach.get_model_machinery(self.m_model)
         self.model_metabolites = MetaboliteBin(self.m_model)
-        self.biomass_reactions= biomass.create_biomass_reactions(self.model_metabolites)
+        self.biomass_reactions= biomass.biomass_reactions + \
+                                biomass.create_constant_component_formation(model_metabolites = self.model_metabolites, 
+                                                                            mass_fraction = mass_fraction, biomass_coefficients = biomass_coefficients)
         self.trna_biogenesis_reactions, self.charged_trna_map, self.modified_trna_transcript_c = create_trna(self.model_metabolites)
 
 
@@ -1324,7 +1329,9 @@ def build_me(me_input_model: Union[cobra.Model,str],
              minimal_proteome: bool = True, compress_mrna: bool = True,
              check_all: bool = True,
              deg_args: Dict[str, bool] = {'couple': True, 'reversible_complex_formation': False, 'nonenzyme_degradation': False,
-                                          'complex_degradation': True}
+                                          'complex_degradation': True},
+            mass_fraction: Dict[str,float] = biomass_parameters.mass_fraction, 
+            biomass_coefficients: Dict = biomass_parameters.coefficients
              ):
     """Build a human ME model according to input M-Model (as provided in preprocess.correct_inputs.correct_model), PSIM (as provided in preprocess.correct_inputs.correct_psim), and the parameters below.
 
@@ -1388,6 +1395,10 @@ def build_me(me_input_model: Union[cobra.Model,str],
             "complex_degration": bool
                 Whether to generate degradation reactions for whole complexes in addition to individual monomers
                 (required for coupling)
+    mass_fraction : Dict[str,float], optional
+        the mass fraction of the constant biomass components, by default see utils.parameters.biomass_parameters.mass_fraction
+    biomass_coefficients : Dict, optional
+        the  biomass component formation metabolite coefficients from the metabolic model that will be scaled by the mass fraction, by default see utils.parameters.biomass_parameters.coefficients
 
     Returns
     -------
@@ -1402,7 +1413,7 @@ def build_me(me_input_model: Union[cobra.Model,str],
                         non_machinery=non_machinery, knock_out=knock_out,
                         dummy_protein=dummy_protein, context_specific_dummy=context_specific_dummy,
                         minimal_proteome=minimal_proteome, compress_mrna=compress_mrna,
-                        check_all=check_all, deg_args=deg_args)
+                        check_all=check_all, deg_args=deg_args, mass_fraction=mass_fraction, biomass_coefficients=biomass_coefficients)
     builder.express_metabolic_enzymes()
     builder.express_expression_enzymes()
     builder.express_dummy_protein()

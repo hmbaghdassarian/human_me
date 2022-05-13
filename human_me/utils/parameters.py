@@ -66,11 +66,30 @@ SINGLE_UB_SEQ = 'MQIFVKTLTGKTITLEVEPSDTIENVKAKIQDKEGIPPDQQRLIFAGKQLEDGRTLSDYNIQK
 # ribosomal_degradation_rate = np.log(2)/300 #bioid 110053 # unused
 
 # biomass
-
-# constant fractions
-DNA_FRAC = 0.014
-CARB_FRAC = 0.071
-LIPID_FRAC = 0.097
-# other_frac = 0.054
-
-UNMODELED_PROTEIN_FRAC = 1 - 0.12041534186261499
+class BiomassParameters:
+    """Stores Biomass reactions' asssociated coefficients and mass fractions in one object."""
+    def __init__(self):
+        """Create all the parameters."""
+        self.mass_fraction = {'DNA': 0.014,
+                              'carbohydrate': 0.071,
+                              'lipid': 0.097,
+                              'other': 0.054}
+        # metabolite ID : metabolite coefficient (excluding biomass component) from Recon2.2 metabolic model (will be scaled by mass fraction)
+        self.coefficients = {'DNA': {'datp_n': -0.941642857142857,
+                                     'dctp_n': -0.674428571428572,
+                                     'dgtp_n': -0.707,
+                                     'dttp_n': -0.935071428571429,
+                                     'ppi_n': 3.2581428571428583},
+                             'carbohydrate': {'g6p_c': -3.87591549295775}, 
+                             'lipid': {'chsterol_c': -0.09580101814936463,
+                                        'clpn_hs_c': -0.05474478062767954,
+                                        'pail_hs_c': -0.10948486535720975,
+                                        'pchol_hs_c': -0.7253284281824849,
+                                        'pe_hs_c': -0.26003066413425396,
+                                        'pglyc_hs_c': -0.01368384720784515,
+                                        'sphmyln_hs_c': -0.08211247504336976,
+                                        'ps_hs_c': -0.02737239031383982}
+                            }
+biomass_parameters = BiomassParameters()
+#TODO: implement an unmodeled protein fraction 
+UNMODELED_PROTEIN_FRAC = 0 #1 - 0.12041534186261499 

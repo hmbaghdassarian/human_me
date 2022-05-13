@@ -6,6 +6,7 @@ from typing import Dict, List, Optional, Union
 import cobra
 
 from human_me.utils import parameters as params
+from human_me.utils.parameters import biomass_parameters
 from human_me.core.reaction import BiomassReaction
 from human_me.core.macromolecules.macromolecule import Macromolecule
 
@@ -18,7 +19,7 @@ class Biomass(cobra.Metabolite):
 
 
 # make the biomass metabolites
-biomass_ = Biomass('biomass')
+biomass_ = Biomass('biomass_total')
 biomass_dilution = BiomassReaction('biomass_dilution')
 biomass_dilution.add_metabolites({biomass_: -1})
 biomass_dilution._lower_bound, biomass_dilution._upper_bound = params.mu, params.mu
@@ -29,25 +30,23 @@ biomass_reactions = [biomass_dilution]
 dna_ = Biomass('biomass_DNA')
 carb_ = Biomass('biomass_carbohydrate')
 lipid_ = Biomass('biomass_lipid')
-# other_ = Biomass('biomass_other')
+other_ = Biomass('biomass_other')
 
 # variable
-protein_ = Biomass('biomass_protein')
-unmodeled_protein_ = Biomass('biomass_unmodeled_protein')
 trna_ = Biomass('biomass_tRNA')
 rrna_ = Biomass('biomass_rRNA')
 mrna_ = Biomass('biomass_mRNA')
 premrna_ = Biomass('biomass_premRNA')
 other_rna_ = Biomass('biomass_other_RNA')
+protein_ = Biomass('biomass_protein')
+unmodeled_protein_ = Biomass('biomass_unmodeled_protein')
 
-biomass_mapper = {'rrna': rrna_, 'protein': protein_, 'dummy_protein': unmodeled_protein_,
-                  'mrna': mrna_, 'trna': trna_, 'fragment_rna': other_rna_,
-                  'premrna': premrna_}
+biomass_mapper = {'rrna': rrna_, 'trna': trna_, 'premrna': premrna_, 'mrna': mrna_, 'fragment_rna': other_rna_, 
+                'protein': protein_, 'dummy_protein': unmodeled_protein_}
 
 # biomass formation reactions
-
-biomass_metabolites = [dna_, carb_, lipid_, trna_, rrna_, mrna_, premrna_, other_rna_,
-                       protein_, unmodeled_protein_]  # , other_]
+constant_biomass_metabolites = [dna_, carb_, lipid_, other_]
+biomass_metabolites = constant_biomass_metabolites + [trna_, rrna_, mrna_, premrna_, other_rna_, protein_, unmodeled_protein_]
 for bm in biomass_metabolites:
     reaction_ = BiomassReaction('_'.join(bm.id.split('_')[1:]) + '_biomass_to_biomass')
     reaction_.add_metabolites({bm: -1, biomass_: 1})
@@ -59,70 +58,46 @@ upb_reaction = biomass_reactions.pop(len(biomass_reactions) - 1)
 # pb_reaction.add_metabolites({protein_: -1, biomass_: 1})
 
 
-# The following reactions convert the biomass components which are a constant proportion from the metabolic model formulation to the ME model formulation. Briefly, the coefficients of the precursor reactions must be scaled by their molecular weight, and the product must be equal to the constant proportion of that class of biomass, bounded by growth (flux through reaction = growth rate).
+# The following reactions convert the biomass components which are a constant proportion from the metabolic model formulation to the ME model 
+# formulation. Briefly, the coefficients of the precursor reactions must be scaled by their molecular weight, and the product must be equal 
+# to the constant proportion of that class of biomass, bounded by growth (flux through reaction = growth rate).
 
 # constant biomass reactions
-# TODO: make *_coef variables customizable by user
-def create_biomass_reactions(model_metabolites, biomass_reactions: List[BiomassReaction] = biomass_reactions):
-    # DNA------------------------------------------------------
-    dna_reaction = BiomassReaction('DNA_biomass_formation')
+def create_constant_component_formation(model_metabolites, 
+                            # biomass_reactions: List[BiomassReaction] = biomass_reactions, 
+                            mass_fraction: Dict[str,float] = biomass_parameters.mass_fraction, 
+                            biomass_coefficients: Dict = biomass_parameters.coefficients):
+    """Generations formation of biomass components for components that have constant mass (i.e., DNA, lipids, carbohydrates, and other, but not RNA/protein).
 
-    # coefs from original RECON2.2
-    datp_coef = 0.941642857142857
-    dctp_coef = 0.674428571428572
-    dgtp_coef = 0.707
-    dttp_coef = 0.935071428571429
+    Parameters
+    ----------
+    model_metabolites : _type_
+        _description_
+    mass_fraction : Dict[str,float], optional
+        the mass fraction of the constant biomass components, by default see utils.parameters.biomass_parameters.mass_fraction
+    biomass_coefficients : Dict, optional
+        the  biomass component formation metabolite coefficients from the metabolic model that will be scaled by the mass fraction, by default see utils.parameters.biomass_parameters.coefficients
 
-    # original coefficient from DNA biomass formation reaction*metabolite molecular weight
-    rxn = {model_metabolites.datp_n: -datp_coef * model_metabolites.datp_n.formula_weight / 1000,
-        model_metabolites.dctp_n: -dctp_coef * model_metabolites.dctp_n.formula_weight / 1000,
-        model_metabolites.dgtp_n: -dgtp_coef * model_metabolites.dgtp_n.formula_weight / 1000,
-        model_metabolites.dttp_n: -dttp_coef * model_metabolites.dttp_n.formula_weight / 1000,
-        dna_: params.DNA_FRAC}
-    dna_reaction.add_metabolites(rxn)
-    dna_reaction._lower_bound, dna_reaction._upper_bound = params.mu, params.mu
+    Returns
+    -------
+    biomass_reactions : List[BiomassReaction]
+        all biomass reactions
+    """
+    biomass_component_formations = list()
+    for biomass_metabolite in constant_biomass_metabolites:
+        biomass_type = biomass_metabolite.id.split('_')[1]
+        biomass_component_formation = BiomassReaction(biomass_type + '_biomass_formation')
 
-    # CARBOHYDRATE------------------------------------------------------
-    g6p_coef = 3.87591549295775
-    carbohydrate_reaction = BiomassReaction('carbohydrate_biomass_formation')
-    rxn = {model_metabolites.g6p_c: -g6p_coef * model_metabolites.g6p_c.formula_weight / 1000,
-        carb_: params.CARB_FRAC}
-    carbohydrate_reaction.add_metabolites(rxn)
-    carbohydrate_reaction._lower_bound, carbohydrate_reaction._upper_bound = params.mu, params.mu
+        rxn = {biomass_metabolite: mass_fraction[biomass_type]}
+        if biomass_type != 'other':
+            for metabolite_id, coef in biomass_coefficients[biomass_type].items():
+                rxn[model_metabolites.__dict__[metabolite_id]] = coef*mass_fraction[biomass_type]
+        biomass_component_formation.add_metabolites(rxn)
+        biomass_component_formation._lower_bound, biomass_component_formation._upper_bound = params.mu, params.mu
 
-    # LIPID------------------------------------------------------
-    chsterol_coef = 0.210319587628866
-    clpn_hs_coef = 0.120185567010309
-    pail_hs_coef = 0.240360824742268
-    pchol_hs_coef = 1.59237113402062
-    pe_hs_coef = 0.570865979381443
-    pglyc_hs_coef = 0.0300412371134021
-    ps_hs_coef = 0.0600927835051546
-    sphmyln_hs_coef = 0.180268041237113
+        biomass_component_formations.append(biomass_component_formation)
 
-    CLPN_HS_C_MW = 508.21930 / 1000  # ChEBI 28494
-    PAIL_HS_C_MW = 387.211 / 1000  # ChEBI 57880
-    PCHOL_HS_C_MW = 311.226 / 1000  # ChEBI 64482
-    PE_HS_C_MW = 269.146 / 1000  # ChEBI 16038
-    PGLYC_HS_C_MW = 299.14860 / 1000  # ChEB 60523
-    PS_HS_C_MW = 312.14740 / 1000  # ChEBI 58436
-    SPHMYLN_HS_C_MW = 492.630  # ChEBI 62490
-
-    lipid_reaction = BiomassReaction('lipid_biomass_formation')
-    rxn = {model_metabolites.chsterol_c: -chsterol_coef * model_metabolites.chsterol_c.formula_weight / 1000,
-        model_metabolites.clpn_hs_c: -clpn_hs_coef * CLPN_HS_C_MW,
-        model_metabolites.pail_hs_c: -pail_hs_coef * PAIL_HS_C_MW,
-        model_metabolites.pchol_hs_c: -pchol_hs_coef * PCHOL_HS_C_MW,
-        model_metabolites.pe_hs_c: -pe_hs_coef * PE_HS_C_MW,
-        model_metabolites.pglyc_hs_c: -pglyc_hs_coef * PGLYC_HS_C_MW,
-        model_metabolites.ps_hs_c: -ps_hs_coef * PS_HS_C_MW,
-        model_metabolites.sphmyln_hs_c: -sphmyln_hs_coef * SPHMYLN_HS_C_MW,
-        lipid_: params.LIPID_FRAC}
-    lipid_reaction.add_metabolites(rxn)
-    lipid_reaction._lower_bound, lipid_reaction._upper_bound = params.mu, params.mu
-
-    biomass_reactions += [dna_reaction, carbohydrate_reaction, lipid_reaction]
-    return biomass_reactions
+    return biomass_component_formations
 
 def add_biomass_change(reaction: cobra.Reaction, inplace: bool = True) -> Union[None, Dict[str, float]]:
     """Calculate net biomass change in a reaction.
@@ -179,3 +154,25 @@ def add_biomass_change(reaction: cobra.Reaction, inplace: bool = True) -> Union[
         reaction.add_metabolites(biomass_change, combine=False)
     else:
         return biomass_change
+
+def check_me_biomass(me_model) -> Dict[str, float]:
+    """Sanity chack that the biomass component formation reactions for DNA, lipid, and carbohydrate are formulated correctly.
+    This is done by checking mass balance -- that the metabolites sum(stoichiometric coefficient * metabolic weight) = mass fraction
+
+    Parameters
+    ----------
+    me_model
+        the generated ME Model
+
+    Returns
+    -------
+    Dict[str, float]
+        expected mass fractions based on the implemented biomass formation reactions in the ME Model
+    """
+    expected_mass_fraction = dict()
+    for reaction in me_model.reactions:
+        if reaction.id.endswith('_biomass_formation') and not reaction.id.startswith('other_'): # filter for biomass component formation reactions except other
+            biomass_type = reaction.id.split('_biomass_formation')[0]
+            mass_fraction =  abs(sum({coef*metabolite_.formula_weight for metabolite_, coef in reaction.metabolites.items() if not metabolite_.id.startswith('biomass_')})/1e3)
+            expected_mass_fraction[biomass_type] = mass_fraction
+    return expected_mass_fraction
