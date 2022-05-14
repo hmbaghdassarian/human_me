@@ -160,8 +160,11 @@ def read_pickled_me_model(file_name: str):
     ME_Model
         ME model object
     """
-    me_model = read_pickled_objected(file_name)
-    me_model._clean_metabolites()  # lost in pickling/loadings
+    me_model = read_pickled_object(file_name)
+    # lost in pickling/loadings:
+    me_model._clean_metabolites()  
+    me_model.initialize_solver(solver_type=me_model.solver_type, precision=me_model.solver_precision)
+
     return me_model
 
 def write_metabolic_model(m_model: cobra.Model, file_name: str, **kwargs) -> None: 
