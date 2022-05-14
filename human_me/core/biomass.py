@@ -2,6 +2,7 @@
 # coding: utf-8
 from collections import OrderedDict
 from typing import Dict, List, Optional, Union
+import warnings
 
 import cobra
 
@@ -155,8 +156,62 @@ def add_biomass_change(reaction: cobra.Reaction, inplace: bool = True) -> Union[
     else:
         return biomass_change
 
+def check_m_biomass(m_model: cobra.Model):
+    """Performs sanity checks on biomass objective of metabolic model.
+    If using Recon2.2 biomass formulation, this will give warnings. If warnings are given, we recommend using our correct_m_biomass function.
+
+    Parameters
+    ----------
+    m_model : cobra.Model
+        the metabolic model to check. Expect biomass formatting to be consistent with Recon2.2 (especially with regards to reaction and metabolite IDs)
+    """
+    total_mass = abs(sum([coef for coef in m_model.reactions.biomass_reaction.metabolites.values() if coef < 1]))
+    if total_mass != 1:
+        warnings.warn('The total mass fraction does not sum to 1')
+
+    # do the substrats for component formation add up to 1g?
+    wrn = False
+    tol = 10
+    for biomass_type in ['lipid', 'DNA', 'carbohydrate']:
+        tot_mass = abs(sum([coef*metabolite_.formula_weight for metabolite_, coef in \
+            m_model.reactions.get_by_id('biomass_' + biomass_type ).metabolites.items() if not metabolite_.id.startswith('biomass_')]))
+        if (tot_mass > 1000 + tol) or (tot_mass < 1000 - tol):
+            wrn = True
+    if wrn:
+        warnings.warn('Some of the biomass component formation reactions are not properly mass balances')
+
+def correct_m_biomass(m_model: cobra.Model):
+    """Sets biomass objective to the default one that is used by ME Model. 
+    Will correct any mass balance issues in the biomass objective (these mass balance issues are present in Recon2.2).
+
+    Parameters
+    ----------
+    m_model : cobra.Model
+        the metabolic model to correct
+
+    Returns
+    -------
+    corrected_model : cobra.Model
+        the corrected metabolic model
+    """
+    corrected_model = m_model.copy()
+
+
+    corrected_model.reactions.EX_biomass_c.lower_bound = 0 # won't effect things, but technically more correct
+    for biomass_metabolite_id in ['biomass_DNA_c', 'biomass_lipid_c']:
+        biomass_metabolite = corrected_model.metabolites.get_by_id(biomass_metabolite_id)
+        biomass_type = biomass_metabolite.id.split('_')[1]
+
+        rxn = {biomass_metabolite: 1}
+        for metabolite_id, coef in biomass_parameters.coefficients[biomass_type].items():
+            rxn[corrected_model.metabolites.get_by_id(metabolite_id)] = coef
+
+        corrected_model.reactions.get_by_id('biomass_' + biomass_type).add_metabolites(rxn, combine = False)
+    return corrected_model
+
+
 def check_me_biomass(me_model) -> Dict[str, float]:
-    """Sanity chack that the biomass component formation reactions for DNA, lipid, and carbohydrate are formulated correctly.
+    """Sanity chack that the ME Model biomass component formation reactions for DNA, lipid, and carbohydrate are formulated correctly.
     This is done by checking mass balance -- that the metabolites sum(stoichiometric coefficient * metabolic weight) = mass fraction
 
     Parameters
