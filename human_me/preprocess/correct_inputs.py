@@ -52,23 +52,6 @@ def bool_metabolite(m_id: str, compartment: str, m_model: cobra.Model) -> Tuple[
     except:
         return False, None
 
-
-# def check_feasibility(m_model, biomass_reaction_id: str = 'biomass_reaction'):
-#     """Checks whether the cobrapy model is feasible for growth
-
-#     Parameters
-#     ----------
-#     m_model : _type_
-#         the input metabolic model
-#     biomass_reaction_id : str, optional
-#         the id of the input metabolic model's biomass reaction, by default 'biomass_reaction'
-#     """
-#         # checks if input model is feasible for growth (will raise error otherwise)
-#     m_model.objective = biomass_reaction_id
-#     sln = m_model.slim_optimize()
-#     if sln <= 0 or np.isnan(sln):
-#         warnings.warn('Metabolic model is not feasible for growth')
-
 def correct_model(model_file: Union[cobra.Model, str] = input_local_path + 'recon2_2.xml', biomass_reaction_id: str = 'biomass_reaction') -> Tuple[cobra.Model]:
     """Makes necessary changes to cobrapy model, largely based on issues encountered with Recon2.2.    
     
@@ -100,9 +83,6 @@ def correct_model(model_file: Union[cobra.Model, str] = input_local_path + 'reco
     rmd = pd.read_csv(build_files_url + 'required_metabolic_model_metabolites.csv', index_col=0)
 
     m_model = load_metabolic_model(model_file)
-
-    # checks if input model is feasible for growth (will raise error otherwise)
-    # check_feasibility(m_model, biomass_reaction_id = biomass_reaction_id)
 
     # check for correct compartments
     different_compartments = list(set(m_model.compartments.keys()).difference(compartments_me.keys()))
@@ -169,13 +149,6 @@ def correct_model(model_file: Union[cobra.Model, str] = input_local_path + 'reco
     missing_metabolites = sorted(set(all_required_metabolites).difference(all_metabolites))
 
     cm_1 = m_model.copy()  # metabolic model with incorrect GPRs corrected
-    # check_feasibility(cm_1, biomass_reaction_id = biomass_reaction_id)
-    # checks if input model is feasible for growth (will raise error otherwise)
-    m_model.objective = biomass_reaction_id
-    sln = m_model.slim_optimize()
-    if sln <= 0:
-        raise ValueError('Input model is not feasible for growth')
-
 
     comp_ = ['c', 'n', 'r', 'g', 'm', 'l', 'x', 'i', 'e', 'b', 'pm']
 
@@ -221,7 +194,6 @@ def correct_model(model_file: Union[cobra.Model, str] = input_local_path + 'reco
                 m_model.add_boundary(metabolite=new_metab, type='exchange')
 
     cm_2 = m_model.copy()  # metabolic model with incorrect GPRs corrected and ME-Model required metabolite transport added
-    # check_feasibility(cm_2, biomass_reaction_id = biomass_reaction_id)
     # remove biomass
     metabolites_1 = [m.id for m in m_model.metabolites]
     try:
