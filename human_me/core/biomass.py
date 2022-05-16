@@ -40,14 +40,14 @@ mrna_ = Biomass('biomass_mRNA')
 premrna_ = Biomass('biomass_premRNA')
 other_rna_ = Biomass('biomass_other_RNA')
 protein_ = Biomass('biomass_protein')
-unmodeled_protein_ = Biomass('biomass_unmodeled_protein')
+orphan_protein_ = Biomass('biomass_orphan_protein')
 
 biomass_mapper = {'rrna': rrna_, 'trna': trna_, 'premrna': premrna_, 'mrna': mrna_, 'fragment_rna': other_rna_, 
-                'protein': protein_, 'dummy_protein': unmodeled_protein_}
+                'protein': protein_, 'orphan_dummy_protein': orphan_protein_}
 
 # biomass formation reactions
 constant_biomass_metabolites = [dna_, carb_, lipid_, other_]
-biomass_metabolites = constant_biomass_metabolites + [trna_, rrna_, mrna_, premrna_, other_rna_, protein_, unmodeled_protein_]
+biomass_metabolites = constant_biomass_metabolites + [trna_, rrna_, mrna_, premrna_, other_rna_, protein_, orphan_protein_]
 for bm in biomass_metabolites:
     reaction_ = BiomassReaction('_'.join(bm.id.split('_')[1:]) + '_biomass_to_biomass')
     reaction_.add_metabolites({bm: -1, biomass_: 1})

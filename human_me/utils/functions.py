@@ -270,7 +270,8 @@ def SASA(mw: float) -> float:
     return mw ** 0.75
 
 
-def average_protein_features(psim_me: pd.DataFrame, context_specific: bool = False, metabolic_machinery: Optional[List[str]] = None) -> pd.DataFrame:
+def average_protein_features(psim_me: pd.DataFrame, hgnc_id: str, 
+                            context_specific: bool = False, metabolic_machinery: Optional[List[str]] = None) -> pd.DataFrame:
     """Function to get the average protein features from the proteins used in a specific ME model being generated.
     
     Note, we filter for metabolic enzymes only, because most orphan reactions come from the metabolic sector.
@@ -279,6 +280,8 @@ def average_protein_features(psim_me: pd.DataFrame, context_specific: bool = Fal
     ----------
     psim_me : pd.DataFrame
         protein specific information matrix, same as corrected input file (see preprocessing output)
+    hgnc_id : str
+        HGNC ID to assign to the average protein
     context_specific : bool, optional
         whether the representative dummy protein is calculated for only genes in the user-provided context specific model from
         the user provided PSIM (True) or for all recon2.2 machinery proteins in the gold-standard PSIM , by default False
@@ -341,7 +344,7 @@ def average_protein_features(psim_me: pd.DataFrame, context_specific: bool = Fal
 
     dummy_psim = pd.DataFrame(columns=psim.columns)
     dummy_psim.loc[0, :] = float('nan')
-    dummy_psim.loc[0, ['HGNC_ID', 'PREMRNA_SEQ', 'MRNA_SEQ', 'PROTEIN_SEQ']] = ['HGNC:DUMMY', premrna_seq, mrna_seq,
+    dummy_psim.loc[0, ['HGNC_ID', 'PREMRNA_SEQ', 'MRNA_SEQ', 'PROTEIN_SEQ']] = [hgnc_id, premrna_seq, mrna_seq,
                                                                                 protein_seq]
     dummy_psim.LOCATION = ['[c]']
 
