@@ -1248,8 +1248,8 @@ class MEBuilder:
                                             isinstance(r, ProteinDegradationReaction) and len(
                                                 compartments.intersection(r._final_compartments)) > 0]
 
-            pdr = [r for r in self.me_reactions if
-                   isinstance(r, ProteinDegradationReaction) and r.id not in nonmachinery_exceptions]
+            pdr = [r for r in self.me_reactions if isinstance(r, ProteinDegradationReaction) and r.id not in nonmachinery_exceptions]
+            pdr = [r for r in pdr if not r.id.startswith('HGNC:DUMMYUNMODELED')] # exclude unmodeled dummy too
             for r in pdr:
                 r._update_enzymes()
                 if not len(r._enzymes) > 0:
