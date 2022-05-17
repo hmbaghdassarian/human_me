@@ -700,7 +700,7 @@ class ME_Model(cobra.Model):
                             if expected_machinery != self.knock_out:
                                 raise ValueError('Machinery mismatch for ' + r.id)
                     else:
-                        if len(actual_machinery) > 1 or not actual_machinery[0].dummy:  # dummy
+                        if len(actual_machinery) > 1 or not (actual_machinery[0].dummy and actual_machinery[0].dummy_type == 'orphan_protein'):  # dummy
                             raise ValueError('Non-dummy protein coupled to deorphaned reaction')
                 elif ribosomal_degradation:
                     am = list()

@@ -43,7 +43,7 @@ protein_ = Biomass('biomass_protein')
 orphan_protein_ = Biomass('biomass_orphan_protein')
 
 biomass_mapper = {'rrna': rrna_, 'trna': trna_, 'premrna': premrna_, 'mrna': mrna_, 'fragment_rna': other_rna_, 
-                'protein': protein_, 'orphan_dummy_protein': orphan_protein_}
+                'protein': protein_, 'orphan_protein': orphan_protein_}
 
 # biomass formation reactions
 constant_biomass_metabolites = [dna_, carb_, lipid_, other_]
@@ -117,7 +117,7 @@ def add_biomass_change(reaction: cobra.Reaction, inplace: bool = True) -> Union[
     Dict[str, float]
         if inplace is False, the new reaction.metabolites representation is returned
     """
-    biomass_change = dict()
+    biomass_change_ = dict()
     # sorting needed for precision (order of adding masses effects final sum)
     md_map = {m.id: m for m in reaction.metabolites}
     md = OrderedDict({md_map[m_id]: reaction.metabolites[md_map[m_id]] for m_id in sorted(md_map)})
@@ -126,35 +126,40 @@ def add_biomass_change(reaction: cobra.Reaction, inplace: bool = True) -> Union[
         md[metabolite] -= metabolite.coupling_coefficient[type]  # coupling not part of mass balance
 
     for m, count in md.items():
-        if m.compartment != 'e':
+        if m.compartment != 'e': # secreted proteins are not contributing to biomass
             if isinstance(m, Macromolecule):
-                if m.type != 'complex':  # includes ribosomes
-                    if m.type in biomass_change:
-                        biomass_change[m.type] += (count * m.formula_weight / 1000)
+                if (m.type not in  ['complex', 'protein']) or (m.type == 'protein' and not m.dummy):  # includes ribosomes and non-dummy proteins
+                    if m.type in biomass_change_:
+                        biomass_change_[m.type] += (count * m.formula_weight / 1000)
                     else:
-                        biomass_change[m.type] = (count * m.formula_weight / 1000)
+                        biomass_change_[m.type] = (count * m.formula_weight / 1000)
+                elif m.type == 'protein': # dummy proteins
+                    if m.dummy_type in biomass_change_:
+                        biomass_change_[m.dummy_type] += (count * m.formula_weight / 1000)
+                    else:
+                        biomass_change_[m.dummy_type] = (count * m.formula_weight / 1000)
                 else:  # complexes
                     for type_, mass_ in m.get_complex_biomass().items():
-                        if type_ in biomass_change:
-                            biomass_change[type_] += (count * mass_)
+                        if type_ in biomass_change_:
+                            biomass_change_[type_] += (count * mass_)
                         else:
-                            biomass_change[type_] = (count * mass_)
+                            biomass_change_[type_] = (count * mass_)
 
     # exclude trna charging/uncharging from change in trna biomass
     # this removes tradeoffs between generating protein biomass and maintaining trna biomass
     if (hasattr(reaction, 'trna_charging') and reaction.trna_charging) or (hasattr(reaction, 'translation') and reaction.translation):
-        del biomass_change['trna']
+        del biomass_change_['trna']
 
     # proxy metabolites do not contribute to bimoass
-    if 'proxy' in biomass_change:
-        del biomass_change['proxy']
+    if 'proxy' in biomass_change_:
+        del biomass_change_['proxy']
 
-    biomass_change = {biomass_mapper[k]: v for k, v in biomass_change.items()}
+    biomass_change_ = {biomass_mapper[k]: v for k, v in biomass_change_.items()}
 
     if inplace:
-        reaction.add_metabolites(biomass_change, combine=False)
+        reaction.add_metabolites(biomass_change_, combine=False)
     else:
-        return biomass_change
+        return biomass_change_
 
 def check_m_biomass(m_model: cobra.Model):
     """Performs sanity checks on biomass objective of metabolic model.

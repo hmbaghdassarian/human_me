@@ -453,6 +453,7 @@ class MEBuilder:
                 for m in r.metabolites:
                     if isinstance(m, Protein) and m.id.startswith('HGNC:DUMMYORPHAN'):  # str requirement to avoid converting ub proteins
                         m.dummy = True
+                        m.dummy_type = 'orphan_protein'
                 if len(r.genes) > 0:
                     generic_id = func.parse_me_reaction_id(r.id)
                     if generic_id not in self._expr_rxn_cmap:

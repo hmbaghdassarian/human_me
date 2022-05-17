@@ -81,6 +81,7 @@ class Protein(Macromolecule):
                                hgnc_id=self.hgnc_id)
 
         self.dummy = dummy
+        self.dummy_type = None # string to specify whether orphan or unmodeled dummy protein, assigned in me building
         self.enzyme = False  # whether the protein is involved in catalysis of a reaction
         self.keff = None
         self._degradation_reactions = set() # associated degradation reactions for protein monomer, if any
