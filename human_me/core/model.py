@@ -754,8 +754,10 @@ class ME_Model(cobra.Model):
         proteins = set([i.split('_')[0] if 'HGNC' in i else i for i in proteins])
         proteins = [i for i in proteins if 'ubiquitin' not in i]
         ub_genes = ['HGNC:12463', 'HGNC:12468']
-        if len(set(proteins).difference(
-                active_proteins + self.additional_ko + ub_genes + list(self.non_machinery.keys()))) > 0:
+        unmodeled_protein = ['HGNC:DUMMYUNMODELED']
+
+        all_proteins = active_proteins + unmodeled_protein + self.additional_ko + ub_genes + list(self.non_machinery.keys())
+        if len(set(proteins).difference(all_proteins)) > 0:
             raise ValueError('Unexpected inclusion of inactive protein monomers')
 
     def _check_coupled_metabolite_tracking(self):

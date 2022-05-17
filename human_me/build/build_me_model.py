@@ -437,7 +437,7 @@ class MEBuilder:
 
         self._clean_non_machinery()
 
-    def express_orphan_dummy(self):
+    def express_dummy(self):
         """Generate the dummy protein for deorphaning reactions and unmodeled protein."""
         # creates a separate dummy protein (identical features) for each of orphan and unmodeled to track separately
         if self.deorphan: # create dummy protein for orphan reactions
@@ -1459,7 +1459,7 @@ def build_me(me_input_model: Union[cobra.Model,str],
                         check_all=check_all, deg_args=deg_args, mass_fraction=mass_fraction, biomass_coefficients=biomass_coefficients)
     builder.express_metabolic_enzymes()
     builder.express_expression_enzymes()
-    builder.express_orphan_dummy()
+    builder.express_dummy()
     builder.get_complex_info()
     builder.generate_complex_reactions()
     builder.get_keff()

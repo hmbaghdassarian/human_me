@@ -49,6 +49,11 @@ class ExpressedGene:
         self.ubiquitin_biogenesis = False
         self.ribosome_biogenesis = False
 
+        if self.hgnc_id != 'HGNC:DUMMYUNMODELED':
+            self._is_unmodeled_protein = False
+        else:
+            self._is_unmodeled_protein = True
+
         self.macromolecules = {'RNA': {'premrna': None, 'mrna': {'coupled': {}, 'other': None}, 'lariat': None},
                                'Protein': {'coupled': {}, 'other': [], 'non-machinery': []},
                                'Complex': {'coupled': {}, 'other': []},
@@ -257,7 +262,7 @@ class ExpressedGene:
 
         if len(self.reactions['Catalysis_Reactions']['Metabolic_Module']) == 0 and len(
                 self.reactions['Catalysis_Reactions']['Expression_Module']) == 0 and not (
-                self.ubiquitin_biogenesis or self._is_non_machinery_only):
+                self.ubiquitin_biogenesis or self._is_non_machinery_only or self._is_unmodeled_protein):
             raise ValueError('No catalysis reactions associated with: ' + self.hgnc_id)
         mrna = self.reactions['ExpressionReactions']['mrna']
         protein = self.reactions['ExpressionReactions']['protein']
@@ -274,7 +279,7 @@ class ExpressedGene:
 
         rib_deg_coupling = self.ribosome_biogenesis or self.hgnc_id in ribosomal_genes
         if len(protein['sink']) == 0 and len(complex_['sink']) == 0 and not self.ubiquitin_biogenesis \
-                and self._enzyme_compartments != ['e'] and not rib_deg_coupling:  # TODO: TEMPORARY - no ribosomal degradation coupling
+                and self._enzyme_compartments != ['e'] and not self._is_unmodeled_protein and not rib_deg_coupling:  # TODO: TEMPORARY - no ribosomal degradation coupling
             raise ValueError('No enzyme degradation reactions associated with: ' + self.hgnc_id)
 
         # all proteins have atleast 1 translation reaction
@@ -385,7 +390,7 @@ class ExpressedGene:
             raise ValueError('No protein metabolites associated with ' + self.hgnc_id)
         if (len(self.macromolecules['Protein']['coupled']) + len(
                 self.macromolecules['Complex']['coupled'])) == 0 and not (
-                self.ubiquitin_biogenesis or self._is_non_machinery_only):
+                self.ubiquitin_biogenesis or self._is_non_machinery_only or self._is_unmodeled_protein):
             raise ValueError('No coupled enzymes associated with ' + self.hgnc_id)
         if len(self.macromolecules['Proxy']['mrna_degradation']) == 0:
             raise ValueError('No mrna degradation proxy metabolite associated with ' + self.hgnc_id)
@@ -393,7 +398,7 @@ class ExpressedGene:
         rib_deg_coupling = self.ribosome_biogenesis or self.hgnc_id in ribosomal_genes
         if len(self.macromolecules['Proxy']['enzyme_degradation']) == 0 \
                 and not (self.ubiquitin_biogenesis or self._enzyme_compartments == ['e']
-                         or self._is_non_machinery_only) and not rib_deg_coupling:  # TEMPORARY no rib deg coupling
+                         or self._is_non_machinery_only or self._is_unmodeled_protein) and not rib_deg_coupling:  # TEMPORARY no rib deg coupling
             raise ValueError('No enzyme degradation proxy metabolite associated with ' + self.hgnc_id)
 
     def check(self):
