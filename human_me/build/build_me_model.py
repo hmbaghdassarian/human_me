@@ -1186,7 +1186,7 @@ class MEBuilder:
                         reactions = [r_f, r_r]
                     self.deorphaned_reactions += reactions
             self.final_reactions += self.orphan_reactions + self.deorphaned_reactions
-            self.orphan_reactions = [r.id for r in self.orphan_reactions + self.biomass_reactions + [biomass.upb_reaction]]
+            self.orphan_reactions = [r.id for r in self.orphan_reactions + self.biomass_reactions]
             for r in self.deorphaned_reactions:
                 r.enzyme_compartment = 'c'
             self.deorphaned_reactions = [r.id for r in self.deorphaned_reactions]
@@ -1282,9 +1282,9 @@ class MEBuilder:
         for r in self.final_reactions:
             biomass.add_biomass_change(r)
 
-        #         br.append(self.pb_reaction)
-        if self.orphan_dummy_protein is not None:
-            self.biomass_reactions.append(biomass.upb_reaction)
+        if self.deorphan:
+            self.biomass_reactions.append(biomass.orphan_modeled_protein_formation)
+            self.orphan_reactions.append(biomass.orphan_modeled_protein_formation.id)
 
         if len([r for r in self.final_reactions if not isinstance(r, core.reaction.ME_Reaction)]) > 0:
             raise ValueError('Internal: Reactions not of type ME_Reaction are included in the model')

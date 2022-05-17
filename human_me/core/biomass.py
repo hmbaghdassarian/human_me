@@ -39,24 +39,31 @@ rrna_ = Biomass('biomass_rRNA')
 mrna_ = Biomass('biomass_mRNA')
 premrna_ = Biomass('biomass_premRNA')
 other_rna_ = Biomass('biomass_other_RNA')
-protein_ = Biomass('biomass_protein')
-orphan_protein_ = Biomass('biomass_orphan_protein')
+
+known_protein_ = Biomass('biomass_known_protein') # explicitly modeled in metabolic model
+orphan_protein_ = Biomass('biomass_orphan_protein') # no GPRs
+modeled_protein_ = Biomass('biomass_modeled_protein') # orphan + known protein
 
 biomass_mapper = {'rrna': rrna_, 'trna': trna_, 'premrna': premrna_, 'mrna': mrna_, 'fragment_rna': other_rna_, 
-                'protein': protein_, 'orphan_protein': orphan_protein_}
+                'protein': known_protein_, 'orphan_protein': orphan_protein_}
 
 # biomass formation reactions
 constant_biomass_metabolites = [dna_, carb_, lipid_, other_]
-biomass_metabolites = constant_biomass_metabolites + [trna_, rrna_, mrna_, premrna_, other_rna_, protein_, orphan_protein_]
+biomass_metabolites = constant_biomass_metabolites + [trna_, rrna_, mrna_, premrna_, other_rna_, modeled_protein_]#protein_, orphan_protein_]
 for bm in biomass_metabolites:
     reaction_ = BiomassReaction('_'.join(bm.id.split('_')[1:]) + '_biomass_to_biomass')
     reaction_.add_metabolites({bm: -1, biomass_: 1})
     biomass_reactions.append(reaction_)
 
-# # protein biomass with unmodeled protein
-upb_reaction = biomass_reactions.pop(len(biomass_reactions) - 1)
-# pb_reaction = cobra.Reaction('protein_biomass_to_biomass')
-# pb_reaction.add_metabolites({protein_: -1, biomass_: 1})
+# modeled protein
+known_modeled_protein_formation = BiomassReaction('known_to_modeled_protein_biomass')
+known_modeled_protein_formation.add_metabolites({known_protein_: -1, modeled_protein_: 1})
+biomass_reactions.append(known_modeled_protein_formation)
+
+# add in ME Model under boolean of deorphaning
+orphan_modeled_protein_formation = BiomassReaction('orphan_to_modeled_protein_biomass')
+orphan_modeled_protein_formation.add_metabolites({orphan_protein_: -1, modeled_protein_: 1})
+
 
 
 # The following reactions convert the biomass components which are a constant proportion from the metabolic model formulation to the ME model 
@@ -86,7 +93,7 @@ def create_constant_component_formation(model_metabolites,
     """
     biomass_component_formations = list()
     for biomass_metabolite in constant_biomass_metabolites:
-        biomass_type = biomass_metabolite.id.split('_')[1]
+        biomass_type = '_'.join(biomass_metabolite.id.split('_')[1:]) 
         biomass_component_formation = BiomassReaction(biomass_type + '_biomass_formation')
 
         rxn = {biomass_metabolite: mass_fraction[biomass_type]}
