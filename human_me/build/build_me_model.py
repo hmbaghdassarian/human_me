@@ -57,7 +57,7 @@ class MEBuilder:
                  model_id: str,
                  stochastic: bool = False, seed: int = 888, n_cores: int = os.cpu_count(),
                  non_machinery: Optional[Dict[str, List[str]]] = None, knock_out: Optional[List[str]] = None,
-                 deorphan: bool = True, context_specific_dummy: bool = False,
+                 deorphan: bool = True, context_specific_dummy: bool = False, unmodeled_protein_fraction: float = 0,
                  minimal_proteome: bool = True, compress_mrna: bool = True,
                  check_all: bool = True,
                  deg_args: Dict[str, bool] = {'couple': True, 'reversible_complex_formation': False, 'nonenzyme_degradation': False,
@@ -106,9 +106,18 @@ class MEBuilder:
         self.m_model = load_metabolic_model(m_model)
         self.metabolic_machinery, self.all_machinery = mach.get_model_machinery(self.m_model)
         self.model_metabolites = MetaboliteBin(self.m_model)
-        self.biomass_reactions= biomass.biomass_reactions + \
+
+        # biomass and dummy proteins
+        self.context_specific_dummy = context_specific_dummy
+        self.deorphan = deorphan
+        self.orphan_dummy_protein = None
+        self.unmodeled_protein_fraction = unmodeled_protein_fraction
+        self.unmodeled_dummy_protein = None
+        total_protein_formation = biomass.create_total_protein_formation(unmodeled_protein_fraction = self.unmodeled_protein_fraction)
+        self.biomass_reactions= biomass.biomass_reactions + [total_protein_formation] + \
                                 biomass.create_constant_component_formation(model_metabolites = self.model_metabolites, 
                                                                             mass_fraction = mass_fraction, biomass_coefficients = biomass_coefficients)
+        
         self.trna_biogenesis_reactions, self.charged_trna_map, self.modified_trna_transcript_c = create_trna(self.model_metabolites)
 
 
@@ -147,9 +156,6 @@ class MEBuilder:
                                                                         self.ub_args, self.compress_mrna,
                                                                         self.deg_args['reversible_complex_formation'],
                                                                         stochastic=self.stochastic, seed=rib_seed)
-
-        self.deorphan = deorphan
-        self.context_specific_dummy = context_specific_dummy
 
         self.deorphaned_reactions = None
         self.orphan_reactions = None
@@ -432,8 +438,9 @@ class MEBuilder:
         self._clean_non_machinery()
 
     def express_orphan_dummy(self):
-        """Generate the dummy protein for deorphaning reacitons."""
-        if self.deorphan:
+        """Generate the dummy protein for deorphaning reactions and unmodeled protein."""
+        # creates a separate dummy protein (identical features) for each of orphan and unmodeled to track separately
+        if self.deorphan: # create dummy protein for orphan reactions
             print('Express dummy protein')
             dummy_psim = func.average_protein_features(psim_me=self.psim_me, hgnc_id='HGNC:DUMMYORPHAN',
                                                        context_specific=self.context_specific_dummy, 
@@ -447,7 +454,6 @@ class MEBuilder:
                                                                ub_args=self.ub_args, nonmachinery_locations=['c'],
                                                                stochastic=self.stochastic,
                                                                seed=self._seeds[self._seed_idx])
-            self._seed_idx += 1
             dm[0].non_machinery = False
             for r in dummy_reactions:
                 for m in r.metabolites:
@@ -469,9 +475,42 @@ class MEBuilder:
             srs[0].synthesis, srs[0].synthesis_type = True, 'protein'
 
             self.me_reactions += self.orphan_dummy_protein['dummy_expression_reactions']
+        if self.unmodeled_protein_fraction > 0: # repeat for unmodeled protein
+            dummy_psim = func.average_protein_features(psim_me=self.psim_me, hgnc_id='HGNC:DUMMYUNMODELED',
+                                                        context_specific=self.context_specific_dummy, 
+                                                        metabolic_machinery=self.metabolic_machinery)
 
-        else:
-            self.orphan_dummy_protein = None
+            dummy_reactions, dm = get_all_expression_reactions(model_metabolites = self.model_metabolites, 
+                                                                hgnc_id='HGNC:DUMMYUNMODELED', psim=dummy_psim, machinery_list=[],
+                                                                modified_trna_transcript_c=self.modified_trna_transcript_c, 
+                                                                charged_trna_map=self.charged_trna_map,
+                                                                reactions=None, compress_mrna=self.compress_mrna,
+                                                                ub_args=self.ub_args, nonmachinery_locations=['c'],
+                                                                stochastic=self.stochastic,
+                                                                seed=self._seeds[self._seed_idx])
+            dm[0].non_machinery = False
+            for r in dummy_reactions:
+                for m in r.metabolites:
+                    if isinstance(m, Protein) and m.id.startswith('HGNC:DUMMYUNMODELED'):  # str requirement to avoid converting ub proteins
+                        m.dummy = True
+                        m.dummy_type = 'unmodeled_protein'
+                if len(r.genes) > 0:
+                    generic_id = func.parse_me_reaction_id(r.id)
+                    if generic_id not in self._expr_rxn_cmap:
+                        raise ValueError('Reactions with unaccounted for compartments')
+                    r.enzyme_compartment, r._compartment_seed = self._expr_rxn_cmap[generic_id]['compartment'], self._expr_rxn_cmap[generic_id]['seed']
+
+            self.unmodeled_dummy_protein = {'protein_metabolite': dm[0], 'dummy_expression_reactions': dummy_reactions}
+
+            srs = [sr for sr in list(self.unmodeled_dummy_protein['protein_metabolite'].reactions) if
+                    self.unmodeled_dummy_protein['protein_metabolite'] in sr.products and not isinstance(sr, ProteinDegradationReaction)]
+            if len(srs) != 1:
+                raise ValueError(self.unmodeled_dummy_protein['protein_metabolite'].id + ' has an incorrect number of associated synthesis reactions')
+            srs[0].synthesis, srs[0].synthesis_type = True, 'protein'
+
+            self.me_reactions += self.unmodeled_dummy_protein['dummy_expression_reactions']
+        if self.deorphan or self.unmodeled_protein_fraction > 0:
+            self._seed_idx += 1
 
     def get_complex_info(self):
         "Parse and organize GPRs."
@@ -1324,7 +1363,7 @@ def build_me(me_input_model: Union[cobra.Model,str],
              model_id: str = 'HUMAN_ME_MODEL',
              stochastic: bool = False, seed: int = 888, n_cores: int = os.cpu_count(),
              non_machinery: Optional[Dict[str, List[str]]] = None, knock_out: Optional[List[str]] = None,
-             deorphan: bool = True, context_specific_dummy: bool = False,
+             deorphan: bool = True, context_specific_dummy: bool = False, unmodeled_protein_fraction: float = 0,
              minimal_proteome: bool = True, compress_mrna: bool = True,
              check_all: bool = True,
              deg_args: Dict[str, bool] = {'couple': True, 'reversible_complex_formation': False, 'nonenzyme_degradation': False,
@@ -1360,6 +1399,10 @@ def build_me(me_input_model: Union[cobra.Model,str],
     context_specific_dummy : bool, optional
         whether the representative dummy protein is calculated for only genes in the user-provided context specific model from
         the user provided PSIM (True) or for all recon2.2 machinery proteins in the gold-standard PSIM (False), by default False
+    unmodeled_protein_fraction : float, optional
+        the fraction of the total proteome that is not accounted for by the ME Model, by default 0
+        value must lie [0,1]
+        Note: default value of 0 is for current version, making the unmodeled protein fraction unimplemented. In future iterations we expect to set to some real value
     minimal_proteome : bool, optional
         For reactions with OR in the GPR, whether the builder generates a separate reaction for each protein complex (False) 
         or just one reaction, choosing the protein complex with the lowest molecular weight to catalyze the reaction (True). 
@@ -1410,7 +1453,8 @@ def build_me(me_input_model: Union[cobra.Model,str],
     builder = MEBuilder(m_model=me_input_model, psim_me=psim_me, model_id=model_id, 
                         stochastic=stochastic, seed=seed, n_cores=n_cores,
                         non_machinery=non_machinery, knock_out=knock_out,
-                        deorphan=deorphan, context_specific_dummy=context_specific_dummy,
+                        deorphan=deorphan, context_specific_dummy=context_specific_dummy, 
+                        unmodeled_protein_fraction=unmodeled_protein_fraction,
                         minimal_proteome=minimal_proteome, compress_mrna=compress_mrna,
                         check_all=check_all, deg_args=deg_args, mass_fraction=mass_fraction, biomass_coefficients=biomass_coefficients)
     builder.express_metabolic_enzymes()
