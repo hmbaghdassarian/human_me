@@ -164,9 +164,8 @@ class qminosSolver:
 
         return sln, stat, hsq
 
-    @staticmethod
-    def _try_mu(mu_val, objective, tolerance, 
-                res: Dict[SupportsFloat, Dict[str, Any]], feasible_mu: List[SupportsFloat], infeasible_mu: List[SupportsFloat]):
+    def _try_mu(self, me_model, mu_val, objective, tolerance, 
+                res: Dict[SupportsFloat, Dict[str, Any]], feasible_mu: List[SupportsFloat], infeasible_mu: List[SupportsFloat], verbose: bool = True):
         """To be used with maximize_growth method"""
         with HiddenPrints():
             sln, stat, hsq = self.solve_lp(me_model, mu_val, objective=objective, tolerance = tolerance)
@@ -191,7 +190,7 @@ class qminosSolver:
                 print('The problem is infeasible at mu = {} (hrs)'.format(mu_val))
             return False, None, None, None, res, feasible_mu, infeasible_mu
         raise ValueError('The problem returned with stat: {}'.format(stat.max()))
-    
+
     def maximize_growth(self, me_model, min_mu: SupportsFloat = 0, max_mu: SupportsFloat = 0.05,
                         mu_accuracy: SupportsFloat = 1e-10, increment: SupportsFloat = 0.02, tolerance: SupportsFloat = 0,
                         verbose: bool = True):
@@ -230,20 +229,24 @@ class qminosSolver:
 
         if verbose:
             print('Trying mu: {}'.format(min_mu))
-        bool_, sln, stat, hsq, res, feasible_mu, infeasible_mu = self._try_mu(min_mu, objective = objective, tolerance = tolerance, res = res, feasible_mu = feasible_mu, infeasible_mu = infeasible_mu)  # start with minimal
+        bool_, sln, stat, hsq, res, feasible_mu, infeasible_mu = self._try_mu(me_model, min_mu, objective = objective, tolerance = tolerance, res = res, 
+                                                                            feasible_mu = feasible_mu, infeasible_mu = infeasible_mu, verbose = verbose)  # start with minimal
 
 
-        bool_max, sln, stat, hsq, res, feasible_mu, infeasible_mu = self._try_mu(max_mu, objective = objective, tolerance = tolerance, res = res, feasible_mu = feasible_mu, infeasible_mu = infeasible_mu)
+        bool_max, sln, stat, hsq, res, feasible_mu, infeasible_mu = self._try_mu(me_model, max_mu, objective = objective, tolerance = tolerance, res = res, 
+                                                                            feasible_mu = feasible_mu, infeasible_mu = infeasible_mu, verbose = verbose)
         while bool_max:  # If max_mu was feasible, keep increasing
             max_mu += increment
             if verbose:
                 print('Trying mu: {}'.format(max_mu))
-            bool_max, sln, stat, hsq, res, feasible_mu, infeasible_mu = self._try_mu(max_mu, objective = objective, tolerance = tolerance, res = res, feasible_mu = feasible_mu, infeasible_mu = infeasible_mu)
+            bool_max, sln, stat, hsq, res, feasible_mu, infeasible_mu = self._try_mu(me_model, max_mu, objective = objective, tolerance = tolerance, 
+                                                                                    res = res, feasible_mu = feasible_mu, infeasible_mu = infeasible_mu, verbose = verbose)
         while (infeasible_mu[-1] - feasible_mu[-1]) > mu_accuracy:
             if verbose:
                 print('Trying mu: {}'.format((infeasible_mu[-1] - feasible_mu[-1]) * 0.5))
-            bool_, sln, stat, hsq, res, feasible_mu, infeasible_mu = self._try_mu((infeasible_mu[-1] + feasible_mu[-1]) * 0.5, 
-                                                    objective = objective, tolerance = tolerance, res = res)
+            bool_, sln, stat, hsq, res, feasible_mu, infeasible_mu = self._try_mu(me_model, (infeasible_mu[-1] + feasible_mu[-1]) * 0.5,  
+                                                                                objective = objective, tolerance = tolerance, res = res, 
+                                                                                feasible_mu = feasible_mu, infeasible_mu = infeasible_mu, verbose = verbose)
         if verbose:
             tot = ((time.time() - start) / 3600)
             print("completed in {:.2f} hours and {} iterations".format(tot, len(feasible_mu + infeasible_mu)))
