@@ -60,8 +60,11 @@ class MEBuilder:
                  deorphan: bool = True, context_specific_dummy: bool = False, unmodeled_protein_fraction: float = 0,
                  minimal_proteome: bool = True, compress_mrna: bool = True,
                  check_all: bool = True,
-                 deg_args: Dict[str, bool] = {'couple': True, 'reversible_complex_formation': False, 'nonenzyme_degradation': False,
-                                              'complex_degradation': True},
+                 deg_args: Dict[str, bool] = {'couple': True, 
+                                            'couple_ribosome': True,
+                                            'reversible_complex_formation': False, 
+                                            'nonenzyme_degradation': False,
+                                            'complex_degradation': True},
                 mass_fraction: Dict[str,float] = biomass_parameters.mass_fraction, 
                 biomass_coefficients: Dict = biomass_parameters.coefficients
                  ):
@@ -1277,9 +1280,9 @@ class MEBuilder:
                                    r.coupled_metabolites != dict() and 'catalysis' in r.coupled_metabolites.values() and r.enzyme_compartment != 'e' and not (
                                        r.lower_bound == r.upper_bound == 0)]
 
-            # TODO: couple ribosomal degradation
-            # TEMPORARY: don't couple ribosomal degradation for now - change in ExpressedGene._check_macromolecules
-            catalysis_reactions = [r for r in catalysis_reactions if 'mrna_formation' not in r.coupled_metabolites.values()]
+            if not self.deg_args['couple_ribosome']: # remove ribosome from degradation coupling
+                # removed check in ExpressedGene._check_macromolecules
+                catalysis_reactions = [r for r in catalysis_reactions if hasattr(r, 'translation') and r.translation]#'mrna_formation' not in r.coupled_metabolites.values()]
 
             for r in tqdm(catalysis_reactions):
                 enzymes = [m for m, t in r.coupled_metabolites.items() if t == 'catalysis']
@@ -1366,7 +1369,10 @@ def build_me(me_input_model: Union[cobra.Model,str],
              deorphan: bool = True, context_specific_dummy: bool = False, unmodeled_protein_fraction: float = 0,
              minimal_proteome: bool = True, compress_mrna: bool = True,
              check_all: bool = True,
-             deg_args: Dict[str, bool] = {'couple': True, 'reversible_complex_formation': False, 'nonenzyme_degradation': False,
+             deg_args: Dict[str, bool] = {'couple': True, 
+                                        'couple_ribosome': True, 
+                                        'reversible_complex_formation': False, 
+                                        'nonenzyme_degradation': False,
                                           'complex_degradation': True},
             mass_fraction: Dict[str,float] = biomass_parameters.mass_fraction, 
             biomass_coefficients: Dict = biomass_parameters.coefficients
@@ -1417,12 +1423,14 @@ def build_me(me_input_model: Union[cobra.Model,str],
         A number of options related to protein and complex degradation. Becomes important in slow growth conditions.
         Note the default values focus on coupling fluxes and degrading the specific enzymes associated with 
         each reaction. 
-        By default {'couple': True, 'reversible_complex_formation': False, 'nonenzyme_degradation': False, 'complex_degradation': True}
+        By default {'couple': True, 'couple_ribosome': True, 'reversible_complex_formation': False, 'nonenzyme_degradation': False, 'complex_degradation': True}
 
         Key value pairs:
             "couple": bool
                 Whether to explicitly couple enzyme degradation reactions to metabolic catalysis. Becomes 
                 particularly important in slow growth conditions.
+            "couple_ribosome": bool
+                Same as couple, but specifically for coupling ribosomal degradation to translation
             "reversible_complex_formation": bool
                 Whether reactions to form complexes are reversible (<->) or not (-->). Setting to True may make
                 model more efficient (reuse of proteins involved in catalysis of multiple reactions in same compartment)
