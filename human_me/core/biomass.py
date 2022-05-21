@@ -151,9 +151,10 @@ def add_biomass_change(reaction: cobra.Reaction, inplace: bool = True) -> Union[
     # sorting needed for precision (order of adding masses effects final sum)
     md_map = {m.id: m for m in reaction.metabolites}
     md = OrderedDict({md_map[m_id]: reaction.metabolites[md_map[m_id]] for m_id in sorted(md_map)})
-
+    
+    # exclude coupling not part of mass balance
     for metabolite, type in reaction.coupled_metabolites.items():
-        md[metabolite] -= metabolite.coupling_coefficient[type]  # coupling not part of mass balance
+        md[metabolite] -= metabolite.coupling_coefficient[type]  
 
     for m, count in md.items():
         if m.compartment != 'e': # secreted proteins are not contributing to biomass
