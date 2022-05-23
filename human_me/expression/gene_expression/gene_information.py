@@ -367,14 +367,18 @@ class GeneInformation:
         self.all_locations = self.machinery_locations.copy()
         for k, v in self.nonmachinery_locations.items():
             self.all_locations[k] = v
+
         # in the case that protein synthesis flux spread across multiple reactions due to multi-localization
-        if len(set(self.all_locations.values())) > 1:
-            if len(set(self.all_locations.values())) == 2:
-                self.coupling['mrna_degradation'] = 0.5 * self.coupling['mrna_degradation']
-                self.coupling['mrna_formation'] = 0.5 * self.coupling['mrna_formation']
-            else:
-                raise ValueError(
-                    'Have not yet accounted for Non-Canonical Secretion or other synthesis forms in coupling of mrna degradataion to protein synthesis')
+        # if len(set(self.all_locations.values())) > 1:
+        #     if len(set(self.all_locations.values())) == 2:
+        #         self.coupling['mrna_degradation'] = 0.5 * self.coupling['mrna_degradation']
+        #         self.coupling['mrna_formation'] = 0.5 * self.coupling['mrna_formation']
+        #     else:
+        #         raise ValueError(
+        #             'Have not yet accounted for Non-Canonical Secretion or other synthesis forms in coupling of mrna degradataion to protein synthesis')
+        if len(set(self.all_locations.values())) > 2:
+            raise ValueError( 'Have not yet accounted for Non-Canonical Secretion or other synthesis forms in coupling of mrna degradataion to protein synthesis')
+  
 
     def check(self):
         """Run checks on GeneInformation methods."""
