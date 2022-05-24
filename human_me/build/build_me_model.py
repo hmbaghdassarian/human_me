@@ -998,8 +998,7 @@ class MEBuilder:
                         if enzyme_to_couple in sr.products and not isinstance(sr, ProteinDegradationReaction):
                             sr.synthesis, sr.synthesis_type = True, 'protein'
                             sr_tracker.add(sr.id)
-                    if len(sr_tracker) != 1:
-                        raise ValueError(enzyme_to_couple.id + ' has an incorrect number of associated synthesis reactions')
+                    if len(sr_tracker) != 1:                        raise ValueError(enzyme_to_couple.id + ' has an incorrect number of associated synthesis reactions')
                 else:
                     enzyme_to_couple = self.complex_id_metabolite_map[self.complex_df.loc[i, 'complex_id']]
                     enzyme_to_couple.get_k_deg()
@@ -1007,7 +1006,8 @@ class MEBuilder:
                             hasattr(r, 'synthesis') and r.synthesis and enzyme_to_couple in r.products)]) != 1:
                         raise ValueError(
                             enzyme_to_couple.id + ' has an incorrect number of associated synthesis reactions')
-                enzyme_to_couple.keff = self.complex_df.loc[i, 'keff']
+                if enzyme_to_couple.keff is None: # only ribosomes should be not None, these are pre-defined (but leaves open to future enzyme specific keffs)
+                    enzyme_to_couple.keff = self.complex_df.loc[i, 'keff']
 
                 # add machinery to substrate side
                 c3 = (params.mu + enzyme_to_couple.k_deg) / enzyme_to_couple.keff

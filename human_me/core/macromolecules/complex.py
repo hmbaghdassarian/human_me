@@ -36,6 +36,7 @@ class Complex(Macromolecule):
             A seed for generating the complex ID if complex_id is None, by default None
         """
         # checks
+        # checks
         if type(metabolites) != list or len(metabolites) == 0:
             raise ValueError('Must provide a list of macromolecules to form complex')
         # cobra metabolite not set up, check for bc they don't have the attribute .type
@@ -44,9 +45,16 @@ class Complex(Macromolecule):
 
         self.components = {m: metabolites.count(m) for m in metabolites}
         # parse compartment
-        compartments = {m.compartment for m in self.components}
+        compartments = list(set([m.compartment for m in self.components]))
+
+        # test compartment consistency - exception of ribosome complexes
+        comp_ids = [m.id for m in self.components]
+        cotransloc_cond = (len(cotransloc_ids.difference(comp_ids)) == 0) or ('mature_ribosome_complex_c' in comp_ids)
+
         if len(compartments) == 1:
-            compartment = list(compartments)[0]
+            compartment = compartments[0]
+        elif (sorted(compartments) == ['c', 'r']) and cotransloc_cond:
+            compartment = 'c'
         else:
             raise ValueError('Metabolites forming a complex must all be in the same compartment')
 
@@ -68,7 +76,7 @@ class Complex(Macromolecule):
                     elements[k] = v * count
 
         # make the metabolite
-        super().__init__(id=self.temp_id + '_complex_' + compartment, compartment=compartment,
+        Macromolecule.__init__(self, id=self.temp_id + '_complex_' + compartment, compartment=compartment,
                                charge=sum([m.charge * count for m, count in self.components.items()]),
                                elements=elements)
 
@@ -264,12 +272,9 @@ class Complex(Macromolecule):
 
 
 class RibosomalComplex(Complex):
-    """Complexes specifically associated with ribosome biogenesis, which has RNA-protein complexes and
-    multiple compartments"""
+    """Complexes specifically associated with ribosome biogenesis, which has RNA-protein complexes and multiple compartments."""
 
-    type = 'complex' 
-
-    def __init__(self, metabolites: List[Macromolecule], complex_id: Optional[str] = None, ignore_compartment: bool = False, seed: Optional[int] = None):
+    def __init__(self, metabolites: List[Macromolecule], complex_id: Optional[str] = None, seed: Optional[int] = None):
         """Init method for RibosomalComplex.
 
         Parameters
@@ -278,60 +283,12 @@ class RibosomalComplex(Complex):
             each entry is a Macromolecule object (protein or RNA or complex, not generic metabolites)
         complex_id : Optional[str], optional
             the id of the complex metabolite; if None, will generate a random id, by default None
-        ignore_compartment : bool, optional
-            whether to ignore the metabolite compartments, mainly for internal use, by default False
         seed : Optional[int], optional
             A seed for generating the complex ID if it is None, by default None
         """
-        # checks
-        if type(metabolites) != list or len(metabolites) == 0:
-            raise ValueError('Must provide a list of macromolecules to form complex')
-        # cobra metabolite not set up, check for bc they don't have the attribute .type
-        if len([m for m in metabolites if not isinstance(m, Macromolecule)]) > 0:
-            raise ValueError('Generic cobra.Metabolite cannot form complexes with macromolecules currently')
-
-        self.components = {m: metabolites.count(m) for m in metabolites}
-        # parse compartment
-        compartments = list(set([m.compartment for m in self.components]))
-
-        # test compartment consistency - exception of ribosome complexes
-        comp_ids = [m.id for m in self.components]
-        cotransloc_cond = (len(cotransloc_ids.difference(comp_ids)) == 0) or ('mature_ribosome_complex_c' in comp_ids)
-
-        if len(compartments) == 1:
-            compartment = compartments[0]
-        elif (sorted(compartments) == ['c', 'r']) and cotransloc_cond:
-            compartment = 'c'
-        else:
-            raise ValueError('Metabolites forming a complex must all be in the same compartment')
-
-        # parse metabolite id
-        self._seed = seed
-        if complex_id is None:
-            Faker.seed(self._seed)
-            f1 = Faker()
-            self.temp_id = f1.uuid4().split('-')[0]
-        else:
-            self.temp_id = complex_id
-
-        elements = dict()
-        for m, count in self.components.items():
-            for k, v in m.elements.items():
-                if k in elements:
-                    elements[k] += v * count
-                else:
-                    elements[k] = v * count
-
         # make the metabolite
-        Macromolecule.__init__(self, id=self.temp_id + '_complex_' + compartment, compartment=compartment,
-                               charge=sum([m.charge * count for m, count in self.components.items()]),
-                               elements=elements)
-
-        self.reaction_id = None  # none before running form_complex(); this is used in update_id() method
-        self._deg_initialized = False
-        self.enzyme = False
-        self.keff = None
-        self.hgnc_id = None  # always None, for internal use with expression/protein_expression/degradation
+        super().__init__(metabolites = metabolites, complex_id = complex_id, seed = seed)
+        self.keff = params.RIBOSOME_TRANSLATION_RATE
 
     def decompose_complex(self, decomposed_complex=None):
         """Recursive method to get the complex by its individual components, including nested complexes."""
@@ -356,7 +313,6 @@ class RibosomalComplex(Complex):
     def form_complex(self, reaction_id: Optional[str] = None, reversible: bool = False,
                      synthesis: bool = False, synthesis_type: Optional[str] = None) -> ExpressionReaction:
         """The reaction to generate the Complex object.
-        
         Note: assumes non-covalent complex formation (in terms of elemental balance)
 
         Parameters
@@ -403,7 +359,6 @@ class RibosomalComplex(Complex):
         """Initialize attributes for creating degradation reactions."""
 
         self._deg_initialized = True
-        self.keff = None
         dc = self.decompose_complex()
         self._check_metabolite_types()
 

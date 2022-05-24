@@ -64,6 +64,7 @@ turnover = {'alpha_m': alpha_m, 'alpha_p': alpha_p,
 RNA_DEGRADATION_CONSTANT = np.log(2) / 72  # bioid 108025
 SINGLE_UB_SEQ = 'MQIFVKTLTGKTITLEVEPSDTIENVKAKIQDKEGIPPDQQRLIFAGKQLEDGRTLSDYNIQKESTLHLVLRLRGG'
 # ribosomal_degradation_rate = np.log(2)/300 #bioid 110053 # unused
+RIBOSOME_TRANSLATION_RATE = 18000 # 5aa/sec/ribosome --> 18000 aa/hr/ribosome (BioID 104598, 107783, https://doi.org/10.1093/nar/gkaa1103)
 
 # biomass
 class BiomassParameters:
