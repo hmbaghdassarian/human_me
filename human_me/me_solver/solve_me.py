@@ -315,12 +315,6 @@ class qminosSolver:
                                                close_biomass_dilution=True)
                 res.append([sln, stat, hsq])
         else:
-            # TODO: fix qminos solver parralelization
-            # msg: Currently, parallelization errors out at /data2/hratch/Software/qminosSolver/solvemepy/qminospy/solver.py
-            # at line 241-243. for some reason, parallelization doesn't recognize the self.precision = 'quad' as == 'quad'.
-            # This does not occur in the serial loop. hard-coding the commented lines 244-250 (same as line 193-199)
-            # fixes this issue, but is only a temporary solution.
-            #             raise ValueError('me_solver/solve_me .optimize() method, see message above for error')
             n_cores = min([n_cores, n_points])
             #         args_ = zip([me_model]*n_points, list(growth_vals), [objective]*n_points, [tolerance]*n_points,
             #                    [True]*n_points)
