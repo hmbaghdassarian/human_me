@@ -920,21 +920,21 @@ def get_protein_expression_reactions(gene_info, mrna_transcript_c, mrna_deg_prox
                 protein_metabolites += secreted_proteins
 
             # retrograde transport
-            if 'r' in gene_info.all_locations or 'g' in gene_info.all_locations:
+            if ('r' in gene_info.all_locations and 'og' in gene_info.ptms) or 'g' in gene_info.all_locations:
                 # golgi retrograde transport for degradation or delivery to ER
                 if not ('r' in gene_info.all_locations and 'og' in gene_info.ptms):
                     retrograde_transport, retro_protein_r = degradation.retrograde_er(macromolecule=modified_protein_g, model_metabolites=model_metabolites, 
                                                                                     retro_protein_r=modified_protein_r)
-                else:
-                    retrograde_transport, retro_protein_r = degradation.retrograde_er(macromolecule=modified_protein_g, model_metabolites=model_metabolites,)
-                if 'g' in gene_info.all_locations:
                     retrograde_transport._final_compartments.add('g')
-                if 'r' in gene_info.all_locations and 'og' in gene_info.ptms:
+                else: # just for transport after O-glycosylation, don't want to remove from the _degradation_reactions
+                    retrograde_transport, retro_protein_r = degradation.retrograde_er(macromolecule=modified_protein_g, model_metabolites=model_metabolites,)
                     retrograde_transport._final_compartments.add('r')
+                    retro_protein_r._degradation_reactions.remove(retro_protein_r.hgnc_id + '_COPI_RETROtr') # to not get removed, even if 'g' in there
                 protein_expression_reactions += [retrograde_transport]
                 if 'g' in gene_info.all_locations:
                     protein_metabolites += [modified_protein_g]
-
+            else:
+                retro_protein_r = modified_protein_r
         else:
             retro_protein_r = modified_protein_r  # for ER resident proteins with no O-glycosylation, they are not transported to Golgi and retrograde transported
 
