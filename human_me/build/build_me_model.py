@@ -1286,6 +1286,7 @@ class MEBuilder:
                 catalysis_reactions = [r for r in catalysis_reactions if hasattr(r, 'translation') and r.translation]#'mrna_formation' not in r.coupled_metabolites.values()]
 
             for r in tqdm(catalysis_reactions):
+                print(r.id) # TODO: delete this line when done debugging
                 enzymes = [m for m, t in r.coupled_metabolites.items() if t == 'catalysis']
 
                 deg_reactions = list()

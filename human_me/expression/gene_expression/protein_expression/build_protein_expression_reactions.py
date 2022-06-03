@@ -952,8 +952,15 @@ def get_protein_expression_reactions(gene_info, mrna_transcript_c, mrna_deg_prox
                 rpdr += erad_reactions
                 if 'i' not in gene_info.all_locations:  # this reaction doesn't already exist
                     dr = degradation.degrade(unfolded_protein_c, model_metabolites=model_metabolites, **{'ub_args': ub_args})
+                    # get all protein metabolites generated from erad_reactions above
+                    erad_pm = set()
+                    for er__ in erad_reactions:
+                        for erad_pm_ in er__.metabolites:
+                            if isinstance(erad_pm_, Protein):
+                                erad_pm.add(erad_pm_)
                     for r in dr:
                         r._final_compartments  = r._final_compartments.union(fc)
+                        r._update_tracking(erad_pm) # adds the erad_reaction metabolites to the cytosolic protein degradation reactions (creates sink for ER enzymes)
                     rpdr += dr
             else:
                 erad_reactions, unfolded_protein_c = degradation.degrade(macromolecule=retro_protein_r,model_metabolites=model_metabolites,

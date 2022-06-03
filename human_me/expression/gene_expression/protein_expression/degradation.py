@@ -506,7 +506,7 @@ def build_erad_reactions(macromolecule: DegradedMacromoleculeType, model_metabol
         unfolded_protein_c = kwargs['unfolded_protein_c']
     else:
         unfolded_protein_c = None
-    
+
     if 'ub_args' in kwargs:
         ub_args = kwargs['ub_args']
     elif macromolecule.type == 'complex':
@@ -557,7 +557,7 @@ def build_erad_reactions(macromolecule: DegradedMacromoleculeType, model_metabol
         return erad_reactions, unfolded_protein_c
     # this portion is hard-coded in protein_expression portion
     erad_reactions += degrade_cytosolic_nuclear_protein(macromolecule=unfolded_protein_c, model_metabolites=model_metabolites, ub_args = ub_args)
-    # if macromolecule.type == 'protein':
+    # if macromolecule.type == 'protein'
     #     erad_reactions += degrade_cytosolic_nuclear_protein(macromolecule=unfolded_protein_c, model_metabolites=model_metabolites, ub_args = ub_args)
     # else: 
     #     erad_reactions += degrade_cytosolic_nuclear_protein(macromolecule=unfolded_protein_c, model_metabolites=model_metabolites, ub_args = ub_args)
