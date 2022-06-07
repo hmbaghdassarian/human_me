@@ -203,6 +203,8 @@ def transport_mitochondrial_inter(gene_info, processed_protein_m: Protein) -> Pr
     mitochondrial_inter_transport = ProteinExpressionReaction(gene_info.hgnc_id + '_IMPORTti', hgnc_id=gene_info.hgnc_id)
     mitochondrial_inter_transport.subsytem = 'Protein_Expression'
     pre_protein_i = processed_protein_m.change_compartment('i')
+    if pre_protein_i.hgnc_id + '_DEGRADATIONm' in pre_protein_i._degradation_reactions:
+        pre_protein_i._degradation_reactions.remove(pre_protein_i.hgnc_id + '_DEGRADATIONm')
 
     rxn = {processed_protein_m: -1, pre_protein_i: 1}
 
@@ -809,7 +811,10 @@ def get_protein_expression_reactions(gene_info, mrna_transcript_c, mrna_deg_prox
     if 'Cytosolic Tranport' in gene_info.all_locations.values() or gene_info.L_protein <= params.PTT_LENGTH:
         translation_elongation_c, unfolded_protein_c = c_trln.translate_protein_cytosolic(gene_info, mrna_transcript_c, mrna_deg_proxy, 
                                                                                             modified_trna_transcript_c, charged_trna_map, model_metabolites)
-        translation_elongation_c._final_compartments = translation_elongation_c._final_compartments.union({comp for comp, v in gene_info.all_locations.items() if v == 'Cytosolic Tranport'})
+        if gene_info.L_protein > params.PTT_LENGTH:
+            translation_elongation_c._final_compartments = translation_elongation_c._final_compartments.union({comp for comp, v in gene_info.all_locations.items() if v == 'Cytosolic Tranport'})
+        else:
+            translation_elongation_c._final_compartments = set(gene_info.all_locations)
         protein_expression_reactions.append(translation_elongation_c)
 
         if 'Cytosolic Tranport' in gene_info.all_locations.values():
@@ -844,11 +849,6 @@ def get_protein_expression_reactions(gene_info, mrna_transcript_c, mrna_deg_prox
                     protein_expression_reactions += nuclear_reactions
                     protein_metabolites += [folded_protein_n]
 
-            if 'i' in gene_info.all_locations:  # no folding for i, but cytoplasmic degradation
-                dr = degradation.degrade(macromolecule=unfolded_protein_c, model_metabolites=model_metabolites, **{ 'ub_args': ub_args})
-                for r in dr:
-                    r._final_compartments.add('i')
-                protein_expression_reactions += dr
             # mitochondrial transport and degradation ('i' and 'm')
             if ('m' in gene_info.all_locations) or ('i' in gene_info.all_locations):
                 if ('m' in gene_info.all_locations) and ('i' in gene_info.all_locations):
@@ -859,6 +859,15 @@ def get_protein_expression_reactions(gene_info, mrna_transcript_c, mrna_deg_prox
                     mitochondrial_reactions, mitochondrial_protein_metabolites = get_mitochondrial_reactions(gene_info, unfolded_protein_c, compartments=['i'], model_metabolites=model_metabolites)
                 protein_expression_reactions += mitochondrial_reactions
                 protein_metabolites += mitochondrial_protein_metabolites
+            
+            if 'i' in gene_info.all_locations:  # no folding for i, but cytoplasmic degradation
+                i_dr = degradation.degrade(macromolecule=unfolded_protein_c, model_metabolites=model_metabolites, **{ 'ub_args': ub_args})
+
+                # i_pms = [i_pm for i_pm in mitochondrial_protein_metabolites if i_pm.compartment == 'i']
+                for r in i_dr:
+                    r._final_compartments.add('i')
+                    # r._update_tracking(i_pms)
+                protein_expression_reactions += i_dr
 
     # SECRETORY PATHWAY: r, g, l, e, pm proteins
     if 'Canonical Secretion' in gene_info.all_locations.values():
@@ -920,69 +929,56 @@ def get_protein_expression_reactions(gene_info, mrna_transcript_c, mrna_deg_prox
                 protein_metabolites += secreted_proteins
 
             # retrograde transport
-            if ('r' in gene_info.all_locations and 'og' in gene_info.ptms) or 'g' in gene_info.all_locations:
+            if 'r' in gene_info.all_locations or 'g' in gene_info.all_locations:
                 # golgi retrograde transport for degradation or delivery to ER
-                if not ('r' in gene_info.all_locations and 'og' in gene_info.ptms):
+                if not 'og' in gene_info.ptms:#not ('r' in gene_info.all_locations and 'og' in gene_info.ptms):
                     retrograde_transport, retro_protein_r = degradation.retrograde_er(macromolecule=modified_protein_g, model_metabolites=model_metabolites, 
                                                                                     retro_protein_r=modified_protein_r)
-                    retrograde_transport._final_compartments.add('g')
                 else: # just for transport after O-glycosylation, don't want to remove from the _degradation_reactions
-                    retrograde_transport, retro_protein_r = degradation.retrograde_er(macromolecule=modified_protein_g, model_metabolites=model_metabolites,)
-                    retrograde_transport._final_compartments.add('r')
-                    retro_protein_r._degradation_reactions.remove(retro_protein_r.hgnc_id + '_COPI_RETROtr') # to not get removed, even if 'g' in there
+                    retrograde_transport, retro_protein_r = degradation.retrograde_er(macromolecule=modified_protein_g, model_metabolites=model_metabolites)
+                    if 'r'in gene_info.all_locations:
+                        for er_pm in [modified_protein_g, retro_protein_r]: # it is just a transport reaction if OG modification and r resident protein
+                            er_pm._degradation_reactions.remove(er_pm.hgnc_id + '_COPI_RETROtr') 
                 protein_expression_reactions += [retrograde_transport]
                 if 'g' in gene_info.all_locations:
                     protein_metabolites += [modified_protein_g]
+                retrograde_transport._final_compartments.update(set(gene_info.all_locations).intersection({'r', 'g'}))
             else:
                 retro_protein_r = modified_protein_r
         else:
             retro_protein_r = modified_protein_r  # for ER resident proteins with no O-glycosylation, they are not transported to Golgi and retrograde transported
 
         # ERAD: ER and Golgi-resident proteins
-        if ('r' in gene_info.all_locations or 'g' in gene_info.all_locations):  # and not lysosomal_degradation_ptm_condition:
+        if 'r' in gene_info.all_locations or 'g' in gene_info.all_locations:  # and not lysosomal_degradation_ptm_condition:
             if 'r' in gene_info.all_locations:
                 protein_metabolites += [retro_protein_r]
-            rpdr = list()
             fc = set(gene_info.all_locations).intersection({'r', 'g'})
             if ptt_:
-                erad_reactions, unfolded_protein_c = degradation.degrade(macromolecule=retro_protein_r, model_metabolites=model_metabolites,
-                                                                         **{'unfolded_protein_c': unfolded_protein_c})
-                for r in erad_reactions:
-                    r._final_compartments  = r._final_compartments.union(fc)
-                rpdr += erad_reactions
+                rpdr, unfolded_protein_c = degradation.degrade(macromolecule=retro_protein_r, model_metabolites=model_metabolites,
+                                                                         **{'unfolded_protein_c': unfolded_protein_c}) # erad reactions
                 if 'i' not in gene_info.all_locations:  # this reaction doesn't already exist
                     dr = degradation.degrade(unfolded_protein_c, model_metabolites=model_metabolites, **{'ub_args': ub_args})
-                    # get all protein metabolites generated from erad_reactions above
-                    erad_pm = set()
-                    for er__ in erad_reactions:
-                        for erad_pm_ in er__.metabolites:
-                            if isinstance(erad_pm_, Protein):
-                                erad_pm.add(erad_pm_)
-                    for r in dr:
-                        r._final_compartments  = r._final_compartments.union(fc)
-                        r._update_tracking(erad_pm) # adds the erad_reaction metabolites to the cytosolic protein degradation reactions (creates sink for ER enzymes)
                     rpdr += dr
+                else:
+                    for r in i_dr:
+                        r._final_compartments.add('r')
+                        r._update_tracking({retro_protein_r, unfolded_protein_c})
             else:
-                erad_reactions, unfolded_protein_c = degradation.degrade(macromolecule=retro_protein_r,model_metabolites=model_metabolites,
-                                                                         **{'unfolded_protein_c': None})
-                for r in erad_reactions:
-                    r._final_compartments  = r._final_compartments.union(fc)
-                rpdr += erad_reactions
+                rpdr, unfolded_protein_c = degradation.degrade(macromolecule=retro_protein_r,model_metabolites=model_metabolites,
+                                                                         **{'unfolded_protein_c': None}) # ERAD reactions
                 # since metabolite id is different for unfolded_protein_c (see erad) and proteasomal degradation
                 # reactions use metabolite id rather than gene_info.hgnc_id,
                 # don't need to worry about overlap with 'i' compartment degradation reactions
                 # in the case of multi-localization
                 # (this unfolded protein is different than cytosolically translated ones bc of the)
                 # signal peptide degradation reaction
-                dr = degradation.degrade(macromolecule=unfolded_protein_c, model_metabolites=model_metabolites, **{'ub_args': ub_args})
-                for r in dr:
-                    r._final_compartments  = r._final_compartments.union(fc)
-                rpdr += dr
-                for r in rpdr:
-                    if 'g' in gene_info.all_locations:
-                        r._update_tracking(modified_protein_g)  # not explicitly accounted for for protein monomers
-                    r._update_tracking({retro_protein_r, unfolded_protein_c})
+                rpdr += degradation.degrade(macromolecule=unfolded_protein_c, model_metabolites=model_metabolites, **{'ub_args': ub_args})
 
+            for r in rpdr:
+                r._final_compartments  = r._final_compartments.union(fc)
+                r._update_tracking({retro_protein_r, unfolded_protein_c})
+                if 'g' in gene_info.all_locations:
+                    r._update_tracking(modified_protein_g) 
             protein_expression_reactions += rpdr
 
         # PM/L degradation needed
