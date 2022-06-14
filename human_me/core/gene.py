@@ -330,6 +330,8 @@ class ExpressedGene:
                 cr = [r.id for r in m.reactions if m in r.coupled_metabolites]
 
                 if len(cr) > 2:
+                    print(m.id)
+                    print(cr)
                     raise ValueError(
                         'Unexpected mrna coupling to multiple reactions associated with ' + self.hgnc_id)
                 self.macromolecules['RNA']['mrna']['coupled'][m.id] = cr

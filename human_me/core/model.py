@@ -636,11 +636,11 @@ class ME_Model(cobra.Model):
         orphan = [self.reactions.get_by_id(r_id) for r_id in self.reaction_types['orphan']]
 
         test_reactions = [r for r in self.reactions if not (r.id in orphan) and not isinstance(r, BiomassReaction)]
-        for r in tqdm(test_reactions):
-            if isinstance(r, MetabolicReaction):
-                r_ = self.m_model.reactions.get_by_id(r.cobra_id).copy()
-            else:  # ExpressionReaction
-                r_ = r.copy()
+        for r_ in tqdm(test_reactions):
+            # if isinstance(r, MetabolicReaction):
+            #     r_ = self.m_model.reactions.get_by_id(r.cobra_id).copy()
+            # else:  # ExpressionReaction
+            #     r_ = r.copy()
 
             if 'or' in r_.gene_reaction_rule and 'and' in r_.gene_reaction_rule:
                 expected_machinery = parse_complex.eval_complex(r_.gene_reaction_rule)
@@ -663,9 +663,9 @@ class ME_Model(cobra.Model):
             if len(set(expected_machinery2).difference(self.knock_out + self.additional_ko)) == 0:
                 ko = True
 
-            if (not hasattr(r, 'coupled_metabolites') or 'catalysis' not in r.coupled_metabolites.values()) and not ko:
-                raise ValueError('Reaction does not have a record of coupled machinery: ' + r.id)
-            actual_machinery = [m for m, v in r.coupled_metabolites.items() if v == 'catalysis']
+            if (not hasattr(r_, 'coupled_metabolites') or 'catalysis' not in r_.coupled_metabolites.values()) and not ko:
+                raise ValueError('Reaction does not have a record of coupled machinery: ' + r_.id)
+            actual_machinery = [m for m, v in r_.coupled_metabolites.items() if v == 'catalysis']
 
             if len(actual_machinery) > 0:
                 translation = isinstance(actual_machinery[0], RibosomalComplex)
@@ -682,7 +682,7 @@ class ME_Model(cobra.Model):
                         am = list()
                         for p in actual_machinery[0].decompose_complex():
                             if p.type != 'protein':
-                                raise ValueError('Non-proteins in complex machinery for ' + r.id)
+                                raise ValueError('Non-proteins in complex machinery for ' + r_.id)
                             am.append(p.id.split('_')[0])
                         actual_machinery = sorted(am)
 
@@ -698,7 +698,7 @@ class ME_Model(cobra.Model):
                                     err = False
                         if err:
                             if expected_machinery != self.knock_out:
-                                raise ValueError('Machinery mismatch for ' + r.id)
+                                raise ValueError('Machinery mismatch for ' + r_.id)
                     else:
                         if len(actual_machinery) > 1 or not (actual_machinery[0].dummy and actual_machinery[0].dummy_type == 'orphan_protein'):  # dummy
                             raise ValueError('Non-dummy protein coupled to deorphaned reaction')
@@ -707,17 +707,17 @@ class ME_Model(cobra.Model):
                     for am_ in actual_machinery:
                         for p in am_.decompose_complex():
                             if p.type != 'protein':
-                                raise ValueError('Non-proteins in complex machinery for ' + r.id)
+                                raise ValueError('Non-proteins in complex machinery for ' + r_.id)
                             am.append(p.id.split('_')[0])
                     actual_machinery = sorted(am)
                     if sorted(expected_machinery[0]) != actual_machinery:
-                        raise ValueError('Incorrect machinery for ribosomal degradation: ' + r.id)
+                        raise ValueError('Incorrect machinery for ribosomal degradation: ' + r_.id)
                 elif translation:
                     actual_machinery = sorted(
                         [p.id.split('_')[0] for p in actual_machinery[0].decompose_complex() if p.type == 'protein'])
                     expected_machinery = sorted([p for p in expected_machinery[0] if p != 'ribosome'] + rbps)
                     if actual_machinery != expected_machinery:
-                        raise ValueError('Incorrect machinery for translation: ' + r.id)
+                        raise ValueError('Incorrect machinery for translation: ' + r_.id)
                 else:
                     raise ValueError('Unaccounted for reaction criteria')
 
@@ -788,6 +788,7 @@ class ME_Model(cobra.Model):
     @staticmethod
     def create_expressed_gene(hgnc_id: str, relat_objects) -> ExpressedGene:
         """Create the ExpressedGene objects associated with the reaction."""
+        print(hgnc_id) # TODO: delete this
         g = ExpressedGene(hgnc_id)
         for m in relat_objects['macromolecules']:
             g.add_macromolecule(m)
