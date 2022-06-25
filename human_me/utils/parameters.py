@@ -40,6 +40,7 @@ MEMBRANE_DIFFUSION_LIMIT = 504  # 504 Da includes ATP, uncharged molecules at th
 
 # enzyme
 KEFF_MEDIAN = 3.983 * 3600  # units: hr^-1 (3.983 in s^-1)
+RECON2_SASA_MEDIAN = 25.853785356296427 # recon2.2 enzymes only, includes complexes #21.114
 
 # central dogma
 ALPHA_M_MEDIAN = 0.06108233261605428  # units: hours (Gregersen et al ) median value

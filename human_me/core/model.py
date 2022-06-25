@@ -35,6 +35,15 @@ from human_me.utils.machinery import rbps
 
 logger = logging.getLogger(__name__)
 
+def create_expressed_gene(hgnc_id: str, relat_objects) -> ExpressedGene:
+    """Create the ExpressedGene objects associated with the reaction."""
+    g = ExpressedGene(hgnc_id)
+    for m in relat_objects['macromolecules']:
+        g.add_macromolecule(m)
+    for r in relat_objects['reactions']:
+        g.add_reaction(r)
+    g.check()
+    return g
 
 class ME_Model(cobra.Model):
     """ME_Model class analogous to cobrapy.model class"""
@@ -785,21 +794,7 @@ class ME_Model(cobra.Model):
         self._check_coupling()
         self._check_enzymes()
 
-    @staticmethod
-    def create_expressed_gene(hgnc_id: str, relat_objects) -> ExpressedGene:
-        """Create the ExpressedGene objects associated with the reaction."""
-        print(hgnc_id) # TODO: delete this
-        g = ExpressedGene(hgnc_id)
-        for m in relat_objects['macromolecules']:
-            g.add_macromolecule(m)
-        for r in relat_objects['reactions']:
-            g.add_reaction(r)
-        g.check()
-
-        return g
-
     def _generate_expressed_genes(self):
-
         # map all hgnc_ids to all associated macromolecules and reactions
         hgnc_ids = {m.hgnc_id for m in self.metabolites if isinstance(m, Macromolecule) and m.hgnc_id is not None}
         hgnc_ids = {hgnc_id: {'macromolecules': []} for hgnc_id in hgnc_ids}
@@ -830,20 +825,14 @@ class ME_Model(cobra.Model):
         print('Add gene objects')
         if self._par:
             pool = multiprocessing.Pool(processes=self.n_cores)
-            try:
-                expressed_genes = pool.starmap(self.create_expressed_gene,
-                                               zip(hgnc_ids.keys(), hgnc_ids.values()))
-                pool.close()
-                pool.join()
-                gc.collect()
-                self.expressed_genes = {g.hgnc_id: g for g in expressed_genes}
-            except:
-                pool.close()
-                pool.join()
-                gc.collect()
-                raise ValueError('Parallelization failed while generating expressed genes list')
+            expressed_genes = pool.starmap(create_expressed_gene,
+                                zip(hgnc_ids.keys(), hgnc_ids.values()))
+            pool.close()
+            pool.join()
+            gc.collect()
+            self.expressed_genes = {g.hgnc_id: g for g in expressed_genes}
         else:
-            self.expressed_genes = {hgnc_id: self.create_expressed_gene(hgnc_id, relat_objects) for hgnc_id, relat_objects in
+            self.expressed_genes = {hgnc_id: create_expressed_gene(hgnc_id, relat_objects) for hgnc_id, relat_objects in
                                     tqdm(hgnc_ids.items())}
 
     def knock_out_gene(self, hgnc_id: str, inplace: bool = False):

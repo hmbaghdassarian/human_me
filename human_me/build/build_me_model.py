@@ -58,6 +58,7 @@ class MEBuilder:
                  stochastic: bool = False, seed: int = 888, n_cores: int = os.cpu_count(),
                  non_machinery: Optional[Dict[str, List[str]]] = None, knock_out: Optional[List[str]] = None,
                  deorphan: bool = True, context_specific_dummy: bool = False, 
+                 context_specific_SASA: bool = False,
                  unmodeled_protein_fraction: float = params.UNMODELED_PROTEIN_FRAC,
                  minimal_proteome: bool = True, compress_mrna: bool = True,
                  check_all: bool = True,
@@ -110,6 +111,8 @@ class MEBuilder:
         self.m_model = load_metabolic_model(m_model)
         self.metabolic_machinery, self.all_machinery = mach.get_model_machinery(self.m_model)
         self.model_metabolites = MetaboliteBin(self.m_model)
+
+        self.context_specific_SASA = context_specific_SASA
 
         # biomass and dummy proteins
         self.context_specific_dummy = context_specific_dummy
@@ -742,7 +745,10 @@ class MEBuilder:
             self.complex_df.loc[i, 'MW_kDa'] = enzyme_to_couple.formula_weight / 1000
 
         self.complex_df['SASA'] = self.complex_df.MW_kDa.apply(lambda x: func.SASA(x))
-        median_SASA = self.complex_df.SASA.median()
+        if self.context_specific_SASA:
+            median_SASA = self.complex_df.SASA.median()
+        else:
+            median_SASA = params.RECON2_SASA_MEDIAN
         self.complex_df['keff'] = self.complex_df['SASA'].apply(lambda x: x * (params.KEFF_MEDIAN / median_SASA))
 
         if self.orphan_dummy_protein is not None:
@@ -1368,6 +1374,7 @@ def build_me(me_input_model: Union[cobra.Model,str],
              stochastic: bool = False, seed: int = 888, n_cores: int = os.cpu_count(),
              non_machinery: Optional[Dict[str, List[str]]] = None, knock_out: Optional[List[str]] = None,
              deorphan: bool = True, context_specific_dummy: bool = False, 
+             context_specific_SASA: bool = False,
              unmodeled_protein_fraction: float = params.UNMODELED_PROTEIN_FRAC,
              minimal_proteome: bool = True, compress_mrna: bool = True,
              check_all: bool = True,
@@ -1407,6 +1414,9 @@ def build_me(me_input_model: Union[cobra.Model,str],
     context_specific_dummy : bool, optional
         whether the representative dummy protein is calculated for only genes in the user-provided context specific model from
         the user provided PSIM (True) or for all recon2.2 machinery proteins in the gold-standard PSIM (False), by default False
+    context_specific_SASA: bool, optional
+        whether the SASA used for keff estimation is calculated on the user-provided context-specific model enzymes (+ expression enzymes) (True) or 
+        from all the recon2.2 enzymes (does not exclude expression enzymes) (False), by default False
     unmodeled_protein_fraction : float, optional
         the fraction of the total proteome that is not accounted for by the ME Model, by default 0
         value must lie [0,1]
@@ -1464,6 +1474,7 @@ def build_me(me_input_model: Union[cobra.Model,str],
                         stochastic=stochastic, seed=seed, n_cores=n_cores,
                         non_machinery=non_machinery, knock_out=knock_out,
                         deorphan=deorphan, context_specific_dummy=context_specific_dummy, 
+                        context_specific_SASA = context_specific_SASA,
                         unmodeled_protein_fraction=unmodeled_protein_fraction,
                         minimal_proteome=minimal_proteome, compress_mrna=compress_mrna,
                         check_all=check_all, deg_args=deg_args, mass_fraction=mass_fraction, biomass_coefficients=biomass_coefficients)
