@@ -294,8 +294,6 @@ def average_protein_features(psim_me: pd.DataFrame, hgnc_id: str,
         [description]
     """
     if context_specific:
-        if me_input_model is None:
-            raise ValueError('Must specify a metabolic model to extract context specific information')
         psim = psim_me[psim_me.HGNC_ID.isin(metabolic_machinery)]  # filter for metabolic machinery only
     else:
         psim = pd.read_csv(build_local_path + 'recon2_2_only_psim.csv')  # load recon2.2 metabolic machinery gold standard PSIM
