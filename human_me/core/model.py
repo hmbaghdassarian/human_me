@@ -35,16 +35,6 @@ from human_me.utils.machinery import rbps
 
 logger = logging.getLogger(__name__)
 
-def create_expressed_gene(hgnc_id: str, relat_objects) -> ExpressedGene:
-    """Create the ExpressedGene objects associated with the reaction."""
-    g = ExpressedGene(hgnc_id)
-    for m in relat_objects['macromolecules']:
-        g.add_macromolecule(m)
-    for r in relat_objects['reactions']:
-        g.add_reaction(r)
-    g.check()
-    return g
-
 class ME_Model(cobra.Model):
     """ME_Model class analogous to cobrapy.model class"""
 
@@ -793,6 +783,17 @@ class ME_Model(cobra.Model):
         self.check_me_mass_balance()
         self._check_coupling()
         self._check_enzymes()
+    
+    @staticmethod
+    def create_expressed_gene(hgnc_id: str, relat_objects) -> ExpressedGene:
+        """Create the ExpressedGene objects associated with the reaction."""
+        g = ExpressedGene(hgnc_id)
+        for m in relat_objects['macromolecules']:
+            g.add_macromolecule(m)
+        for r in relat_objects['reactions']:
+            g.add_reaction(r)
+        g.check()
+        return g
 
     def _generate_expressed_genes(self):
         # map all hgnc_ids to all associated macromolecules and reactions
@@ -825,15 +826,25 @@ class ME_Model(cobra.Model):
         print('Add gene objects')
         if self._par:
             pool = multiprocessing.Pool(processes=self.n_cores)
-            expressed_genes = pool.starmap(create_expressed_gene,
+            expressed_genes = pool.starmap(self.create_expressed_gene,
                                 zip(hgnc_ids.keys(), hgnc_ids.values()))
             pool.close()
             pool.join()
             gc.collect()
             self.expressed_genes = {g.hgnc_id: g for g in expressed_genes}
         else:
-            self.expressed_genes = {hgnc_id: create_expressed_gene(hgnc_id, relat_objects) for hgnc_id, relat_objects in
+            self.expressed_genes = {hgnc_id: self.create_expressed_gene(hgnc_id, relat_objects) for hgnc_id, relat_objects in
                                     tqdm(hgnc_ids.items())}
+    # def __getstate__(self):
+
+    #     # this method is called when you are
+    #     # going to pickle the class, to know what to pickle
+    #     state = self.__dict__.copy()
+
+    #     return state
+    
+    # def __setstate__(self, state):
+    #     self.__dict__.update(state)
 
     def knock_out_gene(self, hgnc_id: str, inplace: bool = False):
         """Knocks out a gene by blocking flux through synthesis of the associated mRNA molecule

@@ -53,6 +53,8 @@ def read_metabolic_model(file_name: str) -> cobra.Model:
     with HiddenPrints():
         m_model = cobra.io.read_sbml_model(file_name)
         _correct_sbml_bounds(m_model)
+        if hasattr(m_model, '_sbml') and 'created' in m_model._sbml: # SwigPy Object pickling
+            del m_model._sbml['created']
 
     return m_model
 
