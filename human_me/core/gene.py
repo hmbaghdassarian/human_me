@@ -311,7 +311,7 @@ class ExpressedGene:
                 raise ValueError('Multiple ' + 'lariats' + ' assigned to ' + self.hgnc_id)
             self.macromolecules['RNA']['lariat'] = m.id
         elif m.type == 'premrna':
-            if self.macromolecules['premrna'] is not None:
+            if self.macromolecules['RNA']['premrna'] is not None:
                 raise ValueError('Multiple ' + 'premrna' + ' assigned to ' + self.hgnc_id)
             self.macromolecules['RNA']['premrna'] = m.id
         elif m.type == 'mrna':

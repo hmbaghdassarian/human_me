@@ -787,6 +787,7 @@ class ME_Model(cobra.Model):
     @staticmethod
     def create_expressed_gene(hgnc_id: str, relat_objects) -> ExpressedGene:
         """Create the ExpressedGene objects associated with the reaction."""
+        print(hgnc_id)
         g = ExpressedGene(hgnc_id)
         for m in relat_objects['macromolecules']:
             g.add_macromolecule(m)
