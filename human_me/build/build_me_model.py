@@ -962,7 +962,7 @@ class MEBuilder:
             raise ValueError('Not all metabolic reactions that require machinery have been accounted for')
         if self.orphan_dummy_protein is None:
             self.orphan_reactions = [to_metabolic_reaction(model_metabolites=self.model_metabolites, reaction=r) for r in self.m_model.reactions if len(r.genes) == 0]
-            final_reactions += self.orphan
+            final_reactions += self.orphan_reactions
             self.deorphaned_reactions = list()
         self.final_reactions = final_reactions
 

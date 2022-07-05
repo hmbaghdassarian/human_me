@@ -827,11 +827,23 @@ class ME_Model(cobra.Model):
         if self._par:
             pool = multiprocessing.Pool(processes=self.n_cores)
             expressed_genes = pool.starmap(self.create_expressed_gene,
-                                zip(hgnc_ids.keys(), hgnc_ids.values()))
+                    zip(hgnc_ids.keys(), hgnc_ids.values()))
             pool.close()
             pool.join()
             gc.collect()
             self.expressed_genes = {g.hgnc_id: g for g in expressed_genes}
+            # try:
+            #     expressed_genes = pool.starmap(self.create_expressed_gene,
+            #                         zip(hgnc_ids.keys(), hgnc_ids.values()))
+            #     pool.close()
+            #     pool.join()
+            #     gc.collect()
+            #     self.expressed_genes = {g.hgnc_id: g for g in expressed_genes}
+            # except:
+            #     pool.close()
+            #     pool.join()
+            #     gc.collect()
+            #     raise ValueError('Parallelization failed')
         else:
             self.expressed_genes = {hgnc_id: self.create_expressed_gene(hgnc_id, relat_objects) for hgnc_id, relat_objects in
                                     tqdm(hgnc_ids.items())}
