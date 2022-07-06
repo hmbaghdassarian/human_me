@@ -251,7 +251,7 @@ def check_non_machinery(non_machinery: Optional[Dict[str, List[str]]] = None) ->
     for hgnc_id, compartments in non_machinery.items():
         if not hgnc_id.startswith('HGNC:'):
             raise ValueError('All non-machinery must be in HGNC ID format')
-        non_machinery[hgnc_id] = list(set(compartments).difference(compartments_me.keys()))
+        non_machinery[hgnc_id] = list(set(compartments).intersection(compartments_me))
 
     return non_machinery
 
