@@ -945,11 +945,10 @@ class MEBuilder:
                 reactions = [r]
 
             # if multiple of the same reaction with different machinery due to OR GPR, add a different id for each
-            if self.complex_df.loc[i, 'creates_multiple_reactions']:
-                if len(reactions) > 1:
-                    for j, r_ in enumerate(reactions):
-                        r_.id = r_.id + '_' + str(reaction_counter[reaction_id])
-                        reactions[j] = r_
+            if self.complex_df.loc[i, 'creates_multiple_reactions'] and not self.minimal_proteome:
+                for j, r_ in enumerate(reactions):
+                    r_.id = r_.id + '_' + str(reaction_counter[reaction_id])
+                    reactions[j] = r_
                 if reaction_counter[reaction_id] == 0:  # tracking that all metabolic reactions are added
                     metabolic_reactions.remove(reaction_id)
                 reaction_counter[reaction_id] += 1
@@ -1045,11 +1044,10 @@ class MEBuilder:
                     reactions = [r_f, r_r]
 
                 # if multiple of the same reaction with different machinery due to OR GPR, add a different id for each
-                if self.complex_df.loc[i, 'creates_multiple_reactions']:
-                    if len(reactions) > 1:
-                        for j,r_ in enumerate(reactions):
-                            r_.id = r_.id + '_' + str(reaction_counter[reaction_id])
-                            reactions[j] = r_
+                if self.complex_df.loc[i, 'creates_multiple_reactions'] and not self.minimal_proteome:
+                    for j,r_ in enumerate(reactions):
+                        r_.id = r_.id + '_' + str(reaction_counter[reaction_id])
+                        reactions[j] = r_
                     reaction_counter[reaction_id] += 1
                 self.final_reactions += reactions
 
