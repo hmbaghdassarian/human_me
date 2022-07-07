@@ -23,7 +23,7 @@ LICENSE = 'MIT'
 VERSION = '0.1.0'
 ISRELEASED = False
 
-PYTHON_MIN_VERSION = '3.6'
+PYTHON_MIN_VERSION = '3.7'
 PYTHON_MAX_VERSION = '3.9'
 PYTHON_REQUIRES = f'>={PYTHON_MIN_VERSION}, <={PYTHON_MAX_VERSION}'
 
@@ -64,7 +64,7 @@ metadata = dict(
     long_description_content_type="text/markdown",
     long_description=long_description,
     url='https://github.com/hmbaghdassarian/human_me',  # homepage
-    packages=find_packages(include=('human_me*')),  # PACKAGES
+    packages=find_packages(include=('human_me*'), exclude=('*test*',)),  # PACKAGES
     scripts=['install_solver.py'],
     project_urls={'Documentation': 'https://hmbaghdassarian.github.io/human_me/'},
     # py_modules=['io'],
