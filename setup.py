@@ -28,6 +28,8 @@ PYTHON_MAX_VERSION = '3.9'
 PYTHON_REQUIRES = f'>={PYTHON_MIN_VERSION}, <={PYTHON_MAX_VERSION}'
 
 INSTALL_REQUIRES = [
+    'cppy==1.2.0',
+    'kiwisolver==1.3.1'
     'pathos==0.2.7',
     'cmake==3.18.2',
     'cython==0.29.20',
@@ -63,9 +65,9 @@ metadata = dict(
     long_description=long_description,
     url='https://github.com/hmbaghdassarian/human_me',  # homepage
     packages=find_packages(include=('human_me*')), # PACKAGES
-    scripts=['install_solver.py'], 
+    scripts=['install_solver.py'],
     project_urls = {'Documentation': 'https://hmbaghdassarian.github.io/human_me/'},
-    # py_mopdules=['io'],
+    # py_modules=['io'],
     python_requires=PYTHON_REQUIRES,
     install_requires=INSTALL_REQUIRES,
     classifiers=[CLASSIFIERS],
