@@ -41,7 +41,7 @@ class ME_Model(cobra.Model):
     # overriden methods------------------------------------------------------------------------------------------------
     def __init__(self, id_or_model, name: Optional[str] = None, m_model: Optional[cobra.Model] = None,
                  n_cores: int = os.cpu_count(),
-                 non_machinery: Dict[str, List[str]] = None, knock_out: Optional[List[str]] = None, additional_ko: List[str] = None):
+                 non_machinery: Dict[str, List[str]] = None, knock_out: Optional[List[str]] = None):
         """Initialize method for ME_Model class.
 
         Parameters
@@ -63,10 +63,6 @@ class ME_Model(cobra.Model):
             *Note: you may want to instead knock-out during building if setting minimal_proteome = True and knocking out a
             gene that participates in a OR GPR rule (in case it is the one that is selected); otherwise
             me_model.knock_out() method should suffice, by default None
-        additional_ko : List[str], optional
-            a list of HGNC IDs for genes that were not explicitly knocked-out, but were only involved in catalysis of
-            reactions catalyzed by a complex which contains another gene that was knocked-out, by default None
-            this list is generated in build_me_model/me_builder
 
         Returns
         -------
@@ -100,11 +96,6 @@ class ME_Model(cobra.Model):
             self.knock_out = list()
         else:
             self.knock_out = knock_out
-
-        if additional_ko is None:
-            self.additional_ko = list()
-        else:
-            self.additional_ko = additional_ko
 
         if non_machinery is None:
             self.non_machinery = dict()
@@ -659,7 +650,7 @@ class ME_Model(cobra.Model):
                 else:
                     expected_machinery2.append(em)
 
-            if len(set(expected_machinery2).difference(self.knock_out + self.additional_ko)) == 0:
+            if len(set(expected_machinery2).difference(self.knock_out)) == 0:
                 ko = True
 
             if (not hasattr(r_, 'coupled_metabolites') or 'catalysis' not in r_.coupled_metabolites.values()) and not ko:
@@ -755,7 +746,7 @@ class ME_Model(cobra.Model):
         ub_genes = ['HGNC:12463', 'HGNC:12468']
         unmodeled_protein = ['HGNC:DUMMYUNMODELED']
 
-        all_proteins = active_proteins + unmodeled_protein + self.additional_ko + ub_genes + list(self.non_machinery.keys())
+        all_proteins = active_proteins + unmodeled_protein + ub_genes + list(self.non_machinery.keys())
         if len(set(proteins).difference(all_proteins)) > 0:
             raise ValueError('Unexpected inclusion of inactive protein monomers')
 
@@ -787,7 +778,6 @@ class ME_Model(cobra.Model):
     @staticmethod
     def create_expressed_gene(hgnc_id: str, relat_objects) -> ExpressedGene:
         """Create the ExpressedGene objects associated with the reaction."""
-        print(hgnc_id)
         g = ExpressedGene(hgnc_id)
         for m in relat_objects['macromolecules']:
             g.add_macromolecule(m)

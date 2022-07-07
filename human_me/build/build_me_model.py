@@ -93,16 +93,6 @@ class MEBuilder:
                 del non_machinery[exception]
         self.non_machinery = non_machinery
 
-        if knock_out is None:
-            self.knock_out = list()
-        else:
-            self.knock_out = knock_out
-        if len(set(self.knock_out).intersection(mach.expression_machinery)) > 0:
-            raise ValueError(
-                'Knock outs can only be applied to metabolic machinery and non-machinery, not expression machinery')
-        if len(set(self.knock_out).intersection(self.non_machinery)) > 0:
-            raise ValueError('Speficied knocking out of genes that are also specified to be expressed as non-machinery')
-
         # all parameters that use psim_me as input
         self.psim_me = load_psim(psim_me)
         psim_rib = set_ribosomal_psim(self.psim_me)
@@ -111,6 +101,32 @@ class MEBuilder:
         self.m_model = load_metabolic_model(m_model)
         self.metabolic_machinery, self.all_machinery = mach.get_model_machinery(self.m_model)
         self.model_metabolites = MetaboliteBin(self.m_model)
+
+        if knock_out is None:
+            self.knock_out = list()
+        else:
+            # can only knock out exclusively metabolic machinery
+            self.knock_out = set(knock_out).intersection(self.metabolic_machinery).difference(mach.expression_machinery + list(self.non_machinery))
+            
+            # additionaly ko genes that only catalyze reactions in complex with user-specified knock-out genes
+            knock_out_reactions = list()
+            for hgnc_id in self.knock_out:
+                    knock_out_reactions += [r.id for r in self.m_model.genes.get_by_id(hgnc_id).reactions]
+            gene_complexes = list()
+            for r_id in knock_out_reactions:
+                    reaction = self.m_model.reactions.get_by_id(r_id)
+                    gene_complexes += parse_complex.eval_complex(reaction.gene_reaction_rule)
+            complexed_with_ko = set()
+            for gc in gene_complexes:
+                    if type(gc) == list and len(self.knock_out.intersection(gc))>0:
+                            complexed_with_ko = complexed_with_ko.union({hgnc_id for hgnc_id in gc if hgnc_id not in self.knock_out})
+            only_complexed_with_ko = set()
+            for hgnc_id in complexed_with_ko:
+                    not_ko = [gc for gc in gene_complexes if type(gc) == list and hgnc_id in gc and len(self.knock_out.intersection(gc)) == 0]
+                    if len(not_ko) == 0:
+                            only_complexed_with_ko.add(hgnc_id)
+            
+            self.knock_out = sorted(self.knock_out.union(only_complexed_with_ko))
 
         self.context_specific_SASA = context_specific_SASA
 
@@ -207,9 +223,8 @@ class MEBuilder:
             if hgnc_id not in gene_reaction_map:
                 gene_reaction_map[hgnc_id] = None
 
-        iterable = sorted(set(self.loop_machinery).difference(
-            self.knock_out))  # sorted so seeds are consistent; probably unecessary given the gene seed map but keeping
-        #         if not self._par:
+        iterable = sorted(set(self.loop_machinery).difference(self.knock_out))  # sorted so seeds are consistent; probably unecessary given the gene seed map but keeping
+
         for hgnc_id in tqdm(iterable):
             nml = list()
             if hgnc_id in self.non_machinery:
@@ -255,7 +270,7 @@ class MEBuilder:
         #             self.me_reactions += func.flatten_list(expr_reactions)
         #             del expr_reactions
 
-        for hgnc_id in sorted(self.knock_out):
+        for hgnc_id in self.knock_out:#sorted(set(self.knock_out).intersection(gene_reaction_map)):
             # None bc will add later for expression model specific to this
             expr_reactions, protein_metabolites = get_all_expression_reactions(model_metabolites = self.model_metabolites, 
                                                                                 hgnc_id=hgnc_id,
@@ -596,17 +611,9 @@ class MEBuilder:
         self.complex_formation_reactions = list()  # store all complex formation reactions
         complex_degradation_reactions = list()
 
-        retain = list(set(func.flatten_list(
-            [i.split(';') for i in unique_complexes[~unique_complexes.knock_out.astype(bool)].machinery.tolist()])))
-        self.additional_ko = list()
-
         counter = 0
         for i in tqdm(unique_complexes.index):
             ko = unique_complexes.loc[i, 'knock_out']
-            if ko:
-                # get the  genes that are only expressed to participate as part of a complex that is knocked out
-                self.additional_ko += list(
-                    set(unique_complexes.loc[i, 'machinery'].split(';')).difference(retain + self.knock_out))
             complex_id = unique_complexes.loc[i, 'complex_id']
             compartment = unique_complexes.loc[i, 'compartment']
             machinery = unique_complexes.loc[i, 'machinery'].split(';')
@@ -707,18 +714,6 @@ class MEBuilder:
         #         err = 'Internal: Expected no additional machinery'
         #         print(err)
         #         raise ValueError('See internal error message above')
-
-        # if want, in the future, can back-track and remove associated expression reactions with these
-        self.additional_ko = list(set(self.additional_ko))
-        # #started some code for this:
-        # for hgnc_id in additional_ko:
-        #     if len(self.id_protein_map[hgnc_id])>1:
-        #         err = 'Internal: Have not accounted for scenario where knocked out complex has an associated gene'
-        #         err = 'that was not explicitly knocked out but '
-        #         raise ValueError(err)
-        #     else:
-        #         self._ko_protein_map[hgnc_id] = self.id_protein_map.pop(hgnc_id)
-        #         # remove expression reactions...
 
     def get_keff(self):
         """Estimate the keff of all enzymes."""
@@ -1339,8 +1334,7 @@ class MEBuilder:
 
         print('Generate ME-Model')
         me_model = ME_Model(m_model=self.m_model, id_or_model=self.model_id, n_cores=self.n_cores,
-                            knock_out=self.knock_out, non_machinery=self.non_machinery,
-                            additional_ko=self.additional_ko)
+                            knock_out=self.knock_out, non_machinery=self.non_machinery)
 
         # note, at end of .add_reactions() method, we reassign .coupled_metabolites attribute
         # running .add_metabolic_reactions() code outside of ME_Builder object doesn't create disagreement
@@ -1404,7 +1398,8 @@ def build_me(me_input_model: Union[cobra.Model,str],
         keys are HGNC IDs, values are a list wherein element represents a compartment within the model for the gene to be expressed, by default None
         We define machinery as proteins that are utilized in the reaction GPRs. In its current format, it is not possible for a protein to both be machinery and non-machinery
     knock_out : List[str], optional
-        each element is the HGNC ID of a gene expressed in the model which should be knocked out, by default None
+        each element is the HGNC ID of a gene expressed in the metabolic model which should be knocked out, by default None
+        this option can only be applied to metabolic enzymes, not expression machinery
         *Note: you may want to knock-out during building if setting minimal_proteome = True and knocking out a 
         gene that participates in a OR GPR rule (in case it is the one that is selected by minimal proteome); otherwise ME_Model.knock_out() method should suffice
     deorphan : bool, optional
