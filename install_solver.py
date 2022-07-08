@@ -3,7 +3,6 @@ import os
 import sys
 import shutil
 
-
 root_path = os.path.abspath(os.path.dirname(__file__))
 lib_a_map = {'minos56': 'minos', 'qminos56': 'quadminos'}
 def install_qminos(solver_path: str = root_path + 'solver/'):
@@ -38,6 +37,10 @@ def install_qminos(solver_path: str = root_path + 'solver/'):
         # STEP 4: transfer files from qminos to solvemepy 
         shutil.copy2(src=os.path.join(solver_path, 'qminos1114', dir_m, 'lib/lib' + lib_a_map[dir_m] + '.a'), 
                     dst=os.path.join(solver_path, 'solvemepy'))
+
+    os.chdir(os.path.join(solver_path, 'solvemepy'))
+    os.system('python ' + os.path.join(solver_path, 'solvemepy/setup.py') + ' develop')
+    os.chdir(root_path)
 
 def install_solver_(solver_path: str = root_path + 'solver/', solver_type = 'qminos'):
     if solver_type == 'qminos':

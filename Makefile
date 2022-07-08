@@ -19,7 +19,7 @@ help:
 # solver path is the parent directory that should contain the qminos.tar.gz file
 install-qminos:
 	${PYTHON} install_solver.py ${SOLVER_PATH} ${SOLVER_TYPE}
-	${PYTHON} ${SOLVER_PATH}/solvemepy/setup.py develop
+#	${PYTHON} ${SOLVER_PATH}solvemepy/setup.py develop
 
 # make DATA_DIR=/data3/hratch/test_data PREBUILD=0 build-data
 build-data:
