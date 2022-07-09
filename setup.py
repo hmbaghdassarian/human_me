@@ -28,7 +28,7 @@ PYTHON_MAX_VERSION = '3.9'
 PYTHON_REQUIRES = f'>={PYTHON_MIN_VERSION}, <={PYTHON_MAX_VERSION}'
 
 INSTALL_REQUIRES = [
-    'pathos==0.2.7',
+    'pathos==0.2.9',
     'cppy==1.2.0',
     'kiwisolver==1.3.1',
     'gdown==4.4.0',
@@ -45,8 +45,7 @@ INSTALL_REQUIRES = [
     'matplotlib==3.3.4',
     'seaborn==0.11.2',
     'biopython==1.79',
-    'Faker==8.5.1',
-
+    'Faker==8.5.1'
 ]
 
 PACKAGES = [
