@@ -18,6 +18,7 @@
 # **/.isort.cfg
 # **/.pydocstyle
 human_me/data/data.ini
+human_me/data/test_data.ini
 
 *.env
 .env_template

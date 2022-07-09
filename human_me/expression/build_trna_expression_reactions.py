@@ -352,7 +352,8 @@ def get_base_frequency(seq_col, t_length):
     return final_seq
 
 
-trna_data = pd.read_excel(build_files_url + 'trna_leaders_and_trailers.xlsx')
+trna_data = pd.read_excel(build_files_url + 'trna_leaders_and_trailers.xlsx', 
+            engine='openpyxl')
 trna_data['Mature_Length'] = trna_data['mature seq'].apply(lambda x: len(x))
 
 L_mature = trna_data.Mature_Length.value_counts()[

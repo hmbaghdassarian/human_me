@@ -45,7 +45,8 @@ INSTALL_REQUIRES = [
     'matplotlib==3.3.4',
     'seaborn==0.11.2',
     'biopython==1.79',
-    'Faker==8.5.1'
+    'Faker==8.5.1', 
+    'openpyxl==3.0.10'
 ]
 
 PACKAGES = [
