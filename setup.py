@@ -34,7 +34,7 @@ INSTALL_REQUIRES = [
     'gdown==4.4.0',
     'cmake==3.18.2',
     'cython==0.29.20',
-    'multiprocess==0.70.11.1',
+    'multiprocess==0.70.13',
     'numpy==1.19.5',
     'pandas==1.1.5',
     'scipy==1.5.4',
