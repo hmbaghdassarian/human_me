@@ -7,7 +7,7 @@ After pip installing, this can be found as follows in Python:
 
 ```python
 import human_me
-print(human_me.__file__)
+print(human_me.__path__)
 ```
 
 ## Step 1-2: Creating the Environment
@@ -122,11 +122,14 @@ Larger files need to be downloaded directly from public Google Drive files. This
 make -C <path/to/human_me/> build-data DATA_DIR=</desired/local_data/directory>
 ```
 
+Downloading the build files will take ~30 min, as the PSIM file is > 10 Gb.
+
 If you also want to download the prebuild files, run the following command:
 ```console
 make -C <path/to/human_me/> build-data DATA_DIR=</desired/local_data/directory> PREBUILD=1
 ```
-The user-specificed local data directory is stored in a human_me/data/data.ini config file. 
+The user-specificed local data directory is stored in a human_me/data/data.ini config file.  
+
 ### Input File Descriptions
 1. M_Model: a cobrapy metabolic model in sbml format. We highly recommend Recon2.2 or a context-specific metabolic model generated from Recon2.2, as this is the only model the pipeline has been tested on. Our "inputs" directory provides a version of Recon2.2 with minor modifications to work with the ME-Model building pipeline. Alternatively, you can use the preprocess.correct_inputs.correct_model function on your metabolic model to introduce these modifications. 
 2. PSIM: see the [doumentation](https://hmbaghdassarian.github.io/human_me/) for details. If a user does not provide a PSIM, either directly into the function as a datatable or via data/inputs/psim_user, the default input PSIM is data/build/psim_gold.h5 (the gold-standard PSIM). 

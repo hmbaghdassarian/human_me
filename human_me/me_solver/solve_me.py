@@ -8,6 +8,7 @@ import time
 import warnings
 from collections import OrderedDict
 from typing import Any, Dict, List, Optional, SupportsFloat
+# from itertools import repeat
 
 import cobra
 from cobra.util.array import create_stoichiometric_matrix
@@ -17,6 +18,7 @@ import numpy as np
 import pandas as pd
 import scipy
 import seaborn as sns
+# from multiprocessing import Pool
 from pathos.multiprocessing import ProcessingPool as Pool
 from qminospy.solver import QMINOS  # need solveME (https://github.com/SBRG/solvemepy) installed and working
 from tqdm import tqdm
@@ -307,7 +309,7 @@ class qminosSolver:
                 'Currently, NLP objectives must be either only maximization or minimization (only all 1s or only all -1s in objective dictionary values)')
 
         growth_vals = np.arange(0, mu_max + mu_max / n_points, mu_max / (n_points - 1))
-        if (n_cores <= 1) or (n_cores is None):
+        if (n_cores is None) or (n_cores <= 1):
             res = list()
             for mu_val in tqdm(growth_vals):
                 sln, stat, hsq = self.solve_lp(me_model=me_model, mu_val=mu_val, objective=objective,
@@ -316,10 +318,11 @@ class qminosSolver:
                 res.append([sln, stat, hsq])
         else:
             n_cores = min([n_cores, n_points])
-            #         args_ = zip([me_model]*n_points, list(growth_vals), [objective]*n_points, [tolerance]*n_points,
-            #                    [True]*n_points)
             pool = Pool(n_cores)
             try:
+                # res = pool.starmap(self.solve_lp, 
+                #                     zip(repeat(me_model), list(growth_vals), repeat(objective), repeat(tolerance), 
+                #                     repeat(True)))
                 res = pool.map(self.solve_lp, [me_model] * n_points, list(growth_vals), [objective] * n_points,
                                [tolerance] * n_points,
                                [True] * n_points)

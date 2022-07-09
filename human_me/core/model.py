@@ -461,7 +461,7 @@ class ME_Model(cobra.Model):
         return mu_max, res
 
     def optimize(self, objective: Dict[str, int], mu_max: SupportsFloat, n_points: int = 10,
-                 tolerance: SupportsFloat = 0, n_cores: Optional[int] = None, visualize: bool = True, fig_name: str = None):
+                 tolerance: SupportsFloat = 0, visualize: bool = True, fig_name: str = None):
         """General optimization of any non-growth objective.
 
         Parameters
@@ -477,8 +477,6 @@ class ME_Model(cobra.Model):
             # of growth values to consider between 0 and mu_max, by default 10
         tolerance : SupportsFloat, optional
             Threshold below which expected sensitivity of solver is too low to detect infeasibility, by default 0
-        n_cores : Optional[int], optional
-            the number of workers to use for parallelization, by default None
         visualize : bool, optional
             plot the relationship between growth and the objective function of interest, by default True
         fig_name : Optional[str], optional
@@ -510,7 +508,7 @@ class ME_Model(cobra.Model):
         sln, predicted, interp_fit, optimal_vals, res = self.solver_.optimize(me_model=self, objective=objective,
                                                                               mu_max=mu_max, n_points=n_points,
                                                                               tolerance=tolerance,
-                                                                              n_cores=n_cores, visualize=visualize,
+                                                                              n_cores=self.n_cores, visualize=visualize,
                                                                               fig_name=fig_name)
         return sln, predicted, interp_fit, optimal_vals, res
 
