@@ -2,8 +2,8 @@
 
 These provide additional details and alternate installation instructions for setting up the human_me environment and qMINOS solver
 
-Note, throughout the instructions we will refer to "path/to/human_me" as the root path to the package directory. 
-After pip installing, this can be found as follows in Python:
+Note, throughout the instructions we will refer to "path/to/human_me" as the root path to the package directory stored within your virtual environment.
+After pip installing, this can be found as follows in Python: <env_name>/lib/python3.7/site-packages/human_me-0.1.0-py3.7.egg/human_me
 
 ```python
 import human_me
