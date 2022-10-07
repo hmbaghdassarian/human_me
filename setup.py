@@ -50,6 +50,9 @@ INSTALL_REQUIRES = [
     'tables==3.6.1' # needed but errors out unless just pip install after
 ]
 
+EXTRAS_REQUIRES = {'interactive': ['jupyter', 'ipykerne']
+                  }
+
 PACKAGES = [
     'human_me'
 ]
@@ -72,6 +75,7 @@ metadata = dict(
     # py_modules=['io'],
     python_requires=PYTHON_REQUIRES,
     install_requires=INSTALL_REQUIRES,
+    extras_require=EXTRAS_REQUIRES,
     classifiers=[CLASSIFIERS],
     license=LICENSE
 )
