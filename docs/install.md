@@ -19,6 +19,7 @@ This can be done as follows:
 python3 -m venv <env_name> #--python=python3.6.9
 source <env_name>/bin/activate
 ```
+Make sure this virtual environment has Python 3.7-3.9 and setuptools >= 65.4.
 
 human_me can be installed using pip and PyPi:
 ```console
