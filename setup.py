@@ -34,6 +34,8 @@ INSTALL_REQUIRES = [
     'gdown==4.4.0',
     'cmake==3.18.2',
     'cython==0.29.20',
+    'tables==3.7.0',
+    'h5py==3.7.0'
     'multiprocess==0.70.13',
     'numpy==1.19.5',
     'pandas==1.1.5',
@@ -46,7 +48,7 @@ INSTALL_REQUIRES = [
     'seaborn==0.11.2',
     'biopython==1.79',
     'Faker==8.5.1', 
-    'openpyxl==3.0.10'
+    'openpyxl==3.0.10',
 ]
 
 PACKAGES = [
