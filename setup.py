@@ -35,7 +35,7 @@ INSTALL_REQUIRES = [
     'cmake==3.18.2',
     'cython==0.29.20',
     'tables==3.7.0',
-    'h5py==3.7.0'
+    'h5py==3.7.0',
     'multiprocess==0.70.13',
     'numpy==1.19.5',
     'pandas==1.1.5',
