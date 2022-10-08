@@ -120,7 +120,7 @@ def create_constant_component_formation(model_metabolites,
         biomass_component_formation = BiomassReaction(biomass_type + '_biomass_formation')
 
         rxn = {biomass_metabolite: mass_fraction[biomass_type]}
-        if biomass_type != 'other':
+        if biomass_coefficients[biomass_type] is not None:
             for metabolite_id, coef in biomass_coefficients[biomass_type].items():
                 rxn[model_metabolites.__dict__[metabolite_id]] = coef*mass_fraction[biomass_type]
         biomass_component_formation.add_metabolites(rxn)

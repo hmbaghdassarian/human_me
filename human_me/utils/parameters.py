@@ -90,7 +90,8 @@ class BiomassParameters:
                                         'pe_hs_c': -0.26003066413425396,
                                         'pglyc_hs_c': -0.01368384720784515,
                                         'sphmyln_hs_c': -0.08211247504336976,
-                                        'ps_hs_c': -0.02737239031383982}
+                                        'ps_hs_c': -0.02737239031383982}, 
+                             'other': None
                             }
 biomass_parameters = BiomassParameters()
 #TODO: implement an unmodeled protein fraction 
