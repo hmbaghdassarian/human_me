@@ -122,7 +122,7 @@ def create_constant_component_formation(model_metabolites,
         rxn = {biomass_metabolite: mass_fraction[biomass_type]}
         if biomass_coefficients[biomass_type] is not None:
             for metabolite_id, coef in biomass_coefficients[biomass_type].items():
-                rxn[model_metabolites.__dict__[metabolite_id]] = coef*mass_fraction[biomass_type]
+                rxn[model_metabolites.id_object_map[metabolite_id]] = coef*mass_fraction[biomass_type]
         biomass_component_formation.add_metabolites(rxn)
         biomass_component_formation._lower_bound, biomass_component_formation._upper_bound = params.mu, params.mu
 

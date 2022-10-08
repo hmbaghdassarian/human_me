@@ -100,7 +100,7 @@ class MEBuilder:
         # all parameters that use m_model as input
         self.m_model = load_metabolic_model(m_model)
         self.metabolic_machinery, self.all_machinery = mach.get_model_machinery(self.m_model)
-        self.model_metabolites = MetaboliteBin(self.m_model)
+        self.model_metabolites = MetaboliteBin(me_input_model = self.m_model)
 
         if knock_out is None:
             self.knock_out = list()
@@ -137,7 +137,7 @@ class MEBuilder:
         self.unmodeled_protein_fraction = unmodeled_protein_fraction
         self.unmodeled_dummy_protein = None
         total_protein_formation = biomass.create_total_protein_formation(unmodeled_protein_fraction = self.unmodeled_protein_fraction)
-        self.biomass_reactions= biomass.biomass_reactions + [total_protein_formation] + \
+        self.biomass_reactions = biomass.biomass_reactions + [total_protein_formation] + \
                                 biomass.create_constant_component_formation(model_metabolites = self.model_metabolites, 
                                                                             mass_fraction = mass_fraction, biomass_coefficients = biomass_coefficients)
         
