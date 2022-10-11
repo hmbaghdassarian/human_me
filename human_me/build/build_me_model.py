@@ -1097,7 +1097,8 @@ class MEBuilder:
                                      len(r.genes) == 0] + self.complex_formation_reactions
             if self.deg_args['complex_degradation']:
                 enzymeless_reactions += [r for r in self.complex_degradation_reactions if len(r.genes) == 0]
-            boundary_ids = [r.id for r in self.m_model.exchanges + self.m_model.demands]
+            demand_ids = [r.id for r in self.m_model.demands]
+            boundary_ids = [r.id for r in self.m_model.exchanges] + demand_ids
 
             if len(set([r.id for r in enzymeless_reactions]).intersection([r.id for r in self.final_reactions])) > 0:
                 raise ValueError('Incorrect parsing of reaction lists for dummy protein')
@@ -1108,8 +1109,9 @@ class MEBuilder:
             _orphan = list()
             for r in self.orphan_reactions:  # secondary exchange reactions
                 if len(r.metabolites) > 1 or list(r.metabolites)[0].compartment != 'b':
-                    raise ValueError(
-                        'Incorrectly formatted exchange reaction: ' + r.id + '. Must follow Recon2.2 format.')
+                    if r.id not in demand_ids: # demands don't meet the aforementions requirement
+                        raise ValueError(
+                            'Incorrectly formatted exchange reaction: ' + r.id + '. Must follow Recon2.2 format.')
 
                 assoc_rxn = [r_.id for r_ in list(list(self.m_model.reactions.get_by_id(r.id).metabolites)[0].reactions)]
                 assoc_rxn.remove(r.cobra_id)
