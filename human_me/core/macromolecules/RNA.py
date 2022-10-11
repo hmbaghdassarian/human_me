@@ -92,8 +92,9 @@ class RNA(Macromolecule):
         rna_synthesis.add_metabolites(rxn)
         rna_synthesis.gene_reaction_rule = synth_mach_map[self.type]
 
-        if len(rna_synthesis.check_mass_balance()) > 0:
-            raise ValueError('RNA synthesis for ' + id_ + ' is unbalanced')
+        cmb = rna_synthesis.check_mass_balance()
+        if len(cmb) > 0:
+            raise ValueError('RNA synthesis for ' + id_ + ' is unbalanced with a balance of: ' + str(cmb))
         if list(rna_synthesis.compartments) != ['n']:
             raise ValueError('RNA synthesis must be confined to nuclear compartment')
         return rna_synthesis
