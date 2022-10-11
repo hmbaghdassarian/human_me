@@ -486,3 +486,46 @@ def correct_psim(me_input_model: Union[cobra.Model, str],
     del psim_gold
 
     return psim_me, non_machinery, revised_genes
+
+def format_exchanges(m_model):
+    """Formats typical exchange reactions (transport across ECM) as those in recon2.2 (LPAREN_e_RPAREN_, transport across boundary)
+    for the input metabolic model. 
+
+    Parameters
+    ----------
+    m_model : cobra Model
+        model to format
+    """
+    rm = []
+    for er_e in m_model.exchanges:
+        if len(er.metabolites) != 1:
+            raise ValueError('Unexpected metabolites')
+        em_e = list(er_e.metabolites)[0]
+
+        # make the exchange reaction with the boundary rather than ECM
+        em_b = em_e.copy()
+        em_b.compartment = 'b'
+        em_b.id = '_'.join(em_b.id.split('_')[:-1]) + '_b'
+        m_model.add_metabolites([em_b])
+
+        er_b_metabolites = dict()
+        for metab, coef in er_e.metabolites.items():
+            if metab.id != em_e.id:
+                er_b_metabolites[metab] = coef
+            else:
+                er_b_metabolites[em_b] = coef
+
+        er_b = cobra.Reaction(id = '_'.join(er_e.id.split('_')[:-1]) + '_b', 
+                             name = '_'.join(er_e.id.split('_')[:-1]) + '_b', 
+                             lower_bound = er_e.lower_bound, upper_bound = er_e.upper_bound)
+        m_model.add_reactions([er_b])
+        er_b.add_metabolites(er_b_metabolites)
+
+        er_e_2 = cobra.Reaction(id = '_'.join(er_b.id.split('_')[:-1]) + '_LPAREN_e_RPAREN_', 
+                               name = er_e.name, 
+                               lower_bound = -1000, upper_bound = 1000)
+        m_model.add_reactions([er_e_2])
+        er_e_2.add_metabolites({em_e: -1, em_b: 1})
+
+        rm.append(er_e)
+    m_model.remove_reactions(rm, remove_orphans=True)
