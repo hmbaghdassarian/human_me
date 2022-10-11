@@ -498,7 +498,7 @@ def format_exchanges(m_model):
     """
     rm = []
     for er_e in m_model.exchanges:
-        if len(er.metabolites) != 1:
+        if len(er_e.metabolites) != 1:
             raise ValueError('Unexpected metabolites')
         em_e = list(er_e.metabolites)[0]
 
