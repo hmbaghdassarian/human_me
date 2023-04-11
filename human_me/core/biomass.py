@@ -192,7 +192,7 @@ def add_biomass_change(reaction: cobra.Reaction, inplace: bool = True) -> Union[
     else:
         return biomass_change_
 
-def check_m_biomass(m_model: cobra.Model):
+def check_m_biomass(m_model: cobra.Model, biomass_reaction_id: str = 'biomass_reaction'):
     """Performs sanity checks on biomass objective of metabolic model.
     If using Recon2.2 biomass formulation, this will give warnings. If warnings are given, we recommend using our correct_m_biomass function.
 
@@ -201,11 +201,11 @@ def check_m_biomass(m_model: cobra.Model):
     m_model : cobra.Model
         the metabolic model to check. Expect biomass formatting to be consistent with Recon2.2 (especially with regards to reaction and metabolite IDs)
     """
-    total_mass = abs(sum([coef for coef in m_model.reactions.biomass_reaction.metabolites.values() if coef < 1]))
+    total_mass = abs(sum([coef for coef in m_model.reactions.get_by_id(biomass_reaction_id).metabolites.values() if coef < 1]))
     if total_mass != 1:
         warnings.warn('The total mass fraction does not sum to 1')
 
-    # do the substrats for component formation add up to 1g?
+    # do the substrates for component formation add up to 1g?
     wrn = False
     tol = 10
     for biomass_type in ['lipid', 'DNA', 'carbohydrate']:
