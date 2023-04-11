@@ -48,13 +48,8 @@ INSTALL_REQUIRES = [
     'Faker==8.5.1',
     'openpyxl==3.0.10',
     'tables==3.6.1',
-<<<<<<< HEAD
-    'numexpr==2.7.3', 
-    #'swiglpk==5.0.5'
-=======
     'numexpr==2.7.3'
 #   'swiglpk==5.0.5'
->>>>>>> dev
 ]
 
 EXTRAS_REQUIRES = {'interactive': ['jupyter', 'ipykerne']
