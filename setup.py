@@ -45,9 +45,11 @@ INSTALL_REQUIRES = [
     'matplotlib==3.3.4',
     'seaborn==0.11.2',
     'biopython==1.79',
-    'Faker==8.5.1', 
+    'Faker==8.5.1',
     'openpyxl==3.0.10',
-    'tables==3.6.1' # needed but errors out unless just pip install after
+    'tables==3.6.1',
+    'numexpr==2.7.3'
+#   'swiglpk==5.0.5'
 ]
 
 EXTRAS_REQUIRES = {'interactive': ['jupyter', 'ipykerne']
