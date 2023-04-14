@@ -91,9 +91,9 @@ def correct_model(model_file: Union[cobra.Model, str] = input_local_path + 'reco
         err += 'Please remove the following compartments from your model: ' + ', '.join(different_compartments)
         raise ValueError(err)
 
-    # incase GPR has redundant complexes (recon2.2 had atleast one instance of this - id = OIVD1m)
     for r in m_model.reactions:
-        if 'and' in r.gene_reaction_rule and 'or' in r.gene_reaction_rule:
+        # incase GPR has redundant complexes (recon2.2 had atleast one instance of this - id = OIVD1m)
+        if 'and' in r.gene_reaction_rule and 'or' in r.gene_reaction_rule: 
             machinery_final = parse_complex.eval_complex(r.gene_reaction_rule)
 
             idx = list(itertools.combinations(range(len(machinery_final)), 2))
@@ -116,6 +116,29 @@ def correct_model(model_file: Union[cobra.Model, str] = input_local_path + 'reco
                 new_gpr = new_gpr[:-4]
 
                 m_model.reactions.get_by_id(r.id).gene_reaction_rule = new_gpr
+    #ensure reversibility is respected and exchanges do not have a GPR
+    for r in m_model.reactions:
+        if r.reversibility: 
+            lb, ub = r.bounds
+            if not lb < 0:
+                warnings.warn(r.id + ' reaction is supposed to be reversible, but bounds do not agree, changing lower bound to -1000')
+                lb = -1000
+                r._bounds = (lb, ub)
+            if not ub > 0:
+                warnings.warn(r.id + ' reaction is supposed to be reversible, but bounds do not agree, changing upper bound to 1000')
+                r._bounds = (lb, 1000)
+        elif not r.reversibility:
+            lb, ub = r.bounds
+            if lb < 0 and ub <= 0:
+                if r.gene_reaction_rule != '':
+                    msg = 'One-directional reactions going in the reverse reaction should only be for exchanges, which should not be enzyme catalyzed'
+                    msg = 'Please change your reaction, ' + r.id + ', from a "product <-- substrate" to "substrate --> product" format'
+                    raise ValueError(msg)
+        if r.id.startswith('EX_'):
+            if r.gene_reaction_rule != '':
+                warnings.warn('Exchange reaction ' + r.id + ' has a catalyzing enzyme, but exchange reactions should be diffusion processes, removing')
+                r.gene_reaction_rule = ''
+
 
     # remove psuedogene w/ no sequences
     g = [g for g in m_model.genes if g.id == 'HGNC:4686']
@@ -497,6 +520,7 @@ def format_exchanges(m_model):
         model to format
     """
     rm = []
+    add = []
     for er_e in m_model.exchanges:
         if len(er_e.metabolites) != 1:
             raise ValueError('Unexpected metabolites')
@@ -520,12 +544,14 @@ def format_exchanges(m_model):
                              lower_bound = er_e.lower_bound, upper_bound = er_e.upper_bound)
         m_model.add_reactions([er_b])
         er_b.add_metabolites(er_b_metabolites)
+        m_model.exchanges.append(er_b)
 
         er_e_2 = cobra.Reaction(id = '_'.join(er_b.id.split('_')[:-1]) + '_LPAREN_e_RPAREN_', 
                                name = er_e.name, 
                                lower_bound = -1000, upper_bound = 1000)
         m_model.add_reactions([er_e_2])
         er_e_2.add_metabolites({em_e: -1, em_b: 1})
+        m_model.exchanges.append(er_e_2)
 
         rm.append(er_e)
     m_model.remove_reactions(rm, remove_orphans=True)

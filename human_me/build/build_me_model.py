@@ -925,6 +925,12 @@ class MEBuilder:
                 if not r.reversibility:
                     r.couple(metabolites=enzyme_to_couple, types='catalysis')
                     reactions = [r]
+                    # lb, ub = r.bounds
+                    # if lb >= 0 and ub > 0:
+                    #     r.couple(metabolites=enzyme_to_couple, types='catalysis')
+                    #     reactions = [r]
+                    # elif lb < 0 and ub <= 0: # typically exchanges
+                    #     raise ValueError(r.id + ' is a enzyme-catalyzed, one-directional reaction in the reverse direction')
                 else:  # add a forward and reverse reaction for reversible reactions
                     r_f, r_r = r.copy(), r.copy()
                     r_f.lower_bound, r_r.lower_bound, r_r.upper_bound = 0, 0, abs(r.lower_bound)
@@ -1027,6 +1033,12 @@ class MEBuilder:
                 if not r.reversibility:
                     r.couple(metabolites=enzyme_to_couple, types='catalysis')
                     reactions = [r]
+                    # lb, ub = r.bounds
+                    # if lb >= 0 and ub > 0:
+                    #     r.couple(metabolites=enzyme_to_couple, types='catalysis')
+                    #     reactions = [r]
+                    # elif lb < 0 and ub <= 0: # typically exchanges
+                    #     raise ValueError(r.id + ' is a enzyme-catalyzed, one-directional reaction in the reverse direction')
                 else:  # add a forward and reverse reaction for reversible reactions
                     r_f, r_r = r.copy(), r.copy()
                     r_f.lower_bound, r_r.lower_bound, r_r.upper_bound = 0, 0, abs(r.lower_bound)
