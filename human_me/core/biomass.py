@@ -4,6 +4,8 @@ from collections import OrderedDict
 from typing import Dict, List, Optional, Union
 import warnings
 
+import numpy as np
+
 import cobra
 
 from human_me.utils import parameters as params
@@ -192,17 +194,28 @@ def add_biomass_change(reaction: cobra.Reaction, inplace: bool = True) -> Union[
     else:
         return biomass_change_
 
-def check_m_biomass(m_model: cobra.Model, biomass_reaction_id: str = 'biomass_reaction'):
+def check_m_biomass(m_model: cobra.Model, biomass_reaction_id: str = 'biomass_reaction', tol: float = 10, *args, **kwargs):
     """Performs sanity checks on biomass objective of metabolic model.
     If using Recon2.2 biomass formulation, this will give warnings. If warnings are given, we recommend using our correct_m_biomass function.
 
     Parameters
     ----------
     m_model : cobra.Model
-        the metabolic model to check. Expect biomass formatting to be consistent with Recon2.2 (especially with regards to reaction and metabolite IDs)
+        the metabolic model to check.
+        *Expect biomass formatting to be consistent with Recon2.2 (especially with regards to reaction and metabolite IDs). 
+        This means that the final biomass reaction must not consist of different biomass types, and each biomass type must have its
+        own formation reaction consisting of specific metabolic substrates.
+    biomass_reaction_id : str
+        character ID for biomass reaction
+    tol: float
+        tolerance with which to check biomass component reaction mass balance
+    *args: list
+        passed to numpy.isclose
+    **kwargs: dict
+        passed to numpy.isclose
     """
     total_mass = abs(sum([coef for coef in m_model.reactions.get_by_id(biomass_reaction_id).metabolites.values() if coef < 1]))
-    if total_mass != 1:
+    if not np.isclose(total_mass, 1, *args, **kwargs):
         warnings.warn('The total mass fraction does not sum to 1')
 
     # do the substrates for component formation add up to 1g?
@@ -231,7 +244,6 @@ def correct_m_biomass(m_model: cobra.Model):
         the corrected metabolic model
     """
     corrected_model = m_model.copy()
-
 
     corrected_model.reactions.EX_biomass_c.lower_bound = 0 # won't effect things, but technically more correct
     for biomass_metabolite_id in ['biomass_DNA_c', 'biomass_lipid_c']:
