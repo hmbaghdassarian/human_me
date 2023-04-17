@@ -520,7 +520,7 @@ def format_exchanges(m_model):
         model to format
     """
     rm = []
-    add = []
+    new_exchanges = []
     for er_e in m_model.exchanges:
         if len(er_e.metabolites) != 1:
             raise ValueError('Unexpected metabolites')
@@ -544,14 +544,15 @@ def format_exchanges(m_model):
                              lower_bound = er_e.lower_bound, upper_bound = er_e.upper_bound)
         m_model.add_reactions([er_b])
         er_b.add_metabolites(er_b_metabolites)
-        m_model.exchanges.append(er_b)
+        new_exchanges.append(er_b)
 
         er_e_2 = cobra.Reaction(id = '_'.join(er_b.id.split('_')[:-1]) + '_LPAREN_e_RPAREN_', 
                                name = er_e.name, 
                                lower_bound = -1000, upper_bound = 1000)
         m_model.add_reactions([er_e_2])
         er_e_2.add_metabolites({em_e: -1, em_b: 1})
-        m_model.exchanges.append(er_e_2)
+        new_exchanges.append(er_e_2)
 
         rm.append(er_e)
     m_model.remove_reactions(rm, remove_orphans=True)
+    m_model.formatted_exchanges = new_exchanges # .exchanges is an attribute and can't be overwritten

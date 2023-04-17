@@ -1110,7 +1110,11 @@ class MEBuilder:
             if self.deg_args['complex_degradation']:
                 enzymeless_reactions += [r for r in self.complex_degradation_reactions if len(r.genes) == 0]
             demand_ids = [r.id for r in self.m_model.demands]
-            boundary_ids = [r.id for r in self.m_model.exchanges] + demand_ids
+            if hasattr(self.m_model, 'formatted_exchanges'):
+                er = self.m_model.formatted_exchanges # see preprocess.correct_inputs.format_exchanges
+            else:
+                er = self.m_model.exchanges
+            boundary_ids = [r.id for r in er] + demand_ids
 
             if len(set([r.id for r in enzymeless_reactions]).intersection([r.id for r in self.final_reactions])) > 0:
                 raise ValueError('Incorrect parsing of reaction lists for dummy protein')

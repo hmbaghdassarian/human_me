@@ -49,7 +49,7 @@ INSTALL_REQUIRES = [
     'openpyxl==3.0.10',
     'tables==3.6.1',
     'numexpr==2.7.3'
-#   'swiglpk==5.0.5'
+    # 'swiglpk==5.0.5'
 ]
 
 EXTRAS_REQUIRES = {'interactive': ['jupyter', 'ipykerne']
