@@ -1122,26 +1122,30 @@ class MEBuilder:
             # metabolic module enzymes to exclude from deorphaning - boundary reactions
             self.orphan_reactions = [r for r in enzymeless_reactions_map.values() if
                            hasattr(r, 'cobra_id') and r.cobra_id in boundary_ids]
-            _orphan = list()
-            for r in self.orphan_reactions:  # secondary exchange reactions
-                if len(r.metabolites) > 1 or list(r.metabolites)[0].compartment != 'b':
-                    if r.id not in demand_ids: # demands don't meet the aforementions requirement
-                        raise ValueError(
-                            'Incorrectly formatted exchange reaction: ' + r.id + '. Must follow Recon2.2 format.')
 
-                assoc_rxn = [r_.id for r_ in list(list(self.m_model.reactions.get_by_id(r.id).metabolites)[0].reactions)]
-                assoc_rxn.remove(r.cobra_id)
+            # DEPRECATED: following block no longer needed with .formatted_exchanges attribute
+            # _orphan = list()
+            # for r in self.orphan_reactions:  # secondary exchange reactions
+            #     if len(r.metabolites) > 1 or list(r.metabolites)[0].compartment != 'b':
+            #         if r.id not in demand_ids: # demands don't meet the aforementions requirement
+            #             if len(r.metabolites) != 2 and r.compartments != {'e', 'b'}: #LPAREN_e_PAREN do not meet the aformentioned requirements:
+            #                 raise ValueError(
+            #                     'Incorrectly formatted exchange reaction: ' + r.id + '. Must follow Recon2.2 format.')
 
-                if len(assoc_rxn) > 0:
-                    for r_id in assoc_rxn:  # id the second exchange reaction (Recon2.2 format)
-                        r_ = self.m_model.reactions.get_by_id(r_id)
-                        cond1 = (sorted(r_.compartments) == ['b', 'e'])
-                        cond2 = (len(set(['_'.join(m.id.split('_')[:-1]) for m in list(r_.metabolites)])) == 1)
-                        cond3 = (len(r_.genes) == 0)
-                        if cond1 and cond2 and cond3:
-                            _orphan.append(enzymeless_reactions_map[r_.id])
-            self.orphan_reactions += _orphan
-            del _orphan
+            #     assoc_rxn = [r_.id for r_ in list(list(self.m_model.reactions.get_by_id(r.id).metabolites)[0].reactions)]
+            #     assoc_rxn.remove(r.cobra_id)
+
+            #     if len(assoc_rxn) > 0:
+            #         for r_id in assoc_rxn:  # id the second exchange reaction (Recon2.2 format)
+            #             r_ = self.m_model.reactions.get_by_id(r_id)
+            #             cond1 = (sorted(r_.compartments) == ['b', 'e'])
+            #             cond2 = (len(set(['_'.join(m.id.split('_')[:-1]) for m in list(r_.metabolites)])) == 1)
+            #             cond3 = (len(r_.genes) == 0)
+            #             if cond1 and cond2 and cond3:
+            #                 _orphan.append(enzymeless_reactions_map[r_.id])
+            # self.orphan_reactions += _orphan
+            # del _orphan
+
             # # Deprecated
             # if exclude is not None:
             #     for r_id in exclude:

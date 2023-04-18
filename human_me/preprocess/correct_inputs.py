@@ -117,6 +117,7 @@ def correct_model(model_file: Union[cobra.Model, str] = input_local_path + 'reco
 
                 m_model.reactions.get_by_id(r.id).gene_reaction_rule = new_gpr
     #ensure reversibility is respected and exchanges do not have a GPR
+    # exchange reactions are just feeding into the model from boundary, and boundary to ECM, so should not be enzyme catalyzed; otherwise, coupling will be wrong
     for r in m_model.reactions:
         if r.reversibility: 
             lb, ub = r.bounds

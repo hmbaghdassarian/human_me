@@ -709,6 +709,13 @@ class ME_Model(cobra.Model):
                 else:
                     raise ValueError('Unaccounted for reaction criteria')
 
+        for r in self.reactions:
+            lb, ub = r.bounds
+            if not isinstance(lb, sympy.Expr) and not isinstance(ub, sympy.Expr):
+                if lb < 0 and ub <= 0:
+                    if len(r.coupled_metabolites) > 0:
+                        raise ValueError('Backwards, one-directional reaction, ' + r.id + ' contains coupled metabolites which will be incorrectly formatted')
+
     def _check_enzymes(self):
         """Makes sure all genes being expressed participate in a catalysis reaction (no unecessary expression reactions)"""
         # # following three lines replace .map_enzymes method
