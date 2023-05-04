@@ -512,6 +512,25 @@ class ME_Model(cobra.Model):
                                                                               fig_name=fig_name)
         return sln, predicted, interp_fit, optimal_vals, res
 
+    def format_solution(self, sln: List[float]) -> pd.DataFrame:
+        """Fromats the LP output into a pandas DataFrame to map reaction IDs
+
+        Parameters
+        ----------
+        sln : List[float]
+            output of "solve_lp" method
+
+        Returns
+        -------
+        formatted_sln : pd.DataFrame
+            fluxes output by "solve_lp" method and their corresponding reaction IDs
+        """
+
+        formatted_sln = pd.DataFrame(data = {'reaction_id': [r.id for r in self.reactions]})
+        formatted_sln['flux'] = formatted_sln.reaction_id.apply(lambda r_id: sln[self.reactions.index(r_id)])
+
+        return(formatted_sln)
+
     def infeasible_reactions(self, mu_val: SupportsFloat, sln, stat, tolerance: SupportsFloat = 1e-19) -> Dict[str, SupportsFloat]:
         """Returns infeasible reactions in solution.
 
