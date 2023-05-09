@@ -216,6 +216,19 @@ def correct_model(model_file: Union[cobra.Model, str] = input_local_path + 'reco
                 m_model.add_boundary(metabolite=new_metab, type='sink')
             else:
                 m_model.add_boundary(metabolite=new_metab, type='exchange')
+ 
+    # add reactions required for me modeling that are not present in recon2 but should be
+    reactions_to_add = []
+
+    # 1) nuclear proton transport (diffusion)
+    nt_present = [r for r in m_model.metabolites.get_by_id('h_n').reactions if len(r.compartments) > 1] # check whether transport exists
+    if len(nt_present) == 0:
+        nuclear_proton_transport = cobra.Reaction(id = 'Htn', name = 'H transporter, nucleus', lower_bound = -1000, upper_bound = 1000)
+        nuclear_proton_transport.add_metabolites({m_model.metabolites.get_by_id('h_c'): -1, 
+                                                m_model.metabolites.get_by_id('h_n'): 1})
+        nuclear_proton_transport.bounds = (-1000, 1000)
+        reactions_to_add.append(nuclear_proton_transport)
+    m_model.add_reactions(reactions_to_add)
 
     cm_2 = m_model.copy()  # metabolic model with incorrect GPRs corrected and ME-Model required metabolite transport added
     # remove biomass
