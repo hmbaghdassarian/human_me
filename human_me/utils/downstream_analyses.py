@@ -44,7 +44,9 @@ def _order_metabolites(metabolites_list: List[str], compartment_order: List[str]
     return ordered_metabolites
 
 def troubleshoot_me(me_model_file: str, mu_val: float = 1e-9, out_path: str = None):
-    """_summary_
+    """Helps troubleshoot ME Model if solver finds infeasible solution at growth rate of "mu_val". Basic principle is to 
+    iterate through the metabolites from the input metabolic model, add them as sinks, and see which are required as sinks to 
+    make the model feasible. 
 
     Parameters
     ----------
@@ -90,13 +92,14 @@ def troubleshoot_me(me_model_file: str, mu_val: float = 1e-9, out_path: str = No
 
     with HiddenPrints():
         sln, stat, _ = me_model.solve_lp(mu_val = mu_val)
-    if stat != 0:
+    if counter == 1 and stat != 0:
         raise ValueError('The ME Model is not feasible at {:.2f} growth even when all metabolites are added as sinks'.format(mu_val))
 
     print('Initial flux blocking')
 
     n_excluded_metabolites_0 = -1
     n_excluded_metabolites = 0
+    stat = 0
 
     counter = 1
 
@@ -110,7 +113,7 @@ def troubleshoot_me(me_model_file: str, mu_val: float = 1e-9, out_path: str = No
 
         formatted_sln = me_model.format_solution(sln)
 
-        sink_sln = formatted_sln[formatted_sln.reaction_id.apply(lambda x: x.startswith('SK_'))] # added before
+        sink_sln = formatted_sln[formatted_sln.reaction_id.apply(lambda x: x.startswith('SK_'))]  # added before
         sink_sln = sink_sln[sink_sln.flux == 0]
 
         metab_exclude = sink_sln.reaction_id.apply(lambda x: x.split('SK_')[1]).tolist()
@@ -120,7 +123,7 @@ def troubleshoot_me(me_model_file: str, mu_val: float = 1e-9, out_path: str = No
 
         for metabolite_id in metab_exclude:
             rxn = me_model.reactions.get_by_id('SK_' + metabolite_id)
-            rxn._lower_bound, rxn._upper_bound = 0,0
+            rxn._lower_bound, rxn._upper_bound = 0, 0
 
         with HiddenPrints():
             sln, stat, _ = me_model.solve_lp(mu_val = mu_val)
@@ -158,7 +161,7 @@ def troubleshoot_me(me_model_file: str, mu_val: float = 1e-9, out_path: str = No
             rxn = me_model.reactions.get_by_id('SK_' + metab_id)
             lb, ub = rxn.bounds
 
-            rxn._lower_bound, rxn._upper_bound = 0,0
+            rxn._lower_bound, rxn._upper_bound = 0, 0
 
             with HiddenPrints():
                 sln, stat, _ = me_model.solve_lp(mu_val = mu_val)
@@ -175,6 +178,10 @@ def troubleshoot_me(me_model_file: str, mu_val: float = 1e-9, out_path: str = No
                 metab_exclude_additional = set(metab_exclude_additional).intersection(model_metabolite_ids)
                 metab_exclude_additional = metab_exclude_additional.difference(metab_exclude_df.metabolite_id.tolist())
 
+                for metab_id_additional in metab_exclude_additional:
+                    rxn = me_model.reactions.get_by_id('SK_' + metab_id_additional)
+                    rxn._lower_bound, rxn._upper_bound = 0, 0
+
                 if len(metab_exclude_additional) >  0:
                     metab_exclude_df = pd.concat([metab_exclude_df, 
                                                 pd.DataFrame(data = {'metabolite_id': sorted(metab_exclude_additional), 'iteration': counter})], 
@@ -182,7 +189,7 @@ def troubleshoot_me(me_model_file: str, mu_val: float = 1e-9, out_path: str = No
 
                 metab_exclude = metab_exclude.union(metab_exclude_additional) # will avoid iterating through these 
 
-            else: # reset reaction bounds to original
+            else:  # reset reaction bounds to original
                 rxn._lower_bound, rxn._upper_bound = lb, ub
                 metab_include_df.loc[metab_include_df.shape[0], :] = metab_id, counter
 
