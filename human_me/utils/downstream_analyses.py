@@ -13,7 +13,12 @@ from human_me.core.biomass import Biomass
 from human_me import io
 from human_me.io import HiddenPrints
 
-def _order_metabolites(metabolites_list: List[str], compartment_order: List[str] = None):
+e_aa = ['his_L', 'ile_L', 'leu_L', 'lys_L', 'met_L', 'phe_L', 'thr_L', 'trp_L', 'val_L']
+ne_aa = ['ala_L', 'arg_L', 'asn_L', 'asp_L_c', 'cys_L', 'glu_L', 'gln_L', 'gly', 'pro_L', 'ser_L', 'tyr_L']
+ordered_aa = e_aa + ne_aa # essential aas first
+
+def _order_metabolites(metabolites_list: List[str], compartment_order: List[str] = None, 
+                       order_aa: bool = True):
     """Order the metabolites to test in troubleshoot_me by compartment, with the first compartment being most likely 
     source of infeasability. 
 
@@ -23,27 +28,39 @@ def _order_metabolites(metabolites_list: List[str], compartment_order: List[str]
         full list of metabolite IDs from the model
     compartment_order : List[str], optional
         ME Model compartments orderd by which are likely to cause feasibility issues, by default List[str]
+    order_aa : bool, optional
+        whether to sort amino acids in each compartment to be first in that list (most likely to influence 
+        feasability)and within amino acids in the compartment, whether to put those that are essential 
+        before those that are non-essential (more likely source of infeasability)
 
     Returns
     -------
-    _type_
-        _description_
+    ordered_metabolites : List[str]
+        the input metabolites but sorted
     """
-    if compartment_order is None:
-        compartment_order = ['b', 'e', 'c', 'n', 'm', 'i', 
-                        'g', 'r', 'l', 'x', 'pm']
-    
+    compartment_order = ['b', 'e', 'c', 'n', 'm', 'i', 'g', 'r', 'l', 'x', 'pm']
+
     ordered_model_metabolite_ids = {}
     for compartment in compartment_order:
-        ordered_model_metabolite_ids[compartment] = sorted([m_id for m_id in metabolites_list if m_id.endswith('_' + compartment)])
-    
+        ordered_metabolites_compartment = sorted([m_id for m_id in metabolites_list if m_id.endswith('_' + compartment)])
+
+        if order_aa:
+            ordered_aa_compartment = [aa + '_' + compartment for aa in ordered_aa]
+            aa_to_add = []
+            for aa in ordered_aa_compartment:
+                if aa in ordered_metabolites_compartment:
+                    aa_to_add.append(aa)
+            ordered_metabolites_compartment = [m_id for m_id in ordered_metabolites_compartment if m_id not in aa_to_add]
+            ordered_metabolites_compartment = aa_to_add + ordered_metabolites_compartment
+        ordered_model_metabolite_ids[compartment] = ordered_metabolites_compartment
+
     ordered_metabolites = []
     for compartment in compartment_order:
         ordered_metabolites += ordered_model_metabolite_ids[compartment]
-    
+
     return ordered_metabolites
 
-def troubleshoot_me(me_model_file: str, mu_val: float = 1e-9, out_path: str = None):
+def troubleshoot_me(me_model_file: str, mu_val: float = 1e-9, out_path: str = None, *args, **kwargs):
     """Helps troubleshoot ME Model if solver finds infeasible solution at growth rate of "mu_val". Basic principle is to 
     iterate through the metabolites from the input metabolic model, add them as sinks, and see which are required as sinks to 
     make the model feasible. 
@@ -144,7 +161,7 @@ def troubleshoot_me(me_model_file: str, mu_val: float = 1e-9, out_path: str = No
     # sort the metabolites since this algorithm depends on order you iterate through
     # setting those that are simplest/expected to be most essential to be tested last
     # that way, if earlier metabolites show up, we know it's not an issue of transport or exchange
-    metab_include = _order_metabolites(metab_include)[::-1] # backward to test expected most essential last
+    metab_include = _order_metabolites(metab_include, *args, **kwargs)[::-1] # backward to test expected most important last
 
     for metab_id in tqdm(metab_include):
         me_model.add_boundary(me_model.metabolites.get_by_id(metab_id), type = 'sink')
