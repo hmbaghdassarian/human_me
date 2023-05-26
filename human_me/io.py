@@ -170,9 +170,28 @@ def read_pickled_me_model(file_name: str):
     else: # in the case where solve_lp has not been run prior to pickling
         solver_type = 'qminos'
     me_model.initialize_solver(solver_type=solver_type, precision=me_model.solver_precision)
-    
 
     return me_model
+
+def load_ME_model(model_file):
+    """Reads in ME model, checking for appropriate type.
+
+    Parameters
+    ----------
+    model_file : Union[str, ME_Model]
+        ME_Model object or 'full/path/to/me_model.pickle'
+
+    Returns
+    -------
+    me_model : ME_Model
+        ME_Model object
+    """
+    if isinstance(model_file, str):
+        return read_pickled_me_model(model_file)
+    else:
+        return model_file
+    # else:
+    #     raise TypeError('Model arg must either by a cobrapy model or specify a path to a sbml file of a cobrapy model')
 
 def write_metabolic_model(m_model: cobra.Model, file_name: str, **kwargs) -> None: 
     """Write a metabolic model to smbl format with .xml extension.
