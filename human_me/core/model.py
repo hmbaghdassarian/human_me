@@ -531,50 +531,50 @@ class ME_Model(cobra.Model):
 
         return(formatted_sln)
 
-    def infeasible_reactions(self, mu_val: SupportsFloat, sln, stat, tolerance: SupportsFloat = 1e-19) -> Dict[str, SupportsFloat]:
-        """Returns infeasible reactions in solution.
+    # def infeasible_reactions(self, mu_val: SupportsFloat, sln, stat, tolerance: SupportsFloat = 1e-19) -> Dict[str, SupportsFloat]:
+    #     """Returns infeasible reactions in solution.
 
-        Parameters
-        ----------
-        mu_val : SupportsFloat
-            input growth value to ME_Model.solve_lp
-        sln, stat : outputs of ME_Model.solve_lp
-            Expected minimum feasible growth rate (~0)
-        tolerance : SupportsFloat
-            Threshold below which expected sensitivity of solver is too low to detect infeasibility
+    #     Parameters
+    #     ----------
+    #     mu_val : SupportsFloat
+    #         input growth value to ME_Model.solve_lp
+    #     sln, stat : outputs of ME_Model.solve_lp
+    #         Expected minimum feasible growth rate (~0)
+    #     tolerance : SupportsFloat
+    #         Threshold below which expected sensitivity of solver is too low to detect infeasibility
 
-        Returns
-        -------
-        ir : Dict[str, SupportsFloat]
-            for reactions that cause infeasibility, keys are reaction ids for infeasible reactions and values are
-            difference by which reaction flux is infeasible
-        """
-        if tolerance < 0:
-            tolerance = abs(tolerance)
+    #     Returns
+    #     -------
+    #     ir : Dict[str, SupportsFloat]
+    #         for reactions that cause infeasibility, keys are reaction ids for infeasible reactions and values are
+    #         difference by which reaction flux is infeasible
+    #     """
+    #     if tolerance < 0:
+    #         tolerance = abs(tolerance)
 
-        ir = dict()
-        for r in self.reactions:
-            flux = sln[self.reactions.index(r.id)]
+    #     ir = dict()
+    #     for r in self.reactions:
+    #         flux = sln[self.reactions.index(r.id)]
 
-            ub = copy.copy(r.upper_bound)
-            lb = copy.copy(r.lower_bound)
+    #         ub = copy.copy(r.upper_bound)
+    #         lb = copy.copy(r.lower_bound)
 
-            if isinstance(ub, sympy.Expr):
-                ub = float(ub.subs(params.mu, mu_val))
-            if isinstance(lb, sympy.Expr):
-                lb = float(lb.subs(params.mu, mu_val))
+    #         if isinstance(ub, sympy.Expr):
+    #             ub = float(ub.subs(params.mu, mu_val))
+    #         if isinstance(lb, sympy.Expr):
+    #             lb = float(lb.subs(params.mu, mu_val))
 
-            if math.isnan(flux):
-                ir[r.id] = flux
-            elif flux > ub + tolerance:
-                ir[r.id] = abs(flux - ub)
-            elif flux < lb - tolerance:
-                ir[r.id] = abs(lb - flux)
+    #         if math.isnan(flux):
+    #             ir[r.id] = flux
+    #         elif flux > ub + tolerance:
+    #             ir[r.id] = abs(flux - ub)
+    #         elif flux < lb - tolerance:
+    #             ir[r.id] = abs(lb - flux)
 
-        if (len(ir) > 0 and stat == 0) or (len(ir) == 0 and stat != 0):
-            warnings.warn(
-                'There is a discrepancy between the solver status and reactions that violate bound constraints')
-        return ir
+    #     if (len(ir) > 0 and stat == 0) or (len(ir) == 0 and stat != 0):
+    #         warnings.warn(
+    #             'There is a discrepancy between the solver status and reactions that violate bound constraints')
+    #     return ir
 
     def check_me_mass_balance(self):
         """Check that all reactions in ME Model are mass balance. Use after self.add_reactions."""
