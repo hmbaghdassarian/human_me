@@ -8,6 +8,7 @@ from typing import List
 import warnings
 
 import pandas as pd
+import cobra
 
 from human_me.core.macromolecules.macromolecule import Macromolecule, Proxy
 from human_me.core.biomass import Biomass
@@ -319,47 +320,51 @@ def get_limiting_nutrients(me_model_file: str, max_feasible_mu: float, uptake_on
 
     return sink_sln, metab_include_df
 
-from typing import List
-import pandas
 
-def _format_reaction_id(r_id):
-    r_id_split = r_id.split('_')
-
-    if r_id_split[-1].isdigit(): # when minimal_proteome = False in building
-        reaction_no = int(r_id_split[-1])
-        r_id_split = r_id_split[:-1]
-    else:
+def _format_reaction_id(r_id, metabolic_reactions):
+    if r_id in metabolic_reactions:
+        cobra_id = r_id
         reaction_no = 0
-
-    if r_id_split[-1] in ['F', 'R']:
-        reaction_direction = r_id_split[-1]
-        r_id_split = r_id_split[:-1]
+        reaction_direction = 'F'
+        
     else:
-        reaction_direction = 'F' # works for reversible reactions that weren't split too (doesn't have GPRs)
-    
-    cobra_id = '_'.join(r_id_split)
-    
+        r_id_split = r_id.split('_')
+
+        if r_id_split[-1].isdigit(): # when minimal_proteome = False in building
+            reaction_no = int(r_id_split[-1])
+            r_id_split = r_id_split[:-1]
+        else:
+            reaction_no = 0
+
+        if r_id_split[-1] in ['F', 'R']:
+            reaction_direction = r_id_split[-1]
+            r_id_split = r_id_split[:-1]
+        else:
+            reaction_direction = 'F' # works for reversible reactions that weren't split too (doesn't have GPRs)
+
+        cobra_id = '_'.join(r_id_split)
     return cobra_id, reaction_no, reaction_direction
 
-def compare_metabolic_fluxes(me_sln: pd.DataFrame, m_sln: pd.DataFrame = None, reaction_ids: List[str] = None):
+
+def compare_metabolic_fluxes(me_sln: pd.DataFrame, m_model: cobra.Model, add_m_fluxes: bool = True):
     """For metabolic reactions, formats and aggregates (e.g. across reversibility or multiple reactions due to "OR" GPRs) 
-    the ME Model solution to be comparable to the metabolic model solution. 
-    
-    We recommend using the cm_2 output from preprocess.correct_inputs.correct_model as the comparable metabolic model.
-    Though not necessary, a more fair comparison may be to set the growth rates (mu) of the metabolic and me model to be
-    the same. In the cobra.Model metabolic model this can be done by setting the growth reaction bounds to be mu. 
-    In the me model, this can be specified with the "mu_val" parameter in the ME_Model.solve_lp method.
+    the ME Model solution to be comparable to the metabolic model solution. This should then be easily compared to the 
+    output of m_model.optimize().to_frame().
 
     Parameters
     ----------
     me_sln : pd.DataFrame
-        the solution to the ME Model (output of ME_Model.format_solution method)
-    m_sln : pd.DataFrame, optional
-        the solution to the metabolic model (output of cobra.Model.optimize().to_frame()). If not provided, 
-        will simply format the me_fluxes, however this will include ExpressionReactions not present in the 
-        metabolic model. 
-    reaction_ids : List[str], optional
-        a list of ME Model reaction IDs to analyze, by default considers all
+        the solution to the ME Model LP (output of ME_Model.format_solution method)
+    m_model : cobra.Model
+        the solution to the metabolic model
+        
+        We recommend using the cm_2 output from preprocess.correct_inputs.correct_model as the comparable metabolic model.
+        Though not necessary, a more fair comparison may be to set the growth rates (mu) of the metabolic and me model to be
+        the same. In the cobra.Model metabolic model this can be done by setting the growth reaction bounds to be mu. 
+        In the me model, this can be specified with the "mu_val" parameter in the ME_Model.solve_lp method.
+    add_m_fluxes: bool, optional
+        Whether to solve the m_model (for the set objective) and concatenate the m_model fluxes to the solution, by 
+        default True
 
     Returns
     -------
@@ -367,20 +372,32 @@ def compare_metabolic_fluxes(me_sln: pd.DataFrame, m_sln: pd.DataFrame = None, r
         dataframe containing both the me model (column name "me_flux") and metabolic model (column name "m_flux") flux solutions
     """
     
-    me_metab_sln = me_sln.copy()
-    if reaction_ids is not None:
-        me_metab_sln = me_metab_sln.loc[me_metab_sln.reaction_id.isin(reaction_ids), :]
+    metabolic_reactions = [r.id for r in m_model.reactions]
 
+    me_metab_sln = me_sln.copy()
     me_metab_sln['cobra_id'], me_metab_sln['reaction_no'], \
-    me_metab_sln['reaction_direction'] = zip(*me_metab_sln['reaction_id'].map(_format_reaction_id))
+    me_metab_sln['reaction_direction'] = zip(*me_metab_sln['reaction_id'].apply(_format_reaction_id, 
+                                                                              metabolic_reactions = metabolic_reactions))
     me_metab_sln['me_flux'] = me_metab_sln.apply(lambda x: x.flux if x.reaction_direction == 'F' else -x.flux, axis = 1).tolist()
 
     me_metab_sln = me_metab_sln.groupby(['cobra_id', 'reaction_direction', 'reaction_no'])['me_flux'].sum()
     me_metab_sln = pd.DataFrame(me_metab_sln.groupby(['cobra_id']).sum())
-    
-    if m_sln is not None:
-        me_metab_sln = me_metab_sln[me_metab_sln.index.isin(m_sln.index)]
-        me_metab_sln['m_flux'] = m_sln.loc[me_metab_sln.index, 'fluxes'].tolist()
+
+    final_reactions = [r_id for r_id in metabolic_reactions if 'biomass' not in r_id] + \
+                            [r_id for r_id in me_metab_sln.index if 'biomass' in r_id]
+    if len(set(final_reactions).difference(me_metab_sln.index)) > 0:
+        warnings.warn('Unexpected missing cobra ID reactions when parsin me_sln dataframe')
+
+    final_reactions = list(set(me_metab_sln.index).intersection(final_reactions))
+    # sort according to reaction index
+    additional_reactions = list(set(final_reactions).difference(metabolic_reactions))
+    final_reactions = [r_id for r_id in metabolic_reactions if r_id in final_reactions] + additional_reactions
+    me_metab_sln = me_metab_sln.loc[final_reactions, :]
+    if add_m_fluxes:
+        me_metab_sln = pd.concat([me_metab_sln, 
+              pd.DataFrame(m_model.optimize().to_frame().fluxes)], 
+             axis = 1, ignore_index = False)
+        me_metab_sln.columns = ['me_flux', 'm_flux']
         
     
     return(me_metab_sln)
