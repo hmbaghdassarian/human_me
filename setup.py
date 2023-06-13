@@ -23,7 +23,7 @@ LICENSE = 'MIT'
 VERSION = '0.1.0'
 ISRELEASED = False
 
-PYTHON_MIN_VERSION = '3.7'
+PYTHON_MIN_VERSION = '3.8'
 PYTHON_MAX_VERSION = '3.9'
 PYTHON_REQUIRES = f'>={PYTHON_MIN_VERSION}, <={PYTHON_MAX_VERSION}'
 
@@ -39,7 +39,7 @@ INSTALL_REQUIRES = [
     'pandas==1.1.5',
     'scipy==1.5.4',
     'statsmodels==0.10.2',
-    'sympy==1.9',
+    'sympy==1.12',
     'tqdm==4.62.3',
     'cobra==0.18.1',
     'matplotlib==3.3.4',
@@ -50,6 +50,7 @@ INSTALL_REQUIRES = [
     'tables==3.6.1',
     'numexpr==2.7.3'
     # 'swiglpk==5.0.5'
+    # 'ruamel_yaml==0.17.4'
 ]
 
 EXTRAS_REQUIRES = {'interactive': ['jupyter', 'ipykerne']
