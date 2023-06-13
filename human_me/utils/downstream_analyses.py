@@ -401,3 +401,81 @@ def compare_metabolic_fluxes(me_sln: pd.DataFrame, m_model: cobra.Model, add_m_f
         
     
     return(me_metab_sln)
+
+def _get_expression_flux(me_model, me_sln: pd.DataFrame, hgnc_id: str, 
+                         molecule_type: str, group_by: str = 'sum', 
+                        consider_degradation: bool = True) -> float:
+    """Calculate the flux through gene expression for a given gene.
+
+    Parameters
+    ----------
+    me_model : 
+        the ME Model
+    me_sln : pd.DataFrame
+        the solution to the ME Model LP (output of ME_Model.format_solution method)
+    hgnc_id : str
+        the hgnc ID of a gene expressed in the input me_model
+    molecule_type : str
+        one of 'mrna' or 'protein' to get transcriptional or translational fluxes
+    group_by : str, optional
+        if multiple reactions, aggregate fluxes by group_by as input to the "func" argument of  by default 'sum'
+    consider_degradation : bool, optional
+        whether to subtract the degradation fluxes from the synthesis fluxes or only consider synthesis fluxes, 
+        by default True
+
+    Returns
+    -------
+    tot_flux : float
+        the net flux for expression of a given gene
+    """
+
+    _syn_key = 'synthesis' if molecule_type == 'mrna' else 'translation'
+
+    synthesis_reactions = me_model.expressed_genes[hgnc_id].reactions['ExpressionReactions'][molecule_type][_syn_key]
+    degradation_reactions = None
+    if consider_degradation: 
+        degradation_reactions = me_model.expressed_genes[hgnc_id].reactions['ExpressionReactions'][molecule_type]['sink']
+
+    if molecule_type == 'mrna':
+        synthesis_reactions, degradation_reactions = [synthesis_reactions], [degradation_reactions]
+
+    tot_flux = me_sln.loc[me_sln.reaction_id.isin(synthesis_reactions)]['flux'].aggregate(func = group_by)
+    if consider_degradation:
+        tot_flux = me_sln.loc[me_sln.reaction_id.isin(degradation_reactions)]['flux'].aggregate(func = group_by)
+        
+    return tot_flux
+
+def get_expression_fluxes(me_model, me_sln: pd.DataFrame,  
+                         molecule_type: str, group_by: str = 'sum', 
+                        consider_degradation: bool = True) -> float:
+    """Calculate the flux through gene expression for each gene in ME Model.
+
+    Parameters
+    ----------
+    me_model : 
+        the ME Model
+    me_sln : pd.DataFrame
+        the solution to the ME Model LP (output of ME_Model.format_solution method)
+    molecule_type : str
+        one of 'mrna' or 'protein' to get transcriptional or translational fluxes
+    group_by : str, optional
+        if multiple reactions, aggregate fluxes by group_by as input to the "func" argument of  by default 'sum'
+    consider_degradation : bool, optional
+        whether to subtract the degradation fluxes from the synthesis fluxes or only consider synthesis fluxes, 
+        by default True
+
+    Returns
+    -------
+    flux_df : pd.DataFrame
+        the net flux for expression of each gene
+    """
+
+    expression_fluxes = dict()
+    for hgnc_id in tqdm(me_model.expressed_genes):
+        expression_fluxes[hgnc_id] = _get_expression_flux(me_model = me_model, me_sln = me_sln, hgnc_id = hgnc_id, 
+                                 molecule_type = molecule_type, group_by = 'sum', 
+                                consider_degradation = True)
+
+    flux_df = pd.DataFrame(data = {'HGNC_ID': expression_fluxes.keys(), 
+                        molecule_type + '_flux': expression_fluxes.values()})
+    return flux_df
