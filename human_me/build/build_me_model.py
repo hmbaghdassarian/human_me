@@ -1492,7 +1492,8 @@ def build_me(me_input_model: Union[cobra.Model,str],
                         context_specific_SASA = context_specific_SASA,
                         unmodeled_protein_fraction=unmodeled_protein_fraction,
                         minimal_proteome=minimal_proteome, compress_mrna=compress_mrna,
-                        check_all=check_all, deg_args=deg_args, mass_fraction=mass_fraction, biomass_coefficients=biomass_coefficients)
+                        check_all=check_all, 
+                        deg_args=deg_args, mass_fraction=mass_fraction, biomass_coefficients=biomass_coefficients)
     builder.express_metabolic_enzymes()
     builder.express_expression_enzymes()
     builder.express_dummy()
