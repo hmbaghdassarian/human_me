@@ -77,7 +77,7 @@ class qminosSolver:
         if objective is None:
             objective = {'biomass_dilution': 1}
         # normalize objective to be 1
-        if not all([np.sign(v) == 1 for v in objective.values()]) or all(
+        if not all([np.sign(v) == 1 for v in objective.values()]) and not all(
                 [np.sign(v) == -1 for v in objective.values()]):
             raise ValueError('Current version can only maximize or minimize combinations of objectives, not do both')
         tot = abs(sum(objective.values()))
