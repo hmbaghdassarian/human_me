@@ -8,6 +8,7 @@ from typing import List
 import warnings
 
 import pandas as pd
+import numpy as np
 import cobra
 
 from human_me.core.macromolecules.macromolecule import Macromolecule, Proxy
@@ -479,3 +480,74 @@ def get_expression_fluxes(me_model, me_sln: pd.DataFrame,
     flux_df = pd.DataFrame(data = {'HGNC_ID': expression_fluxes.keys(), 
                         molecule_type + '_flux': expression_fluxes.values()})
     return flux_df
+
+def _fill_by_bounds(fva_df, sln):
+    """If any other reactions in the solution are at their boundary, add these to avoid iterating through them."""
+    fva_df = fva_df.copy()
+    # skip some iterations if possible 
+    reactions_min = fva_df[fva_df.minimum.isna()].index
+    reactions_min = reactions_min[np.where(sln.loc[reactions_min, 'flux'] == fva_df.loc[reactions_min, 'min_bound'])[0]]
+    fva_df.loc[reactions_min, 'minimum'] = fva_df.loc[reactions_min, 'min_bound']
+
+    reactions_max = fva_df[fva_df.maximum.isna()].index
+    reactions_max = reactions_max[np.where(sln.loc[reactions_max, 'flux'] == fva_df.loc[reactions_max, 'max_bound'])[0]]
+    fva_df.loc[reactions_max, 'maximum'] = fva_df.loc[reactions_max, 'max_bound'] 
+    
+    return fva_df
+
+def flux_variability_analysis(me_model, mu_val: float, reactions: List[str], n_cores: int = 0) -> pd.DataFrame:
+    """Runs FVA on reactions of interest at a given growth rate. 
+
+    Parameters
+    ----------
+    me_model : 
+        the me model
+    mu_val : float
+        the growth rate at which to run the LP (should be <= maximum feasible growth rate)
+    reactions : List[str]
+        a list of reaction IDs from the ME Model. Solving the ME Model takes much longer than a standard
+        metabolic model, so we highly recommend limiting this list to a few reactions. 
+    n_cores : int, optional
+        number of cores to parallelize with, by default no parallelization. This may take longer than iterating
+        through each one at a time (see use of _fill_by_bounds function when n_cores <= 1). 
+        *Currently not implemented.
+
+    Returns
+    -------
+    fva_df : pd.DataFrame
+        first two columns represent the minimum and maximum possible fluxes at that growth rate
+    """
+    fva_df = pd.DataFrame(index = reactions, columns = ['minimum', 'maximum', 'solution_stats'])
+
+    max_bounds, min_bounds = dict(), dict()
+    for r_id in reactions:
+        reaction_bounds = me_model.reactions.get_by_id(r_id).bounds
+        max_bounds[r_id] = reaction_bounds[1]
+        min_bounds[r_id] = reaction_bounds[0]
+    fva_df['min_bound'] = fva_df.index.map(min_bounds)
+    fva_df['max_bound'] = fva_df.index.map(max_bounds)
+
+    if n_cores <= 1:
+        for reaction in tqdm(reactions):
+            if np.isnan(fva_df.loc[reaction, 'minimum']):
+                sln, stat, _ = me_model.solve_lp(mu_val = mu_val, objective = {reaction: -1})
+                sln = me_model.format_solution(sln)
+                sln.set_index('reaction_id', inplace = True)
+                fva_df.loc[reaction, ['minimum', 'solution_stats']] = [sln.loc[reaction, 'flux'], stat[()]]
+
+                # skip some iterations by getting other reactions that are at their boundary
+                fva_df = _fill_by_bounds(fva_df, sln)
+            if np.isnan(fva_df.loc[reaction, 'maximum']):
+                sln, stat, _ = me_model.solve_lp(mu_val = mu_val, objective = {reaction: 1})
+                sln = me_model.format_solution(sln)
+                sln.set_index('reaction_id', inplace = True)
+                fva_df.loc[reaction, ['maximum', 'solution_stats']] = [sln.loc[reaction, 'flux'], stat[()]]
+
+                # skip some iterations by getting other reactions that are at their boundary
+                fva_df = _fill_by_bounds(fva_df, sln)
+    else: #TODO
+        raise ValueError('Internal: need to implement parallel solving; for now, set 0 <= n_cores <= 1')
+    if (fva_df.solution_stats == 1).any():
+        warnings.warn('An unexpected infeasible solution occured')
+
+    return fva_df
