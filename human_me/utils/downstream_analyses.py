@@ -346,6 +346,36 @@ def _format_reaction_id(r_id, metabolic_reactions):
         cobra_id = '_'.join(r_id_split)
     return cobra_id, reaction_no, reaction_direction
 
+def _format_reaction_id_df(reaction_ids: List[str], metabolic_reactions: List[str]):
+    """Create a DataFrame mapping the ME Model reaction IDs to their respective metabolic model reaction IDs
+
+    Parameters
+    ----------
+    reaction_ids : List[str]
+        ME Model reaction IDs
+    metabolic_reactions : List[str]
+        metabolic model reaction IDs
+        
+     Returns
+    -------
+    m_reaction_df : pd.DataFrame
+        dataframe with the following columns:
+            "reaction_id": the ME Model reaction ID
+            "cobra_id": the metabolic model reaction ID
+            "reaction_no": if the reaction has an OR GPR, the ME Model building will have created one reaction for each GPR and separted them out by a number
+            "reaction_direction": if the reaction was reversible and not spontaneous, the ME Model will have separated out the forward and reverse directions
+    """
+    
+    m_reaction_df = pd.DataFrame(index = range(len(reaction_ids)), 
+                             columns = ['cobra_id', 'reaction_no', 'reaction_direction'])
+    m_reaction_df.insert(0, 'reaction_id', reaction_ids)
+    m_reaction_df['cobra_id'], m_reaction_df['reaction_no'], \
+    m_reaction_df['reaction_direction'] = zip(*m_reaction_df.reaction_id.apply(_format_reaction_id, 
+                                                                            metabolic_reactions = metabolic_reactions))
+    rev_map = dict(m_reaction_df.groupby('cobra_id')['reaction_direction'].apply(lambda x: x.eq('R').any()))
+    m_reaction_df['reversible'] = m_reaction_df.cobra_id.map(rev_map).tolist()
+
+    return m_reaction_df
 
 def compare_metabolic_fluxes(me_sln: pd.DataFrame, m_model: cobra.Model, add_m_fluxes: bool = True):
     """For metabolic reactions, formats and aggregates (e.g. across reversibility or multiple reactions due to "OR" GPRs) 
@@ -357,7 +387,7 @@ def compare_metabolic_fluxes(me_sln: pd.DataFrame, m_model: cobra.Model, add_m_f
     me_sln : pd.DataFrame
         the solution to the ME Model LP (output of ME_Model.format_solution method)
     m_model : cobra.Model
-        the solution to the metabolic model
+        the comparable metabolic model
         
         We recommend using the cm_2 output from preprocess.correct_inputs.correct_model as the comparable metabolic model.
         Though not necessary, a more fair comparison may be to set the growth rates (mu) of the metabolic and me model to be
@@ -372,13 +402,13 @@ def compare_metabolic_fluxes(me_sln: pd.DataFrame, m_model: cobra.Model, add_m_f
     me_metab_sln : pd.DataFrame
         dataframe containing both the me model (column name "me_flux") and metabolic model (column name "m_flux") flux solutions
     """
-    
+
     metabolic_reactions = [r.id for r in m_model.reactions]
 
     me_metab_sln = me_sln.copy()
-    me_metab_sln['cobra_id'], me_metab_sln['reaction_no'], \
-    me_metab_sln['reaction_direction'] = zip(*me_metab_sln['reaction_id'].apply(_format_reaction_id, 
-                                                                              metabolic_reactions = metabolic_reactions))
+    m_reaction_df = _format_reaction_id_df(reaction_ids = me_metab_sln['reaction_id'].tolist(), 
+                    metabolic_reactions = [metabolic_reactions])
+    me_metab_sln = pd.concat([me_metab_sln, m_reaction_df[['cobra_id', 'reaction_no', 'reaction_direction']]], axis = 1)
     me_metab_sln['me_flux'] = me_metab_sln.apply(lambda x: x.flux if x.reaction_direction == 'F' else -x.flux, axis = 1).tolist()
 
     me_metab_sln = me_metab_sln.groupby(['cobra_id', 'reaction_direction', 'reaction_no'])['me_flux'].sum()
@@ -551,3 +581,71 @@ def flux_variability_analysis(me_model, mu_val: float, reactions: List[str], n_c
         warnings.warn('An unexpected infeasible solution occured')
 
     return fva_df
+
+def _format_reaction_bounds(x, type = 'minimum'):
+    if type == 'minimum':
+        if x.reversible:
+            if x.reaction_direction == 'F':
+                return(np.nan)
+            else:
+                return(-x.maximum)
+        else:
+            return(x.minimum)
+    elif type == 'maximum':
+        if x.reaction_direction == 'F':
+            return(x.maximum)
+        else: 
+            return(np.nan)
+
+def format_fva_as_metabolic(me_fva_df: pd.DataFrame, m_model: cobra.Model, concat_type: str = 'lenient'):
+    """Format the FVA to be comparable to the metabolic model reactions
+
+    Parameters
+    ----------
+    me_fva_df : pd.DataFrame
+        the output of the "flux_variability_analysis" function
+    m_model : cobra.Model
+        the comparable metabolic model
+        
+        We recommend using the cm_2 output from preprocess.correct_inputs.correct_model as the comparable metabolic model.
+        Though not necessary, a more fair comparison may be to set the growth rates (mu) of the metabolic and me model to be
+        the same. In the cobra.Model metabolic model this can be done by setting the growth reaction bounds to be mu. 
+        In the me model, this can be specified with the "mu_val" parameter in the ME_Model.solve_lp method.
+    concat_type : str, optional
+        in the presence of OR GPRs, how to aggregate reaction bounds across the multiple reactions generated, by default 'lenient'
+        options include:
+            "lenient": will take the maximum upper bound and minimum lower bound across the multiple reactions
+            "stringent": will take the minimum upper bound and maximum lower bound across the multiple reactions (note that this may cause situations in which min > max)
+            func: input to pd.DataFrame.aggregate's "func" argument
+    Returns
+    -------
+    comp_fva_df : pd.DataFrame
+        A dataframe that should be directly comparable to the output of running 
+        cobra.flux_analysis.variability.flux_variability_analysis on the m_model
+    """
+    metabolic_reactions = [r.id for r in m_model.reactions]
+
+    comp_fva_df = me_fva_df.copy()
+    m_reaction_df = _format_reaction_id_df(reaction_ids = comp_fva_df.index.tolist(), 
+                                          metabolic_reactions = metabolic_reactions)
+
+    comp_fva_df.reset_index(drop = True, inplace = True)
+    comp_fva_df = pd.concat([comp_fva_df[['minimum', 'maximum']], 
+              m_reaction_df], axis = 1)
+
+    comp_fva_df = comp_fva_df[['reaction_id', 'minimum', 'maximum', 'cobra_id', 'reaction_no', 
+                               'reaction_direction', 'reversible']]
+
+    comp_fva_df['minimum'] = comp_fva_df.apply(lambda x: _format_reaction_bounds(x, type = 'minimum'), axis = 1).tolist()
+    comp_fva_df['maximum'] = comp_fva_df.apply(lambda x: _format_reaction_bounds(x, type = 'maximum'), axis = 1).tolist()
+
+    if concat_type == 'lenient':
+        comp_fva_df = pd.concat([comp_fva_df.groupby('cobra_id')['minimum'].min(), 
+                   comp_fva_df.groupby('cobra_id')['maximum'].max()], axis = 1)
+    elif concat_type == 'stringent':
+        comp_fva_df = pd.concat([comp_fva_df.groupby('cobra_id')['minimum'].max(), 
+               comp_fva_df.groupby('cobra_id')['maximum'].max()], axis = 1).min()
+    else:
+        comp_fva_df.groupby('cobra_id')['minimum'].aggregate(func = concat_type)
+
+    return comp_fva_df
