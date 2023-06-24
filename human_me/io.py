@@ -169,7 +169,11 @@ def read_pickled_me_model(file_name: str):
         solver_type = me_model.solver_type
     else: # in the case where solve_lp has not been run prior to pickling
         solver_type = 'qminos'
-    me_model.initialize_solver(solver_type=solver_type, precision=me_model.solver_precision)
+    if hasattr(me_model, 'solver_precision'):
+        solver_precision = me_model.solver_type
+    else: # in the case where solve_lp has not been run prior to pickling
+        solver_precision = 'quad'
+    me_model.initialize_solver(solver_type=solver_type, precision=solver_precision)
 
     return me_model
 
