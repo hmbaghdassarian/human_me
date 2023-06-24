@@ -273,11 +273,12 @@ class ME_Reaction(cobra.Reaction):
 class MetabolicReaction(ME_Reaction):
     """Inherited from ME_Reaction, specifies the metabolic reactions in the model."""
 
-    def __init__(self, id, cobra_id: str, name='', subsystem='', lower_bound=0.0, upper_bound=None):
+    def __init__(self, id, cobra_id: str, cobra_gpr: str, name='', subsystem='', lower_bound=0.0, upper_bound=None):
         """cobra_id specifies the original reaction name in the M-Model"""
 
         super().__init__(id, name, subsystem, lower_bound, upper_bound)
         self.cobra_id = cobra_id
+        self.cobra_gpr = cobra_gpr
 
 def to_metabolic_reaction(model_metabolites, reaction: cobra.Reaction, id: Optional[str] = None) -> MetabolicReaction:
     """Convert a cobrapy Reaction to a ME_Model MetabolicReaction.
@@ -300,7 +301,8 @@ def to_metabolic_reaction(model_metabolites, reaction: cobra.Reaction, id: Optio
         raise TypeError('Reaction must be a cobra.Reaction')
     if id is None:
         id = reaction.id
-    new_rxn = MetabolicReaction(id=id, cobra_id=reaction.id, name=reaction.name, subsystem=reaction.subsystem,
+    new_rxn = MetabolicReaction(id=id, cobra_id=reaction.id, cobra_gpr = reaction.gene_reaction_rule, 
+                                name=reaction.name, subsystem=reaction.subsystem,
                             lower_bound=reaction.lower_bound, upper_bound=reaction.upper_bound)
     new_rxn.add_metabolites({model_metabolites.id_object_map[m.id]: stoich for m, stoich in reaction.metabolites.items()}, 
                         combine=False)
