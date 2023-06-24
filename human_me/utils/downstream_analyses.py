@@ -472,7 +472,7 @@ def _get_expression_flux(me_model, me_sln: pd.DataFrame, hgnc_id: str,
 
     tot_flux = me_sln.loc[me_sln.reaction_id.isin(synthesis_reactions)]['flux'].aggregate(func = group_by)
     if consider_degradation:
-        tot_flux = me_sln.loc[me_sln.reaction_id.isin(degradation_reactions)]['flux'].aggregate(func = group_by)
+        tot_flux -= me_sln.loc[me_sln.reaction_id.isin(degradation_reactions)]['flux'].aggregate(func = group_by)
         
     return tot_flux
 
@@ -505,7 +505,7 @@ def get_expression_fluxes(me_model, me_sln: pd.DataFrame,
     for hgnc_id in tqdm(me_model.expressed_genes):
         expression_fluxes[hgnc_id] = _get_expression_flux(me_model = me_model, me_sln = me_sln, hgnc_id = hgnc_id, 
                                  molecule_type = molecule_type, group_by = 'sum', 
-                                consider_degradation = True)
+                                consider_degradation = consider_degradation)
 
     flux_df = pd.DataFrame(data = {'HGNC_ID': expression_fluxes.keys(), 
                         molecule_type + '_flux': expression_fluxes.values()})
