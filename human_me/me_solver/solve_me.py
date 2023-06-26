@@ -8,7 +8,7 @@ import time
 import warnings
 from collections import OrderedDict
 from typing import Any, Dict, List, Optional, SupportsFloat
-# from itertools import repeat
+from itertools import repeat
 
 import cobra
 from cobra.util.array import create_stoichiometric_matrix
@@ -18,14 +18,112 @@ import numpy as np
 import pandas as pd
 import scipy
 import seaborn as sns
-# from multiprocessing import Pool
-from pathos.multiprocessing import ProcessingPool as Pool
+from multiprocessing import Pool
+# from pathos.multiprocessing import ProcessingPool as Pool
 from qminospy.solver import QMINOS  # need solveME (https://github.com/SBRG/solvemepy) installed and working
 from tqdm import tqdm
 
 from human_me.core.reaction import BiomassReaction
 from human_me.io import HiddenPrints
 
+def _solve_lp_par(me_model, mu_val: SupportsFloat, objective: Optional[Dict[str, int]] = None,
+             tolerance: SupportsFloat = 0, close_biomass_dilution: bool = True):
+    """Solves the linear program for a specified objective at a specified growth rate.
+    Same as "solve_lp" method, but for calling parallel processes in "optimize" method, for some reason does 
+    not recogize the precision = self.precision assignment and errors out. This runs the solver
+    with precision quad by default rather than passing the precision argument.
+    """
+    if objective is None:
+        objective = {'biomass_dilution': 1}
+    # normalize objective to be 1
+    if not all([np.sign(v) == 1 for v in objective.values()]) and not all(
+            [np.sign(v) == -1 for v in objective.values()]):
+        raise ValueError('Current version can only maximize or minimize combinations of objectives, not do both')
+    tot = abs(sum(objective.values()))
+    objective = {k: v / tot for k, v in objective.items()}
+
+    # get stoichiometric matrix at mu_val
+    if type(me_model) != cobra.Model: # ME Model
+        S = me_model.create_stoichiometric_matrix(mu_val=mu_val, array_type='numpy', inplace=False)
+    else: # a regular metabolic model
+        S = create_stoichiometric_matrix(me_model)
+
+    # get equality and inequality matrices to format (Ev=b; lb <= Iv <= ub; A = concat[E,I])
+    zero_tol = 1e-6
+    inequality_index = []
+    equality_index = []
+    b_equal = []
+    b_less = []
+    b_greater = []
+
+    counter = 0
+    for metab in me_model.metabolites:
+        lb = -np.inf if metab.constraint.lb is None else metab.constraint.lb
+        ub = np.inf if metab.constraint.ub is None else metab.constraint.ub
+        equality = (ub - lb) < zero_tol
+        if equality:
+            b_equal.append(lb if abs(lb) > zero_tol else 0.0)
+            equality_index.append(counter)
+        else:
+            b_less.append(ub)
+            b_greater.append(lb)
+            inequality_index.append(counter)
+        counter += 1
+
+    E = S[equality_index, ]
+    I = S[inequality_index, ]
+
+    A = scipy.sparse.dok_matrix(np.concatenate([E, I, I]))  # E, L, G
+    b = np.array(b_equal + b_less + b_greater)
+    csense = np.array(['E'] * len(b_equal) + ['L'] * len(b_less) + ['G'] * len(b_greater))
+    del b_less
+    del b_greater
+    del b_equal
+    del S
+
+    if tolerance is None:
+        tolerance = 0
+    if tolerance < 0:
+        tolerance = abs(tolerance)
+
+    # reaction bounds at mu
+    xl, xu = np.zeros(len(me_model.reactions)), np.zeros(len(me_model.reactions))
+    xl[:], xu[:] = np.nan, np.nan
+    counter = 0
+    for r in me_model.reactions:
+        if not isinstance(r, BiomassReaction):
+            xl[counter] = copy.copy(r.lower_bound) - tolerance
+            xu[counter] = copy.copy(r.upper_bound) + tolerance
+        else:
+            if (r.id != 'biomass_dilution') or close_biomass_dilution:
+                bounds = r.replace_bound_mu(mu_val=mu_val, inplace=False)
+                xl[counter] = bounds[0] - tolerance
+                xu[counter] = bounds[1] + tolerance
+            else:
+                xl[counter] = 0 - tolerance
+                xu[counter] = 1000 + tolerance
+        counter += 1
+
+    # objective vector (max c.T*v)
+    c = np.zeros(len(me_model.reactions))
+    for r_id, coeff in objective.items():
+        try:
+            r_index = me_model.reactions.index(r_id)
+        except:
+            raise ValueError('Specified reaction id(s) not in model')
+        c[r_index] = coeff
+
+    qs = QMINOS()
+
+    sln, stat, hsq = qs.solvelp(A, b, c, xl, xu, csense)
+
+    # remove unwanted output files
+    abspath = os.path.abspath(os.getcwd())
+    for fn in [os.path.join(abspath, 'fort.9'), os.path.join(abspath, 'fort.11')]:
+        if os.path.isfile(fn):
+            os.remove(fn)
+
+    return sln, stat, hsq
 
 class qminosSolver:
     """Solving human ME Model with qMINOS."""
@@ -320,20 +418,20 @@ class qminosSolver:
             n_cores = min([n_cores, n_points])
             pool = Pool(n_cores)
             try:
-                # res = pool.starmap(self.solve_lp, 
-                #                     zip(repeat(me_model), list(growth_vals), repeat(objective), repeat(tolerance), 
-                #                     repeat(True)))
-                res = pool.map(self.solve_lp, [me_model] * n_points, list(growth_vals), [objective] * n_points,
-                               [tolerance] * n_points,
-                               [True] * n_points)
+                res = pool.starmap(_solve_lp_par, 
+                                    zip(repeat(me_model), list(growth_vals), repeat(objective),
+                                        repeat(tolerance), repeat(True)))
+                # res = pool.map(self.solve_lp, [me_model] * n_points, list(growth_vals), [objective] * n_points,
+                #                [tolerance] * n_points,
+                #                [True] * n_points)
                 pool.close()
                 pool.join()
-                pool.restart()
+                # pool.restart()
                 gc.collect()
             except:
                 pool.close()
                 pool.join()
-                pool.restart()
+                # pool.restart()
                 gc.collect()
                 raise ValueError('Parallelization failed')
             res = [list(r) for r in res]
@@ -362,13 +460,13 @@ class qminosSolver:
         sln = (optimal_val_growth, optimal_val)
 
         if visualize:
-            fig, ax = plt.subplots(figsize=(5, 5))
+            fig, ax = plt.subplots(figsize=(8, 5))
             sns.lineplot(x='growth', y=obj_label, data=predicted, ax=ax)
             sns.scatterplot(x=list(optimal_vals.keys()), y=list(optimal_vals.values()), color='black', ax=ax)
             plt.plot([optimal_val_growth], [optimal_val], marker='o', markersize=3, color="red")
             ax.legend(handles=[mpatches.Patch(color='black', label='Solved'),
                                mpatches.Patch(color=sns.color_palette('tab10')[0], label='Interpolated')],
-                      fancybox=True, fontsize=12)
+                      fancybox=True, fontsize=12, bbox_to_anchor = [1,1])
             ax.set_xlabel(r'$\mu$ $[hr^{-1}]$', fontsize=15, labelpad=5)
             ax.set_ylabel(ax.get_ylabel().split('predicted_')[1] + r'$\;\frac{mmol}{gDw \;hr}$', fontsize=15,
                           labelpad=5)
