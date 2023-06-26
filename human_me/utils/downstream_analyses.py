@@ -15,6 +15,11 @@ from human_me.core.macromolecules.macromolecule import Macromolecule, Proxy
 from human_me.core.biomass import Biomass
 from human_me import io
 from human_me.io import HiddenPrints
+from human_me.preprocess.parse_complex import eval_complex
+from human_me.utils.functions import flatten_list
+from human_me.utils.machinery import rbps
+from human_me.core.macromolecules.protein import Protein
+from human_me.core.macromolecules.complex import Complex
 
 e_aa = ['his_L', 'ile_L', 'leu_L', 'lys_L', 'met_L', 'phe_L', 'thr_L', 'trp_L', 'val_L']
 ne_aa = ['ala_L', 'arg_L', 'asn_L', 'asp_L_c', 'cys_L', 'glu_L', 'gln_L', 'gly', 'pro_L', 'ser_L', 'tyr_L']
@@ -321,13 +326,15 @@ def get_limiting_nutrients(me_model_file: str, max_feasible_mu: float, uptake_on
 
     return sink_sln, metab_include_df
 
-def format_reaction_as_metabolic(reaction) -> Dict[str,Union[str, int]]:
+def format_reaction_as_metabolic(reaction, expression_module: bool = False) -> Dict[str, Union[str, int]]:
     """Returns a dictionary mapping a MEReaction to its respective metabolic model reaction, if it exists
 
     Parameters
     ----------
     reaction : cobra.core.reaction.ME_Reaction
         the ME Model reaction to format
+    expression_module : bool
+        whether to also parse ExpressionReactions, which are not necessary for comparison with the metabolic model, by default False
 
     Returns
     -------
@@ -337,12 +344,12 @@ def format_reaction_as_metabolic(reaction) -> Dict[str,Union[str, int]]:
             "reaction_no": if the reaction has an OR GPR, the ME Model building will have created one reaction for each GPR and separted them out by a number
             "reaction_direction": if the reaction was reversible and not spontaneous, the ME Model will have separated out the forward and reverse directions
     """
-    if not hasattr(reaction, 'cobra_id'):
+    if not expression_module and not hasattr(reaction, 'cobra_id'):
         metabolic_format = {'metabolic_reaction_id': np.nan, 'reaction_number': np.nan, 
                            'reaction_direction': np.nan}
     else:
         reaction_id = reaction.id
-        if reaction_id == reaction.cobra_id:
+        if hasattr(reaction, 'cobra_id') and reaction_id == reaction.cobra_id:
             cobra_id = reaction_id
             reaction_no = 0
             reaction_direction = 'F'
@@ -367,15 +374,16 @@ def format_reaction_as_metabolic(reaction) -> Dict[str,Union[str, int]]:
                            'reaction_direction': reaction_direction}
     return metabolic_format
 
-
-def _format_reaction_id_df(reactions: List):
+def _format_reaction_id_df(reactions: List, expression_module: bool = False):
     """Create a DataFrame mapping the ME Model reaction IDs to their respective metabolic model reaction IDs
 
     Parameters
     ----------
     reaction_ids :List[MEReaction]
         a list of ME Model reactions 
-        
+    expression_module : bool
+        whether to also parse ExpressionReactions, which are not necessary for comparison with the metabolic model, by default False
+
      Returns
     -------
     m_reaction_df : pd.DataFrame
@@ -390,7 +398,8 @@ def _format_reaction_id_df(reactions: List):
                              columns = ['cobra_id', 'reaction_no', 'reaction_direction'])
     m_reaction_df.insert(0, 'reaction_id', [r.id for r in reactions])
     m_reaction_df['cobra_id'], m_reaction_df['reaction_no'], \
-    m_reaction_df['reaction_direction'] = zip(*pd.Series(reactions).apply(lambda x: format_reaction_as_metabolic(x).values()))
+    m_reaction_df['reaction_direction'] = zip(*pd.Series(reactions).apply(lambda x: \
+                                                                          format_reaction_as_metabolic(x, expression_module = expression_module).values()))
 
     m_reaction_df = m_reaction_df[m_reaction_df.cobra_id.notna()]
 
@@ -476,9 +485,78 @@ def _get_expression_flux(me_model, me_sln: pd.DataFrame, hgnc_id: str,
         
     return tot_flux
 
+def _drop_or_expression_fluxes(me_model, flux_df):
+    """If multiple reactions were created due to OR GPR, between those multiple reactions, 
+    will only retain the reaction whose catalyzing enzymes' genes have maximal expression flux across the 
+    multiple reactions.
+    """
+    # get the genes that will definitely be retained (participate in a AND or monomeric reaction)
+    not_or_genes = []
+    for reaction in tqdm(me_model.reactions):
+        if hasattr(reaction, 'cobra_gpr'): # MetabolicReaction
+            gpr = reaction.cobra_gpr
+        else: # Expressionreaction
+            gpr = reaction.gene_reaction_rule
+
+        if gpr != '':
+            parsed_gpr = flatten_list([g if (type(g) == list) else [g] for g in eval_complex(gpr)])
+            if 'or' not in gpr:
+                not_or_genes += parsed_gpr
+    #             all_genes += parsed_gpr
+    #         else: # complexes
+    #             all_genes += parsed_gpr
+
+    not_or_genes += rbps # ribosomal proteins aren't in gprs ("ribosome") 
+    not_or_genes.remove('ribosome')
+    not_or_genes += ['HGNC:12468', 'HGNC:12463']   # ubiquitin genes
+    not_or_genes = list(set(not_or_genes))
+
+
+    # get the total expression flux for genes participating in OR reactions
+    # and only retain those genes that have the maximum expression flux between all reactions 
+    m_reaction_df = _format_reaction_id_df(reactions = me_model.reactions, 
+                                          expression_module = True)
+
+    # filter for reactions with OR gprs
+    or_reactions = m_reaction_df[m_reaction_df.reaction_no > 0].cobra_id
+    m_reaction_df = m_reaction_df[m_reaction_df.cobra_id.isin(or_reactions)]
+
+    # add the catalyzing genes for each reaction
+    respective_genes = []
+    for reaction_id in m_reaction_df.reaction_id:
+        reaction = me_model.reactions.get_by_id(reaction_id)
+        cm = [k for k,v in reaction.coupled_metabolites.items() if v == 'catalysis']
+        if len(cm)>1:
+            print(reaction_id)
+            raise ValueError('Unexpecetd multiple catalyzing enzymes')
+        if isinstance(cm[0], Protein):
+            gene = [cm[0].id.split('_')[0]]
+        elif isinstance(cm[0], Complex):
+            gene = [g.id.split('_')[0] for g in cm[0].components]
+        respective_genes.append(gene)
+    m_reaction_df['catalyzing_genes'] = respective_genes
+
+    # get total expression flux through all genes (sum for complexes) for a reaction
+    flux_df.set_index('HGNC_ID', inplace = True)
+    m_reaction_df['tot_expression_flux'] = m_reaction_df['catalyzing_genes'].apply(lambda x: flux_df.loc[x, flux_df.columns[0]].sum())
+
+    # for each reaction derived due to an OR gpr, identify the one with the maximum flux going through it
+    max_fluxes = m_reaction_df.groupby(['cobra_id']).tot_expression_flux.idxmax()
+    m_reaction_df['max_flux'] = False
+    m_reaction_df.loc[max_fluxes, :] = True
+    ors_to_drop = flatten_list(m_reaction_df[~m_reaction_df.max_flux].catalyzing_genes.tolist())
+
+    # retain those that participate as and only reactions in other reactions
+    ors_to_drop = list(set(ors_to_drop).difference(not_or_genes))
+    print('Dropping {} genes from the analysis that participate in OR reactions'.format(len(ors_to_drop)))
+    flux_df = flux_df.loc[~flux_df.index.isin(ors_to_drop), ]
+    flux_df.reset_index(inplace = True)
+    return flux_df
+
 def get_expression_fluxes(me_model, me_sln: pd.DataFrame,  
                          molecule_type: str, group_by: str = 'sum', 
-                        consider_degradation: bool = True) -> float:
+                        consider_degradation: bool = True, 
+                        drop_ors: bool = False) -> float:
     """Calculate the flux through gene expression for each gene in ME Model.
 
     Parameters
@@ -494,6 +572,9 @@ def get_expression_fluxes(me_model, me_sln: pd.DataFrame,
     consider_degradation : bool, optional
         whether to subtract the degradation fluxes from the synthesis fluxes or only consider synthesis fluxes, 
         by default True
+    drop_ors : bool, optional
+        If multiple reactions were created due to OR GPR, between those multiple reactions, will only retain the 
+        reaction whose catalyzing enzymes' genes have maximal expression flux across the multiple reactions.
 
     Returns
     -------
@@ -504,11 +585,13 @@ def get_expression_fluxes(me_model, me_sln: pd.DataFrame,
     expression_fluxes = dict()
     for hgnc_id in tqdm(me_model.expressed_genes):
         expression_fluxes[hgnc_id] = _get_expression_flux(me_model = me_model, me_sln = me_sln, hgnc_id = hgnc_id, 
-                                 molecule_type = molecule_type, group_by = 'sum', 
+                                 molecule_type = molecule_type, group_by = group_by, 
                                 consider_degradation = consider_degradation)
 
     flux_df = pd.DataFrame(data = {'HGNC_ID': expression_fluxes.keys(), 
                         molecule_type + '_flux': expression_fluxes.values()})
+    if drop_ors:
+        flux_df = _drop_or_expression_fluxes(me_model = me_model, flux_df = flux_df)
     return flux_df
 
 def _fill_by_bounds(fva_df, sln):
