@@ -611,6 +611,8 @@ def _fill_by_bounds(fva_df, sln):
 def flux_variability_analysis(me_model, mu_val: float, reactions: List[str], n_cores: int = 0) -> pd.DataFrame:
     """Runs FVA on reactions of interest at a given growth rate. 
 
+    **Note: this currently runs FVA only for the primary objective of growth.
+
     Parameters
     ----------
     me_model : 
