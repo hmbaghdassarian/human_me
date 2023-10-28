@@ -291,13 +291,13 @@ retro_mach_glyco = ['HGNC:16695', 'HGNC:28454', 'HGNC:14236', 'HGNC:18261', 'HGN
 ERDJ5 = ['HGNC:24637']
 
 HSP90AB1 = ['HGNC:5258']
-escrt = pd.read_csv(os.path.join(build_files_url, 'machinery/escrt_complexes.txt', sep='\t')['HGNC ID'].tolist()
+escrt = pd.read_csv(os.path.join(build_files_url, 'machinery/escrt_complexes.txt'), sep='\t')['HGNC ID'].tolist()
 eps = ['HGNC:3419', 'HGNC:21604']
 endocytic_machinery = sorted(set(proteasome_ubiquitin + escrt + eps + clathrin_m))
 
 cathepsins = ['HGNC:2527', 'HGNC:2529', 'HGNC:9251']
 
-expression_machinery = sorted(pd.read_csv(os.path.join(build_files_url, 'machinery/expression_machinery.txt', header = None)[0].tolist())
+expression_machinery = sorted(pd.read_csv(os.path.join(build_files_url, 'machinery/expression_machinery.txt'), header = None)[0].tolist())
 
 def get_model_machinery(me_input_model) -> Tuple[List[str]]:
     """Parse input metabolic model for metabolic machinery. 
