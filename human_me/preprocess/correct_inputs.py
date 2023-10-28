@@ -80,7 +80,7 @@ def correct_model(model_file: Union[cobra.Model, str] = input_local_path + 'reco
     """
     with urllib.request.urlopen(build_files_url + "required_metabolic_model_metabolites.json") as url:
         required_metabolites = json.loads(url.read().decode())
-    rmd = pd.read_csv(build_files_url + 'required_metabolic_model_metabolites.csv', index_col=0)
+    rmd = pd.read_csv(os.path.join(build_files_url, 'required_metabolic_model_metabolites.csv'), index_col=0)
 
     m_model = load_metabolic_model(model_file)
 
@@ -371,7 +371,7 @@ def correct_psim(me_input_model: Union[cobra.Model, str],
     # run basic non-machinery check
     non_machinery = check_non_machinery(non_machinery=non_machinery)
 
-    expression_machinery = sorted(pd.read_csv(build_files_url + 'machinery/expression_machinery.txt', header = None)[0].tolist())
+    expression_machinery = sorted(pd.read_csv(os.path.join(build_files_url, 'machinery/expression_machinery.txt'), header = None)[0].tolist())
     metabolic_machinery = [g.id for g in me_input_model.genes]
 
     # define the required/optional columns-----------------------------------------------------------------
@@ -478,7 +478,7 @@ def correct_psim(me_input_model: Union[cobra.Model, str],
     if 'PTR' not in missing_cols:
         max_val = psim_me['PTR'].dropna().value_counts().index.tolist()
         if len(max_val) > 0 and type(max_val[0]) == str:
-            ptr = pd.read_csv(build_files_url + 'PTR_Gagneur_processed.tsv', sep='\t', index_col=0)
+            ptr = pd.read_csv(os.path.join(build_files_url, 'PTR_Gagneur_processed.tsv'), sep='\t', index_col=0)
             ptr.drop(columns=['ENSG_ID'], inplace=True)
             ptr.columns = pd.Series(ptr.columns).apply(lambda x: x.split('_')[0] if '_PTR' in x else x).tolist()
             if max_val[0] in ptr.columns.tolist():

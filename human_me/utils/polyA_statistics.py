@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 from typing import SupportsRound, Optional, Union
+import os
 
 import numpy as np
 import pandas as pd
@@ -10,7 +11,7 @@ import statsmodels.api as sm
 from human_me.data.file_paths import build_files_url
 
 # polyA polyA_params
-polyA = pd.read_csv(build_files_url + 'polyA_length.csv', index_col=0)
+polyA = pd.read_csv(os.path.join(build_files_url, 'polyA_length.csv'), index_col=0)
 polyA_params = st.johnsonsu.fit(polyA.MEAN)
 idx = sorted(set(polyA.SD.dropna().index.tolist()).intersection(polyA.MEAN.dropna().index.tolist()))
 reg_data = polyA.loc[idx, ['SD', 'MEAN']]
