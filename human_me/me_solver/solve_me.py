@@ -9,6 +9,7 @@ import warnings
 from collections import OrderedDict
 from typing import Any, Dict, List, Optional, SupportsFloat
 from itertools import repeat
+from multiprocessing import Pool
 
 import cobra
 from cobra.util.array import create_stoichiometric_matrix
@@ -18,28 +19,67 @@ import numpy as np
 import pandas as pd
 import scipy
 import seaborn as sns
-from multiprocessing import Pool
 # from pathos.multiprocessing import ProcessingPool as Pool
 from qminospy.solver import QMINOS  # need solveME (https://github.com/SBRG/solvemepy) installed and working
 from tqdm import tqdm
 
 from human_me.core.reaction import BiomassReaction
 from human_me.io import HiddenPrints
+from human_me.utils.functions import starmap_with_kwargs
 
-def _solve_lp_par(me_model, mu_val: SupportsFloat, objective: Optional[Dict[str, int]] = None,
-             tolerance: SupportsFloat = 0, close_biomass_dilution: bool = True):
+def solve_lp(me_model, 
+              mu_val: SupportsFloat,
+              objective: Optional[Dict[str, SupportsFloat]] = None,
+              tolerance: SupportsFloat = 0,
+             additional_equality_constraints: List[Dict[SupportsFloat, Dict[str, SupportsFloat]]] = None,
+              **kwargs):
     """Solves the linear program for a specified objective at a specified growth rate.
-    Same as "solve_lp" method, but for calling parallel processes in "optimize" method, for some reason does 
-    not recogize the precision = self.precision assignment and errors out. This runs the solver
-    with precision quad by default rather than passing the precision argument.
+
+    Parameters
+    ----------
+    me_model : human_me.core.model.ME_Model
+        ME Model to solve 
+        (can also input a metabolic model with some of the parameter no longer being relevant)
+    mu_val : SupportsFloat
+        The growth value for which to solve the linear program [hr^-1]
+    objective : Dict[str, int], optional
+        The objective function to optimize. Dictionary represent a linear combination of reactions to optimize,
+        with reaction ids as keys and the coefficient of the linear combination as the values. Positive values
+        imply maximization, negative values minimization, by default {'biomass_dilution': 1}
+    tolerance : SupportsFloat, optional
+        Threshold below which expected sensitivity of solver is too low to detect infeasibility, by default 0
+    additional_equality_constraints: List[Dict[SupportsFloat, Dict[str, SupportsFloat]]], optional
+        Further linear equality constraints to add to the LP, by default None
+        Mainly for use with FVA in downstream analysis
+        For example, if we set additional_equality_constraints = [{4: {'A': 3, 'B': 5}},
+                                                                  {10: {'C': 1}}], 
+        this tells the LP that the flux through reaction A and B must meet the following: 3*v_A + 5*v_B = 4
+        and that the flux through reaction C must be the following: 1*v_C = 10
+    **kwargs: 
+        keyword arguments for QMINOS.solvelp method
+
+    Returns
+    -------
+    sln: 1D np.array
+        the vector of fluxes in the optimal solution
+    stat: int
+        the solver status
+            0     Optimal solution found.
+            1     The problem is infeasible.
+            2     The problem is unbounded (or badly scaled).
+            3     Too many iterations.
+            4     Apparent stall.  The solution has not changed
+                  for a large number of iterations (e.g. 1000).
+    hsq:
+        optimal basis (see qminospy.solver.QMINOS)
     """
     if objective is None:
         objective = {'biomass_dilution': 1}
     # normalize objective to be 1
-    if not all([np.sign(v) == 1 for v in objective.values()]) and not all(
-            [np.sign(v) == -1 for v in objective.values()]):
-        raise ValueError('Current version can only maximize or minimize combinations of objectives, not do both')
-    tot = abs(sum(objective.values()))
+    if len({np.sign(v) for v in objective.values()}) == 1:
+        tot = abs(sum(objective.values()))
+    else:
+        tot = 1
     objective = {k: v / tot for k, v in objective.items()}
 
     # get stoichiometric matrix at mu_val
@@ -69,8 +109,18 @@ def _solve_lp_par(me_model, mu_val: SupportsFloat, objective: Optional[Dict[str,
             b_greater.append(lb)
             inequality_index.append(counter)
         counter += 1
+    
+    if additional_equality_constraints is None: additional_equality_constraints = []
+    E_ac = np.zeros(shape = (len(additional_equality_constraints), S.shape[1]))    
+    for idx, ec_i in enumerate(additional_equality_constraints):
+        for ev, rf in ec_i.items():
+            b_equal.append(ev)
+            for reaction_id, reaction_weight in rf.items():
+                E_ac[idx, me_model.reactions.index(reaction_id)] = reaction_weight
 
     E = S[equality_index, ]
+    if E_ac.shape[0] > 0:
+        E = np.concatenate([E, E_ac])
     I = S[inequality_index, ]
 
     A = scipy.sparse.dok_matrix(np.concatenate([E, I, I]))  # E, L, G
@@ -95,13 +145,13 @@ def _solve_lp_par(me_model, mu_val: SupportsFloat, objective: Optional[Dict[str,
             xl[counter] = copy.copy(r.lower_bound) - tolerance
             xu[counter] = copy.copy(r.upper_bound) + tolerance
         else:
-            if (r.id != 'biomass_dilution') or close_biomass_dilution:
-                bounds = r.replace_bound_mu(mu_val=mu_val, inplace=False)
-                xl[counter] = bounds[0] - tolerance
-                xu[counter] = bounds[1] + tolerance
-            else:
-                xl[counter] = 0 - tolerance
-                xu[counter] = 1000 + tolerance
+#             if (r.id != 'biomass_dilution') or close_biomass_dilution:
+            bounds = r.replace_bound_mu(mu_val=mu_val, inplace=False)
+            xl[counter] = bounds[0] - tolerance
+            xu[counter] = bounds[1] + tolerance
+#             else:
+#                 xl[counter] = 0 - tolerance
+#                 xu[counter] = 1000 + tolerance
         counter += 1
 
     # objective vector (max c.T*v)
@@ -115,7 +165,7 @@ def _solve_lp_par(me_model, mu_val: SupportsFloat, objective: Optional[Dict[str,
 
     qs = QMINOS()
 
-    sln, stat, hsq = qs.solvelp(A, b, c, xl, xu, csense)
+    sln, stat, hsq = qs.solvelp(A, b, c, xl, xu, csense, **kwargs)
 
     # remove unwanted output files
     abspath = os.path.abspath(os.getcwd())
@@ -127,18 +177,15 @@ def _solve_lp_par(me_model, mu_val: SupportsFloat, objective: Optional[Dict[str,
 
 class qminosSolver:
     """Solving human ME Model with qMINOS."""
-    def __init__(self, precision: str = 'quad') -> None:
-        """"Initializer for solving with qMINOS
+    def __init__(self) -> None:
+        """"Initializer for solving with qMINOS"""
 
-        Parameters
-        ----------
-        precision : str, optional
-            The precision for the qminos solver (options ['double', 'quad', 'dq', 'dqq']), by default 'quad'
-        """
-        self.precision = precision
-
-    def solve_lp(self, me_model, mu_val: SupportsFloat, objective: Optional[Dict[str, int]] = None,
-                 tolerance: SupportsFloat = 0, close_biomass_dilution: bool = True):
+    def solve_lp(me_model, 
+                mu_val: SupportsFloat,
+                objective: Optional[Dict[str, int]] = None,
+                tolerance: SupportsFloat = 0,
+                additional_equality_constraints: List[Dict[SupportsFloat, Dict[str, SupportsFloat]]] = None,
+                **kwargs):
         """Solves the linear program for a specified objective at a specified growth rate.
 
         Parameters
@@ -150,12 +197,18 @@ class qminosSolver:
             The growth value for which to solve the linear program [hr^-1]
         objective : Dict[str, int], optional
             The objective function to optimize. Dictionary represent a linear combination of reactions to optimize,
-            with reaction ids as keys and the coefficient of the linear combination as the values.
-            Values must either be 1 for maximization or -1 for minimization, by default {'biomass_dilution': 1}
+            with reaction ids as keys and the coefficient of the linear combination as the values. Positive values
+            imply maximization, negative values minimization, by default {'biomass_dilution': 1}
         tolerance : SupportsFloat, optional
             Threshold below which expected sensitivity of solver is too low to detect infeasibility, by default 0
-        close_biomass_dilution : bool, optional
-            Internal use only, whether to constrain the biomass_dilution reaction bounds by mu, by default True
+        additional_equality_constraints: List[Dict[SupportsFloat, Dict[str, SupportsFloat]]], optional
+            Further linear equality constraints to add to the LP, by default None
+            For example, if we set additional_equality_constraints = [{4: {'A': 3, 'B': 5}},
+                                                                    {10: {'C': 1}}], 
+            this tells the LP that the flux through reaction A and B must meet the following: 3*v_A + 5*v_B = 4
+            and that the flux through reaction C must be the following: 1*v_C = 10
+        **kwargs: 
+            keyword arguments for QMINOS.solvelp method
 
         Returns
         -------
@@ -168,132 +221,54 @@ class qminosSolver:
                 2     The problem is unbounded (or badly scaled).
                 3     Too many iterations.
                 4     Apparent stall.  The solution has not changed
-                      for a large number of iterations (e.g. 1000).
+                    for a large number of iterations (e.g. 1000).
         hsq:
             optimal basis (see qminospy.solver.QMINOS)
         """
-        if objective is None:
-            objective = {'biomass_dilution': 1}
-        # normalize objective to be 1
-        if not all([np.sign(v) == 1 for v in objective.values()]) and not all(
-                [np.sign(v) == -1 for v in objective.values()]):
-            raise ValueError('Current version can only maximize or minimize combinations of objectives, not do both')
-        tot = abs(sum(objective.values()))
-        objective = {k: v / tot for k, v in objective.items()}
-
-        # get stoichiometric matrix at mu_val
-        if type(me_model) != cobra.Model: # ME Model
-            S = me_model.create_stoichiometric_matrix(mu_val=mu_val, array_type='numpy', inplace=False)
-        else: # a regular metabolic model
-            S = create_stoichiometric_matrix(me_model)
-
-        # get equality and inequality matrices to format (Ev=b; lb <= Iv <= ub; A = concat[E,I])
-        zero_tol = 1e-6
-        inequality_index = []
-        equality_index = []
-        b_equal = []
-        b_less = []
-        b_greater = []
-
-        counter = 0
-        for metab in me_model.metabolites:
-            lb = -np.inf if metab.constraint.lb is None else metab.constraint.lb
-            ub = np.inf if metab.constraint.ub is None else metab.constraint.ub
-            equality = (ub - lb) < zero_tol
-            if equality:
-                b_equal.append(lb if abs(lb) > zero_tol else 0.0)
-                equality_index.append(counter)
-            else:
-                b_less.append(ub)
-                b_greater.append(lb)
-                inequality_index.append(counter)
-            counter += 1
-
-        E = S[equality_index, ]
-        I = S[inequality_index, ]
-
-        A = scipy.sparse.dok_matrix(np.concatenate([E, I, I]))  # E, L, G
-        b = np.array(b_equal + b_less + b_greater)
-        csense = np.array(['E'] * len(b_equal) + ['L'] * len(b_less) + ['G'] * len(b_greater))
-        del b_less
-        del b_greater
-        del b_equal
-        del S
-
-        if tolerance is None:
-            tolerance = 0
-        if tolerance < 0:
-            tolerance = abs(tolerance)
-
-        # reaction bounds at mu
-        xl, xu = np.zeros(len(me_model.reactions)), np.zeros(len(me_model.reactions))
-        xl[:], xu[:] = np.nan, np.nan
-        counter = 0
-        for r in me_model.reactions:
-            if not isinstance(r, BiomassReaction):
-                xl[counter] = copy.copy(r.lower_bound) - tolerance
-                xu[counter] = copy.copy(r.upper_bound) + tolerance
-            else:
-                if (r.id != 'biomass_dilution') or close_biomass_dilution:
-                    bounds = r.replace_bound_mu(mu_val=mu_val, inplace=False)
-                    xl[counter] = bounds[0] - tolerance
-                    xu[counter] = bounds[1] + tolerance
-                else:
-                    xl[counter] = 0 - tolerance
-                    xu[counter] = 1000 + tolerance
-            counter += 1
-
-        # objective vector (max c.T*v)
-        c = np.zeros(len(me_model.reactions))
-        for r_id, coeff in objective.items():
-            try:
-                r_index = me_model.reactions.index(r_id)
-            except:
-                raise ValueError('Specified reaction id(s) not in model')
-            c[r_index] = coeff
-
-        qs = QMINOS()
-
-        sln, stat, hsq = qs.solvelp(A, b, c, xl, xu, csense, precision=self.precision)
-
-        # remove unwanted output files
-        abspath = os.path.abspath(os.getcwd())
-        for fn in [os.path.join(abspath, 'fort.9'), os.path.join(abspath, 'fort.11')]:
-            if os.path.isfile(fn):
-                os.remove(fn)
-
+        sln, stat, hsq = solve_lp(me_model = me_model, mu_val = mu_val, objective = objective, tolerance = tolerance, 
+                                  additional_equality_constraints = additional_equality_constraints,
+                                  **kwargs)
         return sln, stat, hsq
 
-    def _try_mu(self, me_model, mu_val, objective, tolerance, 
-                res: Dict[SupportsFloat, Dict[str, Any]], feasible_mu: List[SupportsFloat], infeasible_mu: List[SupportsFloat], verbose: bool = True):
+    def _try_mu(self, me_model, mu_val, objective, tolerance, additional_equality_constraints,
+                res: Dict[SupportsFloat, Dict[str, Any]], feasible_mu: List[SupportsFloat], infeasible_mu: List[SupportsFloat], verbose: bool = True, 
+                **kwargs):
         """To be used with maximize_growth method"""
+        if 'verbosity' not in kwargs:
+            kwargs = {**kwargs, **dict(verbosity = verbose)} 
         with HiddenPrints():
-            sln, stat, hsq = self.solve_lp(me_model, mu_val, objective=objective, tolerance = tolerance)
-        if stat.max() == 1 and mu_val < 1e-9:
+            sln, stat, hsq = solve_lp(me_model, mu_val, objective=objective, tolerance = tolerance, 
+                                      additional_equality_constraints = additional_equality_constraints,
+                                       **kwargs)
+        if stat[()] == 1 and mu_val < 1e-9:
             warnings.warn('Model is infeasible at mu = 0. Trying mu = 1e-9 instead')
             mu_val = 1e-9
             with HiddenPrints():
-                sln, stat, hsq = self.solve_lp(me_model, mu_val, objective=objective, tolerance = tolerance)
-            if stat.max() == 1:
+                sln, stat, hsq = solve_lp(me_model, mu_val, objective=objective, tolerance = tolerance,
+                                          additional_equality_constraints = additional_equality_constraints,
+                                        **kwargs)
+            if stat[()] == 1:
                 raise ValueError('Provided minimum mu is infeasible')
 
-        res[mu_val] = {'solution': sln, 'status': stat.max(), 'basis': hsq}
+        res[mu_val] = {'solution': sln, 'status': stat[()], 'basis': hsq}
 
-        if stat.max() == 0:  # "optimal":
+        if stat[()] == 0:  # "optimal":
             if verbose:
                 print('The problem has an optimal solution at mu = {} (hrs)'.format(mu_val))
             feasible_mu.append(mu_val)
             return True, sln, stat, hsq, res, feasible_mu, infeasible_mu
-        if stat.max() == 1:
+        if stat[()] == 1:
             infeasible_mu.append(mu_val)
             if verbose:
                 print('The problem is infeasible at mu = {} (hrs)'.format(mu_val))
             return False, None, None, None, res, feasible_mu, infeasible_mu
-        raise ValueError('The problem returned with stat: {}'.format(stat.max()))
+        raise ValueError('The problem returned with stat: {}'.format(stat[()]))
 
     def maximize_growth(self, me_model, min_mu: SupportsFloat = 0, max_mu: SupportsFloat = 0.05,
                         mu_accuracy: SupportsFloat = 1e-10, increment: SupportsFloat = 0.02, tolerance: SupportsFloat = 0,
-                        verbose: bool = True):
+                        verbose: bool = True, 
+                        additional_equality_constraints: List[Dict[SupportsFloat, Dict[str, SupportsFloat]]] = None, 
+                        **kwargs):
         """Binary search to find the maximum feasible growth rate.
 
         Parameters
@@ -312,13 +287,15 @@ class qminosSolver:
             Threshold below which expected sensitivity of solver is too low to detect infeasibility, by default 0
         verbose : bool, optional
             Prints information about each linear program iteration, by default True
+        **kwargs: 
+            keyword arguments for QMINOS.solvelp method
 
         Returns
         -------
         mu_max: int
             the maximum feasible growth value (in hours)
         res: Dict[float, Tuple[np.array, int]]]
-            keys are all attempted growth values, values are dictionaries with keys as output from self.solve_lp
+            keys are all attempted growth values, values are dictionaries with keys as output from solve_lp
         """
         objective = {'biomass_dilution': 1}  # maximizing for growth
         feasible_mu = []
@@ -329,24 +306,32 @@ class qminosSolver:
 
         if verbose:
             print('Trying mu: {}'.format(min_mu))
-        bool_, sln, stat, hsq, res, feasible_mu, infeasible_mu = self._try_mu(me_model, min_mu, objective = objective, tolerance = tolerance, res = res, 
-                                                                            feasible_mu = feasible_mu, infeasible_mu = infeasible_mu, verbose = verbose)  # start with minimal
+        bool_, sln, stat, hsq, res, feasible_mu, infeasible_mu = self._try_mu(me_model, min_mu, objective = objective, tolerance = tolerance, 
+                                                                              additional_equality_constraints = additional_equality_constraints,
+                                                                              res = res, feasible_mu = feasible_mu, infeasible_mu = infeasible_mu, 
+                                                                              verbose = verbose, **kwargs)  # start with minimal
 
 
-        bool_max, sln, stat, hsq, res, feasible_mu, infeasible_mu = self._try_mu(me_model, max_mu, objective = objective, tolerance = tolerance, res = res, 
-                                                                            feasible_mu = feasible_mu, infeasible_mu = infeasible_mu, verbose = verbose)
+        bool_max, sln, stat, hsq, res, feasible_mu, infeasible_mu = self._try_mu(me_model, max_mu, objective = objective, tolerance = tolerance, 
+                                                                                 additional_equality_constraints = additional_equality_constraints,
+                                                                                 res = res, feasible_mu = feasible_mu, infeasible_mu = infeasible_mu, 
+                                                                                 verbose = verbose, **kwargs)
         while bool_max:  # If max_mu was feasible, keep increasing
             max_mu += increment
             if verbose:
                 print('Trying mu: {}'.format(max_mu))
             bool_max, sln, stat, hsq, res, feasible_mu, infeasible_mu = self._try_mu(me_model, max_mu, objective = objective, tolerance = tolerance, 
-                                                                                    res = res, feasible_mu = feasible_mu, infeasible_mu = infeasible_mu, verbose = verbose)
+                                                                                     additional_equality_constraints = additional_equality_constraints,
+                                                                                    res = res, feasible_mu = feasible_mu, infeasible_mu = infeasible_mu, 
+                                                                                    verbose = verbose, **kwargs)
         while (infeasible_mu[-1] - feasible_mu[-1]) > mu_accuracy:
             if verbose:
                 print('Trying mu: {}'.format((infeasible_mu[-1] - feasible_mu[-1]) * 0.5))
             bool_, sln, stat, hsq, res, feasible_mu, infeasible_mu = self._try_mu(me_model, (infeasible_mu[-1] + feasible_mu[-1]) * 0.5,  
-                                                                                objective = objective, tolerance = tolerance, res = res, 
-                                                                                feasible_mu = feasible_mu, infeasible_mu = infeasible_mu, verbose = verbose)
+                                                                                objective = objective, tolerance = tolerance, 
+                                                                                additional_equality_constraints = additional_equality_constraints,
+                                                                                res = res, feasible_mu = feasible_mu, infeasible_mu = infeasible_mu, 
+                                                                                verbose = verbose, **kwargs)
         if verbose:
             tot = ((time.time() - start) / 3600)
             print("completed in {:.2f} hours and {} iterations".format(tot, len(feasible_mu + infeasible_mu)))
@@ -358,7 +343,9 @@ class qminosSolver:
 
     def optimize(self, me_model, objective: Dict[str, int], mu_max: SupportsFloat,
                  n_points: int = 10, tolerance: SupportsFloat = 0, n_cores: Optional[int] = None,
-                 visualize: bool = True, fig_name: Optional[str] = None):
+                 visualize: bool = True, fig_name: Optional[str] = None, 
+                 additional_equality_constraints: List[Dict[SupportsFloat, Dict[str, SupportsFloat]]] = None,
+                 **kwargs):
         """General optimization of any non-growth objective.
 
         Parameters
@@ -382,6 +369,8 @@ class qminosSolver:
             plot the relationship between growth and the objective function of interest, by default True
         fig_name : Optional[str], optional
             save the plotted figure to 'path/to/filename.ext', by default None
+        **kwargs: 
+            keyword arguments for QMINOS.solvelp method
 
         Returns
         -------
@@ -402,45 +391,48 @@ class qminosSolver:
         obj_keys = list(objective.keys())
         if len(obj_keys) == 1 and obj_keys[0] == 'biomass_dilution':
             raise ValueError('To optimize for growth, use the .maximize_growth() method')
-        if len(set(list(objective.values()))) != 1:
-            raise ValueError(
-                'Currently, NLP objectives must be either only maximization or minimization (only all 1s or only all -1s in objective dictionary values)')
+        # if len(set(list(objective.values()))) != 1:
+        #     raise ValueError(
+        #         'Currently, NLP objectives must be either only maximization or minimization (only all 1s or only all -1s in objective dictionary values)')
 
         growth_vals = np.arange(0, mu_max + mu_max / n_points, mu_max / (n_points - 1))
         if (n_cores is None) or (n_cores <= 1):
             res = list()
             for mu_val in tqdm(growth_vals):
-                sln, stat, hsq = self.solve_lp(me_model=me_model, mu_val=mu_val, objective=objective,
-                                               tolerance=tolerance,
-                                               close_biomass_dilution=True)
+                sln, stat, hsq = solve_lp(me_model=me_model, mu_val=mu_val, objective=objective,
+                                               tolerance=tolerance, additional_equality_constraints = additional_equality_constraints, **kwargs)
                 res.append([sln, stat, hsq])
         else:
-            n_cores = min([n_cores, n_points])
+            if 'precision' in kwargs: #TODO: get solveme fixed so this isn't necessary
+                # line 192 https://github.com/SBRG/solvemepy/blob/master/qminospy/solver.py
+                # needs to be "precision=='quad'" rather than "precision is 'quad'" to be able to specify this
+                if kwargs['precision'] != 'quad':
+                    warnings.warn('precision parameter cannot be specified when calling pool.starmap, defaulting to quad')
+                del kwargs['precision']
+            n_cores = min(n_cores, len(growth_vals))
             pool = Pool(n_cores)
             try:
-                res = pool.starmap(_solve_lp_par, 
-                                    zip(repeat(me_model), list(growth_vals), repeat(objective),
-                                        repeat(tolerance), repeat(True)))
-                # res = pool.map(self.solve_lp, [me_model] * n_points, list(growth_vals), [objective] * n_points,
-                #                [tolerance] * n_points,
-                #                [True] * n_points)
+                args_iter = zip(repeat(me_model), list(growth_vals))
+                kwargs_lp = dict(objective = objective, 
+                                tolerance = tolerance, 
+                                additional_equality_constraints = additional_equality_constraints)
+                kwargs_all = {**kwargs_lp, **kwargs} # https://stackoverflow.com/questions/38987/how-do-i-merge-two-dictionaries-in-a-single-expression-in-python
+                kwargs_iter = repeat(kwargs_all)
+                res = starmap_with_kwargs(pool, solve_lp, args_iter, kwargs_iter)
                 pool.close()
                 pool.join()
-                # pool.restart()
                 gc.collect()
             except:
                 pool.close()
                 pool.join()
-                # pool.restart()
                 gc.collect()
                 raise ValueError('Parallelization failed')
             res = [list(r) for r in res]
-
         reaction_indeces = [me_model.reactions.index(j) for j in sorted(objective.keys())]
         res = OrderedDict({i[0]: dict(zip(['val', 'sln', 'stat', 'hsq'],
                                           [(dict(zip(sorted(objective.keys()), i[1][0][reaction_indeces])))] + i[1]))
                            for i in zip(growth_vals, res)})
-        optimal_vals = OrderedDict({k: sum(v['val'].values()) for k, v in res.items()})
+        optimal_vals = OrderedDict({k: sum([v['val'][reaction_id]*reaction_weight for reaction_id, reaction_weight in objective.items()]) for k, v in res.items()})
 
         # estimate objective values across growth using interpolation
         interp_fit = scipy.interpolate.interp1d(x=list(optimal_vals.keys()), y=list(optimal_vals.values()),

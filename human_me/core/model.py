@@ -362,22 +362,20 @@ class ME_Model(cobra.Model):
         else:
             return array
 
-    def initialize_solver(self, solver_type: str = 'qminos', precision: str = 'quad'):
+    def initialize_solver(self, solver_type: str = 'qminos'):
         """Initialize the ME Model solver.
 
         solver_type : str
             The solver to use for the linear programs (options ['qminos']), by default "qminos"
-        precision: str
-            The precision for the qminos solver (options ['double', 'quad', 'dq', 'dqq']), by default 'quad'
         """
         if solver_type == 'qminos':
-            self.solver_ = solve_me.qminosSolver(precision=precision)
+            self.solver_ = solve_me.qminosSolver()
             self.solver_type = 'qminos'
-            self.solver_precision = 'quad'
         else:
             raise ValueError('Only the qMINOS solver is currently implemented')
 
-    def solve_lp(self, mu_val: SupportsFloat, objective: Optional[Dict[str, int]] = None, tolerance: SupportsFloat = 0) -> Tuple[np.array, int]:
+    def solve_lp(self, mu_val: SupportsFloat, objective: Optional[Dict[str, int]] = None, tolerance: SupportsFloat = 0, 
+                 additional_equality_constraints: List[Dict[SupportsFloat, Dict[str, SupportsFloat]]] = None, **kwargs) -> Tuple[np.array, int]:
         """Solves the linear program for a specified objective at a specified growth rate.
 
         Parameters
@@ -390,6 +388,14 @@ class ME_Model(cobra.Model):
             Values must either be 1 for maximization or -1 for minimization, by default {'biomass_dilution': 1}
         tolerance : float, optional
             Threshold below which expected sensitivity of solver is too low to detect infeasibility, by default 0
+        additional_equality_constraints: List[Dict[SupportsFloat, Dict[str, SupportsFloat]]], optional
+            Further linear equality constraints to add to the LP, by default None
+            For example, if we set additional_equality_constraints = [{4: {'A': 3, 'B': 5}},
+                                                                    {10: {'C': 1}}], 
+            this tells the LP that the flux through reaction A and B must meet the following: 3*v_A + 5*v_B = 4
+            and that the flux through reaction C must be the following: 1*v_C = 10
+        **kwargs: 
+            keyword arguments for QMINOS.solvelp method
 
         Returns
         -------
@@ -405,21 +411,25 @@ class ME_Model(cobra.Model):
         hsq:
             optimal basis (see qminospy.solver.QMINOS)
         """
-        if objective is None:
-            objective = {'biomass_dilution': 1}
+        # if objective is None:
+        #     objective = {'biomass_dilution': 1}
         if self.solver_ is None:
             warnings.warn(
                 'Solver is not initialized with ME_Model.intialize_solver, intializing with default parameters')
             self.initialize_solver()
         else:
-            self.initialize_solver(solver_type=self.solver_type, precision=self.solver_precision)
+            self.initialize_solver(solver_type=self.solver_type)
 
-        sln, stat, hs = self.solver_.solve_lp(me_model=self, mu_val=mu_val, objective=objective, tolerance=tolerance)
+        sln, stat, hs = self.solver_.solve_lp(me_model=self, mu_val=mu_val, objective=objective, tolerance=tolerance,
+                                              additional_equality_constraints = additional_equality_constraints, 
+                                            **kwargs)
         return sln, stat, hs
 
     def maximize_growth(self, min_mu: SupportsFloat = 0, max_mu: SupportsFloat = 0.05,
                         mu_accuracy: SupportsFloat = 1e-10, increment: SupportsFloat = 0.02,
-                        tolerance: SupportsFloat = 0, verbose: bool = True):
+                        tolerance: SupportsFloat = 0, verbose: bool = True, 
+                        additional_equality_constraints: List[Dict[SupportsFloat, Dict[str, SupportsFloat]]] = None, 
+                        **kwargs):
         """Binary search to find the maximum feasible growth rate.
 
         Parameters
@@ -438,6 +448,8 @@ class ME_Model(cobra.Model):
             Threshold below which expected sensitivity of solver is too low to detect infeasibility, by default 0
         verbose : bool, optional
             Prints information about each linear program iteration, by default True
+        **kwargs: 
+            keyword arguments for QMINOS.solvelp method
 
         Returns
         -------
@@ -451,17 +463,21 @@ class ME_Model(cobra.Model):
                 'Solver is not initialized with ME_Model.intialize_solver, intializing with default parameters')
             self.initialize_solver()
         else:
-            self.initialize_solver(solver_type=self.solver_type, precision=self.solver_precision)
+            self.initialize_solver(solver_type=self.solver_type)
 
         mu_max, res = self.solver_.maximize_growth(me_model=self,
                                                    min_mu=min_mu, max_mu=max_mu,
                                                    mu_accuracy=mu_accuracy, increment=increment,
                                                    tolerance=tolerance,
-                                                   verbose=verbose)
+                                                   verbose=verbose,
+                                                    additional_equality_constraints = additional_equality_constraints,
+                                                    **kwargs)
         return mu_max, res
 
     def optimize(self, objective: Dict[str, int], mu_max: SupportsFloat, n_points: int = 10,
-                 tolerance: SupportsFloat = 0, visualize: bool = True, fig_name: str = None):
+                 tolerance: SupportsFloat = 0, visualize: bool = True, fig_name: str = None, 
+                 additional_equality_constraints: List[Dict[SupportsFloat, Dict[str, SupportsFloat]]] = None,
+                 **kwargs):
         """General optimization of any non-growth objective.
 
         Parameters
@@ -481,6 +497,8 @@ class ME_Model(cobra.Model):
             plot the relationship between growth and the objective function of interest, by default True
         fig_name : Optional[str], optional
             save the plotted figure to 'path/to/filename.ext', by default None
+        **kwargs: 
+            keyword arguments for QMINOS.solvelp method
 
         Returns
         -------
@@ -503,13 +521,15 @@ class ME_Model(cobra.Model):
                 'Solver is not initialized with ME_Model.intialize_solver, intializing with default parameters')
             self.initialize_solver()
         else:
-            self.initialize_solver(solver_type=self.solver_type, precision=self.solver_precision)
+            self.initialize_solver(solver_type=self.solver_type)
 
         sln, predicted, interp_fit, optimal_vals, res = self.solver_.optimize(me_model=self, objective=objective,
                                                                               mu_max=mu_max, n_points=n_points,
                                                                               tolerance=tolerance,
                                                                               n_cores=self.n_cores, visualize=visualize,
-                                                                              fig_name=fig_name)
+                                                                              fig_name=fig_name,
+                                                                              additional_equality_constraints = additional_equality_constraints,
+                                                                              **kwargs)
         return sln, predicted, interp_fit, optimal_vals, res
 
     def format_solution(self, sln: List[float]) -> pd.DataFrame:

@@ -5,6 +5,7 @@ import random
 from typing import Any, List, Dict, Optional, Union, Tuple
 from urllib.request import urlopen
 from io import StringIO
+from itertools import repeat
 
 import cobra
 from Bio.Seq import Seq
@@ -419,3 +420,11 @@ def read_fasta_url(file_url: str):
     fasta = response.read().decode("utf-8", "ignore")
     formatted_fasta = SeqIO.read(StringIO(fasta), 'fasta')
     return formatted_fasta
+
+# https://stackoverflow.com/questions/45718523/pass-kwargs-to-starmap-while-using-pool-in-python
+def apply_args_and_kwargs(fn, args, kwargs):
+    return fn(*args, **kwargs)
+
+def starmap_with_kwargs(pool, fn, args_iter, kwargs_iter):
+    args_for_starmap = zip(repeat(fn), args_iter, kwargs_iter)
+    return pool.starmap(apply_args_and_kwargs, args_for_starmap)

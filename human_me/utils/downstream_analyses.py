@@ -2,10 +2,12 @@
 # coding: utf-8
 
 import os
-
+import gc
 from tqdm import tqdm
-from typing import List, Dict, Union
+from typing import List, Dict, Union, Optional, SupportsFloat
 import warnings
+from itertools import repeat
+from multiprocessing import Pool
 
 import pandas as pd
 import numpy as np
@@ -16,10 +18,11 @@ from human_me.core.biomass import Biomass
 from human_me import io
 from human_me.io import HiddenPrints
 from human_me.preprocess.parse_complex import eval_complex
-from human_me.utils.functions import flatten_list
+from human_me.utils.functions import flatten_list, starmap_with_kwargs
 from human_me.utils.machinery import rbps
 from human_me.core.macromolecules.protein import Protein
 from human_me.core.macromolecules.complex import Complex
+from human_me.me_solver.solve_me import solve_lp
 
 e_aa = ['his_L', 'ile_L', 'leu_L', 'lys_L', 'met_L', 'phe_L', 'thr_L', 'trp_L', 'val_L']
 ne_aa = ['ala_L', 'arg_L', 'asn_L', 'asp_L_c', 'cys_L', 'glu_L', 'gln_L', 'gly', 'pro_L', 'ser_L', 'tyr_L']
@@ -594,6 +597,25 @@ def get_expression_fluxes(me_model, me_sln: pd.DataFrame,
         flux_df = _drop_or_expression_fluxes(me_model = me_model, flux_df = flux_df)
     return flux_df
 
+def get_optimal_val(formatted_sln: pd.DataFrame, 
+                   objective: Dict[str, SupportsFloat]) -> float:
+    """Calculate the optimal value for the objective
+
+    Parameters
+    ----------
+    formatted_sln : pd.DataFrame
+        output of model.ME_Model.format_solution
+    objective : Dict[str, SupportsFloat]
+        input to model.ME_Model..solve_lp
+
+    Returns
+    -------
+    float
+        _description_
+    """
+    # like line 435 of me_solver.solve_me
+    return sum([formatted_sln.set_index('reaction_id').loc[r_id, 'flux']*wt for r_id, wt in objective.items()]) 
+
 def _fill_by_bounds(fva_df, sln):
     """If any other reactions in the solution are at their boundary, add these to avoid iterating through them."""
     fva_df = fva_df.copy()
@@ -608,11 +630,15 @@ def _fill_by_bounds(fva_df, sln):
     
     return fva_df
 
-def flux_variability_analysis(me_model, mu_val: float, reactions: List[str], n_cores: int = 0) -> pd.DataFrame:
+def flux_variability_analysis(me_model, 
+                              mu_val: float, 
+                              reactions: List[str], 
+                              primary_objective: Optional[Dict[str, SupportsFloat]] = None,
+                              optimal_val: float = None,
+                              tolerance: SupportsFloat = 0,
+                              n_cores: int = 0, 
+                             **kwargs) -> pd.DataFrame:
     """Runs FVA on reactions of interest at a given growth rate. 
-
-    **Note: this currently runs FVA only for the primary objective of growth.
-
     Parameters
     ----------
     me_model : 
@@ -622,17 +648,48 @@ def flux_variability_analysis(me_model, mu_val: float, reactions: List[str], n_c
     reactions : List[str]
         a list of reaction IDs from the ME Model. Solving the ME Model takes much longer than a standard
         metabolic model, so we highly recommend limiting this list to a few reactions. 
+    primary_objective : Dict[str, int], optional
+        The objective function to optimize. Dictionary represent a linear combination of reactions to optimize,
+        with reaction ids as keys and the coefficient of the linear combination as the values. Positive values
+        imply maximization, negative values minimization, by default {'biomass_dilution': 1}
+    optimal_val: float, optional
+        The value of the primary objective at the optimal solution, see "get_optimal_val" function
+    tolerance : float, optional
+        Threshold below which expected sensitivity of solver is too low to detect infeasibility, by default 0
     n_cores : int, optional
         number of cores to parallelize with, by default no parallelization. This may take longer than iterating
         through each one at a time (see use of _fill_by_bounds function when n_cores <= 1). 
-        *Currently not implemented.
+    **kwargs: 
+        keyword arguments for QMINOS.solvelp method
 
     Returns
     -------
     fva_df : pd.DataFrame
         first two columns represent the minimum and maximum possible fluxes at that growth rate
     """
-    fva_df = pd.DataFrame(index = reactions, columns = ['minimum', 'maximum', 'solution_stats'])
+    if primary_objective is None:
+        primary_objective = {'biomass_dilution': 1}
+        if optimal_val is None:
+            optimal_val = mu_val
+        else:
+            if optimal_val != mu_val: 
+                warnings.warn('Setting growth objective to mu_val')
+                optimal_val = mu_val
+    
+    if primary_objective == {'biomass_dilution': 1}:
+        if optimal_val is None:
+            optimal_val = mu_val
+        elif optimal_val != mu_val:
+            warnings.warn('Setting growth objective to mu_val')
+            optimal_val = mu_val
+    elif optimal_val is None:
+        raise ValueError('Please input an optimal solution for the primary objective')
+    
+    # this should work even with objective being growth rate
+    additional_equality_constraints = [{optimal_val: primary_objective}]
+
+    fva_df = pd.DataFrame(index = reactions, columns = ['minimum', 'maximum', 'sln_stats_min', 
+                                                       'sln_stats_max'])
 
     max_bounds, min_bounds = dict(), dict()
     for r_id in reactions:
@@ -645,25 +702,62 @@ def flux_variability_analysis(me_model, mu_val: float, reactions: List[str], n_c
     if n_cores <= 1:
         for reaction in tqdm(reactions):
             if np.isnan(fva_df.loc[reaction, 'minimum']):
-                sln, stat, _ = me_model.solve_lp(mu_val = mu_val, objective = {reaction: -1})
+                sln, stat, _ = me_model.solve_lp(mu_val = mu_val, objective = {reaction: -1}, 
+                                                additional_equality_constraints = additional_equality_constraints, 
+                                                **kwargs)
                 sln = me_model.format_solution(sln)
                 sln.set_index('reaction_id', inplace = True)
-                fva_df.loc[reaction, ['minimum', 'solution_stats']] = [sln.loc[reaction, 'flux'], stat[()]]
+                fva_df.loc[reaction, ['minimum', 'sln_stats_min']] = [sln.loc[reaction, 'flux'], stat[()]]
 
                 # skip some iterations by getting other reactions that are at their boundary
                 fva_df = _fill_by_bounds(fva_df, sln)
             if np.isnan(fva_df.loc[reaction, 'maximum']):
-                sln, stat, _ = me_model.solve_lp(mu_val = mu_val, objective = {reaction: 1})
+                sln, stat, _ = me_model.solve_lp(mu_val = mu_val, objective = {reaction: 1}, 
+                                                additional_equality_constraints = additional_equality_constraints, 
+                                                **kwargs)
                 sln = me_model.format_solution(sln)
                 sln.set_index('reaction_id', inplace = True)
-                fva_df.loc[reaction, ['maximum', 'solution_stats']] = [sln.loc[reaction, 'flux'], stat[()]]
+                fva_df.loc[reaction, ['maximum', 'sln_stats_max']] = [sln.loc[reaction, 'flux'], stat[()]]
 
                 # skip some iterations by getting other reactions that are at their boundary
                 fva_df = _fill_by_bounds(fva_df, sln)
-    else: #TODO
-        raise ValueError('Internal: need to implement parallel solving; for now, set 0 <= n_cores <= 1')
-    if (fva_df.solution_stats == 1).any():
+    else:
+        objective_iter = flatten_list([[{reaction: 1}, {reaction: -1}] for reaction in reactions])
+        n_cores = min(len(objective_iter), n_cores)
+        pool = Pool(n_cores)
+        try:
+            args_iter = zip(repeat(me_model), repeat(mu_val), objective_iter)
+            kwargs_lp = dict(tolerance = tolerance, 
+                            additional_equality_constraints = additional_equality_constraints)
+            kwargs_all = {**kwargs_lp, **kwargs} # https://stackoverflow.com/questions/38987/how-do-i-merge-two-dictionaries-in-a-single-expression-in-python
+            kwargs_iter = repeat(kwargs_all)
+            res = starmap_with_kwargs(pool, solve_lp, args_iter, kwargs_iter)
+            pool.close()
+            pool.join()
+            gc.collect()
+        except:
+            pool.close()
+            pool.join()
+            gc.collect()
+            raise ValueError('Parallelization failed')
+
+    fva_df.sln_stats_max = [i[1][()] for idx, i in enumerate(res) if idx % 2 == 0]
+    fva_df.sln_stats_min = [i[1][()] for idx, i in enumerate(res) if idx % 2 == 1]
+    if (fva_df.sln_stats_max == 1).any() or ((fva_df.sln_stats_min == 1).any()):
         warnings.warn('An unexpected infeasible solution occured')
+    slns = [me_model.format_solution(i[0]).set_index('reaction_id') for i in res]
+    for idx, reaction in enumerate(reactions):
+        fva_df.loc[reaction, 'maximum'] = slns[idx*2].loc[reaction].flux
+        fva_df.loc[reaction, 'minimum'] = slns[(idx*2) + 1].loc[reaction].flux
+
+        # # sanity check on primary objective being maintained
+        # aec_val_max = 0
+        # aec_val_min = 0
+        # for r_id, wt in primary_objective.items():
+        #     aec_val_max += wt*slns[idx*2].loc[r_id, 'flux']
+        #     aec_val_min += wt*slns[(idx*2) + 1].loc[r_id, 'flux']            
+        # assert np.isclose(aec_val_max, optimal_val) and np.isclose(aec_val_min, optimal_val), \
+        #     'Primary objective value was not maintained during FVA'
 
     return fva_df
 
