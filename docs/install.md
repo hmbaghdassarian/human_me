@@ -2,15 +2,7 @@
 
 These provide additional details and alternate installation instructions for setting up the human_me environment and qMINOS solver
 
-Note, throughout the instructions we will refer to "path/to/human_me" as the root path to the package directory stored within your virtual environment.
-After pip installing, this can be found as follows in Python: <env_name>/lib/python3.7/site-packages/human_me-0.1.0-py3.7.egg/human_me
-
-```python
-import human_me
-print(human_me.__path__)
-```
-
-## Step 1-2: Creating the Environment
+## Step 1: Creating the Environment
 
 We highly recommending setting up a [python virtual environment](https://docs.python.org/3/library/venv.html) instead of a conda environment, because it works better with the solver.
 
@@ -19,11 +11,14 @@ This can be done as follows (example with python 3.9):
 python3.9 -m venv <env_name>
 source <env_name>/bin/activate
 ```
-Make sure this virtual environment has Python 3.8-3.9, setuptools >= 65.4, and pip >= 21. Once the environment is created, if setuptools and pip do not meet these version requirements, you can run the following command:
+
+All remaining steps should be implemented with the virtual environment activated. Make sure this virtual environment has Python 3.8-3.9, setuptools >= 65.4, and pip >= 21. Once the environment is created, if setuptools and pip do not meet these version requirements, you can run the following command:
 
 ```console
 pip install --upgrade pip setuptools
 ```
+
+## Step 2: Install the human_me package
 
 human_me can be installed using pip and PyPi:
 ```console
@@ -39,8 +34,13 @@ python setup.py install
 
 If you want to install jupyter notebook: 
 ```console
-pip install human_me[.interactive]
+pip install human_me[interactive]
 python3 -m ipykernel install --user --name=<env_name>
+```
+
+For steps 3-4 below, we need to get the path to the package:
+```console
+PACKAGE_PATH=$(python -c "import human_me; print(human_me.__path__[0])")/
 ```
 
 ## Step 3: Setting up the qMINOS solver
@@ -53,7 +53,7 @@ gfortran (>=4.6) is required for qMINOS <br>
 &emsp;ii) the solver can be installed using the human_me Makefile as follows:
 
 ```console
-make -C <path/to/human_me/> install-qminos SOLVER_PATH=<path/to/solver/solver_parent_directory>
+make -C <path/to/human_me/> install-qminos SOLVER_PATH=<path/to/solver_parent_directory>
 ```
 
 If SOLVER_PATH is not specified, it defaults to path/to/human_me/solver.

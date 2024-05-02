@@ -19,5 +19,6 @@ isort
 mkdocs
 mkdocstrings
 mkdocs-material
+mkdocs-exclude
 pytkdocs[numpy-style]
 Pygments
