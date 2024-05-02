@@ -53,7 +53,7 @@ INSTALL_REQUIRES = [
     # 'ruamel_yaml==0.17.4'
 ]
 
-EXTRAS_REQUIRES = {'interactive': ['jupyter', 'ipykerne']
+EXTRAS_REQUIRES = {'interactive': ['jupyter', 'ipykernel']
                   }
 
 PACKAGES = [

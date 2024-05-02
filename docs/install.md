@@ -14,12 +14,12 @@ print(human_me.__path__)
 
 We highly recommending setting up a [python virtual environment](https://docs.python.org/3/library/venv.html) instead of a conda environment, because it works better with the solver.
 
-This can be done as follows:
+This can be done as follows (example with python 3.9):
 ```console
-python3 -m venv <env_name> #--python=python3.6.9
+python3.9 -m venv <env_name>
 source <env_name>/bin/activate
 ```
-Make sure this virtual environment has Python 3.7-3.9, setuptools >= 65.4, and pip >= 21. Once the environment is created, if setuptools and pip do not meet these version requirements, you can run the following command:
+Make sure this virtual environment has Python 3.8-3.9, setuptools >= 65.4, and pip >= 21. Once the environment is created, if setuptools and pip do not meet these version requirements, you can run the following command:
 
 ```console
 pip install --upgrade pip setuptools
@@ -30,20 +30,16 @@ human_me can be installed using pip and PyPi:
 pip install human_me
 ```
 
-***Alternatively***, the human_me environment can be setup independent of PyPi using github and requirements.txt: 
+***Alternatively***, the human_me environment can be setup independent of PyPi using github and setup.py: 
 ```console
 git clone https://github.com/hmbaghdassarian/human_me.git
-pip install -r <path/to/human_me/>requirements.txt
+cd human_me
+python setup.py install
 ```
 
-or setup.py:
+If you want to install jupyter notebook: 
 ```console
-git clone https://github.com/hmbaghdassarian/human_me.git
-python <path/to/human_me/>setup.py install
-```
-
-If jupyter notebook does not load the virtual environment kernel, outside of the environment, try: 
-```console
+pip install human_me[.interactive]
 python3 -m ipykernel install --user --name=<env_name>
 ```
 
