@@ -1,5 +1,5 @@
-# Documentation for 'human_me.utils'
-
+# Documentation
+<!-- TODO: fix this,commented out portions-->
 ::: human_me.io
     handler: python
     rendering:
@@ -12,11 +12,11 @@
       show_root_heading: true
       show_source: true
 
-::: human_me.utils
+<!-- ::: human_me.utils
     handler: python
     rendering:
       show_root_heading: true
-      show_source: true
+      show_source: true -->
 
 ::: human_me.core.macromolecules
     handler: python
@@ -30,16 +30,11 @@
       show_root_heading: true
       show_source: true
 
-::: human_me.core.model
+<!-- ::: human_me.core.model
     handler: python
-    <!-- -- selection:
-      members:
-        - __init__
-        - add_reactions
-        - check -->
     rendering:
       show_root_heading: true
-      show_source: true
+      show_source: true -->
 
 ::: human_me.core.gene
     handler: python
@@ -59,11 +54,11 @@
       show_root_heading: true
       show_source: true
 
-::: human_me.build
+<!-- ::: human_me.build
     handler: python
     rendering:
       show_root_heading: true
-      show_source: true
+      show_source: true -->
 
 ::: human_me.expression
     handler: python
@@ -71,8 +66,8 @@
       show_root_heading: true
       show_source: true
 
-::: human_me.me_solver
+<!-- ::: human_me.me_solver
     handler: python
     rendering:
       show_root_heading: true
-      show_source: true
+      show_source: true -->

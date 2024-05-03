@@ -9,6 +9,7 @@ plugins:
       default_handler: python
       handlers:
         python:
+#           paths: [human_me]  # search packages in the src folder
           selection:
             docstring_style: "numpy"
           rendering:

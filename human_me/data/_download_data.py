@@ -79,7 +79,11 @@ def download_data(prebuild: bool = False):
     for d_dir, file_dict in google_files.items():
         print('Download {} files'.format(d_dir))
         for file_name, file_id in file_dict.items():
-            gdown.download(id=file_id, output=os.path.join(dir_map[d_dir], file_name))
+            gdown.download(
+                f"https://drive.google.com/uc?export=download&confirm=pbef&id={file_id}",
+                output=os.path.join(dir_map[d_dir], file_name)
+            )
+#             gdown.download(id=file_id, output=os.path.join(dir_map[d_dir], file_name))
             # gdd.download_file_from_google_drive(file_id=file_id,
             #                                     dest_path=os.path.join(dir_map[d_dir], file_name),
             #                                     overwrite = False,

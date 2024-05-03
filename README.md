@@ -6,7 +6,7 @@ For additional details and alternate install options, see the documentation's [i
 Requirements: gfortran (>=4.6)
 
 
-1. Create a [python virtual environment](https://docs.python.org/3/library/venv.html) and activate this environment. Make sure this virtual environment has Python 3.7-3.9, setuptools >= 65.4, and pip >=21. 
+1. Create a [python virtual environment](https://docs.python.org/3/library/venv.html) and activate this environment. Make sure this virtual environment has Python 3.8-3.9, setuptools >= 65.4, and pip >=21. 
 2. Install human_me:
 ```console
 pip install human_me
@@ -18,12 +18,13 @@ pip install human_me
 &emsp;ii) the solver can be installed using the human_me Makefile as follows:
 
 ```console
-make -C <path/to/human_me/> install-qminos SOLVER_PATH=<path/to/solver/solver_parent_directory>
+PACKAGE_PATH=$(python -c "import human_me; print(human_me.__path__[0])")/
+make -C $PACKAGE_PATH install-qminos SOLVER_PATH=<path/to/solver_parent_directory>
 ```
 4. Download the large files for building locally (11 gb of space are needed).
 
 ```console
-make -C <path/to/human_me/> build-data DATA_DIR=</desired/local_data/directory>
+make -C $PACKAGE_PATH build-data DATA_DIR=</desired/local_data/directory>
 ```
 
 ## About

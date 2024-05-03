@@ -29,7 +29,11 @@ pip install human_me
 ```console
 git clone https://github.com/hmbaghdassarian/human_me.git
 cd human_me
-python setup.py install
+pip install .
+
+# delete the cloned repo so that the package path is appropriately read:
+cd ..
+rm -rf human_me
 ```
 
 If you want to install jupyter notebook: 
@@ -48,15 +52,15 @@ qMINOS is a high precision LP solver necessary for the order-of-magnitude differ
 The QMINOS solver can be obtained for academic use from Prof. Michael Saunders at Stanford University.<br>
 gfortran (>=4.6) is required for qMINOS <br>
 
-&emsp;i) download the qminos file into a specified solver directory, which we refer to here as "solver_parent_directory".
+&emsp;i) download the qminos file into a specified directory, which we refer to here as "solver_parent_directory".
 
 &emsp;ii) the solver can be installed using the human_me Makefile as follows:
 
 ```console
-make -C <path/to/human_me/> install-qminos SOLVER_PATH=<path/to/solver_parent_directory>
+make -C $PACKAGE_PATH install-qminos SOLVER_PATH=<path/to/solver_parent_directory>
 ```
 
-If SOLVER_PATH is not specified, it defaults to path/to/human_me/solver.
+If SOLVER_PATH is not specified, it defaults to human_me/solver.
 
 ---
 
@@ -120,14 +124,14 @@ Small files are stored on Github in the [human_me_data repository](https://githu
 Larger files need to be downloaded directly from public Google Drive files. This is done using the make build-files command as follows:
 
 ```console
-make -C <path/to/human_me/> build-data DATA_DIR=</desired/local_data/directory>
+make -C $PACKAGE_PATH build-data DATA_DIR=</desired/local_data/directory>
 ```
 
 Downloading the build files will take ~30 min, as the PSIM file is > 10 Gb.
 
 If you also want to download the prebuild files, run the following command:
 ```console
-make -C <path/to/human_me/> build-data DATA_DIR=</desired/local_data/directory> PREBUILD=1
+make -C $PACKAGE_PATH build-data DATA_DIR=</desired/local_data/directory> PREBUILD=1
 ```
 The user-specificed local data directory is stored in a human_me/data/data.ini config file.  
 

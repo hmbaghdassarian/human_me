@@ -27,6 +27,7 @@ project_files/
 notebooks/.pybiomart.sqlite
 test_code/
 me_env/
+me_env_stable/
 MammalianSecretoryRecon/
 
 

@@ -11,7 +11,6 @@ from multiprocessing import Pool
 
 import pandas as pd
 import numpy as np
-import cobra
 
 from human_me.core.macromolecules.macromolecule import Macromolecule, Proxy
 from human_me.core.biomass import Biomass
@@ -40,7 +39,7 @@ ordered_sugar = sugar_carbon_source_order + other_carbons
 
 def _order_metabolites(metabolites_list: List[str], me_model, 
                        order_aa: bool = True, order_sugar: bool = True, order_excreted: bool = True, 
-                       compartment_order: List[str] = None, ):
+                       compartment_order: Optional[List[str]] = None):
     """Order the metabolites to test in troubleshoot_me by compartment, with the first compartment being most likely 
     source of infeasability. 
 
@@ -56,7 +55,7 @@ def _order_metabolites(metabolites_list: List[str], me_model,
         whether to sort sugar carbon source by which are most important, by default True
     order_excreted: bool, optional
         whether to deprioritize exchanged metabolites that can only be excreted, by default True 
-    compartment_order : List[str], optional
+    compartment_order : Optional[List[str]], optional
         ME Model compartments orderd by which are likely to cause feasibility issues, by default List[str]
 
     Returns
@@ -114,8 +113,8 @@ def _order_metabolites(metabolites_list: List[str], me_model,
     return ordered_metabolites
 
 
-def troubleshoot_me(me_model_file: str, mu_val: float = 1e-9, model_metabolite_ids: List[str] = None,
-                    out_path: str = None, *args, **kwargs):
+def troubleshoot_me(me_model_file: str, mu_val: float = 1e-9, model_metabolite_ids: Optional[List[str]] = None,
+                    out_path: Optional[str] = None, *args, **kwargs):
     """Helps troubleshoot ME Model if solver finds infeasible solution at growth rate of "mu_val". Basic principle is to 
     iterate through the metabolites from the input metabolic model, add them as sinks, and see which are required as sinks to 
     make the model feasible.
@@ -130,9 +129,9 @@ def troubleshoot_me(me_model_file: str, mu_val: float = 1e-9, model_metabolite_i
         full path to pickled me model
     mu_val : float, optional
         growth rate to solve lp at, by default 1e-9
-    metab_ids : List[str], optional
+    model_metab_ids : Optional[List[str]], optional
         a list of metabolite IDs (subset of all) to test whether adding the sinks makes the model feasible, by default all metabolites
-    out_path : str, optional
+    out_path : Optional[str], optional
         where to save the output files, by default current working directory
     *args : 
         into "_order_metabolites" function
