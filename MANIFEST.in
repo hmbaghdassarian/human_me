@@ -1,2 +1,2 @@
-Makefile
-
+include human_me/Makefile
+include README.md

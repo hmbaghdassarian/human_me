@@ -73,7 +73,7 @@ metadata = dict(
     long_description=long_description,
     url='https://github.com/hmbaghdassarian/human_me',  # homepage
     packages=find_packages(include=('human_me*'), exclude=('*test*',)),  # PACKAGES
-    scripts=['install_solver.py'],
+#     scripts=['install_solver.py'],
     include_package_data=True,
     project_urls={'Documentation': 'https://hmbaghdassarian.github.io/human_me/'},
     # py_modules=['io'],
