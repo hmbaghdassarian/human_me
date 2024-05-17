@@ -7,6 +7,7 @@ from typing import Any, Optional, Union
 
 import cobra 
 import pandas as pd
+import scipy
 
 class HiddenPrints:
     '''Supress package print messages.'''
@@ -230,3 +231,36 @@ def write_pickled_object(object: Any, file_name: str) -> None:
 
     with open(file_name, 'wb') as handle:
         pickle.dump(object, handle)
+
+
+def write_stoichiometric_matrix(me_model, file_name: str, mu_val: Union[int, float]):
+    """Writes the ME Model stoichiometric matrix as a scipy sparse array (.npz), replacing growth rate parameters
+    with a specific value. Column (reaction IDs) and row (metabolite IDs) are separately written to text files.
+
+    Parameters
+    ----------
+    me_model : _type_
+        the me model
+    file_name : str
+        name of the file (with full path) to save the stoichiometric matrix to
+    mu_val : Union[int, float]
+        growth rate value to replace terms dependent on the parameter with
+    """
+    file_name = os.path.splitext(file_name)[0]
+    S = me_model.create_stoichiometric_matrix(array_type = 'pandas', 
+                                         mu_val = mu_val, 
+                                         inplace = False)
+    # Direct conversion from DataFrame to scipy.sparse.coo_matrix
+    coo = scipy.sparse.coo_matrix(S.values)
+    csr_matrix = coo.tocsr()
+    scipy.sparse.save_npz(os.path.join(file_name, '.npz'), csr_matrix)
+    
+    # Save column names to a text file
+    with open(os.path.join(file_name, '_column_reaction_ids.txt'), 'w') as f:
+        for column in df.columns:
+            f.write(f"{column}\n")
+
+    # Save row names (index) to a text file
+    with open(os.path.join(file_name, '_row_metabolite_ids.txt'), 'w') as f:
+        for index in df.index:
+            f.write(f"{index}\n")

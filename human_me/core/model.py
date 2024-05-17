@@ -371,8 +371,25 @@ class ME_Model(cobra.Model):
                     reaction._metabolites[metabolite] = float(stoich.subs(params.mu, mu_val))
 
             if isinstance(reaction, BiomassReaction):
-                reaction.replace_bound_mu(mu_val = mu_val, inplace = True)    
+                reaction.replace_bound_mu(mu_val = mu_val, inplace = True)  
+                
+    def to_metabolic(self, mu_val: Union[float, int]):
+        """Converts the ME Model to a metabolic model, with growth rate parameters replaced by mu_val."""
+        reactions = []
+        for reaction_ in self.reactions:
+            reaction = reaction_.copy()
+            for metabolite, stoich in iteritems(reaction.metabolites):
+                if isinstance(stoich, sympy.Expr):
+                    reaction._metabolites[metabolite] = float(stoich.subs(params.mu, mu_val))
 
+            if isinstance(reaction, BiomassReaction):
+                reaction.replace_bound_mu(mu_val = mu_val, inplace = True)  
+            reactions.append(reaction)
+        m_model.add_reactions(reactions)
+
+        return m_model
+                
+                
     def initialize_solver(self, solver_type: str = 'qminos'):
         """Initialize the ME Model solver.
 
