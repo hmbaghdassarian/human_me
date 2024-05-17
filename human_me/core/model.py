@@ -362,6 +362,17 @@ class ME_Model(cobra.Model):
         else:
             return array
 
+    def replace_mu(self, mu_val):
+        """Replaces reaction bounds and stoichiometric coefficients that are a function of 
+        growth rate with a specific growth rate value. Done inplace."""
+        for reaction in self.reactions:
+            for metabolite, stoich in iteritems(reaction.metabolites):
+                if isinstance(stoich, sympy.Expr):
+                    reaction._metabolites[metabolite] = float(stoich.subs(params.mu, mu_val))
+
+            if isinstance(reaction, BiomassReaction):
+                reaction.replace_bound_mu(mu_val = mu_val, inplace = True)    
+
     def initialize_solver(self, solver_type: str = 'qminos'):
         """Initialize the ME Model solver.
 
