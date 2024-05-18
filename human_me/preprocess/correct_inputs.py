@@ -16,6 +16,7 @@ import numpy as np
 from human_me.preprocess import parse_complex
 from human_me.data.file_paths import build_files_url, build_local_path, input_local_path
 from human_me.io import load_metabolic_model, load_psim
+from human_me.core.biomass import check_m_biomass, correct_m_biomass
 
 logging.basicConfig()
 logger = logging.getLogger(cobra.__name__)
@@ -52,7 +53,9 @@ def bool_metabolite(m_id: str, compartment: str, m_model: cobra.Model) -> Tuple[
     except:
         return False, None
 
-def correct_model(model_file: Union[cobra.Model, str] = input_local_path + 'recon2_2.xml', biomass_reaction_id: str = 'biomass_reaction') -> Tuple[cobra.Model]:
+def correct_model(model_file: Union[cobra.Model, str] = input_local_path + 'recon2_2.xml', 
+                  biomass_reaction_id: str = 'biomass_reaction', 
+                  correct_biomass: bool = False) -> Tuple[cobra.Model]:
     """Makes necessary changes to cobrapy model, largely based on issues encountered with Recon2.2.    
     
     Note that because the ME Model will create a new objective function, the input model's biomass objective function
@@ -66,6 +69,11 @@ def correct_model(model_file: Union[cobra.Model, str] = input_local_path + 'reco
         string must be 'full/path/to/input_model.xml', by default input_local_path + 'recon2_2.xml' (full Recon2.2 model)
     biomass_reaction : str, optional
         the id of the input metabolic model's biomass reaction
+    correct_biomass: bool
+        whether to correct biomass function (see `core.biomass.correct_m_biomass` for details)
+
+        can usually also be run separately before this function, but need to ensure all 
+        biomass objective metabolites are present in the model
 
     Returns
     -------
@@ -231,6 +239,14 @@ def correct_model(model_file: Union[cobra.Model, str] = input_local_path + 'reco
     m_model.add_reactions(reactions_to_add)
 
     cm_2 = m_model.copy()  # metabolic model with incorrect GPRs corrected and ME-Model required metabolite transport added
+    
+    # correct the biomass
+    if not correct_biomass:
+        check_m_biomass(cm_2)
+    else: 
+        cm_2 = correct_m_biomass(cm_2)
+
+
     # remove biomass
     metabolites_1 = [m.id for m in m_model.metabolites]
     try:
