@@ -99,6 +99,11 @@ def correct_model(model_file: Union[cobra.Model, str] = input_local_path + 'reco
         err += 'Please remove the following compartments from your model: ' + ', '.join(different_compartments)
         raise ValueError(err)
 
+    for r in m_model.reactions: # some exchanges do not follow standard naming convention
+        if r.id.startswith('EX_') and r.id.endswith('_') and 'LPAREN_e_RPAREN' not in r.id:
+            if sorted(r.compartments) == ['b', 'e']: # not necessary but to ensure getting the correct ones
+                r.id = r.id + 'LPAREN_e_RPAREN_'
+
     for r in m_model.reactions:
         # incase GPR has redundant complexes (recon2.2 had atleast one instance of this - id = OIVD1m)
         if 'and' in r.gene_reaction_rule and 'or' in r.gene_reaction_rule: 
@@ -560,6 +565,7 @@ def format_exchanges(m_model):
         em_b = em_e.copy()
         em_b.compartment = 'b'
         em_b.id = '_'.join(em_b.id.split('_')[:-1]) + '_b'
+
         m_model.add_metabolites([em_b])
 
         er_b_metabolites = dict()
