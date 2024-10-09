@@ -35,7 +35,7 @@ INSTALL_REQUIRES = [
     'cmake==3.18.2',
     'cython==0.29.20',
     'multiprocess==0.70.13',
-    'numpy==1.19.5', 
+    'numpy==1.19.5', # 1.26.4
     'pandas==1.1.5',
     'scipy==1.5.4',
     'statsmodels==0.10.2',
@@ -47,7 +47,7 @@ INSTALL_REQUIRES = [
     'biopython==1.79',
     'Faker==8.5.1',
     'openpyxl==3.0.10',
-    'tables==3.6.1', # 3.7.0 <-- may be needed for pd.read_hdf
+    'tables==3.7.0', # 3.7.0 <-- may be needed for pd.read_hdf
     'numexpr==2.7.3'
     # 'swiglpk==5.0.5'
     # 'ruamel_yaml==0.17.4'
