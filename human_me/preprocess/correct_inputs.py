@@ -90,7 +90,7 @@ def correct_model(model_file: Union[cobra.Model, str] = input_local_path + 'reco
         required_metabolites = json.loads(url.read().decode())
     rmd = pd.read_csv(os.path.join(build_files_url, 'required_metabolic_model_metabolites.csv'), index_col=0)
 
-    m_model = load_metabolic_model(model_file)
+    m_model = load_metabolic_model(model_file).copy()
 
     # check for correct compartments
     different_compartments = list(set(m_model.compartments.keys()).difference(compartments_me.keys()))

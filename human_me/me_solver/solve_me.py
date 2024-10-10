@@ -180,7 +180,7 @@ class qminosSolver:
     def __init__(self) -> None:
         """"Initializer for solving with qMINOS"""
 
-    def solve_lp(me_model, 
+    def solve_lp(self, me_model, 
                 mu_val: SupportsFloat,
                 objective: Optional[Dict[str, int]] = None,
                 tolerance: SupportsFloat = 0,
