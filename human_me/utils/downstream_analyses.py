@@ -12,6 +12,8 @@ from multiprocessing import Pool
 import pandas as pd
 import numpy as np
 
+import sympy
+
 from human_me.core.macromolecules.macromolecule import Macromolecule, Proxy
 from human_me.core.biomass import Biomass
 from human_me import io
@@ -327,6 +329,32 @@ def get_limiting_nutrients(me_model_file: str, max_feasible_mu: float, uptake_on
     sink_sln, metab_include_df = troubleshoot_me(model_file = me_model_file, mu_val = mu_val, model_metabolite_ids = metab_ids)
 
     return sink_sln, metab_include_df
+
+def correct_solution_precision(me_sln, me_model):
+    """Correct fluxes that are out of bounds due to solver precision. 
+
+    Parameters
+    ----------
+    me_model : 
+        the ME Model
+    me_sln : pd.DataFrame
+        the solution to the ME Model LP (output of `ME_Model.format_solution` method)
+
+    Returns
+    -------
+    me_sln
+        the same dataframe with corrected fluxes
+    """
+    for idx in tqdm(me_sln.index):
+        reaction_id, flux = me_sln.loc[idx,:]
+        lb, ub = me_model.reactions.get_by_id(reaction_id).bounds
+        if not isinstance(lb, sympy.Expr) and flux < lb:
+            flux = lb
+        elif not isinstance(ub, sympy.Expr) and flux > ub:
+            flux = ub
+        me_sln.loc[idx, 'flux'] = flux 
+    return me_sln
+
 
 def format_reaction_as_metabolic(reaction, expression_module: bool = False) -> Dict[str, Union[str, int]]:
     """Returns a dictionary mapping a MEReaction to its respective metabolic model reaction, if it exists
