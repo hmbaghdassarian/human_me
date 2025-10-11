@@ -330,8 +330,9 @@ def get_limiting_nutrients(me_model_file: str, max_feasible_mu: float, uptake_on
 
     return sink_sln, metab_include_df
 
-def correct_solution_precision(me_sln, me_model):
-    """Correct fluxes that are out of bounds due to solver precision. 
+def correct_solution_precision(me_sln, me_model, reset_precision: bool = False):
+    """Correct fluxes that are out of bounds due to solver feasibility tolerance (which is 1e-20 by default). 
+    
 
     Parameters
     ----------
@@ -339,21 +340,40 @@ def correct_solution_precision(me_sln, me_model):
         the ME Model
     me_sln : pd.DataFrame
         the solution to the ME Model LP (output of `ME_Model.format_solution` method)
+    reset_precision : bool
+        sets the following fluxes to 0s: those that did not violate bounds, but have absolute values
+        smaller than the largest corrected absolute value (minimum precision detection); 
+        not recommended to use, as the violations are due to feasibility tolerance
 
     Returns
     -------
-    me_sln
+    me_sln_corrected
         the same dataframe with corrected fluxes
     """
-    for idx in tqdm(me_sln.index):
-        reaction_id, flux = me_sln.loc[idx,:]
-        lb, ub = me_model.reactions.get_by_id(reaction_id).bounds
-        if not isinstance(lb, sympy.Expr) and flux < lb:
-            flux = lb
-        elif not isinstance(ub, sympy.Expr) and flux > ub:
-            flux = ub
-        me_sln.loc[idx, 'flux'] = flux 
-    return me_sln
+    me_sln_corrected = me_sln.copy()
+    
+    bounds = pd.DataFrame(me_sln_corrected.reaction_id.apply(lambda r_id: me_model.reactions.get_by_id(r_id).bounds).tolist(),
+                          columns = ['lower_bound', 'upper_bound'])
+    sympy_bounds = bounds[bounds.apply(lambda x: isinstance(x[0], sympy.Expr) or isinstance(x[1], sympy.Expr), axis = 1)].index.tolist()
+    bounds['sympy'] = False
+    bounds.loc[sympy_bounds,'sympy'] = True
+
+    
+    me_sln_corrected = pd.concat([me_sln_corrected, bounds], axis = 1)
+
+    violate = me_sln_corrected[(~me_sln_corrected.sympy)]
+    violate_lower = violate[(violate.flux < violate.lower_bound)].index.tolist()
+    me_sln_corrected.loc[violate_lower, 'flux'] = me_sln_corrected.loc[violate_lower, 'lower_bound']
+
+    violate_upper = violate[(violate.flux > violate.upper_bound)].index.tolist()
+    me_sln_corrected.loc[violate_upper, 'flux'] = me_sln_corrected.loc[violate_upper, 'upper_bound']
+    
+    me_sln_corrected.drop(columns = ['lower_bound', 'upper_bound', 'sympy'], inplace = True)
+
+    if reset_precision:
+        max_precision = me_sln[me_sln.flux != me_sln_corrected.flux].flux.abs().max()
+        me_sln_corrected.loc[me_sln_corrected[me_sln_corrected.flux.abs() <  max_precision].index.tolist(), 'flux'] = 0
+    return me_sln_corrected
 
 
 def format_reaction_as_metabolic(reaction, expression_module: bool = False) -> Dict[str, Union[str, int]]:

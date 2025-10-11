@@ -92,6 +92,12 @@ def correct_model(model_file: Union[cobra.Model, str] = input_local_path + 'reco
 
     m_model = load_metabolic_model(model_file).copy()
 
+    for reaction in m_model.reactions:
+        if reaction.upper_bound > 1000:
+            reaction.upper_bound = 1000
+        if reaction.lower_bound < -1000:
+            reaction.lower_bound = -1000
+
     # check for correct compartments
     different_compartments = list(set(m_model.compartments.keys()).difference(compartments_me.keys()))
     if len(different_compartments) > 0 and different_compartments != ['']:
