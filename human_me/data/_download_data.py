@@ -35,12 +35,11 @@ def load_local_data_path():
     input_local_path = os.path.join(local_dir, 'inputs/')
     return local_dir, build_local_path, input_local_path
 
-
-google_files = {'build': {'psim_gold.h5': '1lpzOAhTEr_-4LGOmM4F2ucLLwBjGqJil', 
-                           'recon2_2_only_psim.csv': '11JBC2rCRFhPdzN-nHn-QSdlCMD45iAS8'},
-                'inputs': {'recon2_2.xml': '1Y5xdr5VtlJtA5r6OqicV_UNeRNhsOgcG'}
+google_files = {'build': {'psim_gold.h5': '1TnXtUde0uzpCkd2feydqAt2sqah9Ep6b', 
+                           'recon2_2_only_psim.csv': '1_ceJn_qFkJnO_8zTIQagFkjL7YQnbY6z'},
+                'inputs': {'recon2_2.xml': '1hXWRRgHpSYq54UWouLU2PXSTHIccODV5'}
                 }
-prebuild_files = {'prebuild.zip': '1GCGHGi6sqgsnojL1-9avreOSx3ZAJA3y'}
+prebuild_files = {'prebuild.zip': '1zSmzth-ssj4-D7oFauvVRh-1VI3mLdsW'}
 
 # # tests
 # google_files = {'build': {'test_1.txt': '1Qj9rQPqZzSlGB_utgKeFFKCQmA1qU_kB', 
