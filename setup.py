@@ -1,93 +1,69 @@
-# python setup.py develop
-# python setup.py install
-from setuptools import setup
-from setuptools import find_packages
+from setuptools import setup, find_packages
 
+CLASSIFIERS = [
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Topic :: Scientific/Engineering :: Bio-Informatics",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: POSIX",
+    "Operating System :: Unix",
+    "Operating System :: MacOS",
+]
 
-CLASSIFIERS = '''\
-License :: OSI Approved :: MIT license
-Programming Language :: Python :: 3.6 :: 3.9
-Topic :: Genome-Scale Modeling
-Operating System :: Microsoft :: Windows
-Operating System :: POSIX
-Operating System :: Unix
-Operating System :: MacOS
-'''
-
-DISTNAME = 'human_me'
-AUTHOR = 'Hratch Baghdassarian'
-AUTHOR_EMAIL = 'hmbaghdassarian@eng.ucsd.edu'
-DESCRIPTION = 'Python package to generate and analyze human ME Models.'
-LICENSE = 'MIT'
-
-VERSION = '0.1.0'
-ISRELEASED = False
-
-PYTHON_MIN_VERSION = '3.8'
-PYTHON_MAX_VERSION = '3.9'
-PYTHON_REQUIRES = f'>={PYTHON_MIN_VERSION}, <={PYTHON_MAX_VERSION}'
-
+# Dependency versions locked to stable, compatible window
 INSTALL_REQUIRES = [
-    'pathos==0.2.9',
-    'cppy==1.2.0',
-    'kiwisolver==1.3.1',
-    'gdown==4.4.0',
-    'cmake==3.18.2',
-    'cython==0.29.20',
-    'multiprocess==0.70.13',
-    'numpy==1.19.5', # 1.26.4
-    'pandas==1.1.5',
-    'scipy==1.5.4',
-    'statsmodels==0.10.2',
-    'sympy==1.12',
-    'tqdm==4.62.3',
-    'cobra==0.18.1',
-    'matplotlib==3.3.4',
-    'seaborn==0.11.2',
-    'biopython==1.79',
-    'Faker==8.5.1',
-    'openpyxl==3.0.10',
-    'tables==3.7.0', # 3.7.0 <-- may be needed for pd.read_hdf
-    'numexpr==2.7.3'
-    # 'swiglpk==5.0.5'
-    # 'ruamel_yaml==0.17.4'
+    # Core scientific + parallel
+    "pathos==0.2.9",
+    "cppy==1.2.0",
+    "kiwisolver==1.3.1",
+    "gdown==4.4.0",
+    "cmake==3.18.2",
+    "cython==0.29.20",
+    "multiprocess==0.70.13",
+
+    # Numpy/Scipy pinned for COBRA & solver compatibility
+    "numpy>=1.22,<1.25",     # <1.25 avoids np.object import break
+    "scipy>=1.8,<1.10",      # <1.10 avoids sparse vstack IndexError
+    "pandas==1.1.5",
+    "statsmodels>=0.13.0,<0.14",
+    "sympy==1.12",
+
+    # COBRA + plotting
+    "cobra==0.18.1",
+    "matplotlib==3.3.4",
+    "seaborn==0.11.2",
+
+    # Bio / I/O helpers
+    "biopython==1.79",
+    "Faker==8.5.1",
+    "openpyxl==3.0.10",
+    "tables==3.7.0",
+    "numexpr==2.7.3",
+    "tqdm==4.62.3",
 ]
 
-EXTRAS_REQUIRES = {'interactive': ['jupyter', 'ipykernel']
-                  }
+EXTRAS_REQUIRE = {
+    "interactive": ["jupyter", "ipykernel"],
+}
 
-PACKAGES = [
-    'human_me'
-]
-
-with open('README.md') as f:
+with open("README.md", encoding="utf-8") as f:
     long_description = f.read()
 
-metadata = dict(
-    name=DISTNAME,
-    version=VERSION,
-    author=AUTHOR,
-    author_email=AUTHOR_EMAIL,
-    description=DESCRIPTION,
-    long_description_content_type="text/markdown",
+setup(
+    name="human_me",
+    version="0.1.0",
+    author="Hratch Baghdassarian",
+    author_email="hmbaghdassarian@gmail.com",
+    description="Python package to generate and analyze human ME Models.",
     long_description=long_description,
-    url='https://github.com/hmbaghdassarian/human_me',  # homepage
-    packages=find_packages(include=('human_me*'), exclude=('*test*',)),  # PACKAGES
-#     scripts=['install_solver.py'],
+    long_description_content_type="text/markdown",
+    url="https://github.com/hmbaghdassarian/human_me",
+    packages=find_packages(include=["human_me*"], exclude=["*test*"]),
     include_package_data=True,
-    project_urls={'Documentation': 'https://hmbaghdassarian.github.io/human_me/'},
-    # py_modules=['io'],
-    python_requires=PYTHON_REQUIRES,
+    python_requires=">=3.8,<3.10",
     install_requires=INSTALL_REQUIRES,
-    extras_require=EXTRAS_REQUIRES,
-    classifiers=[CLASSIFIERS],
-    license=LICENSE
+    extras_require=EXTRAS_REQUIRE,
+    classifiers=CLASSIFIERS,
+    license="MIT",
 )
-
-
-def setup_package() -> None:
-    setup(**metadata)
-
-
-if __name__ == '__main__':
-    setup_package()
