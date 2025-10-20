@@ -7,9 +7,11 @@ import os
 import time
 import warnings
 from collections import OrderedDict
-from typing import Any, Dict, List, Optional, SupportsFloat
+from typing import Any, Dict, List, Optional, SupportsFloat, Union
 from itertools import repeat
 from multiprocessing import Pool
+
+import numpy as np
 
 import cobra
 from cobra.util.array import create_stoichiometric_matrix
@@ -342,7 +344,7 @@ class qminosSolver:
         return mu_max, res_
 
     def optimize(self, me_model, objective: Dict[str, int], mu_max: SupportsFloat,
-                 n_points: int = 10, tolerance: SupportsFloat = 0, n_cores: Optional[int] = None,
+                 n_points: Union[int, list] = 10, tolerance: SupportsFloat = 0, n_cores: Optional[int] = None,
                  visualize: bool = True, fig_name: Optional[str] = None, 
                  additional_equality_constraints: List[Dict[SupportsFloat, Dict[str, SupportsFloat]]] = None,
                  **kwargs):
@@ -361,6 +363,7 @@ class qminosSolver:
             if using an experimental value, make sure it is feasible using the .solve_lp() method 
         n_points : int, optional
             # of growth values to consider between 0 and mu_max, by default 10
+            if a list, just uses those values as the growth values (doesn't need mu_max)
         tolerance : SupportsFloat, optional
             Threshold below which expected sensitivity of solver is too low to detect infeasibility, by default 0
         n_cores : Optional[int], optional
@@ -395,7 +398,11 @@ class qminosSolver:
         #     raise ValueError(
         #         'Currently, NLP objectives must be either only maximization or minimization (only all 1s or only all -1s in objective dictionary values)')
 
-        growth_vals = np.arange(0, mu_max + mu_max / n_points, mu_max / (n_points - 1))
+        if np.isscalar(n_points):
+            growth_vals = np.arange(0, mu_max + mu_max / n_points, mu_max / (n_points - 1))
+        else: 
+            growth_vals = n_points
+
         if (n_cores is None) or (n_cores <= 1):
             res = list()
             for mu_val in tqdm(growth_vals):

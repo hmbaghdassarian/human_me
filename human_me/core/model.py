@@ -503,7 +503,7 @@ class ME_Model(cobra.Model):
                                                     **kwargs)
         return mu_max, res
 
-    def optimize(self, objective: Dict[str, int], mu_max: SupportsFloat, n_points: int = 10,
+    def optimize(self, objective: Dict[str, int], mu_max: SupportsFloat, n_points: Union[int, list] = 10,
                  tolerance: SupportsFloat = 0, visualize: bool = True, fig_name: str = None, 
                  additional_equality_constraints: List[Dict[SupportsFloat, Dict[str, SupportsFloat]]] = None,
                  **kwargs):
@@ -520,6 +520,7 @@ class ME_Model(cobra.Model):
             if using an experimental value, make sure it is feasible using the .solve_lp() method 
         n_points : int, optional
             # of growth values to consider between 0 and mu_max, by default 10
+            if a list, just uses those values as the growth values (doesn't need mu_max)
         tolerance : SupportsFloat, optional
             Threshold below which expected sensitivity of solver is too low to detect infeasibility, by default 0
         visualize : bool, optional

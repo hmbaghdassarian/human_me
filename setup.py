@@ -11,7 +11,7 @@ CLASSIFIERS = [
     "Operating System :: MacOS",
 ]
 
-# Dependency versions locked to stable, compatible window
+# Dependency versions locked to the historically compatible window
 INSTALL_REQUIRES = [
     # Core scientific + parallel
     "pathos==0.2.9",
@@ -22,9 +22,9 @@ INSTALL_REQUIRES = [
     "cython==0.29.20",
     "multiprocess==0.70.13",
 
-    # Numpy/Scipy pinned for COBRA & solver compatibility
-    "numpy>=1.22,<1.25",     # <1.25 avoids np.object import break
-    "scipy>=1.8,<1.10",      # <1.10 avoids sparse vstack IndexError
+    # Numpy/Scipy pinned for COBRA & QMINOSPy compatibility
+    "numpy>=1.19.0,<1.22",   # <=1.21.x keeps qminospy and np.object happy
+    "scipy>=1.5.0,<1.6",     # 1.5.x avoids vstack IndexError and ABI mismatch
     "pandas==1.1.5",
     "statsmodels>=0.13.0,<0.14",
     "sympy==1.12",
