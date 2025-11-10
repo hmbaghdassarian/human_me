@@ -330,8 +330,16 @@ def get_limiting_nutrients(me_model_file: str, max_feasible_mu: float, uptake_on
 
     return sink_sln, metab_include_df
 
-def correct_solution_precision(me_sln, me_model, reset_precision: bool = False):
-    """Correct fluxes that are out of bounds due to solver feasibility tolerance (which is 1e-20 by default). 
+def correct_solution_precision(me_sln, me_model, 
+                               min_precision_noise: float = 1e-20,
+                               use_bound_precision_floor: bool = False, 
+                               precision_floor_thresh: float = 100, 
+                               verbose: bool = True):
+    """Correct fluxes that are out of bounds or below noise threshold due to solver feasibility tolerance (which is 1e-20 by default). 
+
+    1) Resets flux values that violate bounds to the bound.
+    2) Resets flux values below minimum precision to 0. Either uses the optimizer tolerance value (by defaulte 1e-20) OR the maximum 
+    bound discrepancy, which may be > 1e-20.
     
 
     Parameters
@@ -340,17 +348,24 @@ def correct_solution_precision(me_sln, me_model, reset_precision: bool = False):
         the ME Model
     me_sln : pd.DataFrame
         the solution to the ME Model LP (output of `ME_Model.format_solution` method)
-    reset_precision : bool
-        sets the following fluxes to 0s: those that did not violate bounds, but have absolute values
-        smaller than the largest corrected absolute value (minimum precision detection); 
-        not recommended to use, as the violations are due to feasibility tolerance
+    min_precision_noise: float, optional
+        the solver tolerance, the threshold at which flux values below this will definitely be set to 0, by default 1e-20
+        set to 0 to not correct any of these
+    use_bound_precision_floor : bool, optional
+        whether to further raise the noise floor to the largest discrepancy of bound violations, indicating that values below this are also noise
+        if a bound violation > min_precision_noise, will use that value instead to set fluxes small than it to 0
+        *Not recommended, as the boundary violation precision error could be different than the solution precision error
+    precision_floor_thresh : float, optional
+        only relevant if `use_bound_precision_floor` is true, will scale the empirical noise threshold by this value 
+        (since solution error sources could be different than bound error sources)
 
+    
     Returns
     -------
     me_sln_corrected
         the same dataframe with corrected fluxes
     """
-    me_sln_corrected = me_sln.copy()
+    me_sln_corrected = me_sln.copy().reset_index(drop = True)
     
     bounds = pd.DataFrame(me_sln_corrected.reaction_id.apply(lambda r_id: me_model.reactions.get_by_id(r_id).bounds).tolist(),
                           columns = ['lower_bound', 'upper_bound'])
@@ -361,7 +376,7 @@ def correct_solution_precision(me_sln, me_model, reset_precision: bool = False):
     
     me_sln_corrected = pd.concat([me_sln_corrected, bounds], axis = 1)
 
-    violate = me_sln_corrected[(~me_sln_corrected.sympy)]
+    violate = me_sln_corrected[(~me_sln_corrected.sympy)].copy()
     violate_lower = violate[(violate.flux < violate.lower_bound)].index.tolist()
     me_sln_corrected.loc[violate_lower, 'flux'] = me_sln_corrected.loc[violate_lower, 'lower_bound']
 
@@ -370,10 +385,35 @@ def correct_solution_precision(me_sln, me_model, reset_precision: bool = False):
     
     me_sln_corrected.drop(columns = ['lower_bound', 'upper_bound', 'sympy'], inplace = True)
 
-    if reset_precision:
-        max_precision = me_sln[me_sln.flux != me_sln_corrected.flux].flux.abs().max()
-        me_sln_corrected.loc[me_sln_corrected[me_sln_corrected.flux.abs() <  max_precision].index.tolist(), 'flux'] = 0
-    return me_sln_corrected
+    if verbose:
+        lb_max_violate = violate.loc[violate_lower][['flux', 'lower_bound']].diff(axis = 1)['lower_bound'].abs().max()
+        print('{} reactions have flux values that violate the lower bound, with a maximum discrepancy of {:.3E}'.format(
+            len(violate_lower), lb_max_violate
+        ))
+        
+        ub_max_violate = violate.loc[violate_upper][['flux', 'upper_bound']].diff(axis = 1)['upper_bound'].abs().max()
+        print('{} reactions have flux values that violate the upper bound, with a maximum discrepancy of {:.3E}'.format(
+            len(violate_upper), ub_max_violate
+        ))
+
+    if not use_bound_precision_floor:
+        max_precision = min_precision_noise
+    else:
+        empirical_noise = (me_sln.flux - me_sln_corrected.flux).abs().max() / precision_floor_thresh
+        max_precision = max(min_precision_noise, empirical_noise)
+    additional_violations = me_sln_corrected.index[
+        (me_sln_corrected.flux.abs() < max_precision) &
+        (me_sln_corrected.flux != 0) # for accounting purposes
+    ].tolist()
+
+    if verbose:
+        print(
+            "{} additional reactions violate the maximum achieved precision of {:.3E}".format(len(additional_violations), max_precision)
+        )
+    
+    me_sln_corrected.loc[additional_violations, "flux"] = 0.0
+
+    return me_sln_corrected, max_precision
 
 
 def format_reaction_as_metabolic(reaction, expression_module: bool = False) -> Dict[str, Union[str, int]]:
@@ -459,7 +499,8 @@ def _format_reaction_id_df(reactions: List, expression_module: bool = False):
 
     return m_reaction_df
 
-def format_sln_as_metabolic(me_model, me_sln: pd.DataFrame):
+def format_sln_as_metabolic(me_model, me_sln: pd.DataFrame, 
+                           neg_rev_flux = True):
     """For metabolic reactions, formats and aggregates (e.g. across reversibility or multiple reactions due to "OR" GPRs) 
     the ME Model solution to be comparable to the metabolic model solution. This should then be readily compared to the 
     output of m_model.optimize().to_frame().
@@ -467,7 +508,9 @@ def format_sln_as_metabolic(me_model, me_sln: pd.DataFrame):
     We recommend using the cm_2 output from preprocess.correct_inputs.correct_model as the comparable metabolic model.
     Though not necessary, a more fair comparison may be to set the growth rates (mu) of the metabolic and me model to be
     the same. In the cobra.Model metabolic model this can be done by setting the growth reaction bounds to be mu. 
-    In the me model, this can be specified with the "mu_val" parameter in the ME_Model.solve_lp method.
+    In the me model, this can be specified with the "mu_val" parameter in the ME_Model.solve_lp method. 
+    
+    If comparing to cm_2, do not set neg_rev_flux to False.
 
     Parameters
     ----------
@@ -475,6 +518,11 @@ def format_sln_as_metabolic(me_model, me_sln: pd.DataFrame):
         the constructed ME Model
     me_sln : pd.DataFrame
         the solution to the ME Model LP (output of ME_Model.format_solution method)
+    neg_rev_flux : bool, optional
+        whether to take the negative of the fluxes in reactions representing the reverse direction prior to aggregating, by default True
+        True will give the net flux through the reaction (forward - reverse), False will give the total absolute flux through the reaction (forward + reverse) 
+        **Note, if set to False, likely want to then take the absolute value of the fluxes. There are some ME MetabolicReactions that 
+        are negative because of the directionality of the original M-Model cobra.Reaction. 
 
     Returns
     -------
@@ -482,11 +530,18 @@ def format_sln_as_metabolic(me_model, me_sln: pd.DataFrame):
         dataframe containing the me model (column name "me_flux") flux solutions with formatted reaction IDs
     """
 
-    me_metab_sln = me_sln.copy()
+    me_metab_sln = me_sln.copy().reset_index(drop = True)
     m_reaction_df = _format_reaction_id_df(reactions = [me_model.reactions.get_by_id(r_id) for r_id in me_sln.reaction_id])
     me_metab_sln = pd.concat([me_metab_sln, m_reaction_df[['cobra_id', 'reaction_no', 'reaction_direction']]], axis = 1)
-    me_metab_sln['me_flux'] = me_metab_sln.apply(lambda x: x.flux if x.reaction_direction == 'F' else -x.flux, axis = 1).tolist()
+    if neg_rev_flux:
+        me_metab_sln['me_flux'] = me_metab_sln.apply(lambda x: x.flux if x.reaction_direction == 'F' else -x.flux, axis = 1).tolist()
+    else: 
+        me_metab_sln['me_flux'] = me_metab_sln.flux.abs().tolist()
 
+        # a note on using the absolute value: 
+        # if we don't take the absolute value, some MetabolicReactions are negative due to designed directionality of recon2.2 (exchange and transport reactions, e.g. "metA <-- "). Since neg_rev_flux is concerned with the 
+        # however taking the absolute value here is the same as taking it after the .sum() aggregation step; so there is no *real* quantitative change
+        
     me_metab_sln = me_metab_sln.groupby(['cobra_id', 'reaction_direction', 'reaction_no'])['me_flux'].sum()
     me_metab_sln = pd.DataFrame(me_metab_sln.groupby(['cobra_id']).sum())
 
@@ -867,3 +922,33 @@ def format_fva_as_metabolic(me_model, me_fva_df: pd.DataFrame, concat_type: str 
         comp_fva_df.groupby('cobra_id')['minimum'].aggregate(func = concat_type)
 
     return comp_fva_df
+
+def get_enzyme_synthesis_reaction(reaction_id: str, me_model):
+    """Given an enzyme-catalyzed reaction, identified the final expression reaction that forms the catalyzing enzyme.
+
+    Parameters
+    ----------
+    reaction_id : str
+        reaction ID of the enzyme-catalyzed reaction
+    me_model : _type_
+        me model containing the reaction
+    """
+    
+    reaction = me_model.reactions.get_by_id(reaction_id)
+    enzyme = [m for m,mt in reaction.coupled_metabolites.items() if mt == 'catalysis']
+    assert len(enzyme) == 1, 'This is intended for standard, enzyme-catalyzed reactions'
+    enzyme = enzyme[0]
+    assert enzyme.enzyme, 'Identified catalyzing component is not an enzyme'
+    
+    if enzyme.type == 'complex':
+        formation_reaction = [r.id for r in enzyme.reactions if 'COMPLEX_FORMATION' in r.id]
+    elif enzyme.type == 'protein':
+        assert not enzyme.dummy, 'Dummy enzymes are an edge case I have not accounted for'
+        enzyme_info = me_model.expressed_genes[enzyme.hgnc_id]
+        assert reaction_id in enzyme_info.macromolecules['Protein']['coupled'][enzyme.id], 'Missing reaction in coupled reactions list'
+        formation_reaction = enzyme_info.reactions['ExpressionReactions']['protein']['synthesis']
+    else:
+        raise ValueError('Only accounting for complex and protein enzymes')
+    assert len(formation_reaction) == 1, 'Expected one enzyme formation reaction'
+    
+    return formation_reaction[0]
