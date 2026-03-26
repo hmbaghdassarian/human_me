@@ -48,7 +48,7 @@ Columns:
     * Default value: Randomly draws from a johnsonsu distribution
 * N_EXONS<sup>3</sup>: The number of exons in the premrna (isoform specific). Use to estimate the number of introns (as # of exons - 1). 
     * Datatype: int
-    * Default value: Estimated as (premrna sequence length)/6700
+    * Default value: Estimated as 1 + (premrna sequence length)/6700
 * TMD<sup>4</sup>: The number of transmembrane domains contained in the sequence.
     * Datatype: int
     * Default value: 0
