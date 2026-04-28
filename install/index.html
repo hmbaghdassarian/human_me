@@ -191,7 +191,7 @@ Larger files need to be downloaded directly from public Google Drive files. This
 The user-specificed local data directory is stored in a human_me/data/data.ini config file.  </p>
 <h3 id="input-file-descriptions">Input File Descriptions</h3>
 <ol>
-<li>M_Model: a cobrapy metabolic model in sbml format. We highly recommend Recon2.2 or a context-specific metabolic model generated from Recon2.2, as this is the only model the pipeline has been tested on. Our "inputs" directory provides a version of Recon2.2 with minor modifications to work with the ME-Model building pipeline. Alternatively, you can use the preprocess.correct_inputs.correct_model function on your metabolic model to introduce these modifications. </li>
+<li>M_Model: a cobrapy metabolic model in sbml format. As of right now, the package can only handle Recon2.2. Our "inputs" directory provides a version of Recon2.2 with minor modifications to work with the ME-Model building pipeline. Alternatively, you can use the <code>preprocess.correct_inputs.correct_model</code> function on your metabolic model to introduce these modifications. </li>
 <li>PSIM: see the <a href="https://hmbaghdassarian.github.io/human_me/">doumentation</a> for details. If a user does not provide a PSIM, either directly into the function as a datatable or via data/inputs/psim_user, the default input PSIM is data/build/psim_gold.h5 (the gold-standard PSIM). </li>
 </ol>
               

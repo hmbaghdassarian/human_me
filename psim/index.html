@@ -89,7 +89,7 @@
             <div class="section" itemprop="articleBody">
               
                 <h2 id="protein-specific-information-matrix-psim">Protein-Specific Information Matrix (PSIM)</h2>
-<p>This section provides details on the PSIM. The PSIM is a dataframe which contains all protein-specific features needed to generate the expression module reactions in the ME-Model</p>
+<p>This section provides details on the PSIM. The PSIM is a dataframe which contains all gene-specific features needed to generate the expression module reactions in the ME-Model</p>
 <h3 id="data-sources">Data Sources</h3>
 <p>We provide a "gold-standard" PSIM (file name "psim_gold.h5") which can be downloaded using make.</p>
 <p>Sources:</p>
@@ -99,7 +99,7 @@
 <li>The poly(A)-length was taken from <a href="https://doi.org/10.1038/s41592-019-0503-y">here</a>. </li>
 <li>Metadata associated with the secretory pathway was taken from human PSIM specified <a href="https://doi.org/10.1038/s41467-019-13867-y">here</a>. The direct PSIM for this is <a href="(https://github.com/LewisLabUCSD/MammalianSecretoryRecon/blob/master/JUPYTER_NOTEBOOKS/RECON2s_python/PSIM_HUMAN.tab)">here</a>.</li>
 <li>mrna degradation rates were taken from <a href="https://doi.org/10.1016/j.molcel.2014.03.017">here</a>.</li>
-<li>protein degradation rates were taken from <a href="https://doi.org/10.1021/pr101183k">here</a>.</li>
+<li>protein degradation rates were taken from <a href="https://doi.org/10.1021/pr101183k">here</a> and <a href="https://doi.org/10.1016/j.molcel.2021.09.015">here</a>.</li>
 <li>PTRs were taken from <a href="https://doi.org/10.15252/msb.20188513">here</a>.</li>
 </ul>
 <h3 id="formatting">Formatting</h3>
@@ -191,7 +191,7 @@
 </ul>
 </li>
 <li>LOCATION<sup>2</sup>: The final location of the protein. Required for non-machinery, disregarded for machinery (pipeline infers location from the reaction compartments).  <ul>
-<li>Datatype: str, on of utils.paramaters.compartments.keys()</li>
+<li>Datatype: str, on of <code>utils.parameters.compartments.keys()</code></li>
 </ul>
 </li>
 </ul>
