@@ -1,32 +1,40 @@
 site_name: human_me
 site_description: "Python package to generate and analyze human ME Models."
-
 theme: readthedocs
 repo_url: https://github.com/hmbaghdassarian/human_me
+
 plugins:
   - search
   - mkdocstrings:
       default_handler: python
       handlers:
         python:
-#           paths: [human_me]  # search packages in the src folder
           selection:
-            docstring_style: "numpy"
+            docstring_style: numpy
+            filters:
+              - "!^_"             # hide private members (starting with _)
           rendering:
             show_source: false
+            show_root_heading: true
+            show_root_full_path: false
+            show_object_full_path: false
+            show_category_heading: true
+            show_signature_annotations: true
+            show_if_no_docstring: false
+            heading_level: 2
+            members_order: source
+            group_by_category: true
   - exclude:
       glob:
         - 'human_me/me_solver/tests/*'
 
 markdown_extensions:
-  # - search
   - def_list
   - attr_list
   - admonition
-  # - autorefs
+  - md_in_html
   - pymdownx.tasklist:
       custom_checkbox: true
-  - md_in_html
   - pymdownx.superfences
   - pymdownx.betterem
   - pymdownx.caret
@@ -36,12 +44,11 @@ markdown_extensions:
       anchor_linenums: true
   - pymdownx.inlinehilite
   - pymdownx.snippets
-  - pymdownx.superfences
   - pymdownx.tabbed:
-      alternate_style: true 
+      alternate_style: true
 
 nav:
-  - "Home": index.md
-  - "PSIM": psim.md
-  - "Installation": install.md
-  - "API": api.md
+  - Home: index.md
+  - PSIM: psim.md
+  - Installation: install.md
+  - API: api.md

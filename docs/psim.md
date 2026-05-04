@@ -1,6 +1,6 @@
 ## Protein-Specific Information Matrix (PSIM)
 
-This section provides details on the PSIM. The PSIM is a dataframe which contains all protein-specific features needed to generate the expression module reactions in the ME-Model
+This section provides details on the PSIM. The PSIM is a dataframe which contains all gene-specific features needed to generate the expression module reactions in the ME-Model
 
 ### Data Sources
 We provide a "gold-standard" PSIM (file name "psim_gold.h5") which can be downloaded using make.
@@ -12,7 +12,7 @@ Sources:
 * The poly(A)-length was taken from [here](https://doi.org/10.1038/s41592-019-0503-y). 
 * Metadata associated with the secretory pathway was taken from human PSIM specified [here](https://doi.org/10.1038/s41467-019-13867-y). The direct PSIM for this is [here]((https://github.com/LewisLabUCSD/MammalianSecretoryRecon/blob/master/JUPYTER_NOTEBOOKS/RECON2s_python/PSIM_HUMAN.tab)).
 * mrna degradation rates were taken from [here](https://doi.org/10.1016/j.molcel.2014.03.017).
-* protein degradation rates were taken from [here](https://doi.org/10.1021/pr101183k).
+* protein degradation rates were taken from [here](https://doi.org/10.1021/pr101183k) and [here](https://doi.org/10.1016/j.molcel.2021.09.015).
 * PTRs were taken from [here](https://doi.org/10.15252/msb.20188513).
 
 ### Formatting
@@ -77,7 +77,7 @@ Columns:
     * Datatype: float
     * Default value: 65163
 * LOCATION<sup>2</sup>: The final location of the protein. Required for non-machinery, disregarded for machinery (pipeline infers location from the reaction compartments).  
-    * Datatype: str, on of utils.paramaters.compartments.keys()
+    * Datatype: str, on of `utils.parameters.compartments.keys()`
     
 Additional Information in Gold-Standard PSIM:
 

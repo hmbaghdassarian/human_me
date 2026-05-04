@@ -26,7 +26,10 @@ from human_me.core.macromolecules.macromolecule import Macromolecule
 from human_me.core.reaction import (BiomassReaction,
                                     ComplexDegradationReaction,
                                     ExpressionReaction, MetabolicReaction)
-from human_me.me_solver import solve_me
+try:
+    from human_me.me_solver import solve_me
+except ImportError:
+    solve_me = None
 from human_me.preprocess import parse_complex
 from human_me.utils import parameters as params
 from human_me.utils.functions import flatten_list

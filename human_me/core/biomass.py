@@ -25,7 +25,8 @@ class Biomass(cobra.Metabolite):
 biomass_ = Biomass('biomass_total')
 biomass_dilution = BiomassReaction('biomass_dilution')
 biomass_dilution.add_metabolites({biomass_: -1})
-biomass_dilution._lower_bound, biomass_dilution._upper_bound = params.mu, params.mu
+biomass_dilution._lower_bound = params.mu
+biomass_dilution._upper_bound = params.mu
 
 biomass_reactions = [biomass_dilution]
 

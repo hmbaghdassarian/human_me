@@ -22,7 +22,11 @@ import pandas as pd
 import scipy
 import seaborn as sns
 # from pathos.multiprocessing import ProcessingPool as Pool
-from qminospy.solver import QMINOS  # need solveME (https://github.com/SBRG/solvemepy) installed and working
+try:
+    from qminospy.solver import QMINOS
+except ImportError:
+    QMINOS = None
+
 from tqdm import tqdm
 
 from human_me.core.reaction import BiomassReaction

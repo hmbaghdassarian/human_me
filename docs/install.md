@@ -136,5 +136,5 @@ make -C $PACKAGE_PATH build-data DATA_DIR=</desired/local_data/directory> PREBUI
 The user-specificed local data directory is stored in a human_me/data/data.ini config file.  
 
 ### Input File Descriptions
-1. M_Model: a cobrapy metabolic model in sbml format. We highly recommend Recon2.2 or a context-specific metabolic model generated from Recon2.2, as this is the only model the pipeline has been tested on. Our "inputs" directory provides a version of Recon2.2 with minor modifications to work with the ME-Model building pipeline. Alternatively, you can use the preprocess.correct_inputs.correct_model function on your metabolic model to introduce these modifications. 
+1. M_Model: a cobrapy metabolic model in sbml format. As of right now, the package can only handle Recon2.2. Our "inputs" directory provides a version of Recon2.2 with minor modifications to work with the ME-Model building pipeline. Alternatively, you can use the `preprocess.correct_inputs.correct_model` function on your metabolic model to introduce these modifications. 
 2. PSIM: see the [doumentation](https://hmbaghdassarian.github.io/human_me/) for details. If a user does not provide a PSIM, either directly into the function as a datatable or via data/inputs/psim_user, the default input PSIM is data/build/psim_gold.h5 (the gold-standard PSIM). 
