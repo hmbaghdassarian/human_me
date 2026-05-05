@@ -12,34 +12,13 @@ python3.9 -m venv <env_name>
 source <env_name>/bin/activate
 ```
 
-All remaining steps should be implemented with the virtual environment activated. Make sure this virtual environment has Python 3.8-3.9, setuptools >= 65.4, and pip >= 21. Once the environment is created, if setuptools and pip do not meet these version requirements, you can run the following command:
-
-```console
-pip install --upgrade pip setuptools
-```
+All remaining steps should be implemented with the virtual environment activated. Make sure this virtual environment has Python 3.8-3.9 and pip >= 21.
 
 ## Step 2: Install the human_me package
 
-human_me can be installed using pip and PyPi:
+human_me can be installed using pip from the repo:
 ```console
-pip install human_me
-```
-
-***Alternatively***, the human_me environment can be setup independent of PyPi using github and setup.py: 
-```console
-git clone https://github.com/hmbaghdassarian/human_me.git
-cd human_me
-pip install .
-
-# delete the cloned repo so that the package path is appropriately read:
-cd ..
-rm -rf human_me
-```
-
-If you want to install jupyter notebook: 
-```console
-pip install human_me[interactive]
-python3 -m ipykernel install --user --name=<env_name>
+pip install git+https://github.com/hmbaghdassarian/human_me.git
 ```
 
 For steps 3-4 below, we need to get the path to the package:
@@ -52,16 +31,31 @@ qMINOS is a high precision LP solver necessary for the order-of-magnitude differ
 The QMINOS solver can be obtained for academic use from Prof. Michael Saunders at Stanford University.<br>
 gfortran (>=4.6) is required for qMINOS <br>
 
-&emsp;i) download the qminos file into a specified directory, which we refer to here as "solver_parent_directory".
+&emsp;i) download the qminos folder (or zip file) into a specified directory, which we refer to here as "solver_parent_directory".
 
 &emsp;ii) the solver can be installed using the human_me Makefile as follows:
 
 ```console
+git clone https://github.com/hmbaghdassarian/human_me.git
+cd human_me
 make -C $PACKAGE_PATH install-qminos SOLVER_PATH=<path/to/solver_parent_directory>
 ```
 
 If SOLVER_PATH is not specified, it defaults to human_me/solver.
 
+You can check if the solver ran successfully using the following command:
+
+```console
+python -c "
+import traceback
+try:
+    from qminospy.solver import QMINOS
+    print('OK')
+except Exception:
+    traceback.print_exc()
+    print('FAIL')
+"
+```
 ---
 
 ***Alternatively***, instead of using make, you can set up qminos manually as specified in the installation instructions for [solvemepy](https://github.com/SBRG/solvemepy). 
@@ -76,7 +70,7 @@ Ensure that all this is done with the virtual environment activated.
 
 ```console
 tar -xvf qminos.tar.gz #tar file from Prof. Michael Saunders
-cd <path/to/solver/solver_parent_directory/>qminos1114/
+cd <path/to/solver/solver_parent_directory>/qminos1114/
 cp Makefile.defs minos56/
 cp Makefile.defs qminos56/
 cd minos56
@@ -121,13 +115,13 @@ data
 
 
 Small files are stored on Github in the [human_me_data repository](https://github.com/hmbaghdassarian/human_me_data) and accessed directly by the package. 
-Larger files need to be downloaded directly from public Google Drive files. This is done using the make build-files command as follows:
+Larger files need to be downloaded directly from public Google Drive files. This is done using the make build-files command as follows (called within the `human_me` repository as for the qMINOS make command):
 
 ```console
 make -C $PACKAGE_PATH build-data DATA_DIR=</desired/local_data/directory>
 ```
 
-Downloading the build files will take ~30 min, as the PSIM file is > 10 Gb.
+Depending on internet speed, the build files may take some time to download, as the PSIM file is > 10 Gb.
 
 If you also want to download the prebuild files, run the following command:
 ```console
@@ -135,6 +129,21 @@ make -C $PACKAGE_PATH build-data DATA_DIR=</desired/local_data/directory> PREBUI
 ```
 The user-specificed local data directory is stored in a human_me/data/data.ini config file.  
 
-### Input File Descriptions
+### Input Data File Descriptions
 1. M_Model: a cobrapy metabolic model in sbml format. As of right now, the package can only handle Recon2.2. Our "inputs" directory provides a version of Recon2.2 with minor modifications to work with the ME-Model building pipeline. Alternatively, you can use the `preprocess.correct_inputs.correct_model` function on your metabolic model to introduce these modifications. 
 2. PSIM: see the [doumentation](https://hmbaghdassarian.github.io/human_me/) for details. If a user does not provide a PSIM, either directly into the function as a datatable or via data/inputs/psim_user, the default input PSIM is data/build/psim_gold.h5 (the gold-standard PSIM). 
+
+## Step 5. Check for successful package installation
+
+Run: 
+```console
+python -m human_me.verify_install
+```
+
+---
+Once qMINOS and local data are successfully installed, the `human_me` repository is not needed locally and can be deleted if desired:
+
+```console
+cd ..
+rm -rf human_me
+```

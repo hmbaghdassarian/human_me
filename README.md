@@ -5,11 +5,10 @@ human_me is a python package to generate ME-Models from input context-extracted 
 For additional details and alternate install options, see the documentation's [installation instructions](https://hmbaghdassarian.github.io/human_me/install/). <br>
 Requirements: gfortran (>=4.6)
 
-
-1. Create a [python virtual environment](https://docs.python.org/3/library/venv.html) and activate this environment. Make sure this virtual environment has Python 3.8-3.9, setuptools >= 65.4, and pip >=21. 
+1. Create a [python virtual environment](https://docs.python.org/3/library/venv.html) and activate this environment. Make sure this virtual environment has Python 3.8-3.9 and pip >=21. 
 2. Install human_me:
 ```console
-pip install human_me
+pip install git+https://github.com/hmbaghdassarian/human_me.git
 ```
 3. Set up the qMINOS solver. You will need the qminos file, which can be obtained for academic use from Prof. Michael Saunders at Stanford University.
 
@@ -18,6 +17,8 @@ pip install human_me
 &emsp;ii) the solver can be installed using the human_me Makefile as follows:
 
 ```console
+git clone https://github.com/hmbaghdassarian/human_me.git
+cd human_me
 PACKAGE_PATH=$(python -c "import human_me; print(human_me.__path__[0])")/
 make -C $PACKAGE_PATH install-qminos SOLVER_PATH=<path/to/solver_parent_directory>
 ```

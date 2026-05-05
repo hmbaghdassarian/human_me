@@ -13,12 +13,11 @@ CLASSIFIERS = [
 
 # Dependency versions locked to the historically compatible window
 INSTALL_REQUIRES = [
-    # Core scientific + parallel
     "pathos==0.2.9",
     "cppy==1.2.0",
     "kiwisolver==1.3.1",
     "gdown==4.4.0",
-    "cmake==3.18.2",
+    "cmake>=3.18.2,<4",
     "cython==0.29.20",
     "multiprocess==0.70.13",
 

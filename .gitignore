@@ -30,5 +30,12 @@ me_env/
 me_env_stable/
 MammalianSecretoryRecon/
 
+#local pip installs
+build/
+dist/
+*.egg-info/
+__pycache__/
+*.pyc
+
 
 
