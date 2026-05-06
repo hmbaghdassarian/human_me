@@ -58,11 +58,24 @@
     </li>
     <li class="toctree-l2"><a class="reference internal" href="#step-3-setting-up-the-qminos-solver">Step 3: Setting up the qMINOS solver</a>
     </li>
+    <li class="toctree-l2"><a class="reference internal" href="#python-c-import-traceback-try-from-qminospysolver-import-qminos-printok-except-exception-tracebackprint_exc-printfail">python -c &quot;
+import traceback
+try:
+    from qminospy.solver import QMINOS
+    print(&#39;OK&#39;)
+except Exception:
+    traceback.print_exc()
+    print(&#39;FAIL&#39;)
+&quot;
+</a>
+    </li>
     <li class="toctree-l2"><a class="reference internal" href="#step-4-downloading-supporting-data-files">Step 4: Downloading supporting data files</a>
         <ul>
-    <li class="toctree-l3"><a class="reference internal" href="#input-file-descriptions">Input File Descriptions</a>
+    <li class="toctree-l3"><a class="reference internal" href="#input-data-file-descriptions">Input Data File Descriptions</a>
     </li>
         </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#step-5-check-for-successful-package-installation">Step 5. Check for successful package installation</a>
     </li>
     </ul>
                 </li>
@@ -104,73 +117,70 @@
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1"></a><span class="go">python3.9 -m venv &lt;env_name&gt;</span>
 <a id="__codelineno-0-2" name="__codelineno-0-2"></a><span class="go">source &lt;env_name&gt;/bin/activate</span>
 </code></pre></div></p>
-<p>All remaining steps should be implemented with the virtual environment activated. Make sure this virtual environment has Python 3.8-3.9, setuptools &gt;= 65.4, and pip &gt;= 21. Once the environment is created, if setuptools and pip do not meet these version requirements, you can run the following command:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1"></a><span class="go">pip install --upgrade pip setuptools</span>
-</code></pre></div>
+<p>All remaining steps should be implemented with the virtual environment activated. Make sure this virtual environment has Python 3.8-3.9 and pip &gt;= 21.</p>
 <h2 id="step-2-install-the-human_me-package">Step 2: Install the human_me package</h2>
-<p>human_me can be installed using pip and PyPi:
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1"></a><span class="go">pip install human_me</span>
-</code></pre></div></p>
-<p><strong><em>Alternatively</em></strong>, the human_me environment can be setup independent of PyPi using github and setup.py: 
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1"></a><span class="go">git clone https://github.com/hmbaghdassarian/human_me.git</span>
-<a id="__codelineno-3-2" name="__codelineno-3-2"></a><span class="go">cd human_me</span>
-<a id="__codelineno-3-3" name="__codelineno-3-3"></a><span class="go">pip install .</span>
-<a id="__codelineno-3-4" name="__codelineno-3-4"></a>
-<a id="__codelineno-3-5" name="__codelineno-3-5"></a><span class="gp"># </span>delete the cloned repo so that the package path is appropriately read:
-<a id="__codelineno-3-6" name="__codelineno-3-6"></a><span class="go">cd ..</span>
-<a id="__codelineno-3-7" name="__codelineno-3-7"></a><span class="go">rm -rf human_me</span>
-</code></pre></div></p>
-<p>If you want to install jupyter notebook: 
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1"></a><span class="go">pip install human_me[interactive]</span>
-<a id="__codelineno-4-2" name="__codelineno-4-2"></a><span class="go">python3 -m ipykernel install --user --name=&lt;env_name&gt;</span>
+<p>human_me can be installed using pip from the repo:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1"></a><span class="go">pip install git+https://github.com/hmbaghdassarian/human_me.git</span>
 </code></pre></div></p>
 <p>For steps 3-4 below, we need to get the path to the package:
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1"></a><span class="go">PACKAGE_PATH=$(python -c &quot;import human_me; print(human_me.__path__[0])&quot;)/</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1"></a><span class="go">PACKAGE_PATH=$(python -c &quot;import human_me; print(human_me.__path__[0])&quot;)/</span>
 </code></pre></div></p>
 <h2 id="step-3-setting-up-the-qminos-solver">Step 3: Setting up the qMINOS solver</h2>
 <p>qMINOS is a high precision LP solver necessary for the order-of-magnitude differences in ME Model coefficients.<br>
 The QMINOS solver can be obtained for academic use from Prof. Michael Saunders at Stanford University.<br>
 gfortran (&gt;=4.6) is required for qMINOS <br></p>
-<p>&emsp;i) download the qminos file into a specified directory, which we refer to here as "solver_parent_directory".</p>
+<p>&emsp;i) download the qminos folder (or zip file) into a specified directory, which we refer to here as "solver_parent_directory".</p>
 <p>&emsp;ii) the solver can be installed using the human_me Makefile as follows:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1"></a><span class="go">make -C $PACKAGE_PATH install-qminos SOLVER_PATH=&lt;path/to/solver_parent_directory&gt;</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1"></a><span class="go">git clone https://github.com/hmbaghdassarian/human_me.git</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2"></a><span class="go">cd human_me</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3"></a><span class="go">make -C $PACKAGE_PATH install-qminos SOLVER_PATH=&lt;path/to/solver_parent_directory&gt;</span>
 </code></pre></div>
 <p>If SOLVER_PATH is not specified, it defaults to human_me/solver.</p>
-<hr />
+<p>You can check if the solver ran successfully using the following command:</p>
+<h2 id="python-c-import-traceback-try-from-qminospysolver-import-qminos-printok-except-exception-tracebackprint_exc-printfail"><div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1"></a><span class="go">python -c &quot;</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2"></a><span class="go">import traceback</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3"></a><span class="go">try:</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4"></a><span class="go">    from qminospy.solver import QMINOS</span>
+<a id="__codelineno-4-5" name="__codelineno-4-5"></a><span class="go">    print(&#39;OK&#39;)</span>
+<a id="__codelineno-4-6" name="__codelineno-4-6"></a><span class="go">except Exception:</span>
+<a id="__codelineno-4-7" name="__codelineno-4-7"></a><span class="go">    traceback.print_exc()</span>
+<a id="__codelineno-4-8" name="__codelineno-4-8"></a><span class="go">    print(&#39;FAIL&#39;)</span>
+<a id="__codelineno-4-9" name="__codelineno-4-9"></a><span class="go">&quot;</span>
+</code></pre></div></h2>
 <p><strong><em>Alternatively</em></strong>, instead of using make, you can set up qminos manually as specified in the installation instructions for <a href="https://github.com/SBRG/solvemepy">solvemepy</a>. </p>
 <p>This will require getting both qminos and solvemepy. The solver parent directory specified above stores both qminos and solvemepy, but they do not need to be stored in the same directory.</p>
 <p>You can disregard the requirements that are delineated in solvmepy's README, with the exception of gfortran (#4). The remainder should have been appropriately installed with installation of human_me, if necessary.</p>
 <p>Ensure that all this is done with the virtual environment activated.</p>
 <p>&emsp;i) Untar the QMINOS solver and follow Step 1 of solveme installation guide:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1"></a><span class="go">tar -xvf qminos.tar.gz #tar file from Prof. Michael Saunders</span>
-<a id="__codelineno-7-2" name="__codelineno-7-2"></a><span class="go">cd &lt;path/to/solver/solver_parent_directory/&gt;qminos1114/</span>
-<a id="__codelineno-7-3" name="__codelineno-7-3"></a><span class="go">cp Makefile.defs minos56/</span>
-<a id="__codelineno-7-4" name="__codelineno-7-4"></a><span class="go">cp Makefile.defs qminos56/</span>
-<a id="__codelineno-7-5" name="__codelineno-7-5"></a><span class="go">cd minos56</span>
-<a id="__codelineno-7-6" name="__codelineno-7-6"></a><span class="go">make clean</span>
-<a id="__codelineno-7-7" name="__codelineno-7-7"></a><span class="go">make</span>
-<a id="__codelineno-7-8" name="__codelineno-7-8"></a><span class="go">cd ../qminos56/</span>
-<a id="__codelineno-7-9" name="__codelineno-7-9"></a><span class="go">make clean</span>
-<a id="__codelineno-7-10" name="__codelineno-7-10"></a><span class="go">make</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1"></a><span class="go">tar -xvf qminos.tar.gz #tar file from Prof. Michael Saunders</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2"></a><span class="go">cd &lt;path/to/solver/solver_parent_directory&gt;/qminos1114/</span>
+<a id="__codelineno-5-3" name="__codelineno-5-3"></a><span class="go">cp Makefile.defs minos56/</span>
+<a id="__codelineno-5-4" name="__codelineno-5-4"></a><span class="go">cp Makefile.defs qminos56/</span>
+<a id="__codelineno-5-5" name="__codelineno-5-5"></a><span class="go">cd minos56</span>
+<a id="__codelineno-5-6" name="__codelineno-5-6"></a><span class="go">make clean</span>
+<a id="__codelineno-5-7" name="__codelineno-5-7"></a><span class="go">make</span>
+<a id="__codelineno-5-8" name="__codelineno-5-8"></a><span class="go">cd ../qminos56/</span>
+<a id="__codelineno-5-9" name="__codelineno-5-9"></a><span class="go">make clean</span>
+<a id="__codelineno-5-10" name="__codelineno-5-10"></a><span class="go">make</span>
 </code></pre></div>
 <p>&emsp;ii) Having exited the qminos directory, clone the solveme github and follow Step 2-3 of the solveme installation guide: </p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1"></a><span class="go">git clone https://github.com/SBRG/solvemepy.git #@2a2c9c098d5bad957ef41637955fe338a31bac4c</span>
-<a id="__codelineno-8-2" name="__codelineno-8-2"></a><span class="go">cd &lt;path/to/solvemepy/&gt;</span>
-<a id="__codelineno-8-3" name="__codelineno-8-3"></a><span class="go">cp &lt;path/to/solver/solver_parent_directory/&gt;qminos1114/minos56/lib/libminos.a ./</span>
-<a id="__codelineno-8-4" name="__codelineno-8-4"></a><span class="go">cp &lt;path/to/solver/solver_parent_directory/&gt;qminos1114/qminos56/lib/libquadminos.a ./</span>
-<a id="__codelineno-8-5" name="__codelineno-8-5"></a><span class="go">python setup.py develop</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1"></a><span class="go">git clone https://github.com/SBRG/solvemepy.git #@2a2c9c098d5bad957ef41637955fe338a31bac4c</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2"></a><span class="go">cd &lt;path/to/solvemepy/&gt;</span>
+<a id="__codelineno-6-3" name="__codelineno-6-3"></a><span class="go">cp &lt;path/to/solver/solver_parent_directory/&gt;qminos1114/minos56/lib/libminos.a ./</span>
+<a id="__codelineno-6-4" name="__codelineno-6-4"></a><span class="go">cp &lt;path/to/solver/solver_parent_directory/&gt;qminos1114/qminos56/lib/libquadminos.a ./</span>
+<a id="__codelineno-6-5" name="__codelineno-6-5"></a><span class="go">python setup.py develop</span>
 </code></pre></div>
 <h2 id="step-4-downloading-supporting-data-files">Step 4: Downloading supporting data files</h2>
 <p>Data for human_me is structured as follows:
-<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1"></a>data
-<a id="__codelineno-9-2" name="__codelineno-9-2"></a>└───build
-<a id="__codelineno-9-3" name="__codelineno-9-3"></a>│      **psim_gold.h5
-<a id="__codelineno-9-4" name="__codelineno-9-4"></a>│      **recon2_2_only_psim.csv
-<a id="__codelineno-9-5" name="__codelineno-9-5"></a>└───inputs
-<a id="__codelineno-9-6" name="__codelineno-9-6"></a>│      **recon2_2.xml
-<a id="__codelineno-9-7" name="__codelineno-9-7"></a>│      psim_user
-<a id="__codelineno-9-8" name="__codelineno-9-8"></a>│      non_machinery
-<a id="__codelineno-9-9" name="__codelineno-9-9"></a>└───*prebuild
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1"></a>data
+<a id="__codelineno-7-2" name="__codelineno-7-2"></a>└───build
+<a id="__codelineno-7-3" name="__codelineno-7-3"></a>│      **psim_gold.h5
+<a id="__codelineno-7-4" name="__codelineno-7-4"></a>│      **recon2_2_only_psim.csv
+<a id="__codelineno-7-5" name="__codelineno-7-5"></a>└───inputs
+<a id="__codelineno-7-6" name="__codelineno-7-6"></a>│      **recon2_2.xml
+<a id="__codelineno-7-7" name="__codelineno-7-7"></a>│      psim_user
+<a id="__codelineno-7-8" name="__codelineno-7-8"></a>│      non_machinery
+<a id="__codelineno-7-9" name="__codelineno-7-9"></a>└───*prebuild
 </code></pre></div>
 ** = default, downloaded by make build-data</p>
 <ol>
@@ -181,19 +191,28 @@ gfortran (&gt;=4.6) is required for qMINOS <br></p>
 <li>prebuild: not needed to run; these are file inputs/outputs from analyses that helped generate the build files</li>
 </ol>
 <p>Small files are stored on Github in the <a href="https://github.com/hmbaghdassarian/human_me_data">human_me_data repository</a> and accessed directly by the package. 
-Larger files need to be downloaded directly from public Google Drive files. This is done using the make build-files command as follows:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1"></a><span class="go">make -C $PACKAGE_PATH build-data DATA_DIR=&lt;/desired/local_data/directory&gt;</span>
+Larger files need to be downloaded directly from public Google Drive files. This is done using the make build-files command as follows (called within the <code>human_me</code> repository as for the qMINOS make command):</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1"></a><span class="go">make -C $PACKAGE_PATH build-data DATA_DIR=&lt;/desired/local_data/directory&gt;</span>
 </code></pre></div>
-<p>Downloading the build files will take ~30 min, as the PSIM file is &gt; 10 Gb.</p>
+<p>Depending on internet speed, the build files may take some time to download, as the PSIM file is &gt; 10 Gb.</p>
 <p>If you also want to download the prebuild files, run the following command:
-<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1"></a><span class="go">make -C $PACKAGE_PATH build-data DATA_DIR=&lt;/desired/local_data/directory&gt; PREBUILD=1</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1"></a><span class="go">make -C $PACKAGE_PATH build-data DATA_DIR=&lt;/desired/local_data/directory&gt; PREBUILD=1</span>
 </code></pre></div>
 The user-specificed local data directory is stored in a human_me/data/data.ini config file.  </p>
-<h3 id="input-file-descriptions">Input File Descriptions</h3>
+<h3 id="input-data-file-descriptions">Input Data File Descriptions</h3>
 <ol>
 <li>M_Model: a cobrapy metabolic model in sbml format. As of right now, the package can only handle Recon2.2. Our "inputs" directory provides a version of Recon2.2 with minor modifications to work with the ME-Model building pipeline. Alternatively, you can use the <code>preprocess.correct_inputs.correct_model</code> function on your metabolic model to introduce these modifications. </li>
 <li>PSIM: see the <a href="https://hmbaghdassarian.github.io/human_me/">doumentation</a> for details. If a user does not provide a PSIM, either directly into the function as a datatable or via data/inputs/psim_user, the default input PSIM is data/build/psim_gold.h5 (the gold-standard PSIM). </li>
 </ol>
+<h2 id="step-5-check-for-successful-package-installation">Step 5. Check for successful package installation</h2>
+<p>Run: 
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1"></a><span class="go">python -m human_me.verify_install</span>
+</code></pre></div></p>
+<hr />
+<p>Once qMINOS and local data are successfully installed, the <code>human_me</code> repository is not needed locally and can be deleted if desired:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1"></a><span class="go">cd ..</span>
+<a id="__codelineno-11-2" name="__codelineno-11-2"></a><span class="go">rm -rf human_me</span>
+</code></pre></div>
               
             </div>
           </div><footer>

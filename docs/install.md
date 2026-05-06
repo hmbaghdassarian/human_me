@@ -135,7 +135,7 @@ The user-specificed local data directory is stored in a human_me/data/data.ini c
 
 ## Step 5. Check for successful package installation
 
-Run: 
+Start a new shell and run: 
 ```console
 python -m human_me.verify_install
 ```
